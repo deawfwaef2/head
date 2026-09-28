@@ -1,6 +1,7 @@
 // 模型头部管理：解析 models/*.js 中的 GLB、材质变体（改色改模）、表情 morph、眨眼、反应
 window.ModelHeads = (() => {
   const templates = [];
+  const SRC = new WeakMap(); // mesh -> 源材质（不能放 userData：clone 时会 JSON 序列化贴图，极慢）
   let ready = false;
   const grad = (() => {
     const d = new Uint8Array([150, 205, 240, 255]);
@@ -44,7 +45,7 @@ window.ModelHeads = (() => {
           scene.traverse(o => { if (o.isMesh) meshes.push(o); });
           meshes.forEach(m => {
             const src = m.material; const nm = src.name || '';
-            m.userData.srcMat = src;
+            SRC.set(m, src);
             m.userData.kind = nm === '__CUT__' ? 'cut' : /HAIR/i.test(nm) || entry.hair.includes(m.name) ? 'hair' : /Iris/i.test(nm) ? 'iris' : 'other';
             m.renderOrder = /Highlight/i.test(nm) ? 4 : /Iris/i.test(nm) ? 3 : /Eyeline|Eyelash|Brow/i.test(nm) ? 3 : /EyeWhite/i.test(nm) ? 2 : 0;
             m.castShadow = false; m.receiveShadow = false;
@@ -106,7 +107,7 @@ void main() {`)
     const map = new Map();
     t.meshes.forEach(m => {
       const k = m.userData.kind;
-      map.set(m.name, k === 'cut' ? getCut() : makeMat(m.userData.srcMat, k, v));
+      map.set(m.name, k === 'cut' ? getCut() : makeMat(SRC.get(m), k, v));
     });
     if (!v.unique) t.matCache.set(key, map);
     return map;

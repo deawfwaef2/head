@@ -617,8 +617,9 @@ window.startGame = function () {
           if (bAct && b.idx < a.idx) continue; // 双方都活跃时只算一次
           if (a.mount && b.mount) continue;
           tmp.subVectors(b.g.position, a.g.position);
-          const d2 = tmp.lengthSq(), m = RC * 2;
-          if (d2 >= m * m || d2 < 1e-8) continue;
+          let d2 = tmp.lengthSq(); const m = RC * 2;
+          if (d2 >= m * m) continue;
+          if (d2 < 1e-8) { tmp.set(Math.random() - 0.5, 0.1, Math.random() - 0.5); d2 = tmp.lengthSq(); }
           const d = Math.sqrt(d2); tmp.divideScalar(d);
           const pen = m - d;
           const am = a.mount ? 0 : 1, bm = b.mount ? 0 : 1, tot = am + bm; if (!tot) continue;
@@ -725,8 +726,8 @@ window.startGame = function () {
     if (shake > 0) { shake -= dt; camera.position.x += (Math.random() - 0.5) * shake * 0.08; camera.position.y += (Math.random() - 0.5) * shake * 0.08; }
 
     acc += dt; let steps = 0;
-    while (acc > 1 / 120 && steps < 8) { physStep(1 / 120); acc -= 1 / 120; steps++; }
-    if (steps >= 8) acc = 0;
+    while (acc > 1 / 120 && steps < 5) { physStep(1 / 120); acc -= 1 / 120; steps++; }
+    if (steps >= 5) acc = 0;
 
     // 手持
     if (held) {
