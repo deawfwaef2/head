@@ -538,7 +538,7 @@ window.ModelHeads = (() => {
       for (const [x, y, z, r] of spots) {
         const A = onShell(S, x, y, z, 0.006), d = new V3(x, y, z).normalize();
         const sg = new THREE.SphereGeometry(r, 22, 16); sg.rotateX(Math.PI / 2); sg.scale(1, 1, 0.82);
-        const m = add(sg); m.position.copy(A).addScaledVector(d, r * 0.55); m.quaternion.setFromUnitVectors(new V3(0, 0, 1), d);
+        sg.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new V3(0, 0, 1), d)); const cp = A.clone().addScaledVector(d, r * 0.55); sg.translate(cp.x, cp.y, cp.z); add(sg); // 位置烘进几何体：头发着色器按局部 y 做渐变/摆动
         tie(A.clone().addScaledVector(d, 0.002), d, r * 0.78);
         if (st === 'odango' && L > 1.0) bundle(A.clone().addScaledVector(d, r * 0.3), [new V3(0, 0, 0), new V3(x * 0.03, -0.03, -0.02), new V3(x * 0.04, -0.13 * L, -0.01)], 3, 0.009, 0.006);
       }

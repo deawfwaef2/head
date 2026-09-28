@@ -55,6 +55,43 @@ window.BuildCat = (() => {
       for (const s of [-1, 1]) g.add(flame(s * 0.18, 1.08, 0, 0.8, '#7aff9a'));
       return g; },
     cols: () => [[-0.3, 0, -0.3, 0.3, 1.08, 0.3]] };
+
+  // ---- 多插槽展示位（插满 / 同族 / 同阶 → 共鸣加成）----
+  const ring = (n, r, y, yawFn) => Array.from({ length: n }, (_, k) => { const a = k / n * Math.PI * 2 + Math.PI / n; return [Math.cos(a) * r, y, Math.sin(a) * r, yawFn(a)]; });
+  C.headrack = { cat: 'func', n: '首级架', icon: '🪵', base: 800, grow: 1.55, fp: [0.75, 0.22], stat: { ter: 2 }, desc: '横梁上三根尖桩，可插 3 颗首级；每 12 秒 ×1.2 产出。插满或同族/同阶会共鸣', depth: 2,
+    mount: { y: 1.3, period: 12, mult: 1.2, slots: [[-0.42, 1.3, 0], [0, 1.3, 0], [0.42, 1.3, 0]] },
+    make() { const g = new THREE.Group();
+      for (const s of [-1, 1]) { g.add(rock(0.16, M.stone, s * 0.62, 0.05, 0)); g.add(cyl(0.035, 0.045, 1.2, M.wood, s * 0.62, 0.6, 0, 8)); }
+      const bar = box(1.38, 0.08, 0.08, M.wood, 0, 1.12, 0); g.add(bar);
+      for (const s of [-1, 1]) { const r = box(0.5, 0.035, 0.035, M.rust, s * 0.45, 1.02, 0); r.rotation.z = s * 0.6; g.add(r); }
+      for (const x of [-0.42, 0, 0.42]) { g.add(cyl(0.012, 0.02, 0.2, M.iron, x, 1.22, 0, 6)); g.add(mesh(new THREE.ConeGeometry(0.02, 0.08, 6), M.iron, x, 1.34, 0)); g.add(cyl(0.008, 0.014, 0.22 + Math.random() * 0.2, M.blood, x + 0.012, 1.0, 0.03, 5)); }
+      const st = mesh(new THREE.CircleGeometry(0.35, 16), M.blood, 0, 0.004, 0.05); st.rotation.x = -Math.PI / 2; st.scale.set(1.6, 0.6, 1); g.add(st);
+      return g; },
+    cols: () => [[-0.68, 0, -0.06, -0.56, 1.16, 0.06], [0.56, 0, -0.06, 0.68, 1.16, 0.06], [-0.7, 1.08, -0.05, 0.7, 1.16, 0.05]] };
+  C.lampost = { cat: 'func', n: '万首灯柱', icon: '🏮', base: 4500, grow: 1.6, fp: [0.5, 0.5], stat: { soul: 3, ter: 2 }, desc: '骨柱上的铁环挑着 4 根尖刺，首级朝外示众；每 15 秒 ×1.8 产出，可共鸣', depth: 3,
+    mount: { y: 1.45, period: 15, mult: 1.8, labelY: 2.1, slots: ring(4, 0.42, 1.45, a => Math.atan2(Math.cos(a), Math.sin(a))) },
+    make() { const g = new THREE.Group(); g.add(rock(0.34, M.dark, 0, 0.1, 0));
+      g.add(cyl(0.07, 0.1, 2.2, M.bone, 0, 1.1, 0, 10));
+      for (let i = 0; i < 6; i++) g.add(skull(0.7, Math.cos(i) * 0.1, 0.35 + i * 0.3, Math.sin(i) * 0.1));
+      const rg = mesh(new THREE.TorusGeometry(0.42, 0.018, 6, 32), M.iron, 0, 1.3, 0); rg.rotation.x = Math.PI / 2; g.add(rg);
+      for (let k = 0; k < 4; k++) { const a = k / 4 * Math.PI * 2 + Math.PI / 4; const x = Math.cos(a) * 0.42, z = Math.sin(a) * 0.42;
+        const arm = box(0.42, 0.025, 0.025, M.iron, x / 2, 1.3, z / 2); arm.rotation.y = -a; g.add(arm);
+        g.add(cyl(0.01, 0.016, 0.16, M.iron, x, 1.38, z, 6)); g.add(mesh(new THREE.ConeGeometry(0.016, 0.07, 6), M.iron, x, 1.48, z)); }
+      g.add(cyl(0.12, 0.08, 0.1, M.iron, 0, 2.22, 0, 10)); g.add(flame(0, 2.27, 0, 1.6, '#7aff9a'));
+      return g; },
+    cols: () => [[-0.3, 0, -0.3, 0.3, 0.2, 0.3], [-0.1, 0, -0.1, 0.1, 2.3, 0.1]] };
+  C.bloodpool = { cat: 'func', n: '血池祭坛', icon: '🩸', base: 20000, grow: 1.7, fp: [0.95, 0.95], stat: { soul: 5, ter: 4 }, desc: '五根骨刺环绕血池，首级朝内俯视；每 24 秒 ×4 产出，同族五首共鸣极强', depth: 4,
+    mount: { y: 1.0, period: 24, mult: 4, labelY: 1.5, slots: ring(5, 0.78, 1.0, a => Math.atan2(-Math.cos(a), -Math.sin(a))) },
+    make() { const g = new THREE.Group();
+      const rim = mesh(new THREE.TorusGeometry(0.5, 0.09, 8, 28), M.dark, 0, 0.06, 0); rim.rotation.x = Math.PI / 2; g.add(rim);
+      const pool = mesh(new THREE.CircleGeometry(0.5, 28), std('#5a0508', { roughness: 0.08, metalness: 0.2, emissive: '#2a0002' }), 0, 0.08, 0); pool.rotation.x = -Math.PI / 2; g.add(pool);
+      const orb = mesh(new THREE.IcosahedronGeometry(0.09, 1), glowMat('#ff2a3a', 1.6), 0, 0.55, 0); g.add(orb); g.userData.orb = orb;
+      for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2 + Math.PI / 5; const x = Math.cos(a) * 0.78, z = Math.sin(a) * 0.78;
+        g.add(rock(0.13, M.stone, x, 0.04, z)); const sp = mesh(new THREE.ConeGeometry(0.05, 1.05, 7), M.bone, x, 0.52, z); g.add(sp);
+        g.add(cyl(0.008, 0.014, 0.35, M.blood, x + 0.02, 0.8, z, 5)); }
+      for (const s of [0, 2]) g.add(flame(Math.cos(s) * 0.3, 0.1, Math.sin(s) * 0.3, 0.7, '#ff4a3a'));
+      return g; },
+    cols: () => ring(5, 0.78, 0, a => 0).map(([x, , z]) => [x - 0.06, 0, z - 0.06, x + 0.06, 1.0, z + 0.06]) };
   C.wheel = { cat: 'func', n: '魂轮', icon: '☸️', base: 900, grow: 1.5, fp: [0.62, 0.62], stat: { soul: 3 }, desc: '缓慢转动的刑轮，放上面的首级每 6 秒全部触发', radius: 0.58, surface: 0.14, period: 6, depth: 3,
     make() { const g = new THREE.Group(); g.add(cyl(0.64, 0.68, 0.08, M.dark, 0, 0.04, 0, 32)); const top = new THREE.Group(); top.position.y = 0.1; g.add(top);
       const disk = cyl(0.6, 0.6, 0.04, M.wood, 0, 0, 0, 40); top.add(disk);
@@ -164,9 +201,9 @@ window.BuildCat = (() => {
   // 扩建/挖深（特殊：不是摆放物）
   const DIG = [
     { depth: 1, n: '初始洞窟', r: 7, cost: 0 },
-    { depth: 2, n: '挖深·第二层', r: 9, cost: 600, desc: '洞窟扩大，解锁骨龛、招魂铃、魂晶簇等' },
-    { depth: 3, n: '挖深·第三层', r: 11.5, cost: 3000, desc: '解锁魂轮、疗伤血泉、白骨王座等' },
-    { depth: 4, n: '挖深·第四层', r: 14, cost: 12000, desc: '解锁熔岩池' },
+    { depth: 2, n: '挖深·第二层', r: 9, cost: 600, desc: '洞窟扩大，解锁骨龛、首级架、招魂铃、魂晶簇等' },
+    { depth: 3, n: '挖深·第三层', r: 11.5, cost: 3000, desc: '解锁魂轮、万首灯柱、疗伤血泉、白骨王座等' },
+    { depth: 4, n: '挖深·第四层', r: 14, cost: 12000, desc: '解锁熔岩池、血池祭坛' },
     { depth: 5, n: '挖深·第五层', r: 16.5, cost: 45000, desc: '解锁古龙头骨' },
     { depth: 6, n: '挖深·深渊层', r: 19, cost: 150000, desc: '洞窟的尽头……还是开始？' }
   ];

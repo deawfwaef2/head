@@ -119,7 +119,7 @@ window.startGame = function () {
   }
   function removeHead(h) {
     const i = heads.indexOf(h); if (i >= 0) heads.splice(i, 1);
-    if (h.mount) h.mount.head = null;
+    if (h.mount) h.mount.heads[h.slot] = null;
     if (held === h) held = null;
     scene.remove(h.g); scene.remove(h.blob); h.hb.dispose(); if (h.hb.glow) h.hb.glow.material.dispose();
     const j = S.heads.indexOf(h.rec); if (j >= 0) S.heads.splice(j, 1);
@@ -139,7 +139,7 @@ window.startGame = function () {
   function addBuild(type, x, z, rot = 0, save = true) {
     const d = CAT[type]; const g = d.make(); g.position.set(x, 0, z); g.rotation.y = -rot * Math.PI / 2;
     scene.add(g);
-    const b = { type, x, z, rot, g, head: null, timer: Math.random() * (d.mount ? d.mount.period : d.period || 5) };
+    const b = { type, x, z, rot, g, heads: d.mount ? slotsOf(d).map(() => null) : null, timer: Math.random() * (d.mount ? d.mount.period : d.period || 5) };
     if (d.mount) {
       const lab = document.createElement('div'); lab.className = 'wlabel'; lab.innerHTML = '<div class="pbar"><i></i></div>'; ui.labels.appendChild(lab); b.label = lab;
     }
@@ -148,7 +148,7 @@ window.startGame = function () {
   }
   function removeBuild(b) {
     const i = builds.indexOf(b); if (i >= 0) builds.splice(i, 1);
-    if (b.head) { b.head.mount = null; b.head.sleep = 0; b.head = null; }
+    if (b.heads) { b.heads.forEach(h => { if (h) { h.mount = null; h.sleep = 0; } }); b.heads.fill(null); }
     scene.remove(b.g); if (b.label) b.label.remove();
     b.g.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
     rebuildColliders(); persistBuilds();
@@ -156,17 +156,36 @@ window.startGame = function () {
   function persistBuilds() { S.builds = builds.map(b => ({ type: b.type, x: +b.x.toFixed(2), z: +b.z.toFixed(2), rot: b.rot })); }
   const bought = k => builds.filter(b => b.type === k).length;
   const cost = k => Math.round(CAT[k].base * Math.pow(CAT[k].grow, bought(k)));
-  function mountPos(b) { const d = CAT[b.type]; return new V3(b.x, d.mount.y + RC * 0.8, b.z); }
-  function mountHead(h, b) {
-    if (b.head || h.mount) return false;
+  // ---- 展示位：一个建筑可有多个插槽（mount.slots = [[lx, ly, lz, yaw?], ...]）----
+  function slotsOf(d) { return d.mount.slots || [[0, d.mount.y, 0]]; }
+  function mountPos(b, i = 0) { const s = slotsOf(CAT[b.type])[i] || [0, CAT[b.type].mount.y, 0]; const a = -b.rot * Math.PI / 2, c = Math.cos(a), sn = Math.sin(a); return new V3(b.x + s[0] * c + s[2] * sn, s[1] + RC * 0.8, b.z - s[0] * sn + s[2] * c); }
+  function firstHead(b) { return b && b.heads ? b.heads.find(Boolean) || null : null; }
+  function nearestHead(b, pt) { if (!b || !b.heads) return null; let best = null, bd = 1e9; b.heads.forEach(h => { if (!h) return; const d = pt ? h.g.position.distanceToSquared(pt) : 0; if (d < bd) { bd = d; best = h; } }); return best; }
+  function freeSlot(b, pt) { if (!b || !b.heads) return -1; let bi = -1, bd = 1e9; b.heads.forEach((h, i) => { if (h) return; const d = pt ? mountPos(b, i).distanceToSquared(pt) : i; if (d < bd) { bd = d; bi = i; } }); return bi; }
+  // 共鸣：满座 / 同族 / 同阶，多插槽展示位的额外倍率
+  function resonance(b) {
+    const n = b.heads ? b.heads.length : 0, hs = n ? b.heads.filter(Boolean) : [];
+    if (n < 2 || hs.length < 2) return { mul: 1, tags: [] };
+    const tags = []; let mul = 1;
+    if (hs.length === n) { mul += 0.25; tags.push('满座'); }
+    if (hs.every(h => h.rec.c.race === hs[0].rec.c.race)) { mul += 0.15 * hs.length; tags.push('同族'); }
+    if (hs.every(h => h.rec.c.rar === hs[0].rec.c.rar)) { mul += 0.1 * hs.length; tags.push('同阶'); }
+    return { mul, tags };
+  }
+  function mountHead(h, b, i) {
+    if (h.mount || !b.heads) return false;
+    if (i == null || i < 0) i = freeSlot(b);
+    if (i < 0 || b.heads[i]) return false;
     if (held === h) held = null;
-    b.head = h; h.mount = b; h.vel.set(0, 0, 0); h.av.set(0, 0, 0); h.sleep = 0;
-    h.g.position.copy(mountPos(b)); h.g.quaternion.setFromEuler(new THREE.Euler(0, -b.rot * Math.PI / 2 + Math.PI, 0));
-    SFX.chop(); SFX.squish(0.8); burst(h.g.position, '#8a0010', 26, 1.2, 0.7, -6); b.timer = 0;
-    bloodSplat(b.x + 0.05, 0, b.z + 0.03, 0.35);
+    b.heads[i] = h; h.mount = b; h.slot = i; h.vel.set(0, 0, 0); h.av.set(0, 0, 0); h.sleep = 0;
+    const s = slotsOf(CAT[b.type])[i];
+    h.g.position.copy(mountPos(b, i)); h.g.quaternion.setFromEuler(new THREE.Euler(0, -b.rot * Math.PI / 2 + (s[3] != null ? s[3] : Math.PI), 0));
+    SFX.chop(); SFX.squish(0.8); burst(h.g.position, '#8a0010', 26, 1.2, 0.7, -6); if (b.heads.filter(Boolean).length === 1) b.timer = 0;
+    bloodSplat(h.g.position.x + 0.05, 0, h.g.position.z + 0.03, 0.35);
+    const rs = resonance(b); if (rs.tags.length && b.heads.length > 1) toast(`${CAT[b.type].n}：${rs.tags.join(' · ')} 共鸣 ×${rs.mul.toFixed(2)}`, '#ffcf7a', 2);
     return true;
   }
-  function unmount(h) { if (!h.mount) return; h.mount.head = null; h.mount = null; h.sleep = 0; }
+  function unmount(h) { if (!h.mount) return; h.mount.heads[h.slot] = null; h.mount = null; h.sleep = 0; }
 
   // 灯光分配
   function lightSources() {
@@ -273,7 +292,7 @@ window.startGame = function () {
     if (held) { poke(held, 'hold'); return; }
     const hit = lookHit();
     if (hit && hit.head) poke(hit.head, 'manual', hit.point);
-    else if (hit && hit.build && hit.build.head) poke(hit.build.head, 'manual');
+    else if (hit && hit.build && firstHead(hit.build)) poke(nearestHead(hit.build, hit.point), 'manual');
   }
   function interactE() {
     if (buildMode) return;
@@ -295,10 +314,10 @@ window.startGame = function () {
     if (player.pos.distanceTo(cave.exitPos) < 2.6) { UI.openExpedition(); return; }
     if (player.pos.distanceTo(cave.merchantPos) < 2.4) { UI.openMenu('equip'); SFX.coins(); return; }
     if (held) {
-      if (hit && hit.build && CAT[hit.build.type].mount && !hit.build.head) { mountHead(held, hit.build); return; }
+      if (hit && hit.build && CAT[hit.build.type].mount && freeSlot(hit.build) >= 0) { mountHead(held, hit.build, freeSlot(hit.build, hit.point)); return; }
       dropHeld(); return;
     }
-    if (hit && hit.build) { const d = CAT[hit.build.type]; if (d.train) { UI.openTraining(d.train, d.n); return; } if (hit.build.head) { const h = hit.build.head; unmount(h); held = h; return; } }
+    if (hit && hit.build) { const d = CAT[hit.build.type]; if (d.train) { UI.openTraining(d.train, d.n); return; } if (firstHead(hit.build)) { const h = nearestHead(hit.build, hit.point); unmount(h); held = h; return; } }
   }
   function makeBagMesh() {
     const g = new THREE.Group();
@@ -350,7 +369,7 @@ window.startGame = function () {
     held.hb.setExpression && held.hb.setExpression(held.rec.look.ex); SFX.click(); toast(`表情：${names[heldFace]} · 滚轮转向 · V 换表情`, '#e6c7a0', 1.6); save();
   }
   function inspectLook() {
-    const h = held || (lookHit() || {}).head || ((lookHit() || {}).build || {}).head;
+    const lh = lookHit() || {}; const h = held || lh.head || (lh.build ? nearestHead(lh.build, lh.point) : null);
     if (h) { UI.openCard(h.rec); SFX.book(); }
   }
   function dropHeld() { if (!held) return; const h = held; held = null; h.sleep = 0; h.vel.multiplyScalar(0.3); SFX.play('sack', 0.3); }
@@ -471,7 +490,7 @@ window.startGame = function () {
       }
       for (const b of builds) {
         const mt = CAT[b.type].mount;
-        if (mt && !b.head && h.vel.y < 0) { const dx = p.x - b.x, dz = p.z - b.z; if (dx * dx + dz * dz < 0.05 && p.y > mt.y && p.y < mt.y + RC * 2.4) { mountHead(h, b); break; } }
+        if (mt && b.heads && h.vel.y < 0) { let done = false; for (let i = 0; i < b.heads.length; i++) { if (b.heads[i]) continue; const mp = mountPos(b, i), dx = p.x - mp.x, dz = p.z - mp.z, sy = mp.y - RC * 0.8; if (dx * dx + dz * dz < 0.05 && p.y > sy && p.y < sy + RC * 2.4) { mountHead(h, b, i); done = true; break; } } if (done) break; }
       }
     }
     grid.clear();
@@ -626,7 +645,7 @@ window.startGame = function () {
   // ---------------- 存档 ----------------
   function save() {
     if (S.dead) return;
-    for (const h of heads) { h.rec.p = h.g.position.toArray().map(v => +v.toFixed(3)); h.rec.q = h.g.quaternion.toArray().map(v => +v.toFixed(3)); h.rec.mt = h.mount ? builds.indexOf(h.mount) : -1; }
+    for (const h of heads) { h.rec.p = h.g.position.toArray().map(v => +v.toFixed(3)); h.rec.q = h.g.quaternion.toArray().map(v => +v.toFixed(3)); h.rec.mt = h.mount ? builds.indexOf(h.mount) : -1; h.rec.ms = h.mount ? h.slot : 0; }
     persistBuilds();
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { console.warn('save failed', e); }
   }
@@ -638,7 +657,8 @@ window.startGame = function () {
         const p = rec.p ? new V3().fromArray(rec.p) : new V3((Math.random() - 0.5) * 3, 1, (Math.random() - 0.5) * 3);
         const q = rec.q ? new THREE.Quaternion().fromArray(rec.q) : null;
         const h = createHead(rec, p, q);
-        if (rec.mt >= 0 && builds[rec.mt] && CAT[builds[rec.mt].type].mount && !builds[rec.mt].head) { const b = builds[rec.mt]; b.head = h; h.mount = b; h.g.position.copy(mountPos(b)); }
+        const mb = rec.mt >= 0 ? builds[rec.mt] : null, ms = rec.ms || 0;
+        if (mb && mb.heads && ms < mb.heads.length && !mb.heads[ms]) { mb.heads[ms] = h; h.mount = mb; h.slot = ms; h.g.position.copy(mountPos(mb, ms)); }
         else h.sleep = 0.9;
       } catch (e) { console.warn('head load fail', e); }
     }
@@ -718,10 +738,12 @@ window.startGame = function () {
     // 枪桩/骨龛/魂轮 自动
     for (const b of builds) {
       const d = CAT[b.type];
-      if (d.mount && b.head) {
+      if (b.g.userData.orb) { const o = b.g.userData.orb, tt = performance.now() / 1000; o.position.y = 0.55 + Math.sin(tt * 1.7) * 0.05; o.rotation.y = tt * 0.8; o.rotation.x = tt * 0.5; }
+      const fh = d.mount ? firstHead(b) : null;
+      if (fh) {
         b.timer += dt;
-        if (b.timer >= d.mount.period) { b.timer = 0; trigger(b.head, 'auto', d.mount.mult); SFX.soul(3, b.head.rec.c.rar); burst(b.head.g.position, '#6a0008', 10, 0.8, 0.5, -6); }
-        if (b.label) { const sp = screenPos(new V3(b.x, d.mount.y + 0.55, b.z)); const dd = camera.position.distanceTo(b.head.g.position); if (sp.vis && dd < 9) { b.label.style.display = 'block'; b.label.style.left = sp.x + 'px'; b.label.style.top = sp.y + 'px'; b.label.querySelector('i').style.width = (b.timer / d.mount.period * 100) + '%'; } else b.label.style.display = 'none'; }
+        if (b.timer >= d.mount.period) { b.timer = 0; const rs = resonance(b); let top = 0; for (const h of b.heads) if (h) { trigger(h, 'auto', d.mount.mult * rs.mul); burst(h.g.position, '#6a0008', 10, 0.8, 0.5, -6); top = Math.max(top, h.rec.c.rar); } SFX.soul(3, top); }
+        if (b.label) { const sp = screenPos(new V3(b.x, (d.mount.labelY || d.mount.y) + 0.55, b.z)); const dd = camera.position.distanceTo(fh.g.position); if (sp.vis && dd < 9) { b.label.style.display = 'block'; b.label.style.left = sp.x + 'px'; b.label.style.top = sp.y + 'px'; b.label.querySelector('i').style.width = (b.timer / d.mount.period * 100) + '%'; if (b.heads.length > 1) { const rs = resonance(b), k = b.heads.filter(Boolean).length + '/' + b.heads.length + (rs.tags.length ? ' ' + rs.tags.join('·') + ' ×' + rs.mul.toFixed(2) : ''); if (b.label.dataset.k !== k) { b.label.dataset.k = k; let s = b.label.querySelector('s'); if (!s) { s = document.createElement('s'); b.label.appendChild(s); } s.textContent = k; } } } else b.label.style.display = 'none'; }
       } else if (b.label) b.label.style.display = 'none';
       if (d.period && b.type === 'wheel') {
         b.g.userData.spin.rotation.y += dt * 0.5;
@@ -791,7 +813,7 @@ window.startGame = function () {
         else if (hit && hit.head) { const c = hit.head.rec.c; tip = `<span style="color:${RAR[c.rar].c}">【${RAR[c.rar].n}】</span> <b>${c.name}</b> · ${c.raceN}${c.idN}<br><small>左键把玩 · E 拿起 · F 查看/回忆 · XX 碾碎</small>`; }
         else if (player.pos.distanceTo(cave.exitPos) < 2.6) tip = '<b>[E]</b> 离开洞窟，出去狩猎';
         else if (player.pos.distanceTo(cave.merchantPos) < 2.4) tip = '<b>[E]</b> 和地精行商斯尼克交易';
-        else if (hit && hit.build) { const d = CAT[hit.build.type]; tip = `<b>${d.n}</b>` + (d.train ? ' · <b>[E]</b> 开始训练' : '') + (d.mount ? (hit.build.head ? ' · 左键把玩 · E 取下' : ' · 手持首级按 E 插上') : '') + ' <small>· XX 拆除</small>'; }
+        else if (hit && hit.build) { const d = CAT[hit.build.type]; tip = `<b>${d.n}</b>` + (d.train ? ' · <b>[E]</b> 开始训练' : '') + (d.mount ? (() => { const n = hit.build.heads.length, k = hit.build.heads.filter(Boolean).length; return (k ? ' · 左键把玩 · E 取下' : '') + (k < n ? ' · 手持首级按 E 插上' : '') + (n > 1 ? ` · ${k}/${n} 位` : ''); })() : '') + ' <small>· XX 拆除</small>'; }
       }
     }
     ui.tip.innerHTML = tip; ui.tip.style.display = tip ? 'block' : 'none';
