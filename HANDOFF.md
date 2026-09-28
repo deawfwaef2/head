@@ -65,3 +65,12 @@
 - 名称：《魂首窟》——食人魔格罗克被月之魔女诅咒，只能以亡魂为食；被他斩下的首级里残留「残魂」，把玩/折磨首级会渗出「魂晶」(货币)，地精行商斯尼克收购魂晶并出售装备。
 - 模块：js/sfx.js(音效+音乐) js/lore.js(文本生成) js/heads.js(混搭头) js/cave.js(洞穴) js/builds.js js/rpg.js(属性/装备/远征结算) js/ui.js js/game.js。
 - 模型管线 v3：以头骨宽度 0.16 归一化、原点=头骨中心，meta 增加 skullTop/hairTop/front/eye，头发网格名在 meta.hair，便于跨模型换发型。
+
+## 2026-09-28 · v3 可玩（修复 "Cave is not defined"）
+- 原因：上一会话推送了 v3 模块，但 index.html 仍加载已删除的 audio.js/headgen.js，且没有 ui.js。
+- 新 index.html 加载顺序：three → GLTFLoader → models/*.js → sfxdata → sfx → lore → builds → cave → heads → rpg → game → ui。
+- 新增 js/ui.js（window.UI）：主面板 Tab(属性/装备·斯尼克/建造/首级收藏/狩猎日志)、首级档案+「回忆」打字机、训练小游戏(8秒狂点，每9下+1)、出洞选地点→点击60次回家(剧情逐段揭示、掉血/魂晶/得头)、到家结算倒头、HP=0 死亡→G.wipe() 重开、开场5页剧情。
+- 快捷键：B 建造 · Tab/I 属性 · C 收藏 · L 日志 · E 洞口出猎/商人 · F 查看首级 · H 喝药。
+- 坑：开场剧情必须在「开始游戏」点击时直接打开（不先锁鼠标），否则 pointer lock 晚到会盖住弹窗。UI.open() 会隐藏 #menu。
+- 测试：v3b(完整一趟村庄)、v3f(死亡/装备/训练/挖深) 都通过，无报错。swiftshader 下相机贴地近拍可能崩溃（仅测试环境问题）。
+- 待办：更多基础模型（当前14个）；头发目前是 shader 弹簧摆动，非骨骼物理；平衡性调优。
