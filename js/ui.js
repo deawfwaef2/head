@@ -32,7 +32,7 @@ window.UI = (() => {
     SFX.close();
   }
   function onKey(e) {
-    if (cur === 'trip') { if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); if (!e.repeat) tripTap(); } return true; }
+    if (cur === 'trip') { if (trip && trip.choose && (e.code === 'Digit1' || e.code === 'Digit2')) { pickChoice(e.code === 'Digit1' ? 0 : 1); return true; } if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); if (!e.repeat) tripTap(); } return true; }
     if (cur === 'dead' || cur === 'intro') return true;
     if (cur) {
       if (e.code === 'Escape') { close(false); return true; }
@@ -67,6 +67,7 @@ window.UI = (() => {
       case 'loc': startTrip(v); break;
       case 'trainGo': trainStart(); break;
       case 'arrive': finishTrip(); break;
+      case 'tripch': pickChoice(+v); break;
       case 'restart': G.wipe(); location.reload(); break;
       case 'introNext': introStep(); break;
     }
@@ -249,7 +250,8 @@ window.UI = (() => {
     const n = res.beats.length;
     // 第一段立刻出现，其余均匀分布在 60 次点击上，最后一段在第 60 下
     const at = res.beats.map((b, i) => i === 0 ? 0 : Math.round(i / (n - 1) * TAPS));
-    trip = { loc, res, at, taps: 0, shown: 0, hp0: G.S.hp, coins: 0, log: [], dead: false, done: false };
+    trip = { loc, res, at, taps: 0, shown: 0, hp0: G.S.hp, coins: 0, log: [], dead: false, done: false, choose: null,
+      ev: [Math.round(TAPS * (0.3 + Math.random() * 0.1)), Math.round(TAPS * (0.62 + Math.random() * 0.1))], evPool: EVENTS.slice().sort(() => Math.random() - 0.5) };
     SFX.music('expedition'); SFX.roar(0.7);
     open('trip', `<div class="trip" style="--lc:${loc.color}">
       <div class="trip-top"><div class="trip-loc">${loc.icon} ${loc.n}</div><div class="trip-hp"><div class="hpline"><div class="hpfill" id="tripHp"></div><span id="tripHpT"></span></div></div></div>
@@ -265,15 +267,16 @@ window.UI = (() => {
     const m = G.st().maxHp; const f = Math.max(0, G.S.hp / m);
     const hp = document.getElementById('tripHp'); if (!hp) return;
     hp.style.width = f * 100 + '%'; document.getElementById('tripHpT').textContent = `❤️ ${Math.round(G.S.hp)} / ${m}`;
-    document.getElementById('tripBar').style.width = trip.taps / TAPS * 100 + '%'; document.getElementById('tripN').textContent = trip.taps;
+    document.getElementById('tripBar').style.width = trip.taps / TAPS * 100 + '%'; const tn = document.getElementById('tripN'); if (tn) tn.textContent = trip.taps;
   }
   function tripTap(e) {
-    if (!trip || trip.dead || trip.done) return;
+    if (!trip || trip.dead || trip.done || trip.choose) return;
     trip.taps = Math.min(TAPS, trip.taps + 1);
     SFX.step(); if (trip.taps % 6 === 0) SFX.play('step', 0.5, 0.7);
     if (e && e.clientX != null) { const f = document.createElement('div'); f.className = 'tapfx'; f.textContent = ['👣', '💢', '🩸', '⚔️'][trip.taps % 4]; f.style.left = e.clientX + 'px'; f.style.top = e.clientY + 'px'; root.appendChild(f); setTimeout(() => f.remove(), 700); }
     const t = panel.querySelector('.trip'); t.classList.remove('bob'); void t.offsetWidth; t.classList.add('bob');
     revealUpTo(trip.taps); tripHud();
+    if (!trip.dead && trip.ev.length && trip.taps >= trip.ev[0]) { trip.ev.shift(); showChoice(); return; }
     if (trip.taps >= TAPS && !trip.dead) arrive();
   }
   function revealUpTo(taps) {
@@ -297,6 +300,68 @@ window.UI = (() => {
       feed.scrollTop = feed.scrollHeight;
       if (G.S.hp <= 0) { die(); return; }
     }
+  }
+
+  // ---- 旅途抉择事件（每趟 2 次，按 1/2 或点按钮）----
+  const loot = (k) => Math.round((trip.loc.loot[0] + Math.random() * (trip.loc.loot[1] - trip.loc.loot[0])) * k);
+  const EVENTS = [
+    { t: '🛤️ 前方出现岔路。一条是陡峭的险道，一条是绕远的小路。', o: [
+      ['⛰️ 走险道', () => Math.random() < 0.6 ? { coin: loot(1), msg: '险道尽头有一处被遗忘的藏宝洞！' } : { hurt: 0.12, msg: '你一脚踩空滚下山坡。' }],
+      ['🌿 绕小路', () => ({ heal: 0.05, msg: '小路安静又平坦，你顺便喘了口气。' })]] },
+    { t: '🔥 天黑了，你找到一处避风的岩洞。', o: [
+      ['😴 休息一晚', () => ({ heal: 0.22, msg: '你枕着战利品麻袋，打着震天响的呼噜睡了一整夜。' })],
+      ['🌙 连夜赶路', () => ({ coin: loot(0.5), msg: '夜色中你撞见一队落单的巡逻兵，他们丢下钱袋就跑了。' })]] },
+    { t: '✨ 远处的林间飘着一缕奇异的魂光……', o: [
+      ['👣 追踪魂光', () => Math.random() < 0.55 ? { head: true, msg: '魂光把你引向了又一个猎物！' } : { hurt: 0.1, msg: '那是沼气鬼火。你被它烧焦了眉毛。' }],
+      ['🙈 不去管它', () => ({ msg: '你挠挠头，继续赶路。' })]] },
+    { t: '📦 路边的灌木丛里藏着一只上锁的铁箱。', o: [
+      ['🔨 砸开它', () => Math.random() < 0.7 ? { coin: loot(0.8), msg: '箱子里全是闪亮的魂晶！' } : { hurt: 0.14, msg: '是个陷阱箱！毒针扎了你一下。' }],
+      ['🚶 不碰为妙', () => ({ msg: '谨慎是食人魔少有的美德。' })]] },
+    { t: '🧌 你遇到一支地精商队，领头的地精吓得发抖。', o: [
+      ['🧪 买瓶药（🔮60）', () => G.S.coins >= 60 ? (G.S.coins -= 60, G.S.items.potion = (G.S.items.potion || 0) + 1, { msg: '地精找零时手抖得把钱撒了一地。获得 🧪×1' }) : { msg: '你的魂晶不够。地精松了口气。' }],
+      ['🗣️ 打听消息', () => ({ coin: loot(0.25), msg: '地精告诉你附近有一处无人看守的宝库。' })]] },
+    { t: '🩸 血月下，一座古老的献祭祭坛正渴望着首级。', o: [
+      ['💀 献上一颗首级', () => trip.res.heads.length ? (() => { let wi = 0; trip.res.heads.forEach((h, i) => { if (h.c.rar < trip.res.heads[wi].c.rar) wi = i; }); const h = trip.res.heads.splice(wi, 1)[0]; return { coin: loot(2.2 + h.c.rar * 1.2), msg: `你把【${RN[h.c.rar]}】${h.c.name}的首级摆上祭坛。血月一亮，祭坛吐出大把魂晶。` }; })() : { msg: '你的麻袋里还没有首级。祭坛冷冷地沉寂下去。' }],
+      ['🚶 转身离开', () => ({ msg: '首级是你的战利品，不是贡品。' })]] },
+    { t: '⚔️ 你路过一片刚结束厮杀的战场，遍地断矛与破盾。', o: [
+      ['🔍 翻找战利品', () => Math.random() < 0.65 ? { coin: loot(0.9), msg: '你从一面破盾后面摸出一只沉甸甸的钱袋。' } : { hurt: 0.16, msg: '一个装死的佣兵突然跳起来砍了你一刀，然后逃了。' }],
+      ['🏃 快步通过', () => ({ heal: 0.03, msg: '你没有多看一眼，脚步反而更轻快了。' })]] }
+  ];
+  function showChoice() {
+    const ev = trip.evPool.pop(); if (!ev) return;
+    trip.choose = ev;
+    const feed = document.getElementById('tripFeed');
+    const p = document.createElement('div'); p.className = 'beat choice';
+    p.innerHTML = esc(ev.t) + '<div class="chs">' + ev.o.map((o, i) => `<button class="red" data-a="tripch" data-v="${i}"><b>${i + 1}</b> ${esc(o[0])}</button>`).join('') + '</div>';
+    feed.appendChild(p); requestAnimationFrame(() => p.classList.add('in')); feed.scrollTop = feed.scrollHeight;
+    const cta = document.getElementById('tripCta'); if (cta) cta.dataset.old = cta.innerHTML, cta.innerHTML = '⚖️ 做出选择（1 / 2）';
+    SFX.open && SFX.open();
+  }
+  function pickChoice(i) {
+    const ev = trip && trip.choose; if (!ev || !ev.o[i]) return; trip.choose = null;
+    const s = G.st(), r = ev.o[i][1]();
+    const feed = document.getElementById('tripFeed');
+    const box = feed.querySelector('.choice:last-child .chs'); if (box) box.innerHTML = `<i class="chosen">→ ${esc(ev.o[i][0])}</i>`;
+    const p = document.createElement('div'); p.className = 'beat'; let extra = '', rec = { t: ev.t + ' → ' + ev.o[i][0] + '：' + r.msg };
+    if (r.coin) { G.addCoins(r.coin); trip.coins += r.coin; extra += ` <span class="coin">🔮+${r.coin}</span>`; rec.d = `魂晶+${r.coin}`; SFX.coins(); }
+    if (r.heal) { const n = Math.round(s.maxHp * r.heal); G.S.hp = Math.min(s.maxHp, G.S.hp + n); extra += ` <span class="heal">+${n} HP</span>`; rec.d = `+${n} HP`; }
+    if (r.hurt) { const n = Math.max(1, Math.round(s.maxHp * r.hurt * (1 - s.dodge))); G.damage(n); extra += ` <span class="dmg">-${n} HP</span>`; rec.d = `-${n} HP`; const t = panel.querySelector('.trip'); t.classList.remove('hurt'); void t.offsetWidth; t.classList.add('hurt'); }
+    p.innerHTML = esc(r.msg) + extra; feed.appendChild(p); requestAnimationFrame(() => p.classList.add('in')); trip.log.push(rec);
+    if (r.head) {
+      const res2 = RPG.expedition(G.S, s, trip.loc, (Math.random() * 4294967296) >>> 0, G.usedNames, G.usedSig);
+      const hb = res2.beats.find(b => b.head);
+      const q = document.createElement('div'); q.className = 'beat';
+      if (hb && trip.res.heads.length < s.cap) {
+        const c = hb.head.c; trip.res.heads.push(hb.head); q.classList.add('gethead'); q.style.setProperty('--c', RC[c.rar]);
+        q.innerHTML = esc(hb.t) + `<div class="gh">💀 获得首级【${RN[c.rar]}】${esc(c.name)}</div>`; trip.log.push({ t: hb.t, cls: 'gethead' });
+        SFX.chop(); SFX.squish(1); if (c.rar >= 2) SFX.fanfare(c.rar);
+      } else q.textContent = trip.res.heads.length >= s.cap ? '可你的麻袋已经装满了，只能目送猎物远去。' : '猎物消失在了夜色里。';
+      feed.appendChild(q); requestAnimationFrame(() => q.classList.add('in'));
+    }
+    feed.scrollTop = feed.scrollHeight;
+    const cta = document.getElementById('tripCta'); if (cta && cta.dataset.old) { cta.innerHTML = cta.dataset.old; delete cta.dataset.old; }
+    tripHud();
+    if (G.S.hp <= 0) { die(); return; }
   }
   function arrive() {
     trip.done = true;
@@ -357,5 +422,5 @@ window.UI = (() => {
     open('intro', `<div class="intro"><h2>${t}</h2><p>${b}</p><div class="btns"><button class="red" data-a="introNext">${introI >= INTRO.length ? '开始狩猎 ▶' : '继续 ▶'}</button></div><div class="dots">${INTRO.map((_, i) => `<i class="${i < introI ? 'on' : ''}"></i>`).join('')}</div></div>`, 'intro-m');
   }
 
-  return { init, onKey, showIntro, needIntro: () => !G.S.intro, openMenu, openCard, openTraining, openExpedition, close, get open() { return cur; } };
+  return { init, onKey, showIntro, needIntro: () => !G.S.intro, openMenu, openCard, openTraining, openExpedition, close, get open() { return cur; }, get trip() { return trip; }, _startTrip: startTrip, _pick: pickChoice };
 })();
