@@ -934,7 +934,7 @@ window.startGame = function () {
   function frame() {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, clock.getDelta()); const now = clock.elapsedTime;
-    if (window.Seance && Seance.active) return; // 通灵 MV 期间暂停主场景渲染
+    if ((window.Seance && Seance.active) || window.__pauseMain) return; // 通灵 MV / 头棋等全屏小游戏期间暂停主场景渲染
     for (const f of HOOK.frame) { try { f(dt, now); } catch (e) { console.warn(e); } }
     updateAim(now); ModelHeads.tick(now); updateCine(dt); updateCineFx(dt);
     for (const h of heads) if (h.aura) { const ap = h.aura.geometry.attributes.position; for (let i = 0; i < ap.count; i++) { let y = ap.getY(i) + dt * (0.06 + (i % 5) * 0.015); if (y > 0.38) y = -0.15; ap.setY(i, y); } ap.needsUpdate = true; h.aura.position.copy(h.g.position); h.aura.rotation.y = now * 0.25 + h.rec.id; h.aura.visible = h.g.visible !== false; }
