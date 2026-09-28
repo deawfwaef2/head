@@ -30,9 +30,9 @@ window.Play = (() => {
   // ---------------- 样式 ----------------
   const css = document.createElement('style');
   css.textContent = `
-  .hbub{position:fixed;z-index:6;pointer-events:none;transform:translate(-50%,-100%);max-width:230px;padding:7px 11px;border-radius:14px;background:rgba(255,250,244,.94);color:#3a2230;font:600 13px/1.35 system-ui,'PingFang SC','Microsoft YaHei',sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.35);opacity:0;transition:opacity .25s, transform .25s}
+  .hbub{position:fixed;z-index:6;pointer-events:none;transform:translate(-50%,-100%);max-width:260px;padding:7px 12px;border-radius:18px;background:rgba(30,34,60,.72);color:#dfe6ff;font-style:italic;border:1px dashed rgba(180,200,255,.5);font:italic 500 13px/1.4 system-ui,'PingFang SC','Microsoft YaHei',sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.35);opacity:0;transition:opacity .25s, transform .25s}
   .hbub.in{opacity:1;transform:translate(-50%,-112%)}
-  .hbub:after{content:'';position:absolute;left:50%;bottom:-7px;margin-left:-7px;border:7px solid transparent;border-top-color:rgba(255,250,244,.94);border-bottom:0}
+  .hbub:after{content:'';position:absolute;left:46%;bottom:-12px;width:8px;height:8px;border-radius:50%;background:rgba(30,34,60,.72)}
   .hbub small{display:block;font-weight:500;font-size:11px;color:#9a6a80;margin-bottom:1px}
   .pmodal{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:rgba(8,4,10,.62);backdrop-filter:blur(3px);font-family:system-ui,'PingFang SC','Microsoft YaHei',sans-serif}
   .pbox{width:min(720px,94vw);max-height:88vh;overflow:auto;background:linear-gradient(160deg,#241820,#140c12);border:1px solid #6a4a5a;border-radius:18px;padding:20px 22px;color:#f3e6ea;box-shadow:0 20px 60px rgba(0,0,0,.6)}
@@ -238,7 +238,7 @@ window.Play = (() => {
   const BAN_HW = [['{nameB}，你的{hwB}好可爱。', '谢谢，是来这儿以后才戴上的。'], ['{hwA}会不会有点显眼？', '很适合你，真的。']];
   const BAN_RACE = [['同族的气息……你也是{raceA}？', '是啊，真巧。以后互相照应吧。'], ['家乡的歌你还记得吗？', '记得。我唱给你听。♪']];
   const bubbles = [];
-  let chatT = 12;
+  let chatT = 40;
   function fill(s, A, B) {
     const hwA = window.HeadWear ? HeadWear.names(A.rec.look.hw)[0] : '', hwB = window.HeadWear ? HeadWear.names(B.rec.look.hw)[0] : '';
     return s.replace('{nameA}', A.rec.c.name).replace('{nameB}', B.rec.c.name).replace('{idA}', A.rec.c.idN || '勇士').replace('{idB}', B.rec.c.idN || '勇士')
@@ -261,23 +261,31 @@ window.Play = (() => {
     }
     if (!G.playing || G.uiOpen || G.cine) return;
     chatT -= dt; if (chatT > 0) return;
-    chatT = 10 + Math.random() * 10;
+    chatT = 45 + Math.random() * 60;
     startChat();
   }
+  // 第八轮：首级不会说话。改为低频「残响」——她残魂里浮起的一段记忆碎片（思绪气泡，不是台词）
+  const ECHO = [
+    c => `（……${c.locN || '故乡'}的风，好像还带着麦子的味道……）`,
+    c => `（……“${c.goal || '我想活下去'}”……那是谁的愿望来着……）`,
+    c => `（……${c.belief || '神'}……没有回应……）`,
+    c => `（……作为${c.idN || '旅人'}的最后一天，天气很好……）`,
+    c => `（……有人在叫她的名字：${c.name}……）`,
+    c => `（……${c.raceN || ''}的摇篮曲，只记得半句……）`,
+    c => `（……母亲说过，要早点回家……）`,
+    c => `（……那天早上的面包还没吃完……）`,
+    c => `（……篝火的噼啪声，和那夜营地里的一模一样……）`,
+    c => `（……她想起了自己的${(c.traits && c.traits[0]) || '倔强'}……如今也没用了……）`
+  ];
   function startChat() {
     const near = G.heads.filter(h => h !== G.held && h.g.position.distanceTo(G.player.pos) < 7);
-    const pairs = [];
-    for (let i = 0; i < near.length; i++) for (let j = i + 1; j < near.length; j++) if (near[i].g.position.distanceTo(near[j].g.position) < 1.05) pairs.push([near[i], near[j]]);
-    if (!pairs.length) return;
-    let [A, B] = pairs[Math.floor(Math.random() * pairs.length)]; if (Math.random() < 0.5) [A, B] = [B, A];
-    let pool = BANTER.slice();
-    if (A.rec.c.race === B.rec.c.race) pool = pool.concat(BAN_RACE, BAN_RACE);
-    if ((B.rec.look.hw || []).length) pool = pool.concat([BAN_HW[0]]);
-    if ((A.rec.look.hw || []).length) pool = pool.concat([BAN_HW[1]]);
-    const L = pool[Math.floor(Math.random() * pool.length)];
-    say(A, fill(L[0], A, B), 0, 3.2); say(B, fill(L[1], A, B), 1.7, 3.4);
+    if (!near.length) return;
+    const A = near[Math.floor(Math.random() * near.length)];
+    const f = ECHO[Math.floor(Math.random() * ECHO.length)];
+    say(A, f(A.rec.c), 0, 4.5);
     const until = now() + 20;
-    setTimeout(() => { for (const h of [A, B]) if (G.heads.includes(h)) { h.buff = until; h.squash = 0.6; G.floatText('💬 闲聊 ×2', h.g.position.clone().add(new V3(0, 0.5, 0)), '#ffc8dc', 16); } }, 2600);
+    const nb = G.heads.filter(h => h !== A && h.g.position.distanceTo(A.g.position) < 1.05).slice(0, 3);
+    setTimeout(() => { for (const h of [A].concat(nb)) if (G.heads.includes(h)) { h.buff = until; G.floatText('✧ 残响 ×2', h.g.position.clone().add(new V3(0, 0.5, 0)), '#c8d8ff', 15); } }, 2000);
     M.chats = (M.chats || 0) + 1; return true;
   }
 
@@ -519,7 +527,7 @@ window.Play = (() => {
     ['strike25', '球道之王', '累计 25 次全中', () => (M.strikes || 0) >= 25, 2, 'core'],
     ['thief1', '驱魂', '击散第一只盗魂灵', () => (M.thieves || 0) >= 1, 1000],
     ['thief15', '猎魂人', '击散 15 只盗魂灵', () => (M.thieves || 0) >= 15, 2, 'core'],
-    ['chat30', '八卦中心', '听首级们闲聊 30 次', () => (M.chats || 0) >= 30, 1500],
+    ['chat30', '残响收集者', '目睹 30 次首级的记忆残响', () => (M.chats || 0) >= 30, 1500],
     ['dress', '造型师', '在化妆台打扮一颗首级', () => (M.dressed || 0) >= 1, 400],
     ['cx20', '见多识广', '图鉴收录 20 种身份', () => G.codexInfo().nIds >= 20, 3000],
     ['cx40', '百科全书', '图鉴收录 40 种身份', () => G.codexInfo().nIds >= 40, 2, 'core'],

@@ -159,18 +159,21 @@ window.UI = (() => {
     if (sub === 'dig') {
       grid = BuildCat.DIG.slice(1).map(d => {
         const done = S.depth >= d.depth, next = S.depth + 1 === d.depth;
-        return `<div class="bp-item dig ${done ? 'done' : next ? (S.coins < d.cost ? 'poor' : '') : 'locked'}" ${next ? 'data-a="dig"' : ''}><div class="bp-icon">${done ? '✅' : next ? '⛏️' : '🔒'}</div><div class="bp-name">${d.n}</div><div class="bp-cost">${done ? '已完成' : '🔮 ' + fmt(d.cost)}</div><div class="bp-desc">洞窟半径 ${d.r}m。${esc(d.desc || '')}</div></div>`;
+        return `<div class="bp-item dig ${done ? 'done' : next ? (S.coins < d.cost ? 'poor' : '') : 'locked'}" ${next ? 'data-a="dig"' : ''}><div class="bp-icon">${done ? '✅' : next ? '⛏️' : '🔒'}</div><div class="bp-name">${d.n}</div><div class="bp-cost">${done ? '已完成' : '🔮 ' + fmt(d.cost)}</div><div class="bp-desc">洞窟半径 ${d.r}m。${done ? '' : '岩壁后面也许藏着新的东西……'}</div></div>`;
       }).join('');
     } else {
-      grid = Object.keys(C).filter(k => C[k].cat === sub).map(k => {
+      const vis = Object.keys(C).filter(k => C[k].cat === sub && (!window.Unlocks || Unlocks.has(k)));
+      grid = vis.map(k => {
         const d = C[k], lock = d.depth && d.depth > S.depth, c = G.cost(k), own = G.bought(k), maxed = d.max && own >= d.max;
         return `<div class="bp-item ${lock ? 'locked' : maxed ? 'done' : S.coins < c ? 'poor' : ''}" ${lock || maxed ? '' : `data-a="place" data-v="${k}"`}>
           ${own ? `<div class="bp-own">已建 ${own}</div>` : ''}<div class="bp-icon">${lock ? '🔒' : d.icon}</div><div class="bp-name">${d.n}</div>
           <div class="bp-cost">${lock ? `需洞窟第 ${d.depth} 层` : maxed ? '已建成' : '🔮 ' + fmt(c)}</div>
           <div class="bp-stat">${statTxt(d.stat)}${d.regen ? ' 恢复+' + d.regen + '%' : ''}</div><div class="bp-desc">${esc(d.desc || '')}</div></div>`;
       }).join('');
+      const hid = Object.keys(C).filter(k => C[k].cat === sub).length - vis.length;
+      if (hid > 0) grid += `<div class="bp-item locked"><div class="bp-icon">❔</div><div class="bp-name">??? × ${hid}</div><div class="bp-desc">还有未发现的建造灵感，条件未知。</div></div>`;
     }
-    return `<div class="bp-tabs">${tabs}</div><p class="hint2">每件建筑都会<b>永久提升主角属性</b>（战力）。放置时：左键确认 · R 旋转 · 右键取消。对建筑连按 XX 拆除（返还 50%）。</p><div class="bp-grid">${grid}</div>`;
+    return `<div class="bp-tabs">${tabs}</div><p class="hint2">每件建筑都会<b>永久提升主角属性</b>（战力）。放置时：左键确认 · R/Shift+R 任意角度旋转 · 右键取消。新建筑会在达成<b>隐藏条件</b>后出现。对建筑连按 XX 拆除（返还 50%）。</p><div class="bp-grid">${grid}</div>`;
   }
   function headsBody() {
     const list = G.S.heads.slice().sort((a, b) => b.c.rar - a.c.rar || b.id - a.id);

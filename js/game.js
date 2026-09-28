@@ -156,12 +156,14 @@ window.startGame = function () {
   // ---------------- 建造 ----------------
   const builds = [];
   const colliders = [];
+  // rot = 以 90° 为单位的浮点数（0.25 = 22.5°），支持任意角度；碰撞盒取旋转后外接 AABB
   function rotAabb(a, rot, x, z) {
-    let [x0, y0, z0, x1, y1, z1] = a;
-    for (let i = 0; i < rot; i++) { [x0, z0, x1, z1] = [-z1, x0, -z0, x1]; }
-    return { min: new V3(x + Math.min(x0, x1), y0, z + Math.min(z0, z1)), max: new V3(x + Math.max(x0, x1), y1, z + Math.max(z0, z1)) };
+    const [x0, y0, z0, x1, y1, z1] = a, t = -rot * Math.PI / 2, c = Math.cos(t), sn = Math.sin(t);
+    let mnx = 1e9, mnz = 1e9, mxx = -1e9, mxz = -1e9;
+    for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) { const wx = px * c + pz * sn, wz = -px * sn + pz * c; mnx = Math.min(mnx, wx); mxx = Math.max(mxx, wx); mnz = Math.min(mnz, wz); mxz = Math.max(mxz, wz); }
+    return { min: new V3(x + mnx, y0, z + mnz), max: new V3(x + mxx, y1, z + mxz) };
   }
-  function fpOf(type, rot) { const f = CAT[type].fp; return rot % 2 ? [f[1], f[0]] : [f[0], f[1]]; }
+  function fpOf(type, rot) { const f = CAT[type].fp, t = rot * Math.PI / 2, c = Math.abs(Math.cos(t)), sn = Math.abs(Math.sin(t)); return [f[0] * c + f[1] * sn, f[0] * sn + f[1] * c]; }
   function rebuildColliders() { colliders.length = 0; for (const b of builds) { const d = CAT[b.type]; const [hx, hz] = CAT[b.type].fp; for (const a of (d.cols ? d.cols(hx, hz) : [])) colliders.push(Object.assign(rotAabb(a, b.rot, b.x, b.z), { b })); } bonusCache = null; }
   function addBuild(type, x, z, rot = 0, save = true) {
     const d = CAT[type]; const g = d.make(); g.position.set(x, 0, z); g.rotation.y = -rot * Math.PI / 2;
@@ -180,7 +182,7 @@ window.startGame = function () {
     b.g.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
     rebuildColliders(); persistBuilds();
   }
-  function persistBuilds() { S.builds = builds.map(b => ({ type: b.type, x: +b.x.toFixed(2), z: +b.z.toFixed(2), rot: b.rot })); }
+  function persistBuilds() { S.builds = builds.map(b => ({ type: b.type, x: +b.x.toFixed(2), z: +b.z.toFixed(2), rot: +(+b.rot).toFixed(4) })); }
   const bought = k => builds.filter(b => b.type === k).length;
   const cost = k => Math.round(CAT[k].base * Math.pow(CAT[k].grow, bought(k)));
   // ---- 展示位：一个建筑可有多个插槽（mount.slots = [[lx, ly, lz, yaw?], ...]）----
@@ -193,7 +195,7 @@ window.startGame = function () {
     const a = -b.rot * Math.PI / 2, c = Math.cos(a), sn = Math.sin(a);
     const m = h.hb.meta || {}, cut = m.cut || { x: 0, y: m.bottom != null ? m.bottom : -0.1, z: 0 };
     _so.set((cut.x || 0) * HS, (cut.y != null ? cut.y : -0.1) * HS - 0.005, (cut.z || 0) * HS).applyQuaternion(h.g.quaternion);
-    const y = d.mount.top != null ? d.mount.top + 0.004 : s[1] - 0.02;
+    const y = d.mount.top != null ? d.mount.top - 0.003 : s[1] - 0.02;
     h.g.position.set(b.x + s[0] * c + s[2] * sn - _so.x, y - _so.y, b.z - s[0] * sn + s[2] * c - _so.z);
   }
   function firstHead(b) { return b && b.heads ? b.heads.find(Boolean) || null : null; }
@@ -304,7 +306,7 @@ window.startGame = function () {
     if (!playing || uiOpen) return;
     if (e.code === 'KeyE') interactE();
     if (e.code === 'KeyF') inspectLook();
-    if (e.code === 'KeyR' && buildMode) { buildRot = (buildRot + 1) % 4; SFX.click(); }
+    if (e.code === 'KeyR' && buildMode) { buildRot = ((buildRot + (e.shiftKey ? -0.125 : 0.125)) % 4 + 4) % 4; SFX.click(); toast(`旋转 ${Math.round(buildRot * 90)}°（R / Shift+R，每次 11.25°）`, '#8fe0a0', 0.8); }
     if (e.code === 'KeyQ' && held) throwHeld(true);
     if (e.code === 'KeyQ' && bagCarrying) { bagCarrying = false; if (bagGroup) { bagGroup.position.copy(player.pos).add(new V3(0, 0, -0.8)); bagGroup.position.y = 0; } toast('你放下了麻袋。靠近它按 E 再扛起。', '#ccc'); }
     if (e.code === 'KeyV' && held) cycleHeldFace();
@@ -730,7 +732,9 @@ window.startGame = function () {
         if (p.x < c.min.x - RC || p.x > c.max.x + RC || p.z < c.min.z - RC || p.z > c.max.z + RC || p.y < c.min.y - RC || p.y > c.max.y + RC) continue;
         const cx = Math.max(c.min.x, Math.min(p.x, c.max.x)), cy = Math.max(c.min.y, Math.min(p.y, c.max.y)), cz = Math.max(c.min.z, Math.min(p.z, c.max.z));
         const dx = p.x - cx, dy = p.y - cy, dz = p.z - cz, d2 = dx * dx + dy * dy + dz * dz;
-        if (d2 < RC * RC) { const d = Math.sqrt(d2); if (d > 1e-5) contact(h, dx / d, dy / d, dz / d, RC - d); else contact(h, 0, 1, 0, RC); }
+        if (dy > 0 && Math.abs(dx) < 1e-6 && Math.abs(dz) < 1e-6) { if (dy < floorHead) contact(h, 0, 1, 0, floorHead - dy); continue; } // 顶面：按朝向的真实支撑高度，不再悬空
+        const rc = Math.min(RC, floorHead + 0.01);
+        if (d2 < rc * rc) { const d = Math.sqrt(d2); if (d > 1e-5) contact(h, dx / d, dy / d, dz / d, rc - d); else contact(h, 0, 1, 0, floorHead); }
       }
       for (const b of builds) {
         const mt = CAT[b.type].mount;
@@ -764,6 +768,8 @@ window.startGame = function () {
         }
       }
     }
+    // 被推挤的休眠首级也要做地面约束（修复“头陷进地里”）
+    for (const h of heads) { if (h === held || h.mount) continue; const fy = supportH(h); if (h.g.position.y < fy - 0.002) { h.g.position.y = fy; if (h.vel.y < 0) h.vel.y = 0; h.sleep = Math.min(h.sleep, 0.5); } const rr2 = Math.hypot(h.g.position.x, h.g.position.z), R2 = cave.R - 0.82; if (rr2 > R2) { h.g.position.x *= R2 / rr2; h.g.position.z *= R2 / rr2; } }
     for (const h of heads) {
       if (h === held || h.mount || h.sleep > 1.0) continue;
       if (h.grounded) {
@@ -801,11 +807,12 @@ window.startGame = function () {
 
   // ---------------- 建造放置 ----------------
   function startPlace(k) {
+    if (window.Unlocks && !Unlocks.has(k)) { SFX.deny(); return; }
     cancelBuild();
     buildMode = k; buildRot = 0;
     ghost = CAT[k].make(); ghost.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.55; o.material.depthWrite = false; } });
     scene.add(ghost);
-    toast(`放置 <b>${CAT[k].n}</b>：左键确认 · R 旋转 · 右键取消`, '#8fe0a0', 3);
+    toast(`放置 <b>${CAT[k].n}</b>：左键确认 · R/Shift+R 任意角度旋转 · 右键取消`, '#8fe0a0', 3);
   }
   function cancelBuild() { if (ghost) { scene.remove(ghost); ghost = null; } buildMode = null; }
   function updateGhost() {
@@ -979,7 +986,7 @@ window.startGame = function () {
       camera.getWorldDirection(dirV);
       const target = camera.position.clone().addScaledVector(dirV, 0.6).add(new V3(0, -0.12, 0));
       lastHeldPos.copy(held.g.position);
-      held.g.position.lerp(target, Math.min(1, dt * 16));
+      held.g.position.lerp(target, Math.min(1, dt * 16)); { const fy = supportH(held); if (held.g.position.y < fy) held.g.position.y = fy; }
       heldVel.subVectors(held.g.position, lastHeldPos).divideScalar(Math.max(dt, 1e-4)); held.vel.copy(heldVel);
       const faceQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(-player.pitch * 0.4, player.yaw, 0, 'YXZ'));
       faceQ.multiply(new THREE.Quaternion().setFromAxisAngle(UP, heldYaw)); held.g.quaternion.slerp(faceQ, Math.min(1, dt * 12));

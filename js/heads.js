@@ -106,7 +106,7 @@ window.ModelHeads = (() => {
     // 血光
     for (let i = 0; i < 30; i++) { g.fillStyle = 'rgba(255,90,90,0.25)'; g.beginPath(); g.arc(Math.random() * S, Math.random() * S, 1 + Math.random() * 2, 0, 6.283); g.fill(); }
     const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
-    cutMat = new THREE.MeshStandardMaterial({ map: t, roughness: 0.28, metalness: 0.05, bumpMap: t, bumpScale: 0.004, name: '__CUT__' });
+    cutMat = new THREE.MeshStandardMaterial({ map: t, roughness: 0.28, metalness: 0.05, bumpMap: t, bumpScale: 0.004, name: '__CUT__', side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
     return cutMat;
   }
 
