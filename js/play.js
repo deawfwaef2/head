@@ -430,6 +430,7 @@ window.Play = (() => {
         else if (cmd === 'hair') { if (!pay()) return; const [n, c] = H[+arg]; look.hn = n; look.hc1 = c; look.hn2 = n; look.hc2 = c; if (look.hn3) look.hn3 = n; }
         else if (cmd === 'face') { const [n, ex] = FACES[+arg]; look.ex = ex; look.exT = n; h.hb.setExpression && h.hb.setExpression(ex); SFX.click(); openDresser(h); return; }
         else if (cmd === 'mk') { const m = (look.mk || [0, 0, 0]).slice(); const k = +arg; m[k] = k === 1 ? (m[1] + 1) % 4 : (m[k] ? 0 : (k === 0 ? 0.75 : 1)); look.mk = m; }
+        M.dressed = (M.dressed || 0) + 1; saveM();
         G.rebuildHead(h); h.hb.setExpression && h.hb.setExpression(look.ex || {});
         G.burst(h.g.position, '#ffc8dc', 24, 1.2, 0.8, 0.5); SFX.confirm();
         openDresser(h);
@@ -479,12 +480,93 @@ window.Play = (() => {
   }
 
   // =====================================================================
+  // 8) 魂潮：随机降临的 20 秒狂欢，全部产出 ×3
+  // =====================================================================
+  let surge = 0, surgeT = 150 + Math.random() * 150, surgeEl = null;
+  function tickSurge(dt) {
+    if (surge > 0) {
+      surge -= dt;
+      if (!surgeEl) { surgeEl = document.createElement('div'); surgeEl.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:3;box-shadow:inset 0 0 140px 40px rgba(255,190,60,.45);transition:opacity .5s'; document.body.appendChild(surgeEl); }
+      surgeEl.style.opacity = G.uiOpen ? 0 : 0.6 + Math.sin(now() * 5) * 0.3;
+      if (Math.random() < dt * 14 && G.heads.length) { const h = G.heads[Math.floor(Math.random() * G.heads.length)]; G.soulWisp(h.g.position.clone().add(new V3(0, 0.2, 0)), '#ffd27a'); }
+      if (surge <= 0) { surgeEl.remove(); surgeEl = null; G.toast('魂潮退去了。', '#e6c7a0', 2); }
+      return;
+    }
+    if (!G.playing || G.uiOpen || G.cine || G.heads.length < 3) return;
+    surgeT -= dt; if (surgeT > 0) return;
+    surgeT = 360 + Math.random() * 300; surge = 20;
+    banner('魂潮来袭！', '20 秒内全部产出 ×3 —— 快去把玩！', '#ffd27a'); SFX.fanfare(2); G.flash('rgba(255,200,60,0.5)');
+    M.surges = (M.surges || 0) + 1;
+  }
+  const baseMul = api.mul; api.mul = () => baseMul() * (surge > 0 ? 3 : 1);
+
+  // =====================================================================
+  // 9) 成就（跨轮回永久；奖励魂晶或魂核）
+  // =====================================================================
+  const nHeads = () => G.S.heads.length;
+  const ACH = [
+    ['h10', '初窥门径', '收藏 10 颗首级', () => nHeads() >= 10, 500],
+    ['h50', '满室琳琅', '收藏 50 颗首级', () => nHeads() >= 50, 5000],
+    ['h120', '首级博物馆', '收藏 120 颗首级', () => nHeads() >= 120, 1, 'core'],
+    ['shiny1', '异色之光', '获得第一颗异色首级', () => (G.S.shinySeen || 0) >= 1, 3000],
+    ['shiny5', '光谱收藏家', '累计获得 5 颗异色首级', () => (G.S.shinySeen || 0) + (M.shinySeen || 0) >= 5, 2, 'core'],
+    ['god', '神魂降临', '拥有一颗神魂首级', () => G.S.heads.some(r => r.c.rar >= 4), 1, 'core'],
+    ['aff3', '魂印满身', '拥有一颗带 3 条以上魂印的首级', () => G.S.heads.some(r => (r.c.aff || []).length >= 3), 4000],
+    ['fuse1', '炉火初燃', '第一次熔魂', () => (M.fused || 0) >= 1, 800],
+    ['fuse20', '熔魂宗师', '熔魂 20 次', () => (M.fused || 0) >= 20, 2, 'core'],
+    ['strike1', '全中！', '第一次 STRIKE', () => (M.strikes || 0) >= 1, 600],
+    ['strike3', '火鸡', '连续 3 次全中', () => (M.best || 0) >= 3, 1, 'core'],
+    ['strike25', '球道之王', '累计 25 次全中', () => (M.strikes || 0) >= 25, 2, 'core'],
+    ['thief1', '驱魂', '击散第一只盗魂灵', () => (M.thieves || 0) >= 1, 1000],
+    ['thief15', '猎魂人', '击散 15 只盗魂灵', () => (M.thieves || 0) >= 15, 2, 'core'],
+    ['chat30', '八卦中心', '听首级们闲聊 30 次', () => (M.chats || 0) >= 30, 1500],
+    ['dress', '造型师', '在化妆台打扮一颗首级', () => (M.dressed || 0) >= 1, 400],
+    ['cx20', '见多识广', '图鉴收录 20 种身份', () => G.codexInfo().nIds >= 20, 3000],
+    ['cx40', '百科全书', '图鉴收录 40 种身份', () => G.codexInfo().nIds >= 40, 2, 'core'],
+    ['cxall', '万魂归一', '图鉴收录全部身份', () => G.codexInfo().nIds >= G.codexInfo().totalIds, 5, 'core'],
+    ['exC', '小有名气', '展厅评级达到 C', () => G.exhibit().tier >= 3, 2000],
+    ['exA', '远近闻名', '展厅评级达到 A', () => G.exhibit().tier >= 5, 2, 'core'],
+    ['exSS', '传说展厅', '展厅评级达到 SS', () => G.exhibit().tier >= 7, 4, 'core'],
+    ['e1m', '魂晶百万', '单世累计获得 100 万魂晶', () => (G.S.stats.earned || 0) >= 1e6, 2, 'core'],
+    ['e100m', '魂晶亿万', '单世累计获得 1 亿魂晶', () => (G.S.stats.earned || 0) >= 1e8, 5, 'core'],
+    ['deep', '深渊探索者', '洞窟挖到最深处', () => !BuildCat.DIG[G.S.depth], 2, 'core'],
+    ['rb1', '初次轮回', '完成第一次轮回', () => (M.rb || 0) >= 1, 1, 'core'],
+    ['rb5', '轮回者', '完成 5 次轮回', () => (M.rb || 0) >= 5, 5, 'core'],
+    ['surge5', '逐浪者', '经历 5 次魂潮', () => (M.surges || 0) >= 5, 2500]
+  ];
+  let achT = 5;
+  function tickAch(dt) {
+    achT -= dt; if (achT > 0) return; achT = 3;
+    M.ach = M.ach || {};
+    for (const [k, n, d, chk, rw, kind] of ACH) {
+      if (M.ach[k]) continue;
+      let ok = false; try { ok = chk(); } catch (e) {}
+      if (!ok) continue;
+      M.ach[k] = Date.now();
+      let txt;
+      if (kind === 'core') { M.cores += rw; M.total = (M.total || 0) + rw; txt = `+${rw} 魂核`; }
+      else { const v = Math.round(rw * Math.pow(1.6, (G.S.depth || 1) - 1)); G.addCoins(v); txt = `+${fmt(v)} 魂晶`; }
+      saveM(); SFX.fanfare(1);
+      G.toast(`🏅 成就达成「${n}」—— ${d} · ${txt}`, '#ffd27a', 5);
+      break;
+    }
+  }
+  function openAch() {
+    M.ach = M.ach || {};
+    const got = ACH.filter(a => M.ach[a[0]]).length;
+    openModal(`<button class="pbtn pclose" data-a="close">✕ 关闭</button><h2>🏅 成就 ${got}/${ACH.length}</h2><div class="sub">成就跨轮回永久保留。魂核可在「轮回祭坛」兑换永久天赋。</div>
+      ${ACH.map(([k, n, d, , rw, kind]) => `<div class="perk" style="${M.ach[k] ? 'border-color:#8a6a2a;background:#2a2016' : 'opacity:.62'}"><div class="pi">${M.ach[k] ? '🏅' : '🔒'}</div><div class="pt"><b>${n}</b><small>${d}</small></div><div style="font-size:13px;color:${kind === 'core' ? '#9adfff' : '#e0c8ff'}">${kind === 'core' ? `💠 ${rw}` : `🔮 ${fmt(rw)}+`}</div></div>`).join('')}`,
+      a => { if (a === 'close') closeModal(); });
+  }
+  addEventListener('keydown', e => { if (e.code === 'KeyJ' && !e.repeat && !modal && window.G && G.playing && !G.uiOpen && !(window.Seance && Seance.active)) openAch(); });
+
+  // =====================================================================
   // 挂钩
   // =====================================================================
   function init() {
     const HK = G.HOOK;
     applyPending();
-    HK.frame.push((dt) => { tickForge(dt); tickBowling(dt); tickChat(dt); tickThief(dt); tickHand(dt);
+    HK.frame.push((dt) => { tickForge(dt); tickBowling(dt); tickChat(dt); tickThief(dt); tickHand(dt); tickSurge(dt); tickAch(dt);
       for (const b of G.builds) if (b.g.userData.rorb) { const o = b.g.userData.rorb, t = now(); o.position.y = 1.35 + Math.sin(t * 1.3) * 0.04; o.rotation.y = t * 0.5; o.children.forEach((c, i) => { if (i) c.rotation.x += dt * (0.4 + i * 0.3); }); } });
     HK.click.push(() => hitThief());
     HK.e.push((hit, held, pickup) => {
@@ -506,7 +588,7 @@ window.Play = (() => {
       return null;
     });
   }
-  api.init = init; api.openAltar = openAltar; api.openDresser = openDresser; api.spawnThief = spawnThief; api.fuse = fuse;
-  api._dbg = { get thief() { return thief; }, hitThief: () => { if (!thief) return; thief.hp = 1; thief.hitT = 0; killThief(true); }, chat: () => startChat(), coresFor };
+  api.init = init; api.openAch = openAch; api.openAltar = openAltar; api.openDresser = openDresser; api.spawnThief = spawnThief; api.fuse = fuse;
+  api._dbg = { get thief() { return thief; }, hitThief: () => { if (!thief) return; thief.hp = 1; thief.hitT = 0; killThief(true); }, chat: () => startChat(), coresFor, rebirth: () => rebirth(), surge: () => { surgeT = 0; } };
   return api;
 })();
