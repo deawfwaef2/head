@@ -246,7 +246,7 @@ window.Chess = (() => {
     const top = 0.13 + hgt;
     let hb = null;
     try { hb = ModelHeads.create(p.rec.look); const S = 2.6; hb.group.scale.setScalar(S); const meta = hb.meta || {}, cut = meta.cut || { x: 0, y: meta.bottom || -0.1, z: 0 };
-      hb.group.rotation.y = Math.PI; hb.group.position.set((cut.x || 0) * S, top - cut.y * S - 0.01, (cut.z || 0) * S); // 双方都面朝镜头一侧（+z），红方看得见脸，蓝方面朝红方
+      hb.group.position.set(-(cut.x || 0) * S, top - cut.y * S - 0.01, -(cut.z || 0) * S); // 面朝 +z（镜头/红方一侧），看得见脸 // 双方都面朝镜头一侧（+z），红方看得见脸，蓝方面朝红方
       hb.group.traverse(o => { if (o.isMesh) o.castShadow = true; }); g.add(hb.group);
     } catch (e) { console.warn('chess head', e); }
     const gs = glyphSprite(p.t, side); gs.position.y = top + 0.78; g.add(gs); g.userData.glyph = gs;
@@ -408,7 +408,7 @@ window.Chess = (() => {
     st.T = h.T; st.S = h.S; st.turn = h.turn; st.last = h.last; st.moveN = h.moveN;
     st.pieces.forEach((p, i) => { const [alive, sq, t] = h.pos[i]; p.sq = sq; if (p.t !== t) { p.t = t; } if (alive && !p.alive) restore(p); p.alive = alive; const q = sqPos(sq); p.g.position.set(q.x, 0, q.z); });
     st.anims = st.anims.filter(a => a.dur < 99); st.sel = -1; st.targets = []; updTurn(); markTargets(); say('悔棋？嘿嘿，地精很大方的——这次。'); }
-  function restore(p) { if (p.fallen && p.fallen !== p.g) { scene.remove(p.fallen); p.g.add(p.fallen); const hb = p.hb; const S = 2.6; hb.group.scale.setScalar(S); hb.group.quaternion.identity(); hb.group.rotation.y = Math.PI; hb.group.position.copy(p.headPos); }
+  function restore(p) { if (p.fallen && p.fallen !== p.g) { scene.remove(p.fallen); p.g.add(p.fallen); const hb = p.hb; const S = 2.6; hb.group.scale.setScalar(S); hb.group.quaternion.identity(); hb.group.position.copy(p.headPos); }
     p.g.scale.setScalar(1); p.g.visible = true; if (p.g.userData.glyph) p.g.userData.glyph.visible = true; if (p.fallen === p.g) p.g.quaternion.identity(); p.fallen = null; if (!p.g.parent) scene.add(p.g); }
   function updTurn() { const t = el.querySelector('.ch-turn'); if (st.over) return; t.innerHTML = st.mode === 'pvp' ? (st.turn === 0 ? '⚪ 红方（下方）走棋' : '⚫ 蓝方（上方）走棋') : (st.turn === 0 ? '⚪ 你的回合' : '⚫ 斯尼克思考中…'); }
   function finish(winner, why) {
@@ -434,7 +434,7 @@ window.Chess = (() => {
   }
   function start(opt) { // opt: {mode:'ai'|'pvp', lv, white:{list,leader}, black:{list,leader}|null(wood)}
     ensure(); hitList.length = 0; if (scene) dispose();
-    st = { mode: opt.mode, lv: opt.lv || 1, T: new Array(64).fill(''), S: new Array(64).fill(-1), pieces: [], turn: 0, sel: -1, targets: [], anims: [], hist: [], moveN: 1, cam: { t: 0, tt: 0, tp: 0.72, d: 11.5 }, autoFlip: opt.mode === 'pvp', over: false, busy: false, last: null };
+    st = { mode: opt.mode, lv: opt.lv || 1, T: new Array(64).fill(''), S: new Array(64).fill(-1), pieces: [], turn: 0, sel: -1, targets: [], anims: [], hist: [], moveN: 1, cam: { t: 0, tt: 0, tp: 0.62, d: 11 }, autoFlip: opt.mode === 'pvp', over: false, busy: false, last: null };
     st.scene = buildScene();
     const place = (pc, side) => { const sq = pc.r * 8 + pc.f; if (st.T[sq]) return; st.T[sq] = pc.t; st.S[sq] = side;
       const p = { t: pc.t, s: side, sq, rec: pc.rec || null, alive: true }; p.g = pc.rec ? headPiece(p) : woodPiece(pc.t, side); p.hb = p.g.userData.hb || null; if (p.hb) p.headPos = p.hb.group.position.clone();
