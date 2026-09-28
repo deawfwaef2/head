@@ -114,12 +114,12 @@ window.RPG = (() => {
         const mem = Lore.memory(r, c, { weapon: wpn, q: qq, hurt });
         const h = { c, look, sig, mem, story: Lore.backstory(r, c), app: Lore.appearance(c, look), date: Date.now() };
         heads.push(h);
-        beats.push({ t: `你遇到了【${Lore.RAR[c.rar]}】${c.raceN}${c.idN}「${c.name}」。` + (dmg > 0 ? `一番厮杀后你砍下了她的头（-${dmg} HP）。` : '你轻松地砍下了她的头。'), hp: -dmg, head: h });
+        beats.push({ t: `你遇到了【${Lore.RAR[c.rar]}】${c.raceN}${c.idN}「${c.name}」。` + (dmg > 0 ? `一番厮杀后你砍下了她的头（-${dmg} HP）。` : '你轻松地砍下了她的头。'), hp: -dmg, head: h, enc: i });
       } else if (won) {
-        beats.push({ t: `你又砍翻了一个${c.idN}「${c.name}」，可背篓已经满了，只能把她的头留在原地。（-${dmg} HP）`, hp: -dmg, coin: Math.round(loc.loot[0] * 0.3) });
+        beats.push({ t: `你又砍翻了一个${c.idN}「${c.name}」，可背篓已经满了，只能把她的头留在原地。` + (dmg > 0 ? `（-${dmg} HP）` : ''), hp: -dmg, enc: i, coin: Math.round(loc.loot[0] * 0.3) });
       } else {
         const fail = [`${c.raceN}${c.idN}「${c.name}」${Lore.ID[c.id].fight}。你被打得节节败退，她趁机逃走了。`, `你扑向${c.idN}「${c.name}」，却中了她的圈套。等你挣脱时她早已不见踪影。`, `「${c.name}」比你强。你被她${Lore.ID[c.id].fight.slice(0, 12)}……狼狈地逃了出来。`];
-        beats.push({ t: Lore.pick(r, fail) + `（-${dmg} HP）`, hp: -dmg });
+        beats.push({ t: Lore.pick(r, fail) + (dmg > 0 ? `（-${dmg} HP）` : ''), hp: -dmg, enc: i });
       }
     }
     const coins = Math.round((loc.loot[0] + r() * (loc.loot[1] - loc.loot[0])) * (0.5 + Math.min(1.5, q) * 0.5));
@@ -127,6 +127,9 @@ window.RPG = (() => {
     // 打散：把旅途事件和遭遇交错
     const first = beats.shift(), last = beats.pop();
     for (let i = beats.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [beats[i], beats[j]] = [beats[j], beats[i]]; }
+    // 遭遇按发生顺序排列（“背篓满了”不会早于装满它的那几次）
+    const pos = [], enc = []; beats.forEach((b, i) => { if (b.enc != null) { pos.push(i); enc.push(b); } });
+    enc.sort((a, b) => a.enc - b.enc); pos.forEach((p, i) => beats[p] = enc[i]);
     beats.unshift(first); beats.push(last);
     return { beats, heads, q };
   }

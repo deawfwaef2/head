@@ -385,6 +385,65 @@ window.ModelHeads = (() => {
     };
   }
 
+  // ---- 发型移植：径向头皮高度图 + 顶点转移（把 H 的头发从 H 的头皮“搬”到 F 的头皮上，保持离头皮的距离） ----
+  const NT = 24, NP = 48;
+  function skullMap(t) {
+    if (t.skull) return t.skull;
+    const box = new THREE.Box3(), v = new V3();
+    const skins = t.faceMeshes.filter(m => m.userData.kind === 'skin');
+    for (const m of skins) { const P = m.geometry.attributes.position; for (let i = 0; i < P.count; i++) box.expandByPoint(v.fromBufferAttribute(P, i)); }
+    const eyeY = (t.meta.eye && t.meta.eye[1] != null) ? t.meta.eye[1] : (box.min.y + box.max.y) / 2;
+    const c = new V3((box.min.x + box.max.x) / 2, eyeY, (box.min.z + box.max.z) / 2);
+    const R = new Float32Array(NT * NP).fill(-1);
+    for (const m of skins) {
+      const P = m.geometry.attributes.position;
+      for (let i = 0; i < P.count; i++) {
+        v.fromBufferAttribute(P, i).sub(c); const r = v.length(); if (r < 1e-5) continue;
+        const k = binOf(v.x / r, v.y / r, v.z / r); if (r > R[k]) R[k] = r;
+      }
+    }
+    // 空格子用邻居填
+    for (let pass = 0; pass < 6; pass++) for (let a = 0; a < NT; a++) for (let b = 0; b < NP; b++) {
+      const k = a * NP + b; if (R[k] > 0) continue; let s = 0, n = 0;
+      for (const [da, db] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const aa = a + da; if (aa < 0 || aa >= NT) continue; const kk = aa * NP + ((b + db + NP) % NP); if (R[kk] > 0) { s += R[kk]; n++; } }
+      if (n) R[k] = s / n;
+    }
+    return (t.skull = { c, R, eyeY, bottom: box.min.y });
+  }
+  function binOf(x, y, z) { const th = Math.acos(Math.max(-1, Math.min(1, y))); const ph = Math.atan2(z, x) + Math.PI; return Math.min(NT - 1, Math.floor(th / Math.PI * NT)) * NP + Math.min(NP - 1, Math.floor(ph / (2 * Math.PI) * NP)); }
+  function radAt(S, x, y, z) { // 双线性插值
+    const th = Math.acos(Math.max(-1, Math.min(1, y))) / Math.PI * NT - 0.5, ph = (Math.atan2(z, x) + Math.PI) / (2 * Math.PI) * NP - 0.5;
+    const a0 = Math.max(0, Math.min(NT - 1, Math.floor(th))), a1 = Math.min(NT - 1, a0 + 1), fa = Math.max(0, Math.min(1, th - a0));
+    const b0 = ((Math.floor(ph) % NP) + NP) % NP, b1 = (b0 + 1) % NP, fb = ph - Math.floor(ph);
+    const g = (a, b) => S.R[a * NP + b];
+    return (g(a0, b0) * (1 - fb) + g(a0, b1) * fb) * (1 - fa) + (g(a1, b0) * (1 - fb) + g(a1, b1) * fb) * fa;
+  }
+  const FIT = new Map();
+  function fitHair(F, H) {
+    const key = F.meta.file + '|' + H.meta.file; if (FIT.has(key)) return FIT.get(key);
+    const SF = skullMap(F), SH = skullMap(H), v = new V3();
+    const out = H.hairMeshes.map(m => {
+      const src = m.geometry, P = src.attributes.position, np = new Float32Array(P.count * 3);
+      for (let i = 0; i < P.count; i++) {
+        v.fromBufferAttribute(P, i).sub(SH.c); const r = v.length() || 1e-5; const dx = v.x / r, dy = v.y / r, dz = v.z / r;
+        const rh = radAt(SH, dx, dy, dz), rf = radAt(SF, dx, dy, dz);
+        // 眼睛以上完全转移；往下逐渐淡出（长发自然垂落，不按脸颊变形）
+        const yy = v.y; const w = Math.max(0, Math.min(1, (yy + 0.045) / 0.05));
+        let r2 = r + (rf - rh) * w;
+        const off = r - rh; // 原本离头皮的距离
+        if (w > 0.5 && off > -0.004) r2 = Math.max(r2, rf + Math.max(0.0015, off * 0.9)); // 头皮上方的头发绝不能陷进新头皮
+        np[i * 3] = SF.c.x + dx * r2; np[i * 3 + 1] = SF.c.y + dy * r2; np[i * 3 + 2] = SF.c.z + dz * r2;
+      }
+      const g = new THREE.BufferGeometry();
+      for (const k in src.attributes) g.setAttribute(k, src.attributes[k]);
+      g.setAttribute('position', new THREE.BufferAttribute(np, 3)); g.setIndex(src.index);
+      src.groups.forEach(gr => g.addGroup(gr.start, gr.count, gr.materialIndex));
+      g.computeBoundingSphere(); g.computeBoundingBox();
+      return g;
+    });
+    FIT.set(key, out); return out;
+  }
+
   function create(look) {
     let fi = idxOf(look.f); if (fi < 0) fi = 0;
     let hi = idxOf(look.h); if (hi < 0) hi = fi;
@@ -418,8 +477,13 @@ window.ModelHeads = (() => {
       byName[m.name] = c; g.add(c);
     }
     // 表情：持有时可热切换，不眨眼、不重建模型。
-    const setExpression = (ex = {}) => {
+    const setExpression = (ex0 = {}) => {
       for (const m of Object.values(byName)) if (m.morphTargetInfluences) m.morphTargetInfluences.fill(0);
+      // 限制张嘴幅度：VRoid 的 A/O/Surprised 大幅张嘴会让下巴脱离脸型
+      const ex = Object.assign({}, ex0); if (ex.surprised > 0.5) ex.surprised = 0.5;
+      const MOUTH = ['aa', 'oh', 'ee', 'ih', 'ou'];
+      const mSum = MOUTH.reduce((s, k) => s + (ex[k] || 0), 0) + (ex.surprised || 0) * 0.5;
+      if (mSum > 0.28) { const f = 0.28 / mSum; MOUTH.forEach(k => { if (ex[k]) ex[k] *= f; }); if (ex.surprised) ex.surprised = Math.min(ex.surprised, 0.5 * Math.max(0.4, f)); }
       for (const k in ex) {
         const binds = presets[k]; if (!binds) continue;
         for (const [mn, idx, wt] of binds) { const c = byName[mn]; if (c && c.morphTargetInfluences) c.morphTargetInfluences[idx] = Math.min(1, c.morphTargetInfluences[idx] + wt * ex[k]); }
@@ -428,8 +492,10 @@ window.ModelHeads = (() => {
     setExpression(look.ex || {});
     // 发型
     const hg = new THREE.Group(); g.add(hg);
-    if (hi !== fi) { const sy = (F.meta.skullTop || 0.1) / (H.meta.skullTop || 0.1); hg.scale.set(1.04, sy * 1.04, 1.045); hg.position.set(0, 0.002, 0.003); } else { hg.scale.set(1.008, 1.008, 1.008); hg.position.z = 0.002; }
-    for (const m of H.hairMeshes) { const c = new THREE.Mesh(m.geometry, getMat(m, H)); c.renderOrder = m.renderOrder; hg.add(c); }
+    // 借用发型：按头皮高度图精确贴合（见 fitHair），不再整体缩放
+    if (hi === fi) { hg.scale.set(1.008, 1.008, 1.008); hg.position.z = 0.002; }
+    const hairGeos = hi !== fi ? fitHair(F, H) : H.hairMeshes.map(m => m.geometry);
+    H.hairMeshes.forEach((m, i) => { const c = new THREE.Mesh(hairGeos[i], getMat(m, H)); c.renderOrder = m.renderOrder; hg.add(c); });
     const disposables = [];
     addAccessories(g, look, F.meta, U, disposables);
     const radius = 0.1;
