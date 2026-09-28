@@ -824,5 +824,5 @@
     renderer.render(scene, camera);
   }
   frame();
-  window.__cam = camera; window.__game = { player, S, heads, builds, dropHead, addCoins };
+  window.__cam = camera; window.__game = { poke, trigger, addBuild, mountOnPole, tableOf, save, player, S, heads, builds, dropHead, addCoins };
 })();

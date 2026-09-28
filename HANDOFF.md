@@ -24,3 +24,10 @@
 
 ## 进度日志（追加）
 - [v0] 初始化仓库与 handoff。
+- [v1] `1/index.html` 可双击运行（Chrome/Edge）。结构：
+  - `1/lib/three.min.js`（three r149 classic build，勿换成 ES module 版本）
+  - `1/js/audio.js` 程序化音效+BGM；`1/js/headgen.js` 程序化二次元头（表情12种、5稀有度、发型/饰品）；`1/js/game.js` 主逻辑（自写球体物理、建造、存档 localStorage key `head_game_save_v1`）
+  - 已实现：按钮→管道掉头(首2个免费)，把玩(左键)/拿起(E)/扔(右键)，连击倍率，桌子连锁，杆子10秒自动，幸运符升级，XX 卖出/拆除，飘字/粒子/冲击环/稀有光柱/震屏。
+  - 调试钩子：`window.__game`（dropHead, addCoins, poke...）。测试脚本在工作区 /home/user/tmp（不在仓库）。
+  - 总大小 ~0.7MB。
+- 待办/可改进：换授权允许的高质量头模（需 GLB 转 base64 .js 才能 file:// 加载）；真实录音音效（CC0，同样转 base64 .js）；更多建造物；头模更精致（眼睛更大、发量）。
