@@ -122,6 +122,8 @@ window.startGame = function () {
     return p;
   }
   function createHead(rec, pos, quat) {
+    if (rec.look.hw === undefined && window.HeadWear) rec.look.hw = HeadWear.roll(rec.look.seed || rec.id, rec.c, rec.look);
+    if (!rec.look.mk) { let s = ((rec.look.seed || rec.id) * 9301 + 49297) % 233280; const rr = () => (s = (s * 9301 + 49297) % 233280) / 233280; rec.look.mk = [rr() < 0.5 ? +(0.35 + rr() * 0.6).toFixed(2) : 0, rr() < 0.2 ? 1 + Math.floor(rr() * 3) : 0, rr() < 0.13 ? 1 : 0]; }
     const hb = ModelHeads.create(rec.look);
     const g = new THREE.Group(); hb.group.scale.setScalar(HS); hb.group.position.y = -0.005; g.add(hb.group);
     const hit = new THREE.Mesh(hitGeo, hitMat); g.add(hit);

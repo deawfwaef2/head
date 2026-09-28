@@ -182,11 +182,11 @@ window.ModelHeads = (() => {
   function skinMat(src, U) {
     const m = new THREE.MeshToonMaterial({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: src.depthWrite });
     m.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, { uHover: U.hover, uSkin: U.skin, uPale: U.pale, uBlood: U.blood, uSpat: U.spat, uSeed: U.seed, uCutY: U.cutY, uH: U.hH, uScar: U.scar, uPaint: U.paint, uPaintC: U.paintC, uEye: U.eye });
+      Object.assign(sh.uniforms, { uMk: U.mk, uHover: U.hover, uSkin: U.skin, uPale: U.pale, uBlood: U.blood, uSpat: U.spat, uSeed: U.seed, uCutY: U.cutY, uH: U.hH, uScar: U.scar, uPaint: U.paint, uPaintC: U.paintC, uEye: U.eye });
       injectVertex(sh, false);
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <dithering_fragment>', '\n#include <dithering_fragment>\n gl_FragColor.rgb += uHover * (0.1 + 0.6 * pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 2.2)) * vec3(1.0, 0.8, 0.5);')
-        .replace('void main() {', `varying vec3 vHP; uniform float uHover; uniform vec3 uSkin; uniform float uPale; uniform float uBlood; uniform float uSpat; uniform float uSeed; uniform float uCutY; uniform float uH;
+        .replace('void main() {', `varying vec3 vHP; uniform float uHover; uniform vec3 uMk; uniform vec3 uSkin; uniform float uPale; uniform float uBlood; uniform float uSpat; uniform float uSeed; uniform float uCutY; uniform float uH;
           uniform vec4 uScar; uniform float uPaint; uniform vec3 uPaintC; uniform vec3 uEye; ${NOISE}
           float segD(vec2 p, vec2 a, vec2 b){ vec2 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0); return length(pa-ba*h); }
           void main() {`)
@@ -195,6 +195,15 @@ window.ModelHeads = (() => {
           float gl = dot(diffuseColor.rgb, vec3(0.3,0.59,0.11));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(gl) * vec3(0.9, 0.93, 1.0), uPale);
           bool front = vHP.z > 0.0;
+          if (front) { // 腮红 / 泪痣 / 雀斑
+            vec2 ck = vec2((abs(vHP.x) - abs(uEye.x) * 1.02) * 0.85, vHP.y - (uEye.y - 0.025));
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0, 0.5, 0.55), uMk.x * 0.42 * smoothstep(0.017, 0.0, length(ck)));
+            if (uMk.y > 0.5) { vec2 mp = uMk.y < 1.5 ? vec2(abs(uEye.x) + 0.006, uEye.y - 0.017) : uMk.y < 2.5 ? vec2(-abs(uEye.x) - 0.006, uEye.y - 0.017) : vec2(0.013, uEye.y - 0.058);
+              diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.25, 0.12, 0.1), 0.85 * smoothstep(0.0019, 0.0011, length(vHP.xy - mp))); }
+            if (uMk.z > 0.5) { vec2 cell = floor(vHP.xy * 900.0); float hsh = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+              float inReg = smoothstep(0.022, 0.012, length(vec2(abs(vHP.x) - abs(uEye.x) * 0.9, (vHP.y - (uEye.y - 0.022)) * 1.6)));
+              diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62, 0.36, 0.26), step(0.93, hsh) * inReg * 0.55); }
+          }
           // 战纹
           if (uPaint > 0.5 && front) {
             vec2 q = vec2(abs(vHP.x), vHP.y); float pm = 0.0;
@@ -222,7 +231,7 @@ window.ModelHeads = (() => {
           vec3 blood = mix(vec3(0.20, 0.0, 0.01), vec3(0.42, 0.02, 0.03), sp);
           diffuseColor.rgb = mix(diffuseColor.rgb, blood, bm * 0.88);`);
     };
-    m.customProgramCacheKey = () => 'skin4';
+    m.customProgramCacheKey = () => 'skin5';
     return m;
   }
 
@@ -298,7 +307,7 @@ window.ModelHeads = (() => {
         else { cr.position.set(0.004, top - 0.004, -0.008); cr.rotation.z = -0.12; }
         g.add(cr);
       }
-      if (a === 'flowers') {
+      if (a === 'flowers' && !(look.hw || []).some(e => e.k === 'flowercrown')) {
         const cols = ['#ffffff', '#ffd0e0', '#ffe27a', '#c8a8ff', '#ff8aa8'];
         for (let i = 0; i < 9; i++) {
           const an = (i / 9) * Math.PI * 2;
@@ -401,7 +410,7 @@ window.ModelHeads = (() => {
       sway: { value: new V3() }, hTop: { value: top * 0.55 }, hLen: { value: Math.max(0.08, top * 0.55 - hairT.hairMinY) },
       ec1: { value: new THREE.Color(look.ec1) }, ec2: { value: new THREE.Color(look.ec2) }, dull: { value: look.glowEye ? 0.08 : 0.45 }, glow: { value: look.glowEye ? 0.9 : 0 }, shiny: { value: look.shiny || 0 },
       skin: { value: new V3(sk.r / baseSkin.r, sk.g / baseSkin.g, sk.b / baseSkin.b) }, pale: { value: look.pale },
-      blood: { value: look.blood }, spat: { value: look.spat }, seed: { value: look.seed }, ph: { value: ((look.seed || 0) * 7.13) % 6.283 }, hover: { value: 0 },
+      blood: { value: look.blood }, spat: { value: look.spat }, seed: { value: look.seed }, ph: { value: ((look.seed || 0) * 7.13) % 6.283 }, hover: { value: 0 }, mk: { value: new THREE.Vector3(...(look.mk || [0, 0, 0])) },
       cutY: { value: faceMeta.bottom }, hH: { value: (faceMeta.skullTop || 0.1) - faceMeta.bottom },
       scar: { value: look.scar ? new THREE.Vector4(...look.scar) : new THREE.Vector4(-10, 0, 0, 0) },
       paint: { value: look.paint }, paintC: { value: new THREE.Color(look.paintC) },
@@ -638,6 +647,7 @@ window.ModelHeads = (() => {
     const S = hairShell(F, H, F.meta.file + '|' + H.meta.file + (hi === fi ? '|own' : ''), hairGeos);
     if (look.hx && F.meta.grp !== 'godette') try { addHairX(hg, look, S, U, disposables); } catch (e) { console.warn('hairX', e); }
     addAccessories(g, look, F.meta, U, disposables, S.top);
+    if (window.HeadWear && look.hw && look.hw.length) try { HeadWear.build({ g, look, S, onShell, grad, disp: disposables }); } catch (e) { console.warn('headwear', e); }
     const radius = 0.1;
     return {
       group: g, U, radius, meta: F.meta, hl: hlMeshes, presets,
