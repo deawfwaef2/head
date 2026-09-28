@@ -98,12 +98,33 @@ window.BuildCat = (() => {
       const bowl = mesh(new THREE.TorusGeometry(0.2, 0.025, 8, 28), M.gold, 0, 1.06, 0); bowl.rotation.x = Math.PI / 2; g.add(bowl);
       const runeC = mesh(new THREE.RingGeometry(0.55, 0.6, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color('#b06aff').multiplyScalar(1.4), transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false }), 0, 0.012, 0); runeC.rotation.x = -Math.PI / 2; g.add(runeC);
       const float = new THREE.Group(); float.position.y = 1.1; g.add(float);
-      const halo = mesh(new THREE.TorusGeometry(0.3, 0.008, 6, 48), glowMat('#c88aff', 1.8), 0, 0.02, 0); halo.rotation.x = Math.PI / 2; float.add(halo);
-      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; const rn = box(0.05, 0.07, 0.006, glowMat(i % 2 ? '#8ad8ff' : '#d08aff', 1.6), Math.cos(a) * 0.3, 0.06, Math.sin(a) * 0.3); rn.rotation.y = -a + Math.PI / 2; float.add(rn); }
-      for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2 + 0.5; const w = mesh(new THREE.SphereGeometry(0.022, 8, 6), glowMat('#e0c8ff', 2), Math.cos(a) * 0.42, 0.25 + i * 0.07, Math.sin(a) * 0.42); float.add(w); }
+      const halo = mesh(new THREE.TorusGeometry(0.3, 0.008, 6, 48), glowMat('#a060ff', 1.1), 0, 0.02, 0); halo.rotation.x = Math.PI / 2; float.add(halo);
+      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; const rn = box(0.05, 0.07, 0.006, glowMat(i % 2 ? '#4a9aff' : '#a04aff', 1.0), Math.cos(a) * 0.3, 0.06, Math.sin(a) * 0.3); rn.rotation.y = -a + Math.PI / 2; float.add(rn); }
+      for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2 + 0.5; const w = mesh(new THREE.SphereGeometry(0.022, 8, 6), glowMat('#c090ff', 1.2), Math.cos(a) * 0.42, 0.25 + i * 0.07, Math.sin(a) * 0.42); float.add(w); }
       for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + Math.PI / 4; g.add(cyl(0.025, 0.028, 0.16, M.bone, Math.cos(a) * 0.5, 0.08, Math.sin(a) * 0.5, 8)); g.add(flame(Math.cos(a) * 0.5, 0.16, Math.sin(a) * 0.5, 0.55, '#b07aff')); }
       g.userData.float = float; return g; },
     cols: () => [[-0.36, 0, -0.36, 0.36, 0.14, 0.36], [-0.2, 0, -0.2, 0.2, 1.06, 0.2]] };
+  C.showcase = { cat: 'func', n: '展示柜', icon: '🏆', base: 180, grow: 1.55, fp: [0.36, 0.36], stat: { soul: 1 }, desc: '旋转天鹅绒展台 + 铭牌 + 聚光：展出的首级展厅分 ×1.6，每 12 秒 ×1.5 产出', mount: { y: 1.1, period: 12, mult: 1.5, labelY: 1.75 }, showcase: true,
+    make() { const g = new THREE.Group();
+      g.add(box(0.56, 0.86, 0.56, M.dark, 0, 0.43, 0)); g.add(box(0.62, 0.05, 0.62, M.gold, 0, 0.885, 0)); g.add(box(0.62, 0.05, 0.62, M.gold, 0, 0.025, 0));
+      const turn = new THREE.Group(); turn.position.y = 0.92; g.add(turn);
+      turn.add(cyl(0.24, 0.25, 0.04, M.gold, 0, 0.0, 0, 28)); turn.add(cyl(0.22, 0.22, 0.03, std('#6a0a1a', { roughness: 0.95 }), 0, 0.03, 0, 28));
+      for (const [x, z] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) g.add(cyl(0.012, 0.012, 1.0, M.gold, x * 0.29, 1.4, z * 0.29, 6));
+      g.add(box(0.62, 0.03, 0.62, M.gold, 0, 1.9, 0));
+      const cone = mesh(new THREE.ConeGeometry(0.34, 0.95, 24, 1, true), new THREE.MeshBasicMaterial({ color: '#fff2c8', transparent: true, opacity: 0.09, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), 0, 1.4, 0); cone.raycast = () => {}; g.add(cone);
+      const lamp = mesh(new THREE.SphereGeometry(0.035, 10, 8), glowMat('#fff2c8', 2.2), 0, 1.87, 0); g.add(lamp);
+      const cv = document.createElement('canvas'); cv.width = 256; cv.height = 96; const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding;
+      const plaque = mesh(new THREE.PlaneGeometry(0.44, 0.165), new THREE.MeshBasicMaterial({ map: tex }), 0, 0.62, 0.282); g.add(plaque);
+      g.userData.turn = turn; g.userData.plaque = { cv, tex, id: -1 }; return g; },
+    cols: () => [[-0.3, 0, -0.3, 0.3, 0.92, 0.3]] };
+  C.bounty = { cat: 'func', n: '悬赏榜', icon: '📜', base: 150, grow: 2, max: 1, fp: [0.7, 0.2], stat: { ter: 1 }, desc: '赏金猎人的委托：交出符合条件的首级换取大量魂晶与声望（每 3 声望 = 远征幸运 +1）。对着它按 E 查看，拿着首级按 E 交付',  bounty: true,
+    make() { const g = new THREE.Group();
+      for (const sx of [-1, 1]) g.add(cyl(0.035, 0.045, 1.9, M.wood, sx * 0.55, 0.95, 0, 8));
+      g.add(box(1.1, 0.8, 0.05, M.wood, 0, 1.35, 0)); g.add(box(1.2, 0.06, 0.08, M.wood, 0, 1.78, 0));
+      const pm = std('#e8d8b0', { roughness: 1, side: THREE.DoubleSide });
+      for (let i = 0; i < 3; i++) { const p = box(0.28, 0.36, 0.005, pm, -0.34 + i * 0.34, 1.36 + (i % 2 ? -0.03 : 0.03), 0.03); p.rotation.z = (i - 1) * 0.06; g.add(p); g.add(mesh(new THREE.SphereGeometry(0.014, 6, 4), M.blood, -0.34 + i * 0.34, 1.52 + (i % 2 ? -0.03 : 0.03), 0.036)); }
+      g.add(skull(0.8, 0, 1.9, 0.02)); return g; },
+    cols: () => [[-0.6, 0, -0.06, 0.6, 1.8, 0.06]] };
   C.wheel = { cat: 'func', n: '魂轮', icon: '☸️', base: 900, grow: 1.5, fp: [0.62, 0.62], stat: { soul: 3 }, desc: '缓慢转动的刑轮，放上面的首级每 6 秒全部触发', radius: 0.58, surface: 0.14, period: 6, depth: 3,
     make() { const g = new THREE.Group(); g.add(cyl(0.64, 0.68, 0.08, M.dark, 0, 0.04, 0, 32)); const top = new THREE.Group(); top.position.y = 0.1; g.add(top);
       const disk = cyl(0.6, 0.6, 0.04, M.wood, 0, 0, 0, 40); top.add(disk);

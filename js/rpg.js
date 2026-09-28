@@ -95,7 +95,7 @@ window.RPG = (() => {
     let got = 0;
     const heads = [];
     for (let i = 0; i < n; i++) {
-      const c = Lore.makeCharacter(r, loc, usedNames, S.luckLv || 0);
+      const c = Lore.makeCharacter(r, loc, usedNames, luckOf(S));
       const diff = [0.7, 0.9, 1.15, 1.5, 2.1][c.rar];
       const qq = q / diff;
       const win = Math.max(0.03, Math.min(0.97, 1 / (1 + Math.exp(-(qq - 0.75) * 5)) + st.ter * 0.002));
@@ -110,7 +110,7 @@ window.RPG = (() => {
         let sig = sigOf(look), tries = 0;
         while (usedSig.has(sig) && tries++ < 30) { const l2 = ModelHeads.randomLook(r, c.lookRace, c.rar); Object.assign(look, l2); sig = sigOf(look); }
         usedSig.add(sig); usedNames.add(c.name);
-        rollExtras(r, c, look, S.luckLv || 0);
+        rollExtras(r, c, look, luckOf(S));
         const hurt = dmg / st.maxHp;
         const mem = Lore.memory(r, c, { weapon: wpn, q: qq, hurt });
         const h = { c, look, sig, mem, story: Lore.backstory(r, c), app: Lore.appearance(c, look), date: Date.now() };
@@ -149,9 +149,10 @@ window.RPG = (() => {
   };
   const AFF_K = Object.keys(AFF);
   const EPI_A = ['银月', '绯红', '黄昏', '霜雪', '星坠', '蔷薇', '黑棘', '琉璃', '白夜', '灰烬', '苍穹', '深海', '晨曦', '夜樱', '雷鸣', '翡翠', '暮色', '圣焰', '鸦羽', '金穗', '雾中', '血月'];
+  function luckOf(S) { return (S.luckLv || 0) + Math.floor((S.fame || 0) / 3) + (window.G && G.daily && G.daily.k === 'moon' ? 3 : 0); }
   function rollExtras(r, c, look, luck) {
     const nA = [r() < 0.3 ? 1 : 0, 1, r() < 0.4 ? 2 : 1, 2, 3][c.rar];
-    const shiny = r() < 0.025 + (luck || 0) * 0.004 + c.rar * 0.004;
+    const shiny = r() < (0.025 + (luck || 0) * 0.004 + c.rar * 0.004) * (window.G && G.daily && G.daily.k === 'shiny' ? 3 : 1);
     const pool = AFF_K.slice(), aff = [];
     for (let i = 0; i < nA + (shiny ? 1 : 0) && pool.length; i++) aff.push(pool.splice(Math.floor(r() * pool.length), 1)[0]);
     c.aff = aff;
@@ -161,5 +162,5 @@ window.RPG = (() => {
   }
   function sigOf(l) { return [l.f, l.h, l.hn, l.hn2, l.en, l.en2, l.sk, l.feat || '', (l.acc || []).join('+'), l.exT, l.paint, l.hx ? l.hx.s + (l.hx.ahoge || '') : ''].join('|'); }
 
-  return { STATS, EQUIP, SLOTS, CONSUM, TRAIN, AFF, stats, eqSum, trainCost, expedition, sigOf, rollExtras };
+  return { STATS, EQUIP, SLOTS, CONSUM, TRAIN, AFF, stats, eqSum, trainCost, expedition, sigOf, rollExtras, luckOf };
 })();

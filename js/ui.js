@@ -70,14 +70,45 @@ window.UI = (() => {
       case 'arrive': finishTrip(); break;
       case 'tripch': pickChoice(+v); break;
       case 'restart': G.wipe(); location.reload(); break;
+      case 'reroll': if (G.rerollBounties()) openBounty(); else deny(a); break;
       case 'introNext': introStep(); break;
     }
   }
   function deny(el) { SFX.deny(); el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
 
+
+  // ---------------- 图鉴 ----------------
+  function codexBody() {
+    const cx = G.codexInfo(), S = G.S, ex = G.exhibit(true);
+    const byId = {}; for (const k in (S.codex || {})) { const [r, i] = k.split('|'); (byId[i] = byId[i] || []).push([r, S.codex[k]]); }
+    const cards = Object.entries(Lore.ID).sort((a, b) => a[1].r - b[1].r).map(([k, d]) => {
+      const seen = byId[k]; const col = ['#b8b8c0', '#4aa8ff', '#c05aff', '#ffb020', '#ff4a8a'][Math.min(4, d.r)];
+      return seen ? `<div class="cx on" style="--c:${col}"><b>${esc(d.n)}</b><small>${seen.map(([r, n]) => (Lore.RACES[r] ? Lore.RACES[r].n : r) + '×' + n).join(' ')}</small></div>`
+                  : `<div class="cx" style="--c:${col}"><b>？？？</b><small>${'★'.repeat(d.r + 1)}</small></div>`;
+    }).join('');
+    const races = Object.entries(Lore.RACES).map(([k, r]) => `<span class="cxr ${cx.races.has(k) ? 'on' : ''}">${cx.races.has(k) ? r.n : '？？'}</span>`).join('');
+    const nextM = (Math.floor(cx.nIds / 5) + 1) * 5;
+    const ms = [5, 10, 15, 20, 25, 30, 40, 50].map(n => `<span class="cxm ${cx.nIds >= n ? 'on' : ''}">${n}</span>`).join('');
+    return `<div class="cx-top"><div><b>📖 身份图鉴</b> ${cx.nIds}/${cx.totalIds} · 种族 ${cx.nRaces}/${cx.totalRaces} · 组合 ${cx.combos} · ✨异色 ${cx.shiny}</div>
+      <div>图鉴加成：全体产出 <b>×${cx.mul.toFixed(2)}</b>（每收集 5 种身份 +5%，下一档 ${nextM}）</div><div class="cxms">${ms}</div>
+      <div>🏛️ 展厅评级 <b>${ex.grade}</b> · ${G.fmtN(ex.score)} 分${ex.next ? '（下一级 ' + G.fmtN(ex.next) + '）' : ''} · 全体产出 +${ex.tier * 8}% <small>展出首级 ${ex.shown} · 种族 ${ex.races} · 身份 ${ex.ids} · 装饰 ${ex.deco}</small></div>
+      <div>📅 今日魂潮：<b>${G.daily.n}</b> —— ${G.daily.d}</div>
+      <div class="cxrs">${races}</div></div><div class="cx-grid">${cards}</div>
+      <p class="hint2">展厅分 = 挂出（上架）的首级：稀有度 × 异色 ×3 × 已安息 ×1.2 × 展示柜 ×1.6 × 每条魂印 +10%，再加上种族/身份多样性与装饰数量。多样化陈列比堆同一种更划算。</p>`;
+  }
+  // ---------------- 悬赏榜 ----------------
+  function openBounty() {
+    const list = G.bounties(), S = G.S, mul = G.daily.k === 'bounty' ? 2 : 1;
+    const rows = list.map(b => { const have = S.heads.filter(r => !r.inBag && ok(b, r)).length;
+      return `<div class="bty"><div class="bty-n">${esc(b.n)}</div><div class="bty-r">🔮 ${G.fmtN(b.rw * mul)}${mul > 1 ? ' <small>赏金日×2</small>' : ''}</div><div class="bty-h ${have ? 'on' : ''}">${have ? '洞里有 ' + have + ' 颗符合' : '暂无符合的首级'}</div></div>`; }).join('');
+    open('bounty', `<h2>📜 悬赏榜</h2><p class="hint2">拿着符合条件的首级，对准悬赏榜按 <b>E</b> 交付（首级会被赏金猎人带走）。声望 <b>${S.fame || 0}</b> · 远征幸运 <b>${RPG.luckOf(S)}</b>（每 3 声望 +1）</p>
+      <div class="btys">${rows}</div><div class="row"><button data-a="reroll">🔄 刷新委托（🔮 ${50 + S.depth * 40}）</button><button data-a="close">关闭</button></div>`);
+    function ok(b, rec) { const c = rec.c, L = rec.look; switch (b.k) { case 'shiny': return !!c.shiny; case 'race': return c.race === b.v; case 'id': return c.id === b.v; case 'rar': return c.rar >= b.v; case 'aff': return !!(c.aff && c.aff.includes(b.v)); case 'hair': return L.hn === b.v || L.hn2 === b.v; case 'hetero': return L.en2 && L.en2 !== L.en; case 'trait': return (c.traits || []).includes(b.v); } return false; }
+  }
+
   // ---------------- 主菜单 ----------------
   const menuState = { tab: 'stats', sub: 'func' };
-  const TABS = [['stats', '👹 属性'], ['equip', '🪓 装备·斯尼克'], ['build', '🔨 建造'], ['heads', '💀 首级收藏'], ['logs', '📜 狩猎日志']];
+  const TABS = [['stats', '👹 属性'], ['equip', '🪓 装备·斯尼克'], ['build', '🔨 建造'], ['heads', '💀 首级收藏'], ['codex', '📖 图鉴·展厅'], ['logs', '📜 狩猎日志']];
   function openMenu(tab = menuState.tab, sub) {
     menuState.tab = tab; if (sub) menuState.sub = sub;
     const S = G.S;
@@ -89,6 +120,7 @@ window.UI = (() => {
     else if (tab === 'build') body = buildBody();
     else if (tab === 'heads') body = headsBody();
     else if (tab === 'logs') body = logsBody();
+    else if (tab === 'codex') body = codexBody();
     if (cur !== 'menu') SFX.open();
     open('menu', head + '<div class="m-body">' + body + '</div>', 'big');
   }
@@ -424,5 +456,5 @@ window.UI = (() => {
     open('intro', `<div class="intro"><h2>${t}</h2><p>${b}</p><div class="btns"><button class="red" data-a="introNext">${introI >= INTRO.length ? '开始狩猎 ▶' : '继续 ▶'}</button></div><div class="dots">${INTRO.map((_, i) => `<i class="${i < introI ? 'on' : ''}"></i>`).join('')}</div></div>`, 'intro-m');
   }
 
-  return { init, onKey, showIntro, needIntro: () => !G.S.intro, openMenu, openCard, openTraining, openExpedition, close, get open() { return cur; }, get trip() { return trip; }, _startTrip: startTrip, _pick: pickChoice };
+  return { init, onKey, showIntro, needIntro: () => !G.S.intro, openMenu, openBounty, openCard, openTraining, openExpedition, close, get open() { return cur; }, get trip() { return trip; }, _startTrip: startTrip, _pick: pickChoice };
 })();

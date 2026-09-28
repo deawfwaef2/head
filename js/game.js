@@ -344,6 +344,8 @@ window.startGame = function () {
     // A portable sack can be collected even if the ray points past it.
     if (player.pos.distanceTo(cave.exitPos) < 2.6) { UI.openExpedition(); return; }
     if (player.pos.distanceTo(cave.merchantPos) < 2.4) { UI.openMenu('equip'); SFX.coins(); return; }
+    if (held && hit && hit.build && CAT[hit.build.type].bounty) { submitBounty(held); return; }
+    if (hit && hit.build && CAT[hit.build.type].bounty) { if (window.UI && UI.openBounty) UI.openBounty(); return; }
     if (held) {
       if (hit && hit.build && CAT[hit.build.type].mount && freeSlot(hit.build) >= 0) { mountHead(held, hit.build, freeSlot(hit.build, hit.point)); return; }
       dropHeld(); return;
@@ -433,7 +435,7 @@ window.startGame = function () {
         const h = createHead(rec, P0, new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6)));
         h.vel.set((T.x - P0.x) / tf, (T.y - P0.y) / tf - 0.5 * GRAV * tf, (T.z - P0.z) / tf); h.av.set((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14);
         landed.push(h); SFX.play('sack', 0.35, 1 + Math.random() * 0.3); bag.userData.kick = 1;
-        const key = rec.c.race + '|' + rec.c.id, isNew = !S.codex[key]; S.codex[key] = (S.codex[key] || 0) + 1; rec.isNew = isNew;
+        const key = rec.c.race + '|' + rec.c.id, isNew = !S.codex[key]; S.codex[key] = (S.codex[key] || 0) + 1; rec.isNew = isNew; if (rec.c.shiny) S.shinySeen = (S.shinySeen || 0) + 1;
         ev.push({ at: cine.t + tf, fn() {
           const col = sh ? '#fff2b0' : RAR[r].c; spawnBeam(h.g.position, col, r, sh); gachaCard(rec, isNew);
           burst(h.g.position, col, 10 + r * 10 + (sh ? 30 : 0), 1 + r * 0.3, 0.8, 1);
@@ -513,10 +515,90 @@ window.startGame = function () {
   function addCoins(n) { S.coins += n; if (n > 0) S.stats.earned += n; ui.coins.classList.remove('bump'); void ui.coins.offsetWidth; ui.coins.classList.add('bump'); }
   function beaconMul(h) { let m = 1; for (const o of heads) { if (o === h || !hasAff(o, 'beacon')) continue; if (o.g.position.distanceToSquared(h.g.position) < 3.24) m += 0.25; } return m; }
   function auraMul(pos) { let m = 1; for (const b of builds) { const d = CAT[b.type]; if (d.aura) { const dx = pos.x - b.x, dz = pos.z - b.z; if (dx * dx + dz * dz < d.aura * d.aura) m *= d.auraMul; } } return m; }
+  // ---------------- 展厅评级 / 图鉴 / 每日魂潮 / 悬赏 ----------------
+  const EX_T = [[0, 'F'], [150, 'E'], [500, 'D'], [1500, 'C'], [4000, 'B'], [10000, 'A'], [25000, 'S'], [60000, 'SS']];
+  const EX_P = [10, 30, 80, 200, 500];
+  let exCache = { score: 0, tier: 0, t: -9 };
+  function exhibit(force) {
+    const now = clock.elapsedTime; if (!force && now - exCache.t < 1.5) return exCache;
+    let sc = 0, shown = 0; const races = new Set(), ids = new Set();
+    for (const h of heads) if (h.mount) { const c = h.rec.c; sc += EX_P[c.rar] * (c.shiny ? 3 : 1) * (h.rec.calm ? 1.2 : 1) * (CAT[h.mount.type].showcase ? 1.6 : 1) * (1 + (c.aff ? c.aff.length : 0) * 0.1); races.add(c.race); ids.add(c.id); shown++; }
+    const deco = builds.filter(b => CAT[b.type] && CAT[b.type].cat === 'decor').length;
+    sc = Math.round(sc + races.size * 25 + ids.size * 12 + deco * 6);
+    let tier = 0; for (let i = 0; i < EX_T.length; i++) if (sc >= EX_T[i][0]) tier = i;
+    if (exCache.t > 0 && tier > exCache.tier) { toast(`🏛️ 展厅评级提升 → <b>${EX_T[tier][1]}</b>！全体产出 +${tier * 8}%`, '#ffd86a', 4); SFX.fanfare(Math.min(4, tier)); flash('rgba(255,210,100,.45)'); }
+    exCache = { score: sc, tier, grade: EX_T[tier][1], t: now, shown, races: races.size, ids: ids.size, deco, next: EX_T[tier + 1] ? EX_T[tier + 1][0] : null };
+    return exCache;
+  }
+  let cxCache = null, cxT = -9;
+  function codexInfo() {
+    if (cxCache && clock.elapsedTime - cxT < 1) return cxCache; cxT = clock.elapsedTime;
+    const seenIds = new Set(), seenRaces = new Set();
+    for (const k in (S.codex || {})) { const [r, i] = k.split('|'); seenRaces.add(r); seenIds.add(i); }
+    const totalIds = Object.keys(Lore.ID).length, totalRaces = Object.keys(Lore.RACES).length;
+    cxCache = { ids: seenIds, races: seenRaces, nIds: seenIds.size, totalIds, nRaces: seenRaces.size, totalRaces, combos: Object.keys(S.codex || {}).length, shiny: S.shinySeen || 0, mul: 1 + 0.05 * Math.floor(seenIds.size / 5) }; return cxCache;
+  }
+  const DAILY = [
+    { k: 'moon', n: '🌕 血月', d: '远征幸运 +3，更容易遇到高稀有' },
+    { k: 'shiny', n: '✨ 异色之夜', d: '异色首级出现几率 ×3' },
+    { k: 'harvest', n: '💰 丰饶', d: '全体魂晶产出 +50%' },
+    { k: 'seance', n: '🔮 通灵日', d: '首次通灵奖励 ×3' },
+    { k: 'bounty', n: '📜 赏金日', d: '悬赏奖励 ×2' }
+  ];
+  const daily = (() => { const d = new Date(); return DAILY[(d.getFullYear() * 372 + d.getMonth() * 31 + d.getDate()) % DAILY.length]; })();
+  function globalMul() { return (1 + exhibit().tier * 0.08) * codexInfo().mul * (daily.k === 'harvest' ? 1.5 : 1); }
+  // 悬赏
+  const pickA = a => a[Math.floor(Math.random() * a.length)];
+  function makeBounty() {
+    const pool = S.heads.filter(r => !r.inBag), c0 = pool.length ? pickA(pool) : null, sc = 1 + S.depth * 0.6;
+    const R = Math.random(); let b;
+    if (R < 0.05) b = { k: 'shiny', n: '献上一颗✨异色首级', rw: 4000 };
+    else if (R < 0.22) { const races = Object.keys(Lore.RACES); const k = c0 && Math.random() < 0.5 ? c0.c.race : pickA(races); b = { k: 'race', v: k, n: `献上一颗【${Lore.RACES[k].n}】的首级`, rw: 220 }; }
+    else if (R < 0.38) { const ids = Object.keys(Lore.ID); const k = c0 && Math.random() < 0.6 ? c0.c.id : pickA(ids); b = { k: 'id', v: k, n: `献上「${Lore.ID[k].n}」的首级`, rw: 360 }; }
+    else if (R < 0.54) { const n = Math.min(4, 1 + Math.floor(Math.random() * (1.5 + S.depth * 0.5))); b = { k: 'rar', v: n, n: `献上一颗【${RAR[n].n}】或更高的首级`, rw: Math.round(150 * Math.pow(n + 1, 1.7)) }; }
+    else if (R < 0.66) { const ks = Object.keys(RPG.AFF); const k = pickA(ks); b = { k: 'aff', v: k, n: `献上带魂印【${RPG.AFF[k].icon}${RPG.AFF[k].n}】的首级`, rw: 520 }; }
+    else if (R < 0.78) { const hn = c0 && Math.random() < 0.6 ? c0.look.hn : pickA(ModelHeads.HAIR.map(x => x[0])); b = { k: 'hair', v: hn, n: `献上一颗${hn}色头发的首级`, rw: 260 }; }
+    else if (R < 0.88) b = { k: 'hetero', n: '献上一颗异色瞳的首级', rw: 420 };
+    else { const k = c0 && Math.random() < 0.5 ? c0.c.traits[0] : pickA(Lore.TRAITS); b = { k: 'trait', v: k, n: `献上一颗「${k}」性格的首级`, rw: 240 }; }
+    b.rw = Math.round(b.rw * sc); b.id = Math.random().toString(36).slice(2, 8); return b;
+  }
+  function bountyOk(b, rec) {
+    const c = rec.c, L = rec.look;
+    switch (b.k) {
+      case 'shiny': return !!c.shiny; case 'race': return c.race === b.v; case 'id': return c.id === b.v; case 'rar': return c.rar >= b.v;
+      case 'aff': return !!(c.aff && c.aff.includes(b.v)); case 'hair': return L.hn === b.v || L.hn2 === b.v; case 'hetero': return L.en2 && L.en2 !== L.en; case 'trait': return (c.traits || []).includes(b.v);
+    }
+    return false;
+  }
+  function bounties() { S.bounty = S.bounty || { list: [], fame: 0 }; while (S.bounty.list.length < 3) S.bounty.list.push(makeBounty()); return S.bounty.list; }
+  function rerollBounties() { const c = 50 + S.depth * 40; if (S.coins < c) return false; addCoins(-c); S.bounty.list = []; bounties(); SFX.page(); return true; }
+  function submitBounty(h) {
+    const list = bounties(), i = list.findIndex(b => bountyOk(b, h.rec));
+    if (i < 0) { toast('这颗头不符合任何悬赏条件。对着悬赏榜按 E（空手）查看委托。', '#f99', 3); SFX.deny(); return false; }
+    const b = list[i], rw = b.rw * (daily.k === 'bounty' ? 2 : 1);
+    if (held === h) held = null;
+    burst(h.g.position, '#ffd86a', 40, 2, 1); removeHead(h);
+    addCoins(rw); S.fame = (S.fame || 0) + 1; S.stats.bounties = (S.stats.bounties || 0) + 1;
+    list.splice(i, 1, makeBounty()); SFX.coins(); SFX.fanfare(2);
+    const lk = S.fame % 3 === 0 ? ` · 远征幸运 +1（当前 ${RPG.luckOf(S)}）` : '';
+    toast(`📜 悬赏完成：${b.n}<br>+${fmtN(rw)} 魂晶 · 声望 ${S.fame}${lk}`, '#ffd86a', 4.5); save();
+    return true;
+  }
+  const fmtN = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e4 ? (n / 1e3).toFixed(1) + 'k' : String(n);
+  function drawPlaque(b) {
+    const P = b.g.userData.plaque, h = b.heads && b.heads[0], id = h ? h.rec.id : 0; if (!P || P.id === id) return; P.id = id;
+    const g = P.cv.getContext('2d'); const W = 256, H = 96;
+    const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#d8b060'); gr.addColorStop(1, '#8a6420'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    g.strokeStyle = '#4a3208'; g.lineWidth = 4; g.strokeRect(5, 5, W - 10, H - 10);
+    g.fillStyle = '#2a1a04'; g.textAlign = 'center';
+    if (h) { const c = h.rec.c; g.font = 'bold 15px sans-serif'; g.fillText((c.shiny ? '✦ ' : '') + RAR[c.rar].n + ' · ' + c.raceN, W / 2, 28); g.font = 'bold 26px serif'; g.fillText(c.name, W / 2, 60); g.font = '13px sans-serif'; g.fillText(c.title || c.idN, W / 2, 82); }
+    else { g.font = 'bold 20px serif'; g.fillText('— 虚位以待 —', W / 2, 56); }
+    P.tex.needsUpdate = true;
+  }
   function trigger(h, src, mult = 1) {
     const s = st();
     const cap = hasAff(h, 'charm') ? 20 : 10;
-    let v = h.yield * mult * s.yieldMul * auraMul(h.g.position) * beaconMul(h) * (src === 'manual' || src === 'hold' ? (1 + Math.min(combo, cap) * 0.1) : 1);
+    let v = h.yield * mult * s.yieldMul * globalMul() * auraMul(h.g.position) * beaconMul(h) * (src === 'manual' || src === 'hold' ? (1 + Math.min(combo, cap) * 0.1) : 1);
     let tag = '';
     if (src === 'auto' && hasAff(h, 'wrath') && Math.random() < 0.2) { v *= 5; tag = '怨念爆发！'; SFX.play('heavy', 0.4, 1.4); burst(h.g.position, '#b04aff', 30, 1.6, 0.8, 1); }
     if ((src === 'manual' || src === 'hold') && hasAff(h, 'lucky') && Math.random() < 0.06) { v *= 10; tag = '🍀幸运 ×10！'; SFX.fanfare(2); }
@@ -795,6 +877,7 @@ window.startGame = function () {
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { console.warn('save failed', e); }
   }
   function load() {
+    S.codex = S.codex || {}; for (const r of S.heads) { const k = r.c.race + '|' + r.c.id; if (!S.codex[k]) S.codex[k] = 1; }
     for (const b of S.builds) if (CAT[b.type]) addBuild(b.type, b.x, b.z, b.rot, false);
     for (const rec of S.heads) {
       if (rec.inBag) continue;
@@ -899,6 +982,7 @@ window.startGame = function () {
         on.forEach(h => { const dx = h.g.position.x - b.x, dz = h.g.position.z - b.z; const a = dt * 0.5; const c = Math.cos(a), s = Math.sin(a); h.g.position.x = b.x + dx * c - dz * s; h.g.position.z = b.z + dx * s + dz * c; h.g.rotateY(-a); });
         if (b.timer >= d.period) { b.timer = 0; on.forEach((h, i) => setTimeout(() => { trigger(h, 'auto', 1); SFX.soul(i, h.rec.c.rar); }, i * 90)); }
       }
+      if (b.g.userData.turn) { b.g.userData.turn.rotation.y += dt * 0.6; const h0 = b.heads && b.heads[0]; if (h0 && held !== h0) h0.g.rotateOnWorldAxis(UP, dt * 0.6); drawPlaque(b); }
       if (b.g.userData.float) { const f = b.g.userData.float; f.rotation.y += dt * 0.6; f.position.y = 1.1 + Math.sin(now * 1.5) * 0.02; }
       const u = b.g.userData;
       if (u.edge && u.edge.material.opacity > 0) u.edge.material.opacity = Math.max(0, u.edge.material.opacity - dt * 1.5);
@@ -949,7 +1033,7 @@ window.startGame = function () {
     ui.hpbar.style.width = (S.hp / s.maxHp * 100) + '%';
     ui.hptxt.textContent = `${Math.round(S.hp)} / ${s.maxHp}`;
     const bagCount = S.heads.filter(r => r.inBag).length;
-    ui.headcount.textContent = `洞内首级 ${heads.length}/${MAX_HEADS}` + (bagCount ? ` · 麻袋 ${bagCount}` : '') + ` · 第 ${S.depth} 层`;
+    { const ex = exhibit(), cx = codexInfo(); const hc = `洞内首级 ${heads.length}/${MAX_HEADS}` + (bagCount ? ` · 麻袋 ${bagCount}` : '') + ` · 第 ${S.depth} 层<br><span class="exl">🏛️ 展厅 <b class="g${ex.tier}">${ex.grade}</b> ${fmtN(ex.score)}${ex.next ? '/' + fmtN(ex.next) : ''} · 📖 ${cx.nIds}/${cx.totalIds} · ${daily.n}</span>`; if (hc !== ui._hc) { ui._hc = hc; ui.headcount.innerHTML = hc; } }
     // 准星提示
     let tip = '';
     if (playing && !uiOpen) {
@@ -974,8 +1058,8 @@ window.startGame = function () {
 
   // ---------------- 对外 ----------------
   window.G = {
-    _dbg: { interactE: () => interactE(), startSeance: h => startSeance(h), carry() { bagCarrying = true; }, unloadBag: () => unloadBag(), get cine() { return cine; } },
-    hasAff, yieldOf, S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
+    _dbg: { submitBounty: h => submitBounty(h), interactE: () => interactE(), startSeance: h => startSeance(h), carry() { bagCarrying = true; }, unloadBag: () => unloadBag(), get cine() { return cine; } },
+    hasAff, yieldOf, exhibit, codexInfo, daily, DAILY, bounties, rerollBounties, EX_T, fmtN, S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
     save, wipe, setUI, lockPointer, spawnReturnHeads, addHeadRecs, createReturnBag, usedSig, usedNames, headOf, removeHead, refreshWeapon, burst, get cave() { return cave; },
     get playing() { return playing; }, get uiOpen() { return uiOpen; }, renderer, camera, scene, poke, mountHead, createHead, addBuild
   };
