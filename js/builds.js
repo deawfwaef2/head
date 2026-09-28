@@ -48,7 +48,7 @@ window.BuildCat = (() => {
     make() { const g = new THREE.Group(); g.add(rock(0.24, M.stone, 0, 0.08, 0)); g.add(cyl(0.022, 0.03, 1.45, M.wood, 0, 0.72, 0, 8)); const tip = mesh(new THREE.ConeGeometry(0.028, 0.14, 6), M.iron, 0, 1.5, 0); g.add(tip);
       const drip = cyl(0.012, 0.02, 0.4, M.blood, 0.015, 1.25, 0, 6); g.add(drip); return g; },
     cols: () => [[-0.2, 0, -0.2, 0.2, 0.18, 0.2], [-0.03, 0, -0.03, 0.03, 1.45, 0.03]] };
-  C.shrine = { cat: 'func', n: '骨龛', icon: '💀', base: 400, grow: 1.5, fp: [0.32, 0.32], stat: { soul: 2 }, desc: '骸骨垒成的神龛：每 20 秒触发 ×4 产出', mount: { y: 1.12, period: 20, mult: 4 }, depth: 2,
+  C.shrine = { cat: 'func', n: '骨龛', icon: '💀', base: 400, grow: 1.5, fp: [0.32, 0.32], stat: { soul: 2 }, desc: '骸骨垒成的神龛：每 20 秒触发 ×4 产出', mount: { y: 1.12, top: 1.08, period: 20, mult: 4 }, depth: 2,
     make() { const g = new THREE.Group(); g.add(rock(0.35, M.dark, 0, 0.15, 0));
       for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; g.add(skull(0.9, Math.cos(a) * 0.2, 0.35 + (i % 2) * 0.15, Math.sin(a) * 0.2)); }
       g.add(cyl(0.16, 0.22, 0.6, M.bone, 0, 0.7, 0, 10)); g.add(cyl(0.22, 0.2, 0.08, M.bone, 0, 1.04, 0, 10));
@@ -92,7 +92,7 @@ window.BuildCat = (() => {
       for (const s of [0, 2]) g.add(flame(Math.cos(s) * 0.3, 0.1, Math.sin(s) * 0.3, 0.7, '#ff4a3a'));
       return g; },
     cols: () => ring(5, 0.78, 0, a => 0).map(([x, , z]) => [x - 0.06, 0, z - 0.06, x + 0.06, 1.0, z + 0.06]) };
-  C.seance = { cat: 'func', n: '通灵台', icon: '🔮', base: 260, grow: 1.7, fp: [0.42, 0.42], stat: { soul: 2 }, desc: '放上一颗首级，对准按 E 通灵：观看她生前的记忆，再决定安抚还是榨取（Shift+E 取下）。每 30 秒 ×2 产出', mount: { y: 1.1, period: 30, mult: 2, labelY: 1.7 }, seance: true,
+  C.seance = { cat: 'func', n: '通灵台', icon: '🔮', base: 260, grow: 1.7, fp: [0.42, 0.42], stat: { soul: 2 }, desc: '放上一颗首级，对准按 E 通灵：观看她生前的记忆，再决定安抚还是榨取（Shift+E 取下）。每 30 秒 ×2 产出', mount: { y: 1.1, top: 1.12, period: 30, mult: 2, labelY: 1.7 }, seance: true,
     make() { const g = new THREE.Group();
       g.add(cyl(0.36, 0.42, 0.14, M.dark, 0, 0.07, 0, 20)); g.add(cyl(0.12, 0.2, 0.8, M.stone, 0, 0.54, 0, 10)); g.add(cyl(0.26, 0.14, 0.12, M.stone, 0, 1.0, 0, 16));
       const bowl = mesh(new THREE.TorusGeometry(0.2, 0.025, 8, 28), M.gold, 0, 1.06, 0); bowl.rotation.x = Math.PI / 2; g.add(bowl);
@@ -104,7 +104,7 @@ window.BuildCat = (() => {
       for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + Math.PI / 4; g.add(cyl(0.025, 0.028, 0.16, M.bone, Math.cos(a) * 0.5, 0.08, Math.sin(a) * 0.5, 8)); g.add(flame(Math.cos(a) * 0.5, 0.16, Math.sin(a) * 0.5, 0.55, '#b07aff')); }
       g.userData.float = float; return g; },
     cols: () => [[-0.36, 0, -0.36, 0.36, 0.14, 0.36], [-0.2, 0, -0.2, 0.2, 1.06, 0.2]] };
-  C.showcase = { cat: 'func', n: '展示柜', icon: '🏆', base: 180, grow: 1.55, fp: [0.36, 0.36], stat: { soul: 1 }, desc: '旋转天鹅绒展台 + 铭牌 + 聚光：展出的首级展厅分 ×1.6，每 12 秒 ×1.5 产出', mount: { y: 1.1, period: 12, mult: 1.5, labelY: 1.75 }, showcase: true,
+  C.showcase = { cat: 'func', n: '展示柜', icon: '🏆', base: 180, grow: 1.55, fp: [0.36, 0.36], stat: { soul: 1 }, desc: '旋转天鹅绒展台 + 铭牌 + 聚光：展出的首级展厅分 ×1.6，每 12 秒 ×1.5 产出', mount: { y: 1.1, top: 0.965, period: 12, mult: 1.5, labelY: 1.75 }, showcase: true,
     make() { const g = new THREE.Group();
       g.add(box(0.56, 0.86, 0.56, M.dark, 0, 0.43, 0)); g.add(box(0.62, 0.05, 0.62, M.gold, 0, 0.885, 0)); g.add(box(0.62, 0.05, 0.62, M.gold, 0, 0.025, 0));
       const turn = new THREE.Group(); turn.position.y = 0.92; g.add(turn);

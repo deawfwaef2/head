@@ -116,7 +116,7 @@ window.startGame = function () {
   const auraTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d'); const rg = g.createRadialGradient(16, 16, 0, 16, 16, 16); rg.addColorStop(0, 'rgba(255,255,255,1)'); rg.addColorStop(0.35, 'rgba(255,255,255,0.5)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(c); })();
   function makeAura(col, n) {
     const pos = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, r = 0.2 + (i % 3) * 0.035; pos[i * 3] = Math.cos(a) * r; pos[i * 3 + 1] = ((i * 37) % 11 / 11 - 0.4) * 0.35; pos[i * 3 + 2] = Math.sin(a) * r; }
+    for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, r = 0.12 + Math.random() * 0.2; pos[i * 3] = Math.cos(a) * r; pos[i * 3 + 1] = Math.random() * 0.5 - 0.15; pos[i * 3 + 2] = Math.sin(a) * r; }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     const p = new THREE.Points(g, new THREE.PointsMaterial({ map: auraTex, color: col, size: 0.05, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     return p;
@@ -125,7 +125,7 @@ window.startGame = function () {
     const hb = ModelHeads.create(rec.look);
     const g = new THREE.Group(); hb.group.scale.setScalar(HS); hb.group.position.y = -0.005; g.add(hb.group);
     const hit = new THREE.Mesh(hitGeo, hitMat); g.add(hit);
-    if (rec.c.rar >= 2) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, color: RAR[rec.c.rar].c, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending })); sp.scale.setScalar(rec.c.rar >= 3 ? 0.8 : 0.6); g.add(sp); hb.glow = sp; }
+    if (rec.c.rar >= 2) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, color: RAR[rec.c.rar].c, transparent: true, opacity: 0.1, depthWrite: false, blending: THREE.AdditiveBlending })); sp.scale.setScalar(rec.c.rar >= 3 ? 0.55 : 0.42); g.add(sp); hb.glow = sp; }
     g.position.copy(pos); if (quat) g.quaternion.copy(quat);
     scene.add(g);
     const blob = new THREE.Mesh(blobGeo, blobMat); blob.scale.setScalar(0.4); blob.renderOrder = -1; scene.add(blob);
@@ -178,6 +178,16 @@ window.startGame = function () {
   // ---- 展示位：一个建筑可有多个插槽（mount.slots = [[lx, ly, lz, yaw?], ...]）----
   function slotsOf(d) { return d.mount.slots || [[0, d.mount.y, 0]]; }
   function mountPos(b, i = 0) { const s = slotsOf(CAT[b.type])[i] || [0, CAT[b.type].mount.y, 0]; const a = -b.rot * Math.PI / 2, c = Math.cos(a), sn = Math.sin(a); return new V3(b.x + s[0] * c + s[2] * sn, s[1] + RC * 0.8, b.z - s[0] * sn + s[2] * c); }
+  // 让首级的颈部切口中心（而不是模型原点）对准尖桩 / 台面 —— 各模型切口位置不同（z 最多差 5cm）
+  const _so = new V3();
+  function seatHead(h, b, i) {
+    const d = CAT[b.type], s = slotsOf(d)[i] || [0, d.mount.y, 0];
+    const a = -b.rot * Math.PI / 2, c = Math.cos(a), sn = Math.sin(a);
+    const m = h.hb.meta || {}, cut = m.cut || { x: 0, y: m.bottom != null ? m.bottom : -0.1, z: 0 };
+    _so.set((cut.x || 0) * HS, (cut.y != null ? cut.y : -0.1) * HS - 0.005, (cut.z || 0) * HS).applyQuaternion(h.g.quaternion);
+    const y = d.mount.top != null ? d.mount.top + 0.004 : s[1] - 0.02;
+    h.g.position.set(b.x + s[0] * c + s[2] * sn - _so.x, y - _so.y, b.z - s[0] * sn + s[2] * c - _so.z);
+  }
   function firstHead(b) { return b && b.heads ? b.heads.find(Boolean) || null : null; }
   function nearestHead(b, pt) { if (!b || !b.heads) return null; let best = null, bd = 1e9; b.heads.forEach(h => { if (!h) return; const d = pt ? h.g.position.distanceToSquared(pt) : 0; if (d < bd) { bd = d; best = h; } }); return best; }
   function freeSlot(b, pt) { if (!b || !b.heads) return -1; let bi = -1, bd = 1e9; b.heads.forEach((h, i) => { if (h) return; const d = pt ? mountPos(b, i).distanceToSquared(pt) : i; if (d < bd) { bd = d; bi = i; } }); return bi; }
@@ -199,7 +209,7 @@ window.startGame = function () {
     if (held === h) held = null;
     b.heads[i] = h; h.mount = b; h.slot = i; h.vel.set(0, 0, 0); h.av.set(0, 0, 0); h.sleep = 0;
     const s = slotsOf(CAT[b.type])[i];
-    h.g.position.copy(mountPos(b, i)); h.g.quaternion.setFromEuler(new THREE.Euler(0, -b.rot * Math.PI / 2 + (s[3] != null ? s[3] : Math.PI), 0));
+    h.g.quaternion.setFromEuler(new THREE.Euler(0, -b.rot * Math.PI / 2 + (s[3] != null ? s[3] : Math.PI), 0)); seatHead(h, b, i);
     SFX.chop(); SFX.squish(0.8); burst(h.g.position, '#8a0010', 26, 1.2, 0.7, -6); if (b.heads.filter(Boolean).length === 1) b.timer = 0;
     bloodSplat(h.g.position.x + 0.05, 0, h.g.position.z + 0.03, 0.35);
     const rs = resonance(b); if (rs.tags.length && b.heads.length > 1) toast(`${CAT[b.type].n}：${rs.tags.join(' · ')} 共鸣 ×${rs.mul.toFixed(2)}`, '#ffcf7a', 2);
@@ -619,7 +629,8 @@ window.startGame = function () {
     combo = comboT > 0 ? combo + 1 : 0; comboT = 1.2;
     trigger(h, src);
     SFX.squish(0.6); SFX.soul(Math.min(combo, 10), h.rec.c.rar);
-    if (!h.mount && src !== 'hold') { h.vel.y += 2.2; h.vel.x += (Math.random() - 0.5) * 1.2; h.vel.z += (Math.random() - 0.5) * 1.2; h.av.set((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10); h.sleep = 0; }
+    // 不再把头打飞：果冻式挤压 + 摇晃 + 头发甩动（纯视觉，物理位置不动）
+    if (src !== 'hold') { h.squash = 1; h.wob = 1; h.wobA = (Math.random() - 0.5) * 2; h.swayV.add(new V3((Math.random() - 0.5) * 1.2, 0.5, (Math.random() - 0.5) * 1.2)); }
     if (Math.random() < 0.3) burst(h.g.position.clone().add(new V3(0, -0.1, 0)), '#6a0008', 8, 1, 0.5, -8);
     // 桌子连锁
     const tb = tableOf(h);
@@ -652,13 +663,13 @@ window.startGame = function () {
 
   // 目标高亮：脚下/周围一圈脉动光环，明确 E 会拿哪一颗
   let aimHead = null;
-  const aimRing = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.strokeStyle = '#fff'; g.lineWidth = 7; g.shadowColor = '#fff'; g.shadowBlur = 12; g.beginPath(); g.arc(64, 64, 50, 0, 6.283); g.stroke(); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false, depthWrite: false, opacity: 0.8, blending: THREE.AdditiveBlending })); sp.renderOrder = 999; sp.visible = false; return sp; })();
-  scene.add(aimRing);
+  let hoverH = null;
   function updateAim(t) {
     const h = !buildMode && !held && !uiOpen ? aimHead : null;
-    aimRing.visible = !!h; if (!h) return;
-    aimRing.position.copy(h.g.position); const s = 0.52 + Math.sin(t * 6) * 0.03; aimRing.scale.set(s, s, 1);
-    aimRing.material.color.set(RAR[h.rec.c.rar].c);
+    // 准星对准：头部边缘暖色柔光（不再使用圆圈）
+    if (hoverH && hoverH !== h && hoverH.hb.U.hover) hoverH.hb.U.hover.value = 0;
+    hoverH = h; if (!h) return;
+    if (h.hb.U.hover) h.hb.U.hover.value = 0.55 + Math.sin(t * 5) * 0.2;
   }
 
   // ---------------- 物理 ----------------
@@ -886,7 +897,7 @@ window.startGame = function () {
         const q = rec.q ? new THREE.Quaternion().fromArray(rec.q) : null;
         const h = createHead(rec, p, q);
         const mb = rec.mt >= 0 ? builds[rec.mt] : null, ms = rec.ms || 0;
-        if (mb && mb.heads && ms < mb.heads.length && !mb.heads[ms]) { mb.heads[ms] = h; h.mount = mb; h.slot = ms; h.g.position.copy(mountPos(mb, ms)); }
+        if (mb && mb.heads && ms < mb.heads.length && !mb.heads[ms]) { mb.heads[ms] = h; h.mount = mb; h.slot = ms; seatHead(h, mb, ms); }
         else h.sleep = 0.9;
       } catch (e) { console.warn('head load fail', e); }
     }
@@ -908,7 +919,7 @@ window.startGame = function () {
     const dt = Math.min(0.05, clock.getDelta()); const now = clock.elapsedTime;
     if (window.Seance && Seance.active) return; // 通灵 MV 期间暂停主场景渲染
     updateAim(now); ModelHeads.tick(now); updateCine(dt); updateCineFx(dt);
-    for (const h of heads) if (h.aura) { h.aura.position.copy(h.g.position); h.aura.rotation.y = now * 0.9 + h.rec.id; h.aura.visible = h.g.visible !== false; }
+    for (const h of heads) if (h.aura) { const ap = h.aura.geometry.attributes.position; for (let i = 0; i < ap.count; i++) { let y = ap.getY(i) + dt * (0.06 + (i % 5) * 0.015); if (y > 0.38) y = -0.15; ap.setY(i, y); } ap.needsUpdate = true; h.aura.position.copy(h.g.position); h.aura.rotation.y = now * 0.25 + h.rec.id; h.aura.visible = h.g.visible !== false; }
     // 自适应分辨率
     fpsAcc += dt; fpsN++; if (fpsAcc > 2) { const fps = fpsN / fpsAcc; if (fps < 40 && pixelRatio > 0.7) { pixelRatio = Math.max(0.7, pixelRatio - 0.15); renderer.setPixelRatio(pixelRatio); } else if (fps > 58 && pixelRatio < Math.min(devicePixelRatio, 1.5)) { pixelRatio = Math.min(Math.min(devicePixelRatio, 1.5), pixelRatio + 0.1); renderer.setPixelRatio(pixelRatio); } fpsAcc = 0; fpsN = 0; }
     // 玩家
@@ -982,7 +993,7 @@ window.startGame = function () {
         on.forEach(h => { const dx = h.g.position.x - b.x, dz = h.g.position.z - b.z; const a = dt * 0.5; const c = Math.cos(a), s = Math.sin(a); h.g.position.x = b.x + dx * c - dz * s; h.g.position.z = b.z + dx * s + dz * c; h.g.rotateY(-a); });
         if (b.timer >= d.period) { b.timer = 0; on.forEach((h, i) => setTimeout(() => { trigger(h, 'auto', 1); SFX.soul(i, h.rec.c.rar); }, i * 90)); }
       }
-      if (b.g.userData.turn) { b.g.userData.turn.rotation.y += dt * 0.6; const h0 = b.heads && b.heads[0]; if (h0 && held !== h0) h0.g.rotateOnWorldAxis(UP, dt * 0.6); drawPlaque(b); }
+      if (b.g.userData.turn) { b.g.userData.turn.rotation.y += dt * 0.6; const h0 = b.heads && b.heads[0]; if (h0 && held !== h0) { h0.g.rotateOnWorldAxis(UP, dt * 0.6); seatHead(h0, b, 0); } drawPlaque(b); }
       if (b.g.userData.float) { const f = b.g.userData.float; f.rotation.y += dt * 0.6; f.position.y = 1.1 + Math.sin(now * 1.5) * 0.02; }
       const u = b.g.userData;
       if (u.edge && u.edge.material.opacity > 0) u.edge.material.opacity = Math.max(0, u.edge.material.opacity - dt * 1.5);
@@ -996,7 +1007,8 @@ window.startGame = function () {
     // 首级：视觉、摆动、阴影
     for (const h of heads) {
       if (h.lastHit > 0) h.lastHit -= dt;
-      if (h.squash > 0) { h.squash = Math.max(0, h.squash - dt * 4); const k = Math.sin(h.squash * Math.PI) * 0.12 * h.squash; h.hb.group.scale.set(HS * (1 + k), HS * (1 - k), HS * (1 + k)); }
+      if (h.squash > 0) { h.squash = Math.max(0, h.squash - dt * 3.2); const k = Math.sin(h.squash * Math.PI * 2.5) * 0.16 * h.squash; h.hb.group.scale.set(HS * (1 + k * 0.7), HS * (1 - k), HS * (1 + k * 0.7)); }
+      if (h.wob > 0) { h.wob = Math.max(0, h.wob - dt * 1.8); const w = h.wob * h.wob, ph = (1 - h.wob) * 26; h.hb.group.rotation.set(Math.sin(ph) * 0.1 * w, Math.sin(ph * 0.7) * 0.06 * w * h.wobA, Math.cos(ph) * 0.14 * w * h.wobA); h.hb.group.position.y = -0.005 + Math.abs(Math.sin(ph * 0.5)) * 0.025 * w; if (h.wob === 0) { h.hb.group.rotation.set(0, 0, 0); h.hb.group.position.y = -0.005; } }
       const dd = camera.position.distanceToSquared(h.g.position);
       h.g.visible = dd < 400;
       if (dd < 64 && (h.sleep <= 1 || h === held || h.mount || h.sway.lengthSq() > 1e-6 || h.swayV.lengthSq() > 1e-6)) updateSway(h, dt);

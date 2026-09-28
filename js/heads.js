@@ -119,18 +119,19 @@ window.ModelHeads = (() => {
 
   function injectVertex(sh, sway) {
     sh.vertexShader = sh.vertexShader
-      .replace('void main() {', `varying vec3 vHP;\n${sway ? 'uniform vec3 uSway; uniform float uHTop; uniform float uHLen;' : ''}\nvoid main() {`)
-      .replace('#include <morphtarget_vertex>', `#include <morphtarget_vertex>\n${sway ? 'float sw = clamp((uHTop - transformed.y) / uHLen, 0.0, 1.0); sw = sw * sw * (0.4 + 0.6 * clamp(length(transformed.xz) * 12.0, 0.0, 1.0)); vec3 hs = uSway; hs.x *= 0.72; hs.z *= 0.28; transformed += hs * sw;' : ''}\nvHP = transformed;`);
+      .replace('void main() {', `varying vec3 vHP;\n${sway ? 'uniform vec3 uSway; uniform float uHTop; uniform float uHLen; uniform float uT; uniform float uPh;' : ''}\nvoid main() {`)
+      .replace('#include <morphtarget_vertex>', `#include <morphtarget_vertex>\n${sway ? 'float sw = clamp((uHTop - transformed.y) / uHLen, 0.0, 1.0); sw = sw * sw * (0.4 + 0.6 * clamp(length(transformed.xz) * 12.0, 0.0, 1.0)); vec3 hs = uSway; hs.x *= 0.72; hs.z *= 0.28; hs += vec3(sin(uT * 1.15 + uPh + transformed.y * 28.0) * 0.0042 + sin(uT * 2.6 + uPh * 1.7 + transformed.x * 35.0) * 0.0016, sin(uT * 1.7 + uPh) * 0.0008, cos(uT * 0.93 + uPh * 0.6 + transformed.y * 22.0) * 0.0032); transformed += hs * sw;' : ''}\nvHP = transformed;`);
   }
 
   function hairMat(src, U, lum) {
     const m = new THREE.MeshToonMaterial({ map: src.map || null, gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest || (src.transparent ? 0.25 : 0.4), side: THREE.DoubleSide, depthWrite: src.depthWrite });
     m.name = src.name;
     m.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, { uHC1: U.hc1, uHC2: U.hc2, uGrad: U.grad, uHK: { value: 0.95 / lum }, uSway: U.sway, uHTop: U.hTop, uHLen: U.hLen, uShiny: U.shiny, uT: GT });
+      Object.assign(sh.uniforms, { uHC1: U.hc1, uHC2: U.hc2, uGrad: U.grad, uHK: { value: 0.95 / lum }, uSway: U.sway, uHTop: U.hTop, uHLen: U.hLen, uShiny: U.shiny, uT: GT, uPh: U.ph, uHover: U.hover });
       injectVertex(sh, true);
       sh.fragmentShader = sh.fragmentShader
-        .replace('void main() {', 'varying vec3 vHP; uniform vec3 uHC1; uniform vec3 uHC2; uniform vec2 uGrad; uniform float uHK; uniform float uShiny; uniform float uT;\nvoid main() {')
+        .replace('void main() {', 'varying vec3 vHP; uniform vec3 uHC1; uniform vec3 uHC2; uniform vec2 uGrad; uniform float uHK; uniform float uShiny; uniform float uT; uniform float uHover;\nvoid main() {')
+        .replace('#include <dithering_fragment>', '\n#include <dithering_fragment>\n gl_FragColor.rgb += uHover * (0.1 + 0.6 * pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 2.2)) * vec3(1.0, 0.8, 0.5);')
         .replace('#include <map_fragment>', `#include <map_fragment>
           float l = dot(diffuseColor.rgb, vec3(0.299,0.587,0.114));
           vec3 tc = mix(uHC2, uHC1, smoothstep(uGrad.x, uGrad.y, vHP.y));
@@ -145,7 +146,7 @@ window.ModelHeads = (() => {
             diffuseColor.rgb = sc;
           }`);
     };
-    m.customProgramCacheKey = () => 'hair3';
+    m.customProgramCacheKey = () => 'hair4';
     return m;
   }
   function browMat(src, U, lum) {
@@ -181,10 +182,11 @@ window.ModelHeads = (() => {
   function skinMat(src, U) {
     const m = new THREE.MeshToonMaterial({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: src.depthWrite });
     m.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, { uSkin: U.skin, uPale: U.pale, uBlood: U.blood, uSpat: U.spat, uSeed: U.seed, uCutY: U.cutY, uH: U.hH, uScar: U.scar, uPaint: U.paint, uPaintC: U.paintC, uEye: U.eye });
+      Object.assign(sh.uniforms, { uHover: U.hover, uSkin: U.skin, uPale: U.pale, uBlood: U.blood, uSpat: U.spat, uSeed: U.seed, uCutY: U.cutY, uH: U.hH, uScar: U.scar, uPaint: U.paint, uPaintC: U.paintC, uEye: U.eye });
       injectVertex(sh, false);
       sh.fragmentShader = sh.fragmentShader
-        .replace('void main() {', `varying vec3 vHP; uniform vec3 uSkin; uniform float uPale; uniform float uBlood; uniform float uSpat; uniform float uSeed; uniform float uCutY; uniform float uH;
+        .replace('#include <dithering_fragment>', '\n#include <dithering_fragment>\n gl_FragColor.rgb += uHover * (0.1 + 0.6 * pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 2.2)) * vec3(1.0, 0.8, 0.5);')
+        .replace('void main() {', `varying vec3 vHP; uniform float uHover; uniform vec3 uSkin; uniform float uPale; uniform float uBlood; uniform float uSpat; uniform float uSeed; uniform float uCutY; uniform float uH;
           uniform vec4 uScar; uniform float uPaint; uniform vec3 uPaintC; uniform vec3 uEye; ${NOISE}
           float segD(vec2 p, vec2 a, vec2 b){ vec2 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0); return length(pa-ba*h); }
           void main() {`)
@@ -220,7 +222,7 @@ window.ModelHeads = (() => {
           vec3 blood = mix(vec3(0.20, 0.0, 0.01), vec3(0.42, 0.02, 0.03), sp);
           diffuseColor.rgb = mix(diffuseColor.rgb, blood, bm * 0.88);`);
     };
-    m.customProgramCacheKey = () => 'skin3';
+    m.customProgramCacheKey = () => 'skin4';
     return m;
   }
 
@@ -313,7 +315,7 @@ window.ModelHeads = (() => {
         const band = new THREE.Mesh(geo('band', () => new THREE.CylinderGeometry(0.082, 0.085, 0.018, 24, 1, true)), mat('bandM', () => new THREE.MeshToonMaterial({ color: '#8a1a2a', gradientMap: grad }))); band.position.y = 0.012; hat.add(band);
         hat.position.set(0, top - 0.03, -0.01); hat.rotation.set(-0.12, 0, 0.1); g.add(hat);
       }
-      if (a === 'patch') {
+      if (a === 'patch' && false) {
         const pm = mat('patch', () => new THREE.MeshStandardMaterial({ color: '#15110f', roughness: 0.6 }));
         const s = look.patchSide || 1;
         const p = new THREE.Mesh(geo('patchG', () => { const c = new THREE.CircleGeometry(0.017, 16); return c; }), pm); p.position.set(s * Math.abs(eye[0]), eye[1] + 0.002, (meta.front || 0.075) + 0.004); g.add(p);
@@ -354,7 +356,6 @@ window.ModelHeads = (() => {
     for (const [k, p] of Object.entries(race.acc || {})) if (r() < p) acc.push(k);
     if (acc.includes('crown') && acc.includes('tiara')) acc.splice(acc.indexOf('tiara'), 1);
     if (acc.includes('witchhat')) { const i = acc.indexOf('crown'); if (i >= 0) acc.splice(i, 1); }
-    if (r() < 0.06) acc.push('patch');
     // 死气表情
     const exT = pick(r, ['half', 'half', 'closed', 'stare', 'slack', 'agony', 'wide']);
     const ex = {};
@@ -400,7 +401,7 @@ window.ModelHeads = (() => {
       sway: { value: new V3() }, hTop: { value: top * 0.55 }, hLen: { value: Math.max(0.08, top * 0.55 - hairT.hairMinY) },
       ec1: { value: new THREE.Color(look.ec1) }, ec2: { value: new THREE.Color(look.ec2) }, dull: { value: look.glowEye ? 0.08 : 0.45 }, glow: { value: look.glowEye ? 0.9 : 0 }, shiny: { value: look.shiny || 0 },
       skin: { value: new V3(sk.r / baseSkin.r, sk.g / baseSkin.g, sk.b / baseSkin.b) }, pale: { value: look.pale },
-      blood: { value: look.blood }, spat: { value: look.spat }, seed: { value: look.seed },
+      blood: { value: look.blood }, spat: { value: look.spat }, seed: { value: look.seed }, ph: { value: ((look.seed || 0) * 7.13) % 6.283 }, hover: { value: 0 },
       cutY: { value: faceMeta.bottom }, hH: { value: (faceMeta.skullTop || 0.1) - faceMeta.bottom },
       scar: { value: look.scar ? new THREE.Vector4(...look.scar) : new THREE.Vector4(-10, 0, 0, 0) },
       paint: { value: look.paint }, paintC: { value: new THREE.Color(look.paintC) },
