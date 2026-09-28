@@ -85,3 +85,30 @@
 - 篝火锥体改 NormalBlending、降低 opacity / glow，减轻 swiftshader 下白色过曝。
 - 测试：JS `node --check` 与 `git diff --check` 通过；Playwright 加载无 page errors，ModelHeads=14、热切表情可用、麻袋数据可倒出、越界测试的头中心半径 5.791m < 6.18m 安全边界。第二次自动回归脚本受 headless intro/pointer-lock 状态影响，未能覆盖“门口提袋→移动→倒出”的完整人工交互；真实浏览器需再确认一次。
 - 新模型侦察：查询了 OpenSourceAvatars 的 CC0 100Avatars (候选 Witch/Devil/PyreSorcerer/MoonGirl/GoodKnight/StitchWitch 等)、OpenGameArt CC0 VRoid E/F/G 旧样本及 Meshy 的 CC0 资源页面；尚未集成。原因：需要逐个核对 VRM 内嵌授权/暴力许可、模型品质和头部裁切，而当前缺少可复用的 VRM→裁切头 GLB 离线转换脚本。不要把未核实素材塞入公开随机池。
+
+## 用户新约束（第5轮反馈，追加）
+- 头发有时候有 BUG → 修；角色种类太少 → 多加二次元角色（可搜 MMD 等，不限 VRoid；素材少就自己程序化做变化）。
+- 机制更丰富：更多可以放头的地方。
+- 文风：继续按原文风格，不需要先中性化（保留原有文本；新写文本沿用暗黑奇幻战利品口吻）。
+- 仍然：随时可玩、频繁推送、HANDOFF 只追加。
+- 用户提到“按编号存进对应子文件夹”，但未给出编号 → 已向用户询问，未执行。
+- 素材底线（仓库公开）：只收录许可允许公开再分发+改造+暴力表现的模型（CC0 / CC-BY / VRM 元数据允许）。MMD 同样逐个核许可。
+
+## 2026-09-28 · Round 4（第5轮反馈）完成
+- **新角色**：VRoid Studio 2.x 官方样本 **K / L / S**（`models/AvatarSample_K|L|S.js`，grp vroid，可与其他 vroid/twist/seed 混搭发型）。VRM1 元数据：allowExcessivelyViolentUsage=true、allowRedistribution=true、modification=allowModificationRedistribution、法人商用。L 是男性脸（原作），混搭长发后多为短发少女观感。
+- **转换管线 `tools/vrm2head.py`**（离线，Python + numpy + Pillow）：
+  `python3 tools/vrm2head.py src.vrm File "名" "credit" [--grp vroid] [--hair-drop 0.12] [--norm 0.194] [--out path] [--force]`
+  - 读 VRM0/VRM1 许可元数据，不允许暴力/再分发/改造时拒绝（--force 跳过，仅限私用，别提交）。
+  - 静止姿势全量蒙皮；按材质名分类 HAIR / FACE·EYE / SKIN / 其他布料；保留脸、头骨权重>0.5 的头发（切面下 hair-drop 截断）、切面以上的脖子皮肤、帽子类布料。
+  - **VRoid 2.x 的多个图元共享同一顶点缓冲** → 统计（眼睛/头顶/脖子半径）只能用图元索引实际引用的顶点（`up(p)`），否则切面会跑到肩膀。
+  - 切面 yCut = eyeY − 0.81·(skinTop − eyeY)，加 `__CUT__` 盖；统一缩放到 切面→头顶 = 0.194（与旧模型一致，`--norm`）。只保留预设表情；贴图 WebP ≤1024。
+  - 转换后：index.html 加 `<script src="models/X.js">`、CREDITS.md 加一行、渲染检查（见下）。
+- **程序化发饰**（`js/heads.js` addHairX）：马尾 / 双马尾 / 钻头卷 / 丸子 / 双丸子 / 麻花辫 / 双麻花辫 / 呆毛（1~2 根）。挂在“发壳”（贴合后发型的径向最大半径图，头皮+6mm 兜底）上，用同一个头发着色器 → 跟随染发/渐变、会摆动。look.hx = {s, len, rib, seed, ahoge}，在 randomLook **最后**抽签（不改变旧种子其余外观），概率 0.42（race.hxP 可覆盖，race.hx 可指定偏好）；戴魔女帽不出丸子/呆毛；godette 组不加。lore 外观描述会写出发饰。
+  - 注意：着色器按几何体局部 y 做渐变与摆动 → 程序化部件的位置必须**烘进几何体**，不能用 mesh.position。
+  - 本 three.js 版本（2022）用 `texture.encoding = THREE.sRGBEncoding`，没有 colorSpace。
+- **头发 bug**：帽子/兽耳/光环/王冠改按“实际贴上去的发型顶端”（发壳 top）定位，不再用脸模型的 hairTop → 借来高发型时不再陷进头发。
+- **旅途抉择事件**（`js/ui.js`）：每趟 2 次二选一（约 30–40% / 62–72% 进度），1/2 键或点按钮：岔路、岩洞过夜、魂光（可能额外得一颗首级）、铁箱、地精商队（买药）、**血月祭坛**（献上本趟最低阶的首级换大量魂晶）、**战场遗迹**。结果写入远征日志。
+- **多插槽展示位**（`js/game.js` + `js/builds.js`）：`mount.slots = [[lx, ly, lz, yaw?], ...]`，建筑 `b.heads[]`（替代旧 `b.head`），首级 `h.slot`，存档 `rec.ms`（旧档默认 0，兼容）。新建筑：**首级架** headrack（3 位，第 2 层）、**万首灯柱** lampost（4 位朝外，第 3 层）、**血池祭坛** bloodpool（5 位朝内，第 4 层）。**共鸣**：满座 +0.25、同族 +0.15×n、同阶 +0.10×n，乘到自动产出；标签显示 “k/n 满座·同族 ×1.70”。E 放入最近的空位、E 取下最近的头；头掉落到空尖桩上会自动插上。
+  - 建筑 key 不要和装饰 D('rack') 等重名（曾因此 mount 丢失）。
+- **测试工具**（gitignored）：`_t.html` = index.html 只保留 6 个模型（完整版在 1GB 沙箱 headless 会崩）；`_hv.html` + `_tools/hv.py` 渲染头像网格；`_tools/smoke.py`。headless 只需 `chromium_headless_shell`（完整 chromium 可删以省 /tmp 内存）。
+- 待办：更多模型（VRoid Hub 上有 VRoid 2.1 官方样本 Q~Z 的 VRM0/VRM1 版本，但下载需登录，沙箱拿不到；用户如能下载 .vrm 放进仓库，`tools/vrm2head.py` 一条命令即可转换）；程序化发饰再加侧马尾/公主卷/长直发延长；展示位/共鸣的数值平衡需实玩调整。
