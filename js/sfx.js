@@ -54,7 +54,7 @@ window.SFX = (() => {
 
   // ---------------- 音乐 ----------------
   const LISTS = { cave: ['music/volatile_reaction.mp3', 'music/metalmania.mp3'], expedition: ['music/clash_defiant.mp3', 'music/unholy_knight.mp3'] };
-  let cur = null, curList = null, idx = 0, musicOn = true, vol = 0.45;
+  let cur = null, curList = null, idx = 0, musicOn = (() => { try { return localStorage.getItem('soulhead_music') !== '0'; } catch (e) { return true; } })(), vol = 0.45;
   function fade(a, to, ms, done) { const from = a.volume, t0 = performance.now(); const step = () => { const k = Math.min(1, (performance.now() - t0) / ms); a.volume = Math.max(0, Math.min(1, from + (to - from) * k)); if (k < 1) requestAnimationFrame(step); else done && done(); }; step(); }
   function music(list) {
     if (curList === list && cur) return;
@@ -68,11 +68,11 @@ window.SFX = (() => {
     a.addEventListener('ended', () => { if (cur === a) { idx++; startTrack(); } });
     a.play().then(() => fade(a, vol, 1200)).catch(() => { });
   }
-  function toggleMusic() { musicOn = !musicOn; if (!musicOn && cur) { const a = cur; fade(a, 0, 400, () => a.pause()); cur = null; } else if (musicOn && curList) startTrack(); return musicOn; }
+  function toggleMusic() { musicOn = !musicOn; try { localStorage.setItem('soulhead_music', musicOn ? '1' : '0'); } catch (e) {} document.querySelectorAll('.musicBtn').forEach(b => b.textContent = musicOn ? '🎵 BGM 开' : '🔇 BGM 关'); if (!musicOn && cur) { const a = cur; fade(a, 0, 400, () => a.pause()); cur = null; } else if (musicOn && curList) startTrack(); return musicOn; }
   function toggleSfx() { sfxOn = !sfxOn; return sfxOn; }
 
   return {
-    init, play, soul, squish, roar, thud, levelup, heartbeat, fanfare, music, toggleMusic, toggleSfx,
+    get musicOn() { return musicOn; }, init, play, soul, squish, roar, thud, levelup, heartbeat, fanfare, music, toggleMusic, toggleSfx,
     punch: () => play('punch', 0.6), coins: () => play('coins', 0.6), chop: () => play('chop', 0.8), wood: () => play('wood', 0.7), mine: () => play('mine', 0.8),
     click: () => play('click', 0.5), select: () => play('select', 0.5), confirm: () => play('confirm', 0.6), deny: () => play('error', 0.6), open: () => play('open', 0.5), close: () => play('close', 0.5),
     page: () => play('page', 0.6), book: () => play('book', 0.6), step: () => play('step', 0.25, 1, 0.15), sack: () => play('sack', 0.8), latch: () => play('latch', 0.6), metal: () => play('metal', 0.6), bell: () => play('bell', 0.5), plate: () => play('plate', 0.5)

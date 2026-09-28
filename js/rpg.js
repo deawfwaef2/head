@@ -110,6 +110,7 @@ window.RPG = (() => {
         let sig = sigOf(look), tries = 0;
         while (usedSig.has(sig) && tries++ < 30) { const l2 = ModelHeads.randomLook(r, c.lookRace, c.rar); Object.assign(look, l2); sig = sigOf(look); }
         usedSig.add(sig); usedNames.add(c.name);
+        rollExtras(r, c, look, S.luckLv || 0);
         const hurt = dmg / st.maxHp;
         const mem = Lore.memory(r, c, { weapon: wpn, q: qq, hurt });
         const h = { c, look, sig, mem, story: Lore.backstory(r, c), app: Lore.appearance(c, look), date: Date.now() };
@@ -133,7 +134,32 @@ window.RPG = (() => {
     beats.unshift(first); beats.push(last);
     return { beats, heads, q };
   }
+
+  // ---------- 魂印（词缀）：每颗首级按稀有度抽取，给首级真实的玩法差异 ----------
+  const AFF = {
+    greed:   { n: '贪婪', icon: '💰', d: '所有魂晶产出 ×1.5' },
+    wrath:   { n: '怨灵', icon: '👻', d: '自动产出时 20% 几率怨念爆发 ×5' },
+    choir:   { n: '共鸣体', icon: '🎼', d: '在多位展示架上时共鸣倍率 +0.3' },
+    beacon:  { n: '招魂', icon: '🕯️', d: '1.8 米内其他首级产出 +25%' },
+    burst:   { n: '爆魂', icon: '💥', d: '被碾碎时魂晶 ×4' },
+    muse:    { n: '歌姬', icon: '🎤', d: '通灵回放奖励 ×2' },
+    charm:   { n: '魅惑', icon: '💋', d: '把玩连击上限 10 → 20' },
+    lucky:   { n: '幸运', icon: '🍀', d: '被把玩时 6% 几率掉落 ×10 魂晶' },
+    eternal: { n: '不朽', icon: '⏳', d: '收藏越久越值钱：每天 +8%（上限 +120%）' }
+  };
+  const AFF_K = Object.keys(AFF);
+  const EPI_A = ['银月', '绯红', '黄昏', '霜雪', '星坠', '蔷薇', '黑棘', '琉璃', '白夜', '灰烬', '苍穹', '深海', '晨曦', '夜樱', '雷鸣', '翡翠', '暮色', '圣焰', '鸦羽', '金穗', '雾中', '血月'];
+  function rollExtras(r, c, look, luck) {
+    const nA = [r() < 0.3 ? 1 : 0, 1, r() < 0.4 ? 2 : 1, 2, 3][c.rar];
+    const shiny = r() < 0.025 + (luck || 0) * 0.004 + c.rar * 0.004;
+    const pool = AFF_K.slice(), aff = [];
+    for (let i = 0; i < nA + (shiny ? 1 : 0) && pool.length; i++) aff.push(pool.splice(Math.floor(r() * pool.length), 1)[0]);
+    c.aff = aff;
+    if (shiny) { c.shiny = 1; look.shiny = 1 + Math.floor(r() * 4); }
+    if (c.rar >= 2 || shiny || r() < 0.35) { const A = EPI_A[Math.floor(r() * EPI_A.length)], idn = Lore.ID[c.id].n; c.title = r() < 0.5 ? `${A}之${idn}` : `${A}的${c.traits[0]}${idn}`; }
+    if (c.rar >= 3 || shiny || (c.rar === 2 && r() < 0.3)) look.glowEye = 1;
+  }
   function sigOf(l) { return [l.f, l.h, l.hn, l.hn2, l.en, l.en2, l.sk, l.feat || '', (l.acc || []).join('+'), l.exT, l.paint, l.hx ? l.hx.s + (l.hx.ahoge || '') : ''].join('|'); }
 
-  return { STATS, EQUIP, SLOTS, CONSUM, TRAIN, stats, eqSum, trainCost, expedition, sigOf };
+  return { STATS, EQUIP, SLOTS, CONSUM, TRAIN, AFF, stats, eqSum, trainCost, expedition, sigOf, rollExtras };
 })();

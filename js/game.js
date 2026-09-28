@@ -103,6 +103,24 @@ window.startGame = function () {
   const blobTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const rg = g.createRadialGradient(32, 32, 0, 32, 32, 32); rg.addColorStop(0, 'rgba(0,0,0,0.6)'); rg.addColorStop(0.6, 'rgba(0,0,0,0.25)'); rg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = rg; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
   const blobMat = new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false });
   const blobGeo = new THREE.PlaneGeometry(1, 1); blobGeo.rotateX(-Math.PI / 2);
+  const hasAff = (h, k) => !!(h && h.rec.c.aff && h.rec.c.aff.includes(k));
+  function yieldOf(rec) {
+    const c = rec.c; let y = RAR[c.rar].y;
+    if (c.aff && c.aff.includes('greed')) y *= 1.5;
+    if (c.shiny) y *= 3;
+    if (c.aff && c.aff.includes('eternal')) y *= 1 + Math.min(1.2, (Date.now() - (rec.date || Date.now())) / 86400000 * 0.08);
+    if (rec.calm) y *= 1.5; // 通灵后安抚
+    return y;
+  }
+  // 神魂 / 异色：环绕的魂光粒子
+  const auraTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d'); const rg = g.createRadialGradient(16, 16, 0, 16, 16, 16); rg.addColorStop(0, 'rgba(255,255,255,1)'); rg.addColorStop(0.35, 'rgba(255,255,255,0.5)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(c); })();
+  function makeAura(col, n) {
+    const pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, r = 0.2 + (i % 3) * 0.035; pos[i * 3] = Math.cos(a) * r; pos[i * 3 + 1] = ((i * 37) % 11 / 11 - 0.4) * 0.35; pos[i * 3 + 2] = Math.sin(a) * r; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const p = new THREE.Points(g, new THREE.PointsMaterial({ map: auraTex, color: col, size: 0.05, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    return p;
+  }
   function createHead(rec, pos, quat) {
     const hb = ModelHeads.create(rec.look);
     const g = new THREE.Group(); hb.group.scale.setScalar(HS); hb.group.position.y = -0.005; g.add(hb.group);
@@ -112,7 +130,8 @@ window.startGame = function () {
     scene.add(g);
     const blob = new THREE.Mesh(blobGeo, blobMat); blob.scale.setScalar(0.4); blob.renderOrder = -1; scene.add(blob);
     const h = { rec, hb, g, hit, blob, vel: new V3(), av: new V3(), mount: null, lastPoke: -9, squash: 0, sleep: 0, grounded: false, idx: 0,
-      sway: new V3(), swayV: new V3(), prevVel: new V3(), yield: RAR[rec.c.rar].y };
+      sway: new V3(), swayV: new V3(), prevVel: new V3(), yield: yieldOf(rec) };
+    if (rec.c.rar >= 4 || rec.c.shiny) { h.aura = makeAura(rec.c.shiny ? '#fff2b0' : RAR[rec.c.rar].c, rec.c.shiny ? 22 : 14); scene.add(h.aura); }
     hit.userData.head = h;
     heads.push(h);
     return h;
@@ -121,7 +140,7 @@ window.startGame = function () {
     const i = heads.indexOf(h); if (i >= 0) heads.splice(i, 1);
     if (h.mount) h.mount.heads[h.slot] = null;
     if (held === h) held = null;
-    scene.remove(h.g); scene.remove(h.blob); h.hb.dispose(); if (h.hb.glow) h.hb.glow.material.dispose();
+    scene.remove(h.g); scene.remove(h.blob); if (h.aura) { scene.remove(h.aura); h.aura.geometry.dispose(); h.aura.material.dispose(); } h.hb.dispose(); if (h.hb.glow) h.hb.glow.material.dispose();
     const j = S.heads.indexOf(h.rec); if (j >= 0) S.heads.splice(j, 1);
   }
   function headOf(id) { return heads.find(h => h.rec.id === id); }
@@ -170,6 +189,7 @@ window.startGame = function () {
     if (hs.length === n) { mul += 0.25; tags.push('满座'); }
     if (hs.every(h => h.rec.c.race === hs[0].rec.c.race)) { mul += 0.15 * hs.length; tags.push('同族'); }
     if (hs.every(h => h.rec.c.rar === hs[0].rec.c.rar)) { mul += 0.1 * hs.length; tags.push('同阶'); }
+    const ch = hs.filter(h => hasAff(h, 'choir')).length; if (ch) { mul += 0.3 * ch; tags.push('共鸣体'); }
     return { mul, tags };
   }
   function mountHead(h, b, i) {
@@ -276,6 +296,18 @@ window.startGame = function () {
   });
   document.addEventListener('keyup', e => { keys[e.code] = false; });
 
+  // 准星目标：射线命中 → 该头；否则 3m 内、与视线夹角 < ~6.5° 的最接近视线中心者（不隔建筑）
+  const _tf = new V3(), _tv = new V3();
+  function targetHead(hit) {
+    if (hit === undefined) hit = lookHit();
+    if (hit && hit.head && hit.d < 3.2) return hit.head;
+    camera.getWorldDirection(_tf); let best = null, bc = 0.9935;
+    for (const h of heads) {
+      if (h === held) continue; _tv.subVectors(h.g.position, camera.position); const d = _tv.length(); if (d > 3.0 || d < 1e-3) continue;
+      const c = _tv.dot(_tf) / d; if (c > bc && (!hit || !hit.build || hit.d + 0.35 > d)) { bc = c; best = h; }
+    }
+    return best;
+  }
   function lookHit() {
     ray.setFromCamera({ x: 0, y: 0 }, camera);
     const hs = ray.intersectObjects(heads.filter(h => h !== held).map(h => h.hit), false);
@@ -301,13 +333,8 @@ window.startGame = function () {
       unloadBag(); return;
     }
     const hit = lookHit();
-    // Prefer the head under the reticle; if the doorway/crosshair misses it, allow a close, forward-facing pickup too.
-    let pickup = hit && hit.head && hit.d < 3.2 ? hit.head : null;
-    if (!pickup) {
-      const fwd = new V3(Math.sin(player.yaw), 0, -Math.cos(player.yaw));
-      let best = 3.0;
-      for (const h of heads) { if (h === held || h.mount) continue; const to = h.g.position.clone().sub(player.pos); const d = to.length(); to.y = 0; if (d < best && d > 1e-4 && to.normalize().dot(fwd) > 0.18) { best = d; pickup = h; } }
-    }
+    // 只拿准星对准的那颗（或准星 ~6° 小圆锥内最近的一颗，且不能隔着建筑）；不再“附近随便抓一颗”
+    const pickup = targetHead(hit);
     if (pickup) { const h = pickup; unmount(h); held = h; heldYaw = 0; h.sleep = 0; SFX.sack(); poke(h, 'hold'); return; }
     if (bagGroup && !bagCarrying && player.pos.distanceTo(bagGroup.position) < 2.8) { bagCarrying = true; toast('麻袋扛上肩了！走到洞内空地按 E 倒出来；按 Q 可放下。', '#ffd890', 4); SFX.sack(); return; }
     // A portable sack can be collected even if the ray points past it.
@@ -381,7 +408,7 @@ window.startGame = function () {
   function doubleX() {
     const hit = held ? { head: held } : lookHit(); if (!hit) return;
     if (hit.head) {
-      const h = hit.head; const v = Math.round(h.yield * 15 * st().yieldMul);
+      const h = hit.head; const v = Math.round(h.yield * 15 * st().yieldMul * (hasAff(h, 'burst') ? 4 : 1));
       addCoins(v); floatText('碾碎吸魂 +' + v, h.g.position, '#ff4a6a', 30);
       burst(h.g.position, '#8a0010', 60, 2.5, 1.0, -8); burst(h.g.position, RAR[h.rec.c.rar].c, 40, 2, 1.2, 1);
       bloodSplat(h.g.position.x, 0, h.g.position.z, 0.8); SFX.squish(1.4); SFX.play('heavy', 0.8, 0.7); shake = 0.3;
@@ -396,11 +423,17 @@ window.startGame = function () {
   // ---------------- 把玩 / 触发 ----------------
   let combo = 0, comboT = 0, shake = 0;
   function addCoins(n) { S.coins += n; if (n > 0) S.stats.earned += n; ui.coins.classList.remove('bump'); void ui.coins.offsetWidth; ui.coins.classList.add('bump'); }
+  function beaconMul(h) { let m = 1; for (const o of heads) { if (o === h || !hasAff(o, 'beacon')) continue; if (o.g.position.distanceToSquared(h.g.position) < 3.24) m += 0.25; } return m; }
   function auraMul(pos) { let m = 1; for (const b of builds) { const d = CAT[b.type]; if (d.aura) { const dx = pos.x - b.x, dz = pos.z - b.z; if (dx * dx + dz * dz < d.aura * d.aura) m *= d.auraMul; } } return m; }
   function trigger(h, src, mult = 1) {
     const s = st();
-    const v = h.yield * mult * s.yieldMul * auraMul(h.g.position) * (src === 'manual' || src === 'hold' ? (1 + Math.min(combo, 10) * 0.1) : 1);
+    const cap = hasAff(h, 'charm') ? 20 : 10;
+    let v = h.yield * mult * s.yieldMul * auraMul(h.g.position) * beaconMul(h) * (src === 'manual' || src === 'hold' ? (1 + Math.min(combo, cap) * 0.1) : 1);
+    let tag = '';
+    if (src === 'auto' && hasAff(h, 'wrath') && Math.random() < 0.2) { v *= 5; tag = '怨念爆发！'; SFX.play('heavy', 0.4, 1.4); burst(h.g.position, '#b04aff', 30, 1.6, 0.8, 1); }
+    if ((src === 'manual' || src === 'hold') && hasAff(h, 'lucky') && Math.random() < 0.06) { v *= 10; tag = '🍀幸运 ×10！'; SFX.fanfare(2); }
     const val = Math.max(1, Math.round(v));
+    if (tag) floatText(tag, h.g.position.clone().add(new V3(0, 0.45, 0)), '#ffe27a', 24);
     addCoins(val);
     const r = h.rec.c.rar;
     floatText('+' + val, h.g.position.clone().add(new V3(0, 0.25, 0)), RAR[r].c, 18 + r * 4 + Math.min(combo, 10));
@@ -447,8 +480,28 @@ window.startGame = function () {
     return null;
   }
 
+  // 目标高亮：脚下/周围一圈脉动光环，明确 E 会拿哪一颗
+  let aimHead = null;
+  const aimRing = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.strokeStyle = '#fff'; g.lineWidth = 7; g.shadowColor = '#fff'; g.shadowBlur = 12; g.beginPath(); g.arc(64, 64, 50, 0, 6.283); g.stroke(); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false, depthWrite: false, opacity: 0.8, blending: THREE.AdditiveBlending })); sp.renderOrder = 999; sp.visible = false; return sp; })();
+  scene.add(aimRing);
+  function updateAim(t) {
+    const h = !buildMode && !held && !uiOpen ? aimHead : null;
+    aimRing.visible = !!h; if (!h) return;
+    aimRing.position.copy(h.g.position); const s = 0.52 + Math.sin(t * 6) * 0.03; aimRing.scale.set(s, s, 1);
+    aimRing.material.color.set(RAR[h.rec.c.rar].c);
+  }
+
   // ---------------- 物理 ----------------
-  const tmp = new V3(), tmp2 = new V3(), UP = new V3(0, 1, 0), qtmp = new THREE.Quaternion();
+  const tmp = new V3(), tmp2 = new V3(), UP = new V3(0, 1, 0), DOWN = new V3(0, -1, 0), qtmp = new THREE.Quaternion();
+  const RESTS = [new V3(0, -1, 0), new V3(1, 0, 0), new V3(-1, 0, 0), new V3(0, 0, -1), new V3(0, 0, 1)];
+  // 按当前朝下的方向估算首级的支撑高度（椭球近似：断面/侧脸/后脑/脸），侧躺时不会悬空
+  const _ld = new V3(), _iq = new THREE.Quaternion();
+  function supportH(h) {
+    const e = h.ext || (h.ext = (() => { const m = h.hb.meta || {}, b = m.box || [[-0.1, -0.1, -0.11], [0.1, 0.13, 0.09]]; return { xp: Math.max(b[1][0], -b[0][0]) * 0.82 * HS, yn: -(m.bottom != null ? m.bottom : -0.097) * HS + 0.012, yp: (m.hairTop || 0.12) * 0.9 * HS, zp: (m.front || 0.08) * HS, zn: -b[0][2] * 0.8 * HS }; })());
+    _iq.copy(h.g.quaternion).invert(); _ld.set(0, -1, 0).applyQuaternion(_iq);
+    const x = _ld.x * e.xp, y = _ld.y * (_ld.y < 0 ? e.yn : e.yp), z = _ld.z * (_ld.z > 0 ? e.zp : e.zn);
+    return Math.max(0.1, Math.sqrt(x * x + y * y + z * z));
+  }
   function impact(h, v) {
     if (h.lastHit > 0) return; h.lastHit = 0.08;
     const k = Math.min(1, v / 6);
@@ -478,7 +531,7 @@ window.startGame = function () {
       h.vel.y += GRAV * dt;
       h.g.position.addScaledVector(h.vel, dt);
       const p = h.g.position;
-      const floorHead = RC + 0.055; // model cut geometry extends below its physics sphere; keep the stump visibly above the cave floor
+      const floorHead = supportH(h); // 由朝向决定的支撑高度（断面朝下≈旧值，侧躺更低）
       if (p.y < floorHead) contact(h, 0, 1, 0, floorHead - p.y);
       if (p.y > cave.H - 0.5) contact(h, 0, -1, 0, p.y - (cave.H - 0.5));
       const rr = Math.hypot(p.x, p.z); if (rr > R) contact(h, -p.x / rr, 0, -p.z / rr, rr - R);
@@ -523,9 +576,13 @@ window.startGame = function () {
     for (const h of heads) {
       if (h === held || h.mount || h.sleep > 1.0) continue;
       if (h.grounded) {
-        const lu = tmp.set(0, 1, 0).applyQuaternion(h.g.quaternion);
-        const ax = tmp2.crossVectors(lu, UP);
-        if (h.vel.length() < 1.2) h.av.addScaledVector(ax, 28 * dt);
+        // 不再强制“回正”：朝最近的稳定姿态（断面朝下 / 侧脸贴地 / 后脑贴地 / 脸朝下）轻轻落定，保留随机朝向
+        if (h.vel.length() < 1.2) {
+          const q = h.g.quaternion; let best = RESTS[0], bd = -2;
+          for (const L of RESTS) { tmp.copy(L).applyQuaternion(q); if (-tmp.y > bd) { bd = -tmp.y; best = L; } }
+          tmp.copy(best).applyQuaternion(q); const ax = tmp2.crossVectors(tmp, DOWN);
+          if (bd < 0.995) h.av.addScaledVector(ax, 16 * dt);
+        }
         h.av.multiplyScalar(Math.pow(0.02, dt));
         h.vel.x *= Math.pow(0.12, dt); h.vel.z *= Math.pow(0.12, dt);
       } else h.av.multiplyScalar(Math.pow(0.6, dt));
@@ -678,6 +735,8 @@ window.startGame = function () {
   function frame() {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, clock.getDelta()); const now = clock.elapsedTime;
+    updateAim(now); ModelHeads.tick(now);
+    for (const h of heads) if (h.aura) { h.aura.position.copy(h.g.position); h.aura.rotation.y = now * 0.9 + h.rec.id; h.aura.visible = h.g.visible !== false; }
     // 自适应分辨率
     fpsAcc += dt; fpsN++; if (fpsAcc > 2) { const fps = fpsN / fpsAcc; if (fps < 40 && pixelRatio > 0.7) { pixelRatio = Math.max(0.7, pixelRatio - 0.15); renderer.setPixelRatio(pixelRatio); } else if (fps > 58 && pixelRatio < Math.min(devicePixelRatio, 1.5)) { pixelRatio = Math.min(Math.min(devicePixelRatio, 1.5), pixelRatio + 0.1); renderer.setPixelRatio(pixelRatio); } fpsAcc = 0; fpsN = 0; }
     // 玩家
@@ -808,9 +867,10 @@ window.startGame = function () {
       else if (bagCarrying) tip = player.pos.distanceTo(cave.exitPos) < 3.2 ? '<b>[E]</b> 把麻袋扛到洞内空地再倒出 · <b>Q</b>放下' : '<b>[E]</b> 倒出麻袋里的首级 · <b>Q</b>放下';
       else if (bagGroup && player.pos.distanceTo(bagGroup.position) < 2.8) tip = '<b>[E]</b> 扛起战利品麻袋';
       else {
-        const hit = lookHit();
+        let hit = lookHit(); const th = targetHead(hit); if (th && !(hit && hit.head === th)) hit = { head: th, d: 1 };
+        aimHead = th;
         if (held) tip = `手持「${held.rec.c.name}」 · <b>左键</b>把玩 · <b>滚轮</b>转向 · <b>V</b>换表情 · <b>E</b>放下/插桩 · <b>右键</b>扔 · <b>F</b>查看`;
-        else if (hit && hit.head) { const c = hit.head.rec.c; tip = `<span style="color:${RAR[c.rar].c}">【${RAR[c.rar].n}】</span> <b>${c.name}</b> · ${c.raceN}${c.idN}<br><small>左键把玩 · E 拿起 · F 查看/回忆 · XX 碾碎</small>`; }
+        else if (hit && hit.head) { const c = hit.head.rec.c; tip = `<span style="color:${RAR[c.rar].c}">【${RAR[c.rar].n}】</span>${c.shiny ? ' <span style="color:#ffe27a">✨异色</span>' : ''} <b>${c.name}</b>${c.title ? ` <small style="color:#e6c7a0">『${c.title}』</small>` : ''} · ${c.raceN}${c.idN}${(c.aff || []).length ? '<br><small>' + c.aff.map(k => RPG.AFF[k] ? RPG.AFF[k].icon + RPG.AFF[k].n : '').join(' ') + '</small>' : ''}<br><small>左键把玩 · E 拿起 · F 查看/回忆 · XX 碾碎</small>`; }
         else if (player.pos.distanceTo(cave.exitPos) < 2.6) tip = '<b>[E]</b> 离开洞窟，出去狩猎';
         else if (player.pos.distanceTo(cave.merchantPos) < 2.4) tip = '<b>[E]</b> 和地精行商斯尼克交易';
         else if (hit && hit.build) { const d = CAT[hit.build.type]; tip = `<b>${d.n}</b>` + (d.train ? ' · <b>[E]</b> 开始训练' : '') + (d.mount ? (() => { const n = hit.build.heads.length, k = hit.build.heads.filter(Boolean).length; return (k ? ' · 左键把玩 · E 取下' : '') + (k < n ? ' · 手持首级按 E 插上' : '') + (n > 1 ? ` · ${k}/${n} 位` : ''); })() : '') + ' <small>· XX 拆除</small>'; }
@@ -824,7 +884,7 @@ window.startGame = function () {
 
   // ---------------- 对外 ----------------
   window.G = {
-    S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
+    hasAff, yieldOf, S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
     save, wipe, setUI, lockPointer, spawnReturnHeads, addHeadRecs, createReturnBag, usedSig, usedNames, headOf, removeHead, refreshWeapon, burst, get cave() { return cave; },
     get playing() { return playing; }, get uiOpen() { return uiOpen; }, renderer, camera, scene, poke, mountHead, createHead, addBuild
   };

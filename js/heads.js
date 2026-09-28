@@ -4,6 +4,7 @@ window.ModelHeads = (() => {
   const SRC = new WeakMap();  // mesh -> src material（不要放 userData，clone 会 JSON 序列化贴图）
   let ready = false;
   const V3 = THREE.Vector3;
+  const GT = { value: 0 }; // 全局时间（异色流光 / 魂火眼）
 
   // ---------- 调色板 ----------
   const HAIR = [
@@ -126,14 +127,23 @@ window.ModelHeads = (() => {
     const m = new THREE.MeshToonMaterial({ map: src.map || null, gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest || (src.transparent ? 0.25 : 0.4), side: THREE.DoubleSide, depthWrite: src.depthWrite });
     m.name = src.name;
     m.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, { uHC1: U.hc1, uHC2: U.hc2, uGrad: U.grad, uHK: { value: 0.95 / lum }, uSway: U.sway, uHTop: U.hTop, uHLen: U.hLen });
+      Object.assign(sh.uniforms, { uHC1: U.hc1, uHC2: U.hc2, uGrad: U.grad, uHK: { value: 0.95 / lum }, uSway: U.sway, uHTop: U.hTop, uHLen: U.hLen, uShiny: U.shiny, uT: GT });
       injectVertex(sh, true);
       sh.fragmentShader = sh.fragmentShader
-        .replace('void main() {', 'varying vec3 vHP; uniform vec3 uHC1; uniform vec3 uHC2; uniform vec2 uGrad; uniform float uHK;\nvoid main() {')
+        .replace('void main() {', 'varying vec3 vHP; uniform vec3 uHC1; uniform vec3 uHC2; uniform vec2 uGrad; uniform float uHK; uniform float uShiny; uniform float uT;\nvoid main() {')
         .replace('#include <map_fragment>', `#include <map_fragment>
           float l = dot(diffuseColor.rgb, vec3(0.299,0.587,0.114));
           vec3 tc = mix(uHC2, uHC1, smoothstep(uGrad.x, uGrad.y, vHP.y));
-          diffuseColor.rgb = clamp(tc * pow(l * uHK, 1.15) * 1.05, 0.0, 1.2);`);
+          diffuseColor.rgb = clamp(tc * pow(l * uHK, 1.15) * 1.05, 0.0, 1.2);
+          if (uShiny > 0.5) { // 异色发：金辉 / 银霜 / 虹彩 / 星空，带流光
+            float lk = clamp(pow(l * uHK, 1.1), 0.0, 1.3); vec3 sc;
+            if (uShiny < 1.5) sc = mix(vec3(0.42, 0.24, 0.05), vec3(1.0, 0.84, 0.42), lk);
+            else if (uShiny < 2.5) sc = mix(vec3(0.38, 0.44, 0.56), vec3(0.96, 0.98, 1.0), lk);
+            else if (uShiny < 3.5) sc = (0.55 + 0.45 * cos(6.2831 * (vec3(0.0, 0.33, 0.67) + vHP.y * 5.0 + uT * 0.22))) * (0.35 + lk * 0.8);
+            else { sc = mix(vec3(0.04, 0.03, 0.16), vec3(0.32, 0.18, 0.72), lk); float st = step(0.992, fract(sin(dot(floor(vHP * 380.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453)); sc += st * (0.55 + 0.45 * sin(uT * 3.0 + vHP.x * 180.0)) * vec3(1.6, 1.5, 1.2); }
+            sc += pow(max(0.0, sin(vHP.y * 38.0 - uT * 2.2)), 14.0) * 0.4;
+            diffuseColor.rgb = sc;
+          }`);
     };
     m.customProgramCacheKey = () => 'hair3';
     return m;
@@ -152,16 +162,18 @@ window.ModelHeads = (() => {
   function irisMat(src, U, lum) {
     const m = new THREE.MeshToonMaterial({ map: src.map || null, gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: src.depthWrite });
     m.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, { uEC1: U.ec1, uEC2: U.ec2, uDull: U.dull, uHK: { value: 0.85 / lum } });
+      Object.assign(sh.uniforms, { uEC1: U.ec1, uEC2: U.ec2, uDull: U.dull, uHK: { value: 0.85 / lum }, uGlow: U.glow, uT: GT });
       injectVertex(sh, false);
       sh.fragmentShader = sh.fragmentShader
-        .replace('void main() {', 'varying vec3 vHP; uniform vec3 uEC1; uniform vec3 uEC2; uniform float uDull; uniform float uHK;\nvoid main() {')
+        .replace('void main() {', 'varying vec3 vHP; uniform vec3 uEC1; uniform vec3 uEC2; uniform float uDull; uniform float uHK; uniform float uGlow; uniform float uT;\nvoid main() {')
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += irisC * uGlow * (0.8 + 0.2 * sin(uT * 2.3));')
         .replace('#include <map_fragment>', `#include <map_fragment>
           float l = dot(diffuseColor.rgb, vec3(0.299,0.587,0.114));
           vec3 ec = vHP.x > 0.0 ? uEC1 : uEC2;
           vec3 c = ec * pow(l * uHK, 1.3) * 1.1;
           float g = dot(c, vec3(0.333));
-          diffuseColor.rgb = mix(c, vec3(g) * 0.75, uDull) * (1.0 - uDull * 0.35);`);
+          diffuseColor.rgb = mix(c, vec3(g) * 0.75, uDull) * (1.0 - uDull * 0.35);
+          vec3 irisC = ec * pow(l * uHK, 1.6);`);
     };
     m.customProgramCacheKey = () => 'iris3';
     return m;
@@ -386,7 +398,7 @@ window.ModelHeads = (() => {
       hc1: { value: new THREE.Color(look.hc1) }, hc2: { value: new THREE.Color(look.hc2) },
       grad: { value: new THREE.Vector2(look.gy - 0.03, look.gy + 0.03) },
       sway: { value: new V3() }, hTop: { value: top * 0.55 }, hLen: { value: Math.max(0.08, top * 0.55 - hairT.hairMinY) },
-      ec1: { value: new THREE.Color(look.ec1) }, ec2: { value: new THREE.Color(look.ec2) }, dull: { value: 0.45 },
+      ec1: { value: new THREE.Color(look.ec1) }, ec2: { value: new THREE.Color(look.ec2) }, dull: { value: look.glowEye ? 0.08 : 0.45 }, glow: { value: look.glowEye ? 0.9 : 0 }, shiny: { value: look.shiny || 0 },
       skin: { value: new V3(sk.r / baseSkin.r, sk.g / baseSkin.g, sk.b / baseSkin.b) }, pale: { value: look.pale },
       blood: { value: look.blood }, spat: { value: look.spat }, seed: { value: look.seed },
       cutY: { value: faceMeta.bottom }, hH: { value: (faceMeta.skullTop || 0.1) - faceMeta.bottom },
@@ -633,7 +645,7 @@ window.ModelHeads = (() => {
   }
 
   return {
-    init, create, randomLook, HAIR, EYE, SKIN,
+    init, create, randomLook, HAIR, EYE, SKIN, tick(t) { GT.value = t; },
     get ready() { return ready; },
     get count() { return T.length; },
     files: () => T.map(t => t.meta.file),

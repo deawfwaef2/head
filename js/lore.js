@@ -168,6 +168,8 @@ window.Lore = (() => {
     const hs = HAIRSTYLE[look.h] || '长发';
     let s = `${look.hn}${look.hn2 !== look.hn ? '渐变' + look.hn2 : ''}色的${hs}${look.hx && HX_TXT[look.hx.s] ? '，' + HX_TXT[look.hx.s] : ''}${look.hx && look.hx.ahoge ? '，头顶翘着' + (look.hx.ahoge > 1 ? '两根' : '一根') + '呆毛' : ''}，${look.en}${look.en2 !== look.en ? '与' + look.en2 + '异色' : ''}的眼瞳（如今已蒙上一层死灰），${look.sk}色的肌肤`;
     if (look.feat && FEAT_TXT[look.feat]) s += '，' + FEAT_TXT[look.feat];
+    if (look.shiny) s += '，' + ['', '发丝泛着熔金般的光泽', '发丝像覆了一层银霜', '发色随光线流转出彩虹', '发间闪烁着细碎的星光'][look.shiny] + '（异色）';
+    if (look.glowEye) s += '，死去的眼瞳深处仍燃着一点魂火';
     const acc = (look.acc || []).map(a => ACC_TXT[a]).filter(Boolean);
     if (acc.length) s += '，戴着' + acc.join('与');
     if (look.scar) s += '，脸上有一道旧伤疤';

@@ -10,6 +10,7 @@ window.UI = (() => {
   const statTxt = o => o ? Object.entries(o).map(([k, v]) => `${statName(k)}+${v}`).join(' ') : '';
 
   function init() {
+    document.querySelectorAll('.musicBtn').forEach(b => b.textContent = SFX.musicOn ? '🎵 BGM 开' : '🔇 BGM 关');
     root = document.createElement('div'); root.id = 'uiroot';
     root.innerHTML = '<div class="modal" id="uipanel"></div>';
     document.body.appendChild(root);
@@ -167,9 +168,10 @@ window.UI = (() => {
   function openCard(rec, fromMenu) {
     cardRec = rec; const c = rec.c;
     open('card', `<div class="card" style="--c:${RC[c.rar]}">
-      <div class="card-r">【${RN[c.rar]}】</div><h2>${esc(c.name)}</h2>
+      <div class="card-r">【${RN[c.rar]}】${c.shiny ? ' <span class="shiny">✨异色</span>' : ''}${rec.calm ? ' <span class="calm">🕊️已安息</span>' : ''}${rec.seance ? ' <span class="calm">🔮已通灵</span>' : ''}</div>${c.title ? `<div class="card-t">『${esc(c.title)}』</div>` : ''}<h2>${esc(c.name)}</h2>
       <div class="card-id">${esc(c.raceN)} · ${esc(c.idN)} · ${c.age} 岁 · 得自 ${esc(c.locN)}</div>
-      <div class="kv"><span>性格</span><b>${esc((c.traits || []).join('、'))}</b><span>信仰</span><b>${esc(c.belief)}</b><span>生前目的</span><b>${esc(c.goal)}</b><span>魂晶产出</span><b>×${[1, 3, 8, 20, 55][c.rar]}</b></div>
+      <div class="kv"><span>性格</span><b>${esc((c.traits || []).join('、'))}</b><span>信仰</span><b>${esc(c.belief)}</b><span>生前目的</span><b>${esc(c.goal)}</b><span>魂晶产出</span><b>×${+G.yieldOf(rec).toFixed(1)}</b></div>
+      ${(c.aff || []).length ? `<div class="affs">${c.aff.map(k => RPG.AFF[k] ? `<div class="aff"><b>${RPG.AFF[k].icon} ${RPG.AFF[k].n}</b><small>${RPG.AFF[k].d}</small></div>` : '').join('')}</div>` : '<div class="affs none">无魂印</div>'}
       <h3>外貌</h3>${para(rec.app)}${modelNote(rec)}
       <h3>生平</h3>${para(rec.story)}
       <div id="memBox"></div>
