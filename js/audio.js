@@ -87,6 +87,18 @@ window.SFX = (() => {
     osc('square', 180, 120, t, 0.06, 0.15, 0.001, 0.05);
     osc('sine', 660, 660, t + 0.05, 0.12, 0.2, 0.004, 0.2);
   }
+  // 按按钮：音高随进度上升
+  function press(frac = 0) {
+    if (!ok()) return; const t = ctx.currentTime; const f = 300 + frac * 500;
+    noise(t, 0.02, 0.45, 'highpass', 2500, 0.7, 0.03);
+    osc('square', f, f * 0.7, t, 0.04, 0.08, 0.001, 0.03);
+    osc('sine', f * 2, f * 2, t + 0.01, 0.07, 0.12, 0.002, 0.1);
+  }
+  function tick() {
+    if (!ok()) return; const t = ctx.currentTime;
+    noise(t, 0.015, 0.15, 'highpass', 3500, 0.7, 0.02);
+    osc('sine', 1400, 900, t, 0.03, 0.05, 0.001, 0.05);
+  }
   function deny() {
     if (!ok()) return; const t = ctx.currentTime;
     osc('square', 220, 200, t, 0.09, 0.12, 0.002, 0.05);
@@ -192,6 +204,6 @@ window.SFX = (() => {
   function toggleMusic() { musicOn = !musicOn; if (musicBus) musicBus.gain.value = musicOn ? 0.32 : 0; return musicOn; }
   function toggleSfx() { sfxOn = !sfxOn; return sfxOn; }
 
-  return { init, thud, boop, ding, click, deny, rumble, fanfare, build, sell, mount, whoosh, pickup, toggleMusic, toggleSfx,
+  return { init, press, tick, thud, boop, ding, click, deny, rumble, fanfare, build, sell, mount, whoosh, pickup, toggleMusic, toggleSfx,
     get musicOn() { return musicOn; }, get sfxOn() { return sfxOn; } };
 })();

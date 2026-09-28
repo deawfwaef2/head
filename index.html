@@ -29,19 +29,34 @@
   .wlabel { position: absolute; left: 0; top: 0; text-align: center; background: rgba(30,32,38,0.85); color: #fff; padding: 6px 14px; border-radius: 10px; font-size: 14px; line-height: 1.4; transform-origin: 50% 100%; }
   .wlabel b { color: #ffd24d; }
   .wlabel.poor b { color: #ff7a8a; }
-  #buildPanel { position: absolute; left: 50%; bottom: -260px; transform: translateX(-50%); transition: bottom .25s; pointer-events: auto; background: rgba(255,255,255,0.92); border-radius: 18px 18px 0 0; padding: 12px 16px 16px; box-shadow: 0 -6px 30px rgba(0,0,0,0.1); }
-  #buildPanel.open { bottom: 0; }
-  .bp-title { font-weight: 800; font-size: 16px; margin-bottom: 8px; color: #333; }
-  .bp-title span { font-weight: 400; font-size: 12px; color: #999; margin-left: 8px; }
-  .bp-row { display: flex; gap: 10px; }
-  .bp-item { width: 170px; border: 2px solid #eee; border-radius: 12px; padding: 8px 10px; cursor: pointer; position: relative; transition: all .15s; background: #fff; }
-  .bp-item:hover { border-color: #8ff0c0; transform: translateY(-2px); }
-  .bp-item.sel { border-color: #40e090; background: #effff6; }
-  .bp-item.poor { opacity: .55; }
-  .bp-key { position: absolute; top: 6px; right: 8px; background: #333; color: #fff; font-size: 11px; border-radius: 5px; padding: 1px 6px; }
-  .bp-name { font-weight: 800; font-size: 15px; }
-  .bp-cost { color: #d09000; font-weight: 700; font-size: 14px; }
-  .bp-desc { font-size: 11px; color: #888; margin-top: 3px; line-height: 1.4; }
+  #buildPanel { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -46%) scale(.96); opacity: 0; pointer-events: none; transition: all .2s; width: min(1100px, 94vw); max-height: 86vh; overflow: auto; background: rgba(255,255,255,0.96); border-radius: 24px; padding: 20px 24px 24px; box-shadow: 0 20px 80px rgba(0,0,0,0.25); z-index: 5; }
+  #buildPanel.open { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
+  .bp-head { display: flex; align-items: center; gap: 16px; margin-bottom: 6px; }
+  .bp-title { font-weight: 900; font-size: 28px; color: #222; }
+  .bp-tabs { display: flex; gap: 8px; flex: 1; }
+  .bp-tab { font-size: 18px; font-weight: 800; padding: 8px 22px; border-radius: 30px; border: 2px solid #eee; background: #fff; cursor: pointer; color: #666; font-family: inherit; }
+  .bp-tab.on { background: #222; color: #fff; border-color: #222; }
+  .bp-coins { font-size: 22px; font-weight: 900; color: #d09000; }
+  .bp-close { font-size: 15px; padding: 8px 16px; border-radius: 12px; border: none; background: #f1f1f3; cursor: pointer; font-family: inherit; font-weight: 700; color: #555; }
+  .bp-sub { color: #888; font-size: 14px; margin: 4px 0 14px; }
+  .bp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+  .bp-item { border: 2px solid #eee; border-radius: 18px; padding: 14px; cursor: pointer; position: relative; transition: transform .12s, border-color .12s, box-shadow .12s; background: #fff; }
+  .bp-item:hover { border-color: #40e090; transform: translateY(-3px); box-shadow: 0 10px 24px rgba(64,224,144,.2); }
+  .bp-item.poor { opacity: .5; }
+  .bp-item.poor:hover { border-color: #ffb3bd; box-shadow: none; }
+  .bp-item.shake { animation: shk .3s; }
+  @keyframes shk { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+  .bp-icon { font-size: 44px; line-height: 1.1; }
+  .bp-name { font-weight: 900; font-size: 18px; margin-top: 4px; color: #222; }
+  .bp-cost { color: #d09000; font-weight: 800; font-size: 17px; }
+  .bp-desc { font-size: 13px; color: #888; margin-top: 4px; line-height: 1.45; }
+  .bp-own { position: absolute; top: 10px; right: 12px; font-size: 12px; background: #eefaf4; color: #2a9; border-radius: 8px; padding: 2px 8px; font-weight: 700; }
+  .pbar { width: 120px; height: 6px; background: rgba(255,255,255,.2); border-radius: 3px; margin: 4px auto 0; overflow: hidden; }
+  .pbar i { display: block; height: 100%; background: linear-gradient(90deg, #40e090, #ffd24d, #ff5a6e); }
+  #bonus { font-size: 12px; color: #999; margin-top: 2px; }
+  #loadbar { width: 320px; height: 8px; background: #e2e3e7; border-radius: 4px; overflow: hidden; margin-top: 14px; }
+  #loadbar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ff5a7a, #ff8a5c); transition: width .2s; }
+  #credits { position: absolute; bottom: 14px; font-size: 11px; color: #aaa; text-align: center; max-width: 800px; }
   #hint { position: absolute; left: 22px; bottom: 16px; font-size: 12px; color: #999; line-height: 1.6; }
   #menu { position: fixed; inset: 0; background: radial-gradient(ellipse at center, rgba(255,255,255,0.75), rgba(230,232,236,0.95)); display: flex; align-items: center; justify-content: center; flex-direction: column; transition: opacity .3s; z-index: 10; }
   #menu.hidden { opacity: 0; pointer-events: none; }
@@ -54,23 +69,23 @@
   .controls { margin-top: 28px; display: grid; grid-template-columns: auto auto; gap: 6px 22px; font-size: 14px; color: #555; }
   .controls kbd { display: inline-block; background: #fff; border: 1px solid #ddd; border-bottom-width: 3px; border-radius: 6px; padding: 1px 8px; font-family: inherit; font-weight: 700; min-width: 26px; text-align: center; }
   .rules { margin-top: 20px; max-width: 560px; text-align: center; font-size: 13px; color: #888; line-height: 1.7; }
-  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #888; background: #f2f3f5; z-index: 20; }
+  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 18px; color: #888; background: #f2f3f5; z-index: 20; }
 </style>
 </head>
 <body>
-<div id="loading">加载中…（如一直停在这里，请用 Chrome / Edge 打开）</div>
+<div id="loading"><div id="loadtxt">加载中…（如一直停在这里，请用 Chrome / Edge 打开）</div><div id="loadbar"><i></i></div></div>
 <div id="game"></div>
 <div id="hud">
   <div id="labels"></div>
-  <div id="coinBox"><div id="coins">0</div><div id="rate">≈ 0 / 分钟</div></div>
+  <div id="coinBox"><div id="coins">0</div><div id="rate">≈ 0 / 分钟</div><div id="bonus"></div></div>
   <div id="combo"></div>
   <div id="info"></div>
   <div id="cross"></div>
   <div id="tip"></div>
   <div id="toast"></div>
-  <div id="hint">WASD 移动 · Shift 跑 · 左键 把玩/按按钮 · E 拿起/放下/插杆 · 右键 扔 · B 建造 · XX 卖出/拆除 · M 音乐 · Esc 暂停</div>
-  <div id="buildPanel"></div>
+  <div id="hint">WASD 移动 · Shift 跑 · 左键 把玩/按按钮(按住连按) · E 拿起/放下/放上杆 · 右键 扔 · B 建造 · XX 卖出/拆除 · M 音乐 · Esc 暂停</div>
 </div>
+<div id="buildPanel"></div>
 <div id="menu">
   <h1>H<span>E</span>AD</h1>
   <div class="sub">头 部 收 集 · 纯白房间</div>
@@ -82,12 +97,37 @@
     <div><kbd>右键</kbd> 扔出</div><div><kbd>B</kbd> 建造菜单（<kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>）</div>
     <div><kbd>X</kbd><kbd>X</kbd> 卖出头 / 拆除</div><div><kbd>M</kbd> 音乐开关</div>
   </div>
-  <div class="rules">按按钮 → 管道掉下随机稀有度的头（N / R / SR / SSR / UR）。<br>把玩头产出金币，连击加成。建造<b>桌子</b>：把玩桌上一个头，桌上所有头连锁产出；<br>建造<b>杆子</b>：插上头每 10 秒自动产出。进度自动保存。</div>
+  <div class="rules">按红色按钮 <b>60 次</b> → 管道掉下随机稀有度的头（N / R / SR / SSR / UR，稀有度越高改色越大胆）。<br>把玩头产出金币（连击加成）。按 <b>B</b> 打开建造菜单（鼠标点选）：自动按钮器、桌子(连锁)、杆子/展示台(自动)、转盘、音箱、各种装饰（加舒适度=全局加成）。进度自动保存。</div>
+  <div id="credits">头部模型来自 CC0 / VRM Public License / CC-BY 授权模型（pixiv Inc.、VirtualCast, Inc.、SirRichard94），经裁切改造。详见 CREDITS.md</div>
 </div>
 <script src="lib/three.min.js"></script>
+<script src="lib/GLTFLoader.js"></script>
+<script src="models/AvatarSample_A.js"></script>
+<script src="models/AvatarSample_B.js"></script>
+<script src="models/Darkness_Shibu.js"></script>
+<script src="models/Godette.js"></script>
+<script src="models/HairSample_Female.js"></script>
+<script src="models/Seed-san.js"></script>
+<script src="models/Sendagaya_Shibu.js"></script>
+<script src="models/Sendagaya_Shino.js"></script>
+<script src="models/Twist.js"></script>
+<script src="models/Victoria_Rubin.js"></script>
+<script src="models/Vita.js"></script>
+<script src="models/Vivi.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/headgen.js"></script>
+<script src="js/heads.js"></script>
+<script src="js/builds.js"></script>
 <script src="js/game.js"></script>
-<script>document.getElementById('loading').remove();</script>
+<script>
+(async () => {
+  const bar = document.querySelector('#loadbar i'), txt = document.getElementById('loadtxt');
+  try {
+    await ModelHeads.init((f, name) => { bar.style.width = (f * 100) + '%'; txt.textContent = '加载头部模型 ' + Math.round(f * 100) + '% · ' + name; });
+  } catch (e) { console.warn(e); }
+  try { startGame(); } catch (e) { txt.textContent = '启动失败：' + e.message; console.error(e); return; }
+  document.getElementById('loading').remove();
+})();
+</script>
 </body>
 </html>

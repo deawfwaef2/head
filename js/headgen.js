@@ -454,5 +454,5 @@ window.HeadGen = (() => {
     return { group: grp, setExpr, react: () => setExpr(REACT), name, exprName: expr.n, style, acc, dispose };
   }
 
-  return { build, R };
+  return { build, R, cutMaterial: getCutMaterial };
 })();
