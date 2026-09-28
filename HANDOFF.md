@@ -112,3 +112,29 @@
   - 建筑 key 不要和装饰 D('rack') 等重名（曾因此 mount 丢失）。
 - **测试工具**（gitignored）：`_t.html` = index.html 只保留 6 个模型（完整版在 1GB 沙箱 headless 会崩）；`_hv.html` + `_tools/hv.py` 渲染头像网格；`_tools/smoke.py`。headless 只需 `chromium_headless_shell`（完整 chromium 可删以省 /tmp 内存）。
 - 待办：更多模型（VRoid Hub 上有 VRoid 2.1 官方样本 Q~Z 的 VRM0/VRM1 版本，但下载需登录，沙箱拿不到；用户如能下载 .vrm 放进仓库，`tools/vrm2head.py` 一条命令即可转换）；程序化发饰再加侧马尾/公主卷/长直发延长；展示位/共鸣的数值平衡需实玩调整。
+
+---
+
+## Round 6（本轮）— 用户反馈与实现记录
+
+### 用户反馈（原话要点）
+麻袋倒头要"大师级"动画；E 经常拿到别的位置的头；展览感要更强、组件机制要更有创意；通灵台：放头→播放她生前的 MV（反差要爽）；头要有更多用途；"为什么每次头会自动回正"；角色太同质化、没有抽卡惊喜；后期无聊、无重玩性；BGM 要能关。
+
+### 新增约束（长期有效）
+- BGM 必须可由玩家关闭（M 键 / 右上角按钮，localStorage `soulhead_music` 持久化）。
+- 首级不再自动回正：落地按 `RESTS` 静止姿态（侧躺/仰/俯等）自然停住。
+- E 只拿准星对准的那颗（射线或 ~6° 小圆锥，不隔建筑）。
+
+### 实现（commit）
+1. `8ee803b` 阶段1+2：E 精确选头 + 准星环；静止姿态；BGM 开关；**抽卡系统**：魂印 `c.aff`（贪婪/怨灵/共鸣体/招魂/爆魂/歌姬/魅惑/幸运/不朽，均有真实效果）、称号 `c.title`、异色 `c.shiny`（金辉/银霜/虹彩/星空发色 ×3 产出 + 光环）、发光眼 `look.glowEye`。
+2. `466735c` 阶段3：**倒袋仪式**（game.js `unloadBag`/`updateCine`/`gachaCard`）：麻袋悬空→按袋内最高稀有度发预兆光→抖动→翻转→首级按稀有度升序抛出（压轴），落地光柱 + 抽卡卡片（星级/称号/魂印/NEW/异色彩虹框），高稀有闪屏震屏；E/点击 3.2× 加速。朝向用 `camera.getWorldDirection`（旧的 sin/cos yaw 公式方向是反的，别再用）。
+3. `d7a20f6` 阶段4：**通灵台**（builds `C.seance` + `js/seance.js`）：对准台上首级按 E（Shift+E 取下）。独立 WebGLRenderer 渲染"活着的"她（`ModelHeads.create(look,{alive:true})` 保留高光、dull/blood/pale=0），眨眼、打字时口型（aa/oh/ih/ou/ee）、每幕表情；8 幕：标题→童年(种族)→日常(ID.act)→性格台词(45 种 trait 各一句)→信仰→梦想(c.goal)→最后一个早晨(八音盒发条变慢)→反转"……然后，她遇见了你。"（褪色、眼中高光熄灭、血色浮现、不协和低音+心跳）。首次通灵：安抚（`rec.calm` 产出×1.5 安详脸）或榨取（大量魂晶 + 怨灵魂印，痛苦脸）；歌姬×2、通灵日×3。MV 期间主场景暂停渲染。
+4. `b03116a` 阶段5：**展厅/重玩**：展示柜 `C.showcase`（旋转台、铭牌 canvas、聚光锥 `raycast=()=>{}` 不挡准星）；展厅分 `exhibit()` 与评级 F→SS（每级全体产出 +8%）；图鉴·展厅菜单页（每 5 种身份 +5%）；悬赏榜 `C.bounty`（3 条委托，交首级换魂晶 + 声望，每 3 声望远征幸运 +1，`RPG.luckOf(S)`）；每日魂潮 `G.daily`（血月/异色之夜/丰饶/通灵日/赏金日）。全局倍率在 `trigger` 里 `globalMul()`。
+
+### 测试
+- `_tools/scene.py` + `_t.html`（轻量模型集）。测试钩子：`G._dbg.{carry,unloadBag,startSeance,submitBounty,interactE,cine}`。
+- headless 仅 ~0.3–0.5× 实时速度，等待时间要放宽。
+
+### 待办 / 想法
+- 用户的"编号→子文件夹"问题仍未回答。
+- 可继续：轮回/转生（永久加成）、首级互动事件（两颗头对话）、展厅访客 NPC 打分、图鉴完成奖励模型等。
