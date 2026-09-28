@@ -119,11 +119,11 @@ window.ModelHeads = (() => {
   function injectVertex(sh, sway) {
     sh.vertexShader = sh.vertexShader
       .replace('void main() {', `varying vec3 vHP;\n${sway ? 'uniform vec3 uSway; uniform float uHTop; uniform float uHLen;' : ''}\nvoid main() {`)
-      .replace('#include <morphtarget_vertex>', `#include <morphtarget_vertex>\n${sway ? 'float sw = clamp((uHTop - transformed.y) / uHLen, 0.0, 1.0); sw = sw * sw * (0.4 + 0.6 * clamp(length(transformed.xz) * 12.0, 0.0, 1.0)); transformed += uSway * sw;' : ''}\nvHP = transformed;`);
+      .replace('#include <morphtarget_vertex>', `#include <morphtarget_vertex>\n${sway ? 'float sw = clamp((uHTop - transformed.y) / uHLen, 0.0, 1.0); sw = sw * sw * (0.4 + 0.6 * clamp(length(transformed.xz) * 12.0, 0.0, 1.0)); vec3 hs = uSway; hs.x *= 0.72; hs.z *= 0.28; transformed += hs * sw;' : ''}\nvHP = transformed;`);
   }
 
   function hairMat(src, U, lum) {
-    const m = new THREE.MeshToonMaterial({ map: src.map || null, gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest || (src.transparent ? 0 : 0.4), side: src.side, depthWrite: src.depthWrite });
+    const m = new THREE.MeshToonMaterial({ map: src.map || null, gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest || (src.transparent ? 0.25 : 0.4), side: THREE.DoubleSide, depthWrite: src.depthWrite });
     m.name = src.name;
     m.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, { uHC1: U.hc1, uHC2: U.hc2, uGrad: U.grad, uHK: { value: 0.95 / lum }, uSway: U.sway, uHTop: U.hTop, uHLen: U.hLen });
@@ -321,8 +321,12 @@ window.ModelHeads = (() => {
     const faceIdx = race.faces ? Math.max(0, idxOf(pick(r, race.faces))) : Math.floor(r() * T.length);
     const face = T[faceIdx];
     const grp = face.meta.grp || 'vroid';
-    const hairCands = T.map((t, i) => i).filter(i => (MIX[grp] || [grp]).includes(T[i].meta.grp || 'vroid') && T[i].hairMeshes.length && !T[i].meta.noHair);
-    const hairIdx = face.meta.grp === 'godette' || !hairCands.length ? faceIdx : ((r() < 0.2 && !face.meta.noHair) ? faceIdx : pick(r, hairCands));
+    const allHair = T.map((t, i) => i).filter(i => T[i].hairMeshes.length && !T[i].meta.noHair);
+    const compatible = allHair.filter(i => (MIX[grp] || [grp]).includes(T[i].meta.grp || 'vroid'));
+    const hairCands = compatible.length ? compatible : allHair;
+    const nativeHair = face.hairMeshes.length > 0 && !face.meta.noHair;
+    // Never roll a bald result accidentally: if the chosen face has no usable fringe, borrow a compatible hair mesh.
+    const hairIdx = face.meta.grp === 'godette' && nativeHair ? faceIdx : (!hairCands.length ? faceIdx : (nativeHair && r() < 0.12 ? faceIdx : pick(r, hairCands)));
     const hn = race.hair && r() < 0.85 ? pick(r, race.hair) : pick(r, HAIR)[0];
     const hc = (HAIR.find(h => h[0] === hn) || HAIR[0]);
     const two = r() < 0.12 + rarity * 0.08;
@@ -413,14 +417,18 @@ window.ModelHeads = (() => {
       if (m.morphTargetInfluences) { c.morphTargetInfluences = new Array(m.morphTargetInfluences.length).fill(0); c.morphTargetDictionary = m.morphTargetDictionary; }
       byName[m.name] = c; g.add(c);
     }
-    // 表情（静态，不眨眼）
-    for (const k in look.ex) {
-      const binds = presets[k]; if (!binds) continue;
-      for (const [mn, idx, wt] of binds) { const c = byName[mn]; if (c && c.morphTargetInfluences) c.morphTargetInfluences[idx] = Math.min(1, c.morphTargetInfluences[idx] + wt * look.ex[k]); }
-    }
+    // 表情：持有时可热切换，不眨眼、不重建模型。
+    const setExpression = (ex = {}) => {
+      for (const m of Object.values(byName)) if (m.morphTargetInfluences) m.morphTargetInfluences.fill(0);
+      for (const k in ex) {
+        const binds = presets[k]; if (!binds) continue;
+        for (const [mn, idx, wt] of binds) { const c = byName[mn]; if (c && c.morphTargetInfluences) c.morphTargetInfluences[idx] = Math.min(1, c.morphTargetInfluences[idx] + wt * ex[k]); }
+      }
+    };
+    setExpression(look.ex || {});
     // 发型
     const hg = new THREE.Group(); g.add(hg);
-    if (hi !== fi) { const sy = (F.meta.skullTop || 0.1) / (H.meta.skullTop || 0.1); hg.scale.set(1.035, sy * 1.03, 1.04); hg.position.y = 0.002; }
+    if (hi !== fi) { const sy = (F.meta.skullTop || 0.1) / (H.meta.skullTop || 0.1); hg.scale.set(1.04, sy * 1.04, 1.045); hg.position.set(0, 0.002, 0.003); } else { hg.scale.set(1.008, 1.008, 1.008); hg.position.z = 0.002; }
     for (const m of H.hairMeshes) { const c = new THREE.Mesh(m.geometry, getMat(m, H)); c.renderOrder = m.renderOrder; hg.add(c); }
     const disposables = [];
     addAccessories(g, look, F.meta, U, disposables);
@@ -428,6 +436,7 @@ window.ModelHeads = (() => {
     return {
       group: g, U, radius, meta: F.meta,
       setSway(v) { U.sway.value.copy(v); },
+      setExpression,
       dispose() { own.forEach(m => m.dispose()); disposables.forEach(m => m.dispose()); }
     };
   }

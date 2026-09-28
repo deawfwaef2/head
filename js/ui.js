@@ -158,13 +158,18 @@ window.UI = (() => {
 
   // ---------------- 首级档案 ----------------
   let cardRec = null;
+  function modelNote(rec) {
+    const a = ModelHeads.meta(rec.look && rec.look.f), b = ModelHeads.meta(rec.look && rec.look.h);
+    const items = [...new Set([a,b].filter(Boolean).map(m => `${esc(m.name)}（${esc(m.credit || '许可见 CREDITS.md')}）`))];
+    return `<div class="model-license"><b>模型来源 / 公开状态</b><br>${items.join(' + ') || '程序化生成'}<br><small>本颗首级使用的模型当前允许随本仓库公开分发（须遵守上方原许可/署名）。标为“未公开/受限”的候选模型不会进入随机池。详见根目录 CREDITS.md。</small></div>`;
+  }
   function openCard(rec, fromMenu) {
     cardRec = rec; const c = rec.c;
     open('card', `<div class="card" style="--c:${RC[c.rar]}">
       <div class="card-r">【${RN[c.rar]}】</div><h2>${esc(c.name)}</h2>
       <div class="card-id">${esc(c.raceN)} · ${esc(c.idN)} · ${c.age} 岁 · 得自 ${esc(c.locN)}</div>
       <div class="kv"><span>性格</span><b>${esc((c.traits || []).join('、'))}</b><span>信仰</span><b>${esc(c.belief)}</b><span>生前目的</span><b>${esc(c.goal)}</b><span>魂晶产出</span><b>×${[1, 3, 8, 20, 55][c.rar]}</b></div>
-      <h3>外貌</h3>${para(rec.app)}
+      <h3>外貌</h3>${para(rec.app)}${modelNote(rec)}
       <h3>生平</h3>${para(rec.story)}
       <div id="memBox"></div>
       <div class="btns"><button class="red" data-a="mem">🩸 回忆：我是怎么得到这颗头的</button>${fromMenu ? '<button data-a="back">← 返回</button>' : ''}<button data-a="close">关闭</button></div></div>`, 'card-m');
@@ -300,7 +305,7 @@ window.UI = (() => {
     cta.innerHTML = `<div class="arrive"><div class="arr-t">🕳️ 回到了魂首窟</div>
       <div>带回首级 <b>${r.heads.length}</b> 颗 · 🔮 +${fmt(trip.coins)} · ❤️ -${hpLost}</div>
       <div class="arr-h">${r.heads.map(h => `<span style="color:${RC[h.c.rar]}">【${RN[h.c.rar]}】${esc(h.c.name)}</span>`).join('<br>') || '<span style="color:#999">两手空空……</span>'}</div>
-      <button class="red" data-a="arrive">把首级倒在洞里 ▶</button></div>`;
+      <button class="red" data-a="arrive">扛起战利品麻袋 ▶</button></div>`;
     SFX.levelup();
   }
   function logTrip(dead) {
@@ -317,7 +322,7 @@ window.UI = (() => {
     const n = recs.length; trip = null;
     close();
     SFX.music('cave');
-    setTimeout(() => { G.spawnReturnHeads(recs); if (n) G.toast(`背篓一倒，<b>${n}</b> 颗首级滚了出来 · 对着首级按 <b>F</b> 查看她的故事`, '#ffd890', 4); else G.toast('这趟什么都没带回来……', '#aaa', 3); }, 200);
+    setTimeout(() => { if (n) G.createReturnBag(recs); else G.toast('这趟什么都没带回来……', '#aaa', 3); }, 200);
     G.save();
   }
   function die() {

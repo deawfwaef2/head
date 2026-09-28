@@ -210,7 +210,7 @@ window.startGame = function () {
   const keys = {};
   let locked = false, noLock = false, playing = false, uiOpen = false;
   const ray = new THREE.Raycaster(); ray.far = 3.4;
-  let held = null, buildMode = null, buildRot = 0, ghost = null, ghostOk = false;
+  let held = null, bagGroup = null, bagCarrying = false, heldYaw = 0, heldFace = 0, buildMode = null, buildRot = 0, ghost = null, ghostOk = false;
   const lastHeldPos = new V3(), heldVel = new V3();
   function lockPointer() { if (noLock) { startPlaying(); return; } try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => { noLock = true; startPlaying(); }); } catch (e) { noLock = true; startPlaying(); } }
   function startPlaying() { playing = true; $('menu').classList.add('hidden'); SFX.music('cave'); if (uiOpen && document.pointerLockElement) document.exitPointerLock(); }
@@ -238,6 +238,7 @@ window.startGame = function () {
   });
   document.addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; if (noLock && dragLook && e.button === 0) { dragLook = false; if (dragMoved < 6) action(0); } });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('wheel', e => { if (!playing || uiOpen) return; if (held) { e.preventDefault(); heldYaw += Math.sign(e.deltaY) * 0.32; } }, { passive: false });
   let lastX = 0;
   document.addEventListener('keydown', e => {
     keys[e.code] = true;
@@ -247,6 +248,8 @@ window.startGame = function () {
     if (e.code === 'KeyF') inspectLook();
     if (e.code === 'KeyR' && buildMode) { buildRot = (buildRot + 1) % 4; SFX.click(); }
     if (e.code === 'KeyQ' && held) throwHeld(true);
+    if (e.code === 'KeyQ' && bagCarrying) { bagCarrying = false; if (bagGroup) { bagGroup.position.copy(player.pos).add(new V3(0, 0, -0.8)); bagGroup.position.y = 0; } toast('你放下了麻袋。靠近它按 E 再扛起。', '#ccc'); }
+    if (e.code === 'KeyV' && held) cycleHeldFace();
     if (e.code === 'KeyH') useItem(S.items.bigpotion && st().maxHp - S.hp > st().maxHp * 0.6 ? 'bigpotion' : 'potion');
     if (e.code === 'KeyM') { const on = SFX.toggleMusic(); toast('音乐 ' + (on ? '开' : '关'), '#ccc', 1); }
     if (e.code === 'KeyX') { const t = performance.now(); if (t - lastX < 450) { doubleX(); lastX = 0; } else { lastX = t; toast('再按一次 X：碾碎首级吸魂 / 拆除建筑', '#f88', 1); } }
@@ -265,7 +268,7 @@ window.startGame = function () {
   }
   function action(btn) {
     if (buildMode) { if (btn === 0) placeBuild(); else cancelBuild(); return; }
-    if (btn === 2) { if (held) throwHeld(false); return; }
+    if (btn === 2) { if (bagCarrying) { bagCarrying = false; if (bagGroup) { bagGroup.position.copy(player.pos).add(new V3(0, 0, -0.8)); bagGroup.position.y = 0; } toast('麻袋放下了。', '#ccc'); } else if (held) throwHeld(false); return; }
     swing = 1;
     if (held) { poke(held, 'hold'); return; }
     const hit = lookHit();
@@ -274,16 +277,77 @@ window.startGame = function () {
   }
   function interactE() {
     if (buildMode) return;
-    // 出口/商人
+    if (bagCarrying) {
+      if (player.pos.distanceTo(cave.exitPos) < 3.2) { toast('先把麻袋扛离洞口，到篝火旁的空地再按 E 倒出来。', '#ffd890', 2.5); return; }
+      unloadBag(); return;
+    }
+    const hit = lookHit();
+    // Prefer the head under the reticle; if the doorway/crosshair misses it, allow a close, forward-facing pickup too.
+    let pickup = hit && hit.head && hit.d < 3.2 ? hit.head : null;
+    if (!pickup) {
+      const fwd = new V3(Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+      let best = 3.0;
+      for (const h of heads) { if (h === held || h.mount) continue; const to = h.g.position.clone().sub(player.pos); const d = to.length(); to.y = 0; if (d < best && d > 1e-4 && to.normalize().dot(fwd) > 0.18) { best = d; pickup = h; } }
+    }
+    if (pickup) { const h = pickup; unmount(h); held = h; heldYaw = 0; h.sleep = 0; SFX.sack(); poke(h, 'hold'); return; }
+    if (bagGroup && !bagCarrying && player.pos.distanceTo(bagGroup.position) < 2.8) { bagCarrying = true; toast('麻袋扛上肩了！走到洞内空地按 E 倒出来；按 Q 可放下。', '#ffd890', 4); SFX.sack(); return; }
+    // A portable sack can be collected even if the ray points past it.
     if (player.pos.distanceTo(cave.exitPos) < 2.6) { UI.openExpedition(); return; }
     if (player.pos.distanceTo(cave.merchantPos) < 2.4) { UI.openMenu('equip'); SFX.coins(); return; }
-    const hit = lookHit();
     if (held) {
       if (hit && hit.build && CAT[hit.build.type].mount && !hit.build.head) { mountHead(held, hit.build); return; }
       dropHeld(); return;
     }
-    if (hit && hit.head) { const h = hit.head; unmount(h); held = h; h.sleep = 0; SFX.play('cloth1' in {} ? 'sack' : 'sack', 0.4); poke(h, 'hold'); return; }
     if (hit && hit.build) { const d = CAT[hit.build.type]; if (d.train) { UI.openTraining(d.train, d.n); return; } if (hit.build.head) { const h = hit.build.head; unmount(h); held = h; return; } }
+  }
+  function makeBagMesh() {
+    const g = new THREE.Group();
+    const cloth = new THREE.MeshStandardMaterial({ color: '#72502d', roughness: 0.96 });
+    const sack = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), cloth); sack.scale.set(1, 1.22, 0.78); sack.position.y = 0.27; g.add(sack);
+    const neck = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.025, 6, 12), new THREE.MeshStandardMaterial({ color: '#b38a4c', roughness: 0.8 })); neck.position.y = 0.52; neck.rotation.x = Math.PI / 2; g.add(neck);
+    const tie = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), new THREE.MeshStandardMaterial({ color: '#d1b17b', roughness: 0.9 })); tie.position.set(0, 0.62, 0); g.add(tie);
+    const strap = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.018, 5, 16, Math.PI), new THREE.MeshStandardMaterial({ color: '#3e2a19', roughness: 0.9 })); strap.rotation.set(Math.PI / 2, 0, Math.PI / 2); strap.position.y = 0.34; g.add(strap);
+    g.userData.cloth = cloth; return g;
+  }
+  function createReturnBag(recs) {
+    recs.forEach(r => r.inBag = true);
+    if (bagGroup) { scene.remove(bagGroup); bagGroup = null; }
+    if (!recs.length) return;
+    bagGroup = makeBagMesh();
+    const d = new V3(Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+    bagGroup.position.copy(player.pos).addScaledVector(d, 1.05); bagGroup.position.y = 0;
+    bagGroup.rotation.y = player.yaw; scene.add(bagGroup); save();
+    toast(`背篓里有 ${recs.length} 颗首级。对着麻袋按 E 扛起，再到洞内按 E 倒出。`, '#ffd890', 5);
+  }
+  function unloadBag() {
+    if (!bagCarrying) return;
+    bagCarrying = false;
+    const list = S.heads.filter(r => r.inBag);
+    list.forEach(r => { r.inBag = false; });
+    if (bagGroup) { scene.remove(bagGroup); bagGroup = null; }
+    SFX.sack(); burst(player.pos.clone().add(new V3(0, 0.4, -0.5)), '#c79548', 18, 1.1, 0.5, -2);
+    toast(`麻袋口一松，${list.length} 颗首级滚进洞里！`, '#ffd890', 3);
+    list.forEach((rec, i) => setTimeout(() => {
+      if (heads.length >= MAX_HEADS) { toast('洞里的首级已满，超出的留在麻袋里。', '#f88'); rec.inBag = true; return; }
+      const fwd = new V3(Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+      const p = player.pos.clone().addScaledVector(fwd, 1.1).add(new V3((Math.random() - 0.5) * 0.45, 0.55 + (i % 3) * 0.13, (Math.random() - 0.5) * 0.45));
+      const h = createHead(rec, p, new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 0.7, Math.random() * 6, Math.random() * 0.7)));
+      h.vel.set((Math.random() - 0.5) * 0.5, 0.1, (Math.random() - 0.5) * 0.5); h.av.set((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4);
+      if (rec.c.rar >= 3) { SFX.fanfare(rec.c.rar); burst(p, RAR[rec.c.rar].c, 32, 1.4, 0.8, 0); }
+      save();
+    }, 650 + i * 620));
+    setTimeout(() => { const remain = S.heads.filter(r => r.inBag); if (remain.length) createReturnBag(remain); }, 800 + list.length * 620);
+    save();
+  }
+  function cycleHeldFace() {
+    if (!held) return;
+    const names = ['半阖死寂', '双目紧闭', '失焦凝视', '颌骨松垂', '极度惊恐', '狰狞痛苦'];
+    const expressions = [
+      { blink: 0.55, aa: 0.12 }, { blink: 1, sad: 0.2 }, { blink: 0.05, surprised: 0.35 },
+      { blink: 0.3, aa: 0.55, oh: 0.3 }, { surprised: 1, oh: 0.55 }, { blink: 0.42, angry: 0.95, ee: 0.6, sad: 0.45 }
+    ];
+    heldFace = (heldFace + 1) % expressions.length; held.rec.look.ex = expressions[heldFace]; held.rec.look.exT = names[heldFace];
+    held.hb.setExpression && held.hb.setExpression(held.rec.look.ex); SFX.click(); toast(`表情：${names[heldFace]} · 滚轮转向 · V 换表情`, '#e6c7a0', 1.6); save();
   }
   function inspectLook() {
     const h = held || (lookHit() || {}).head || ((lookHit() || {}).build || {}).head;
@@ -388,14 +452,15 @@ window.startGame = function () {
   }
   const grid = new Map(); const CELL = RC * 2;
   function physStep(dt) {
-    const R = cave.R - 0.45;
+    const R = cave.R - 0.82; // visual head radius is wider than the conservative collision sphere; keep thrown heads inside the wall
     for (const h of heads) {
       if (h === held || h.mount || h.sleep > 1.0) continue;
       h.grounded = false;
       h.vel.y += GRAV * dt;
       h.g.position.addScaledVector(h.vel, dt);
       const p = h.g.position;
-      if (p.y < RC) contact(h, 0, 1, 0, RC - p.y);
+      const floorHead = RC + 0.055; // model cut geometry extends below its physics sphere; keep the stump visibly above the cave floor
+      if (p.y < floorHead) contact(h, 0, 1, 0, floorHead - p.y);
       if (p.y > cave.H - 0.5) contact(h, 0, -1, 0, p.y - (cave.H - 0.5));
       const rr = Math.hypot(p.x, p.z); if (rr > R) contact(h, -p.x / rr, 0, -p.z / rr, rr - R);
       for (const c of colliders) {
@@ -568,6 +633,7 @@ window.startGame = function () {
   function load() {
     for (const b of S.builds) if (CAT[b.type]) addBuild(b.type, b.x, b.z, b.rot, false);
     for (const rec of S.heads) {
+      if (rec.inBag) continue;
       try {
         const p = rec.p ? new V3().fromArray(rec.p) : new V3((Math.random() - 0.5) * 3, 1, (Math.random() - 0.5) * 3);
         const q = rec.q ? new THREE.Quaternion().fromArray(rec.q) : null;
@@ -578,6 +644,7 @@ window.startGame = function () {
     }
   }
   load();
+  if (S.heads.some(r => r.inBag)) createReturnBag(S.heads.filter(r => r.inBag));
   S.hp = Math.min(S.hp, st().maxHp);
   setInterval(save, 8000);
   addEventListener('beforeunload', save);
@@ -634,6 +701,7 @@ window.startGame = function () {
     if (steps >= 5) acc2 = 0;
 
     // 手持
+    if (bagCarrying && bagGroup) { camera.getWorldDirection(dirV); bagGroup.position.copy(camera.position).addScaledVector(dirV, 0.75).add(new V3(0, -0.48, 0)); bagGroup.rotation.set(0, player.yaw + Math.sin(now * 4) * 0.06, 0); }
     if (held) {
       camera.getWorldDirection(dirV);
       const target = camera.position.clone().addScaledVector(dirV, 0.6).add(new V3(0, -0.12, 0));
@@ -641,7 +709,7 @@ window.startGame = function () {
       held.g.position.lerp(target, Math.min(1, dt * 16));
       heldVel.subVectors(held.g.position, lastHeldPos).divideScalar(Math.max(dt, 1e-4)); held.vel.copy(heldVel);
       const faceQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(-player.pitch * 0.4, player.yaw, 0, 'YXZ'));
-      held.g.quaternion.slerp(faceQ, Math.min(1, dt * 12));
+      faceQ.multiply(new THREE.Quaternion().setFromAxisAngle(UP, heldYaw)); held.g.quaternion.slerp(faceQ, Math.min(1, dt * 12));
       if (mouseDown && !noLock) { /* 按住左键连续把玩 */ if (now - held.lastPoke > 0.22) poke(held, 'hold'); }
     } else if (mouseDown && !noLock && playing && !uiOpen && !buildMode) {
       const hit = lookHit(); if (hit && hit.head && now - hit.head.lastPoke > 0.22) { swing = 1; poke(hit.head, 'manual', hit.point); }
@@ -709,17 +777,20 @@ window.startGame = function () {
     ui.power.textContent = s.power;
     ui.hpbar.style.width = (S.hp / s.maxHp * 100) + '%';
     ui.hptxt.textContent = `${Math.round(S.hp)} / ${s.maxHp}`;
-    ui.headcount.textContent = `首级 ${heads.length}/${MAX_HEADS} · 洞窟第 ${S.depth} 层`;
+    const bagCount = S.heads.filter(r => r.inBag).length;
+    ui.headcount.textContent = `洞内首级 ${heads.length}/${MAX_HEADS}` + (bagCount ? ` · 麻袋 ${bagCount}` : '') + ` · 第 ${S.depth} 层`;
     // 准星提示
     let tip = '';
     if (playing && !uiOpen) {
       if (buildMode) tip = '';
-      else if (player.pos.distanceTo(cave.exitPos) < 2.6) tip = '<b>[E]</b> 离开洞窟，出去狩猎';
-      else if (player.pos.distanceTo(cave.merchantPos) < 2.4) tip = '<b>[E]</b> 和地精行商斯尼克交易';
+      else if (bagCarrying) tip = player.pos.distanceTo(cave.exitPos) < 3.2 ? '<b>[E]</b> 把麻袋扛到洞内空地再倒出 · <b>Q</b>放下' : '<b>[E]</b> 倒出麻袋里的首级 · <b>Q</b>放下';
+      else if (bagGroup && player.pos.distanceTo(bagGroup.position) < 2.8) tip = '<b>[E]</b> 扛起战利品麻袋';
       else {
         const hit = lookHit();
-        if (held) tip = `手持「${held.rec.c.name}」 · <b>左键</b>把玩 · <b>E</b>放下/插桩 · <b>右键</b>扔 · <b>F</b>查看`;
+        if (held) tip = `手持「${held.rec.c.name}」 · <b>左键</b>把玩 · <b>滚轮</b>转向 · <b>V</b>换表情 · <b>E</b>放下/插桩 · <b>右键</b>扔 · <b>F</b>查看`;
         else if (hit && hit.head) { const c = hit.head.rec.c; tip = `<span style="color:${RAR[c.rar].c}">【${RAR[c.rar].n}】</span> <b>${c.name}</b> · ${c.raceN}${c.idN}<br><small>左键把玩 · E 拿起 · F 查看/回忆 · XX 碾碎</small>`; }
+        else if (player.pos.distanceTo(cave.exitPos) < 2.6) tip = '<b>[E]</b> 离开洞窟，出去狩猎';
+        else if (player.pos.distanceTo(cave.merchantPos) < 2.4) tip = '<b>[E]</b> 和地精行商斯尼克交易';
         else if (hit && hit.build) { const d = CAT[hit.build.type]; tip = `<b>${d.n}</b>` + (d.train ? ' · <b>[E]</b> 开始训练' : '') + (d.mount ? (hit.build.head ? ' · 左键把玩 · E 取下' : ' · 手持首级按 E 插上') : '') + ' <small>· XX 拆除</small>'; }
       }
     }
@@ -732,7 +803,7 @@ window.startGame = function () {
   // ---------------- 对外 ----------------
   window.G = {
     S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
-    save, wipe, setUI, lockPointer, spawnReturnHeads, addHeadRecs, usedSig, usedNames, headOf, removeHead, refreshWeapon, burst, get cave() { return cave; },
+    save, wipe, setUI, lockPointer, spawnReturnHeads, addHeadRecs, createReturnBag, usedSig, usedNames, headOf, removeHead, refreshWeapon, burst, get cave() { return cave; },
     get playing() { return playing; }, get uiOpen() { return uiOpen; }, renderer, camera, scene, poke, mountHead, createHead, addBuild
   };
   window.__game = G;
