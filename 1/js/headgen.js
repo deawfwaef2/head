@@ -1,4 +1,5 @@
 // 程序化二次元头部生成器（v1 占位方案；后续可替换为授权允许的高质量模型）
+if (THREE.ColorManagement) THREE.ColorManagement.legacyMode = false;
 window.HeadGen = (() => {
   const V3 = THREE.Vector3;
   const R = 0.15; // 头半径（米）
@@ -171,7 +172,7 @@ window.HeadGen = (() => {
   function drawEye(g, s, e, look, lash) {
     // s: +1/-1 镜像，外眼角在 +x
     g.scale(s, 1);
-    const w = 14.5, h = 16.5;
+    const w = 18, h = 21;
     const type = e;
     g.lineCap = 'round'; g.lineJoin = 'round';
     if (type === 'happy' || type === 'closed' || type === 'xx') {
@@ -195,7 +196,7 @@ window.HeadGen = (() => {
     const sh = g.createLinearGradient(0, -hh, 0, 0); sh.addColorStop(0, 'rgba(120,80,120,0.35)'); sh.addColorStop(1, 'rgba(120,80,120,0)');
     g.fillStyle = sh; g.fillRect(-ww, -hh, ww * 2, hh);
     const small = (type === 'stare' || type === 'dull' || type === 'wide') ? 0.7 : 1;
-    const iw = 10.5 * small, ih = 14 * small;
+    const iw = 13.5 * small, ih = 18.5 * small;
     const ig = g.createLinearGradient(0, -ih, 0, ih);
     ig.addColorStop(0, hexLerp(look.eye[0], '#000', 0.55)); ig.addColorStop(0.45, look.eye[0]); ig.addColorStop(1, look.eye[1]);
     g.fillStyle = ig; g.beginPath(); g.ellipse(-1, 1.5, iw, ih, 0, 0, Math.PI * 2); g.fill();
@@ -214,9 +215,9 @@ window.HeadGen = (() => {
       // 高光
       g.fillStyle = '#fff';
       if (look.special === 'star') {
-        star(g, -5, -5, 4.5);
-      } else { g.beginPath(); g.ellipse(-5, -5, 3.4, 4, -0.3, 0, Math.PI * 2); g.fill(); }
-      g.beginPath(); g.arc(3.5, 6.5, 1.6, 0, Math.PI * 2); g.fill();
+        star(g, -6, -7, 6);
+      } else { g.beginPath(); g.ellipse(-6, -7, 4.4, 5.2, -0.3, 0, Math.PI * 2); g.fill(); }
+      g.beginPath(); g.arc(4.5, 8.5, 2.1, 0, Math.PI * 2); g.fill();
     }
     // 眼皮覆盖
     if (lid > -hh) {
@@ -293,12 +294,12 @@ window.HeadGen = (() => {
       });
     }
     // 眉
-    for (const s of [-1, 1]) at(g, 1.36, s * 0.36, g2 => drawBrow(g2, s, expr.brow, hexLerp(look.hairDark, '#000', 0.2)));
+    for (const s of [-1, 1]) at(g, 1.33, s * 0.33, g2 => drawBrow(g2, s, expr.brow, hexLerp(look.hairDark, '#000', 0.2)));
     // 眼
     for (const s of [-1, 1]) {
       let e = expr.eye;
       if (e === 'wink') e = s > 0 ? 'happy' : 'open';
-      at(g, 1.64, s * 0.35, g2 => drawEye(g2, s, e, look, lash));
+      at(g, 1.66, s * 0.32, g2 => drawEye(g2, s, e, look, lash));
     }
     // 鼻
     at(g, 1.9, 0, g2 => { g2.strokeStyle = 'rgba(200,120,110,0.7)'; g2.lineWidth = 1.2; g2.beginPath(); g2.moveTo(0.5, -2); g2.lineTo(-0.5, 1.5); g2.stroke(); });
@@ -315,7 +316,7 @@ window.HeadGen = (() => {
     const hsel = rarity >= 3 ? pick(r, HAIR[rarity]) : (r() < 0.6 ? pick(r, HAIR[rarity]) : pick(r, pool)[0]);
     const hc0 = hsel[0], hc1 = hsel[1];
     const hairDark = hc0 === 'rainbow' ? '#b86bd6' : hc0;
-    const skin = pick(r, ['#ffe6d8', '#ffe0cf', '#fde3d6', '#ffeadf', '#f9dcc8']);
+    const skin = pick(r, ['#ffd8c4', '#ffd2bd', '#fcd6c6', '#ffdccb', '#f7cdb4']);
     const look = { eye: pick(r, EYES), skin, hairDark, special: rarity === 3 ? 'star' : rarity === 4 ? 'heart' : null };
     if (rarity === 4) look.eye = ['#d43b8a', '#ffb3e0'];
     const expr = pick(r, EXPR);
@@ -323,7 +324,7 @@ window.HeadGen = (() => {
     const style = pick(r, rarity >= 2 ? ['long', 'twintail', 'ponytail', 'bob', 'twintail'] : ['long', 'bob', 'bob', 'ponytail']);
 
     const grp = new THREE.Group();
-    const skinMat = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.55, metalness: 0 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.5, metalness: 0, emissive: skin, emissiveIntensity: 0.18 });
     // 头骨
     const skull = new THREE.SphereGeometry(R, 48, 36); deform(skull);
     const skullM = new THREE.Mesh(skull, skinMat); skullM.castShadow = true; grp.add(skullM);
@@ -376,7 +377,7 @@ window.HeadGen = (() => {
     for (const s of [-1, 1]) {
       const a = s * 1.12;
       const pts = [sp(0.5, a, R * 1.06), sp(1.2, a, R * 1.14), sp(1.75, a * 1.02, R * 1.1), new V3(s * R * 0.78, -R * 0.95, R * 0.34), new V3(s * R * 0.72, -R * (style === 'long' ? 1.35 : 1.1), R * 0.36)];
-      addH(strand(pts, taper(R * 0.36, 0.7), R * 0.1));
+      addH(strand(pts, taper(R * 0.46, 0.6), R * 0.12, 14, 7, () => new V3(s * 0.35, 0, 1)));
     }
     // 后发
     const longL = style === 'long' ? R * 0.75 : style === 'bob' ? R * 0.15 : R * 0.1;

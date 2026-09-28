@@ -5,7 +5,7 @@
   const ROOM = { x: 5, z: 5, h: 4 };
   const G = -9.8;
   const RAR = [
-    { n: 'N', c: '#c9d1da', y: 1, w: 55 },
+    { n: 'N', c: '#8a96a3', y: 1, w: 55 },
     { n: 'R', c: '#4da3ff', y: 3, w: 28 },
     { n: 'SR', c: '#b56bff', y: 8, w: 12 },
     { n: 'SSR', c: '#ffc53d', y: 25, w: 4.5 },
@@ -24,7 +24,7 @@
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(innerWidth, innerHeight);
   renderer.outputEncoding = THREE.sRGBEncoding;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.85;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.getElementById('game').appendChild(renderer.domElement);
   const scene = new THREE.Scene();
@@ -95,11 +95,8 @@
     inner.position.set(PIPE.x, PIPE.y + 0.3, PIPE.z); pipeG.add(inner);
     const mouth = new THREE.Mesh(new THREE.CylinderGeometry(pr * 1.05, pr * 1.25, 0.18, 32, 1, true), metal); mouth.position.set(PIPE.x, PIPE.y + 0.05, PIPE.z); pipeG.add(mouth);
     const rim = new THREE.Mesh(new THREE.TorusGeometry(pr * 1.25, 0.03, 12, 40), metal); rim.rotation.x = Math.PI / 2; rim.position.set(PIPE.x, PIPE.y - 0.04, PIPE.z); pipeG.add(rim);
-    const elbow = new THREE.Mesh(new THREE.TorusGeometry(0.35, pr, 20, 32, Math.PI / 2), metal);
-    elbow.rotation.y = Math.PI / 2; elbow.position.set(PIPE.x, ROOM.h - 0.35, PIPE.z - 0.35); pipeG.add(elbow);
-    const hlen = PIPE.z - 0.35 + ROOM.z;
-    const h = new THREE.Mesh(new THREE.CylinderGeometry(pr, pr, hlen, 32, 1, true), metal); h.rotation.x = Math.PI / 2; h.position.set(PIPE.x, ROOM.h - 0.0, -ROOM.z + hlen / 2); h.position.y = ROOM.h - 0.35 + 0.35; pipeG.add(h);
-    h.position.y = ROOM.h; // 贴顶
+    const v2 = new THREE.Mesh(new THREE.CylinderGeometry(pr, pr, 0.4, 32, 1, true), metal); v2.position.set(PIPE.x, ROOM.h - 0.2, PIPE.z); pipeG.add(v2);
+    const flange = new THREE.Mesh(new THREE.CylinderGeometry(pr * 1.6, pr * 1.6, 0.04, 40), metal); flange.position.set(PIPE.x, ROOM.h - 0.02, PIPE.z); pipeG.add(flange);
     for (let i = 0; i < 3; i++) { const b = new THREE.Mesh(new THREE.TorusGeometry(pr * 1.04, 0.025, 10, 36), metal); b.rotation.x = Math.PI / 2; b.position.set(PIPE.x, PIPE.y + 0.25 + i * 0.22, PIPE.z); pipeG.add(b); }
     // 出口指示灯
     const ringLight = new THREE.Mesh(new THREE.TorusGeometry(pr * 1.15, 0.012, 8, 40), new THREE.MeshBasicMaterial({ color: '#7fd4ff' }));
@@ -278,7 +275,7 @@
     }
     amt = Math.max(1, Math.round(amt));
     const wp = h.g.position.clone().add(new V3(0, R * 1.6, 0));
-    addCoins(amt, wp, src === 'pole' ? '#7fe0ff' : src === 'chain' ? '#b8ff7a' : RAR[h.rarity].c === '#c9d1da' ? '#ffd24d' : RAR[h.rarity].c);
+    addCoins(amt, wp, src === 'pole' ? '#7fe0ff' : src === 'chain' ? '#b8ff7a' : h.rarity === 0 ? '#ffb800' : RAR[h.rarity].c);
     h.squash = 1; h.reactT = 0.35; h.hb.react();
     burst(h.g.position.clone().add(new V3(0, R, 0)), src === 'chain' ? '#b8ff7a' : '#ffd24d', 10 + h.rarity * 5, 1.8, 0.7);
     shockRing(h.g.position, RAR[h.rarity].c, 0.35 + h.rarity * 0.08);
@@ -436,6 +433,7 @@
   document.addEventListener('mousemove', e => {
     if (!playing) return;
     if (locked || (noLock && dragLook)) {
+      if (Math.abs(e.movementX) > 250 || Math.abs(e.movementY) > 250) return; // 过滤指针锁定跳变
       player.yaw -= e.movementX * 0.0022; player.pitch -= e.movementY * 0.0022;
       player.pitch = Math.max(-1.5, Math.min(1.5, player.pitch));
       if (dragLook) dragMoved += Math.abs(e.movementX) + Math.abs(e.movementY);
@@ -826,5 +824,5 @@
     renderer.render(scene, camera);
   }
   frame();
-  window.__game = { S, heads, builds, dropHead, addCoins };
+  window.__cam = camera; window.__game = { player, S, heads, builds, dropHead, addCoins };
 })();
