@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HEAD · 头部收集</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #eee; font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; user-select: none; }
+  #game { position: fixed; inset: 0; }
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  #coinBox { position: absolute; top: 18px; left: 22px; background: rgba(255,255,255,0.82); backdrop-filter: blur(6px); border-radius: 16px; padding: 10px 18px; box-shadow: 0 6px 24px rgba(0,0,0,0.08); }
+  #coins { font-size: 34px; font-weight: 800; color: #e0a100; display: inline-block; }
+  #coins::before { content: "🪙 "; }
+  #coins.bump { animation: bump .25s ease-out; }
+  @keyframes bump { 0% { transform: scale(1.25); color: #ffb800; } 100% { transform: scale(1); } }
+  #rate { font-size: 13px; color: #888; }
+  #info { position: absolute; top: 18px; right: 22px; background: rgba(255,255,255,0.82); border-radius: 12px; padding: 8px 14px; font-size: 13px; color: #555; text-align: right; line-height: 1.6; font-weight: 600; }
+  #combo { position: absolute; top: 110px; left: 22px; font-size: 20px; color: #ff5a7a; font-weight: 800; transition: opacity .3s; text-shadow: 0 2px 8px rgba(255,90,122,.3); }
+  #combo b { font-size: 32px; }
+  #cross { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(0,0,0,0.45); box-shadow: 0 0 0 2px rgba(255,255,255,0.7); transition: all .12s; }
+  #cross.active { width: 18px; height: 18px; margin: -9px 0 0 -9px; background: transparent; border: 2.5px solid #ff4d6d; box-shadow: 0 0 10px rgba(255,77,109,.5); }
+  #tip { position: absolute; left: 50%; top: calc(50% + 34px); transform: translateX(-50%); font-size: 14px; color: #333; background: rgba(255,255,255,0.85); padding: 6px 14px; border-radius: 10px; text-align: center; white-space: nowrap; line-height: 1.5; }
+  #tip:empty { display: none; }
+  #toast { position: absolute; top: 90px; left: 50%; transform: translate(-50%, -20px); font-size: 22px; font-weight: 700; background: rgba(255,255,255,0.92); padding: 10px 26px; border-radius: 14px; opacity: 0; transition: all .3s; box-shadow: 0 8px 30px rgba(0,0,0,0.1); white-space: nowrap; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #labels { position: absolute; inset: 0; overflow: hidden; }
+  .float { position: absolute; left: 0; top: 0; font-weight: 900; text-shadow: 0 2px 0 rgba(0,0,0,0.25), 0 0 10px rgba(255,255,255,0.8); white-space: nowrap; will-change: transform; -webkit-text-stroke: 1px rgba(80,50,0,0.35); }
+  .wlabel { position: absolute; left: 0; top: 0; text-align: center; background: rgba(30,32,38,0.85); color: #fff; padding: 6px 14px; border-radius: 10px; font-size: 14px; line-height: 1.4; transform-origin: 50% 100%; }
+  .wlabel b { color: #ffd24d; }
+  .wlabel.poor b { color: #ff7a8a; }
+  #buildPanel { position: absolute; left: 50%; bottom: -260px; transform: translateX(-50%); transition: bottom .25s; pointer-events: auto; background: rgba(255,255,255,0.92); border-radius: 18px 18px 0 0; padding: 12px 16px 16px; box-shadow: 0 -6px 30px rgba(0,0,0,0.1); }
+  #buildPanel.open { bottom: 0; }
+  .bp-title { font-weight: 800; font-size: 16px; margin-bottom: 8px; color: #333; }
+  .bp-title span { font-weight: 400; font-size: 12px; color: #999; margin-left: 8px; }
+  .bp-row { display: flex; gap: 10px; }
+  .bp-item { width: 170px; border: 2px solid #eee; border-radius: 12px; padding: 8px 10px; cursor: pointer; position: relative; transition: all .15s; background: #fff; }
+  .bp-item:hover { border-color: #8ff0c0; transform: translateY(-2px); }
+  .bp-item.sel { border-color: #40e090; background: #effff6; }
+  .bp-item.poor { opacity: .55; }
+  .bp-key { position: absolute; top: 6px; right: 8px; background: #333; color: #fff; font-size: 11px; border-radius: 5px; padding: 1px 6px; }
+  .bp-name { font-weight: 800; font-size: 15px; }
+  .bp-cost { color: #d09000; font-weight: 700; font-size: 14px; }
+  .bp-desc { font-size: 11px; color: #888; margin-top: 3px; line-height: 1.4; }
+  #hint { position: absolute; left: 22px; bottom: 16px; font-size: 12px; color: #999; line-height: 1.6; }
+  #menu { position: fixed; inset: 0; background: radial-gradient(ellipse at center, rgba(255,255,255,0.75), rgba(230,232,236,0.95)); display: flex; align-items: center; justify-content: center; flex-direction: column; transition: opacity .3s; z-index: 10; }
+  #menu.hidden { opacity: 0; pointer-events: none; }
+  #menu h1 { font-size: 72px; letter-spacing: 12px; color: #222; font-weight: 900; }
+  #menu h1 span { color: #ff4d6d; }
+  #menu .sub { color: #888; margin: 6px 0 30px; letter-spacing: 4px; }
+  #startBtn { font-size: 24px; font-weight: 800; padding: 16px 64px; border-radius: 50px; border: none; background: linear-gradient(135deg, #ff5a7a, #ff8a5c); color: #fff; cursor: pointer; box-shadow: 0 10px 30px rgba(255,90,122,0.4); transition: transform .15s; }
+  #startBtn:hover { transform: scale(1.06); }
+  #resetBtn { margin-top: 14px; font-size: 12px; background: none; border: none; color: #aaa; cursor: pointer; text-decoration: underline; }
+  .controls { margin-top: 28px; display: grid; grid-template-columns: auto auto; gap: 6px 22px; font-size: 14px; color: #555; }
+  .controls kbd { display: inline-block; background: #fff; border: 1px solid #ddd; border-bottom-width: 3px; border-radius: 6px; padding: 1px 8px; font-family: inherit; font-weight: 700; min-width: 26px; text-align: center; }
+  .rules { margin-top: 20px; max-width: 560px; text-align: center; font-size: 13px; color: #888; line-height: 1.7; }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #888; background: #f2f3f5; z-index: 20; }
+</style>
+</head>
+<body>
+<div id="loading">加载中…（如一直停在这里，请用 Chrome / Edge 打开）</div>
+<div id="game"></div>
+<div id="hud">
+  <div id="labels"></div>
+  <div id="coinBox"><div id="coins">0</div><div id="rate">≈ 0 / 分钟</div></div>
+  <div id="combo"></div>
+  <div id="info"></div>
+  <div id="cross"></div>
+  <div id="tip"></div>
+  <div id="toast"></div>
+  <div id="hint">WASD 移动 · Shift 跑 · 左键 把玩/按按钮 · E 拿起/放下/插杆 · 右键 扔 · B 建造 · XX 卖出/拆除 · M 音乐 · Esc 暂停</div>
+  <div id="buildPanel"></div>
+</div>
+<div id="menu">
+  <h1>H<span>E</span>AD</h1>
+  <div class="sub">头 部 收 集 · 纯白房间</div>
+  <button id="startBtn">开始游戏</button>
+  <button id="resetBtn">重置存档</button>
+  <div class="controls">
+    <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动</div><div><kbd>鼠标</kbd> 视角</div>
+    <div><kbd>左键</kbd> 把玩 / 按按钮</div><div><kbd>E</kbd> 拿起 / 放下 / 插到杆上</div>
+    <div><kbd>右键</kbd> 扔出</div><div><kbd>B</kbd> 建造菜单（<kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>）</div>
+    <div><kbd>X</kbd><kbd>X</kbd> 卖出头 / 拆除</div><div><kbd>M</kbd> 音乐开关</div>
+  </div>
+  <div class="rules">按按钮 → 管道掉下随机稀有度的头（N / R / SR / SSR / UR）。<br>把玩头产出金币，连击加成。建造<b>桌子</b>：把玩桌上一个头，桌上所有头连锁产出；<br>建造<b>杆子</b>：插上头每 10 秒自动产出。进度自动保存。</div>
+</div>
+<script src="lib/three.min.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/headgen.js"></script>
+<script src="js/game.js"></script>
+<script>document.getElementById('loading').remove();</script>
+</body>
+</html>
