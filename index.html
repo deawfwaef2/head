@@ -214,7 +214,7 @@
   } catch (e) { fail(e); return; }
   document.getElementById('loading').remove();
   document.getElementById('menu').classList.remove('hidden');
-  document.getElementById('startBtn').addEventListener('click', e => { e.stopPropagation(); SFX.init(); G.lockPointer(); });
+  document.getElementById('startBtn').addEventListener('click', e => { e.stopPropagation(); SFX.init(); if (UI.needIntro()) { SFX.music('cave'); UI.showIntro(); } else G.lockPointer(); });
   document.getElementById('resetBtn').addEventListener('click', e => { e.stopPropagation(); if (confirm('确定删除存档？所有首级、装备、建筑都会消失。')) { G.wipe(); location.reload(); } });
 })();
 </script>

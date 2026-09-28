@@ -22,7 +22,17 @@ window.BuildCat = (() => {
   const cyl = (rt, rb, h, mat, x = 0, y = 0, z = 0, s = 16) => mesh(new THREE.CylinderGeometry(rt, rb, h, s), mat, x, y, z);
   const rock = (r, mat, x = 0, y = 0, z = 0, det = 1) => { const g = new THREE.IcosahedronGeometry(r, det); const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const k = 0.75 + Math.random() * 0.4; p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k); } g.computeVertexNormals(); return mesh(g, mat, x, y, z); };
   const skull = (s = 1, x = 0, y = 0, z = 0) => { const g = new THREE.Group(); const c = mesh(new THREE.SphereGeometry(0.09 * s, 12, 10), M.bone, 0, 0, 0); c.scale.set(1, 0.95, 1.1); g.add(c); const j = box(0.1 * s, 0.05 * s, 0.08 * s, M.bone, 0, -0.07 * s, 0.03 * s); g.add(j); for (const sx of [-1, 1]) g.add(mesh(new THREE.SphereGeometry(0.022 * s, 8, 6), std('#111'), sx * 0.035 * s, -0.005 * s, 0.085 * s)); g.position.set(x, y, z); return g; };
-  const flame = (x, y, z, s = 1, col = '#ff9a3a') => { const g = new THREE.Group(); const f = mesh(new THREE.ConeGeometry(0.05 * s, 0.16 * s, 8), glowMat(col, 2.4), 0, 0.08 * s, 0); g.add(f); const f2 = mesh(new THREE.ConeGeometry(0.03 * s, 0.1 * s, 6), glowMat('#fff0a0', 2.5), 0, 0.05 * s, 0); g.add(f2); g.position.set(x, y, z); g.userData.flame = true; return g; };
+  const flameMats = {};
+  const fMat = (col, op) => { const k = col + op; if (!flameMats[k]) flameMats[k] = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }); return flameMats[k]; };
+  const flame = (x, y, z, s = 1, col = '#ff9a3a') => {
+    const g = new THREE.Group();
+    const c = new THREE.Color(col);
+    const f = mesh(new THREE.ConeGeometry(0.055 * s, 0.2 * s, 10, 1, true), fMat(col, 0.55), 0, 0.1 * s, 0); g.add(f);
+    const f2 = mesh(new THREE.ConeGeometry(0.035 * s, 0.13 * s, 8, 1, true), fMat('#' + c.clone().lerp(new THREE.Color('#fff2a0'), 0.6).getHexString(), 0.6), 0, 0.065 * s, 0); g.add(f2);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: GLOW(), color: c.clone().multiplyScalar(0.8), transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    sp.scale.setScalar(0.3 * s); sp.position.y = 0.07 * s; g.add(sp);
+    g.position.set(x, y, z); g.userData.flame = true; return g;
+  };
 
   const TABLE = { w: 1.5, d: 0.85, h: 0.78 };
   const C = {};

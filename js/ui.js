@@ -17,12 +17,11 @@ window.UI = (() => {
     root.addEventListener('mousedown', e => { if (e.target === root && cur && cur !== 'trip' && cur !== 'dead' && cur !== 'intro') close(); });
     panel.addEventListener('click', onClick);
     if (G.S.dead || G.S.hp <= 0) { G.S.hp = 0; }
-    if (!G.S.intro) document.getElementById('startBtn').addEventListener('click', () => setTimeout(showIntro, 50), { once: true });
   }
 
   // ---------------- 通用 ----------------
   function open(name, html, cls = '') {
-    cur = name; G.setUI(true);
+    cur = name; G.setUI(true); document.getElementById('menu').classList.add('hidden');
     panel.className = 'modal ' + cls; panel.innerHTML = html; panel.scrollTop = 0;
     root.classList.add('on');
   }
@@ -353,5 +352,5 @@ window.UI = (() => {
     open('intro', `<div class="intro"><h2>${t}</h2><p>${b}</p><div class="btns"><button class="red" data-a="introNext">${introI >= INTRO.length ? '开始狩猎 ▶' : '继续 ▶'}</button></div><div class="dots">${INTRO.map((_, i) => `<i class="${i < introI ? 'on' : ''}"></i>`).join('')}</div></div>`, 'intro-m');
   }
 
-  return { init, onKey, openMenu, openCard, openTraining, openExpedition, close, get open() { return cur; } };
+  return { init, onKey, showIntro, needIntro: () => !G.S.intro, openMenu, openCard, openTraining, openExpedition, close, get open() { return cur; } };
 })();

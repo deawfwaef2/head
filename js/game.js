@@ -213,7 +213,7 @@ window.startGame = function () {
   let held = null, buildMode = null, buildRot = 0, ghost = null, ghostOk = false;
   const lastHeldPos = new V3(), heldVel = new V3();
   function lockPointer() { if (noLock) { startPlaying(); return; } try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => { noLock = true; startPlaying(); }); } catch (e) { noLock = true; startPlaying(); } }
-  function startPlaying() { playing = true; $('menu').classList.add('hidden'); SFX.music('cave'); }
+  function startPlaying() { playing = true; $('menu').classList.add('hidden'); SFX.music('cave'); if (uiOpen && document.pointerLockElement) document.exitPointerLock(); }
   document.addEventListener('pointerlockchange', () => {
     locked = document.pointerLockElement === canvas;
     if (locked) startPlaying();
@@ -687,7 +687,8 @@ window.startGame = function () {
     // 灯光闪烁
     lightTimer -= dt; if (lightTimer <= 0) { assignLights(); lightTimer = 0.7; }
     LIGHTS.forEach((l, i) => { if (!lightList[i]) return; const k = l.userData.k || 1; l.intensity = l.userData.fire ? k * (0.85 + Math.sin(now * 13 + i) * 0.08 + Math.sin(now * 29 + i * 3) * 0.05 + (Math.random() - 0.5) * 0.06) : k; });
-    cave.flames.forEach((f, i) => { f.scale.y = 1 + Math.sin(now * 12 + i * 2) * 0.2; f.rotation.y = now * 2 + i; });
+    cave.flames.forEach((f, i) => { f.scale.y = 1 + Math.sin(now * 12 + i * 2) * 0.25 + Math.sin(now * 31 + i) * 0.1; f.scale.x = f.scale.z = 1 + Math.sin(now * 17 + i) * 0.08; f.rotation.y = now * 2 + i; });
+    if (Math.random() < dt * 14) burst(new V3(cave.firePos.x + (Math.random() - 0.5) * 0.3, 0.25, cave.firePos.z + (Math.random() - 0.5) * 0.3), Math.random() < 0.5 ? '#ff7a20' : '#ffb040', 1, 0.5, 1.4, 1.2);
     scene.traverseVisible && null;
     // 连击
     if (comboT > 0) { comboT -= dt; if (comboT <= 0) combo = 0; }
