@@ -114,7 +114,8 @@ window.Lore = (() => {
     angel: ['至高神', '天秤审判', '圣光'], dragon: ['龙神', '力量', '血脉荣耀'], vampire: ['血月', '永夜女神', '死亡女神']
   };
   const GOALS = ['为被杀的父亲报仇', '找到失散多年的妹妹', '成为王国第一剑士', '攒够自己的嫁妆', '亲手斩杀洞穴食人魔格罗克', '寻找传说中的圣杯', '摆脱家族强加的婚约', '复兴没落的家族', '研究被禁止的死灵魔法', '成为大魔导师', '开一家属于自己的酒馆', '在死前看一次大海', '证明自己不是废物', '统治整个王国', '赎清过去犯下的罪孽', '守护她的村子', '找回被偷走的记忆', '与心上人私奔', '找到治愈瘟疫的药方', '登上龙骨圣山之巅', '写一本流传后世的诗集', '驯服一头真正的龙', '让妹妹吃上一顿饱饭', '揭穿教会的谎言', '成为传奇冒险者', '杀光所有魔物', '活到一百岁', '被所有人记住', '偿还父亲的赌债', '找到自己的亲生母亲', '把她的名字刻在英雄碑上', '打败那个一直压她一头的宿敌', '收集世上所有种类的蝴蝶', '当上女王', '在王都拥有一座带花园的房子'];
-  const HAIRSTYLE = { Sendagaya_Shino: '黑长直式长发', Sendagaya_Shibu: '齐肩短发', Darkness_Shibu: '凌乱短发', Vivi: '蘑菇头', Vita: '蓬松短发', Victoria_Rubin: '侧马尾', HairSample_Female: '双马尾', AvatarSample_A: '波波头', AvatarSample_B: '编辫长发', AvatarSample_D_Darkness: '姬发式长发', Base_Female: '盘发', 'Seed-san': '利落短发', Twist: '及腰长发', Godette: '双丸子头' };
+  const HAIRSTYLE = { Sendagaya_Shino: '黑长直式长发', Sendagaya_Shibu: '齐肩短发', Darkness_Shibu: '凌乱短发', Vivi: '蘑菇头', Vita: '蓬松短发', Victoria_Rubin: '侧马尾', HairSample_Female: '双马尾', AvatarSample_A: '波波头', AvatarSample_B: '编辫长发', AvatarSample_D_Darkness: '姬发式长发', Base_Female: '盘发', 'Seed-san': '利落短发', Twist: '及腰长发', Godette: '双丸子头', AvatarSample_K: '姬发式长发', AvatarSample_L: '凌乱碎短发', AvatarSample_S: '蓬松短发' };
+  const HX_TXT = { pony: '在脑后束成一束高马尾', twin: '左右各扎一束双马尾', drill: '两侧垂着螺旋的钻头卷', bun: '在头顶挽成一个丸子', odango: '在头顶两侧盘着双丸子', braid: '在脑后编成一条麻花辫', braid2: '两侧各垂一条麻花辫' };
   const FEAT_TXT = { elf: '一对尖长的精灵耳', horn: '一对弯曲的魔角', horn2: '一对短小的龙角', beast: '一对毛茸茸的兽耳', halo: '头顶悬着一圈残光的光环' };
   const ACC_TXT = { circlet: '金色额环', circletS: '银色额环', crown: '王冠', tiara: '宝石头冠', flowers: '花冠', witchhat: '尖顶魔女帽', patch: '黑色眼罩' };
   const RAR = ['凡魂', '灵魂', '英魂', '圣魂', '神魂'];
@@ -165,7 +166,7 @@ window.Lore = (() => {
 
   function appearance(c, look) {
     const hs = HAIRSTYLE[look.h] || '长发';
-    let s = `${look.hn}${look.hn2 !== look.hn ? '渐变' + look.hn2 : ''}色的${hs}，${look.en}${look.en2 !== look.en ? '与' + look.en2 + '异色' : ''}的眼瞳（如今已蒙上一层死灰），${look.sk}色的肌肤`;
+    let s = `${look.hn}${look.hn2 !== look.hn ? '渐变' + look.hn2 : ''}色的${hs}${look.hx && HX_TXT[look.hx.s] ? '，' + HX_TXT[look.hx.s] : ''}${look.hx && look.hx.ahoge ? '，头顶翘着' + (look.hx.ahoge > 1 ? '两根' : '一根') + '呆毛' : ''}，${look.en}${look.en2 !== look.en ? '与' + look.en2 + '异色' : ''}的眼瞳（如今已蒙上一层死灰），${look.sk}色的肌肤`;
     if (look.feat && FEAT_TXT[look.feat]) s += '，' + FEAT_TXT[look.feat];
     const acc = (look.acc || []).map(a => ACC_TXT[a]).filter(Boolean);
     if (acc.length) s += '，戴着' + acc.join('与');

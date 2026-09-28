@@ -238,9 +238,10 @@ window.ModelHeads = (() => {
   const silver = () => mat('silver', () => new THREE.MeshStandardMaterial({ color: '#dfe6f0', metalness: 1, roughness: 0.2 }));
   const gemMat = (c) => mat('gem' + c, () => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.35, roughness: 0.1, metalness: 0.2 }));
 
-  function addAccessories(g, look, meta, U, disposables) {
+  function addAccessories(g, look, meta, U, disposables, fitTop) {
     const eye = meta.eye || [0.017, -0.014, 0.03];
-    const top = Math.max(meta.hairTop || 0.11, meta.skullTop || 0.1);
+    // 用“实际贴上去的发型”顶端（借来的高发型会更高），否则帽子/兽耳会陷进头发
+    const top = Math.max(fitTop || meta.hairTop || 0.11, meta.skullTop || 0.1);
     const skullTop = meta.skullTop || 0.1;
     const f = look.feat;
     if (f === 'elf' && meta.file !== 'AvatarSample_D_Darkness') {
@@ -353,7 +354,7 @@ window.ModelHeads = (() => {
     else { ex.surprised = 0.6 + r() * 0.4; ex.oh = 0.2 + r() * 0.4; }
     for (const k in ex) ex[k] = +ex[k].toFixed(2);
     const featCols = ['#1a1418', '#e8dcc0', '#6a0f18', '#2a2a3a', '#4a3a2a'];
-    return {
+    const LOOK = {
       f: face.meta.file, h: T[hairIdx].meta.file,
       hn: hc[0], hc1: hc[1], hn2: hc2[0], hc2: hc2[1], gy: +(r() * 0.05 - 0.04).toFixed(3),
       en: ec[0], ec1: ec[1], en2: ec2[0], ec2: ec2[1],
@@ -365,6 +366,16 @@ window.ModelHeads = (() => {
       scar: r() < 0.18 ? [+(r() * 0.06 - 0.03).toFixed(3), +(r() * 0.05 - 0.03).toFixed(3), +(r() * 0.06 - 0.03).toFixed(3), +(r() * 0.05 - 0.02).toFixed(3)] : null,
       paint: r() < (race.paint || 0.08) ? 1 + Math.floor(r() * 4) : 0, paintC: pick(r, ['#1a1a2a', '#b01a1a', '#f0f0f0', '#2a5ab0', '#d0a020'])
     };
+    // 程序化发饰（放在最后抽签，不改变旧种子的其余外观）
+    if (grp !== 'godette' && r() < (race.hxP != null ? race.hxP : 0.42) + rarity * 0.05) {
+      const hat = acc.includes('witchhat');
+      const styles = hat ? ['pony', 'twin', 'drill', 'braid', 'braid2'] : ['pony', 'pony', 'twin', 'twin', 'drill', 'bun', 'odango', 'braid', 'braid2'];
+      let s0 = race.hx && r() < 0.7 ? pick(r, race.hx) : pick(r, styles); if (hat && /bun|odango/.test(s0)) s0 = 'pony';
+      LOOK.hx = { s: s0, len: +(0.75 + r() * 0.6).toFixed(2), rib: pick(r, ['#b01a2a', '#1a1a22', '#f0f0f0', '#2a4ab0', '#d0a020', '#6a2a8a', '#1a6a4a']), seed: 1 + Math.floor(r() * 9999) };
+      if (!hat && r() < 0.3) LOOK.hx.ahoge = r() < 0.25 ? 2 : 1;
+      LOOK.hn3 = { pony: '马尾', twin: '双马尾', drill: '钻头卷', bun: '丸子头', odango: '双丸子', braid: '麻花辫', braid2: '双麻花辫' }[LOOK.hx.s];
+    } else if (grp !== 'godette' && !acc.includes('witchhat') && r() < 0.12) LOOK.hx = { s: null, ahoge: 1, seed: 1 + Math.floor(r() * 9999) };
+    return LOOK;
   }
 
   function makeUniforms(look, faceMeta, hairMeta, hairT) {
@@ -444,6 +455,118 @@ window.ModelHeads = (() => {
     FIT.set(key, out); return out;
   }
 
+
+  // ---- 程序化发饰：马尾/双马尾/钻头卷/丸子/双丸子/麻花辫/呆毛（贴在“发壳”上，用同一头发着色器→随染发变色、会摆动） ----
+  let STRAND = null;
+  function strandTex() {
+    if (STRAND) return STRAND;
+    const W = 64, H = 256, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const x = cv.getContext('2d');
+    x.fillStyle = '#b8b8b8'; x.fillRect(0, 0, W, H);
+    let s = 7; const rr = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+    for (let i = 0; i < 90; i++) { const px = rr() * W, w = 0.6 + rr() * 2.2, l = 150 + rr() * 100; x.fillStyle = `rgba(${l|0},${l|0},${l|0},${0.35 + rr() * 0.5})`; x.fillRect(px, 0, w, H); }
+    for (let i = 0; i < 40; i++) { const px = rr() * W; x.fillStyle = 'rgba(40,40,40,0.35)'; x.fillRect(px, 0, 0.8, H); }
+    const gr = x.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, 'rgba(255,255,255,0.18)'); gr.addColorStop(0.3, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.12)'); x.fillStyle = gr; x.fillRect(0, 0, W, H);
+    const tx = new THREE.CanvasTexture(cv); tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.encoding = THREE.sRGBEncoding; tx.anisotropy = 4; tx.userData = { lum: avgLum(tx) };
+    return (STRAND = tx);
+  }
+  // 沿曲线扫掠：rad(t) 半径，flat 截面压扁（带状发束）
+  function sweep(pts, rad, flat = 1, segs = 36, M = 10, twist = 0) {
+    const cur = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+    const fr = cur.computeFrenetFrames(segs, false);
+    const pos = [], uv = [], idx = [], P = new V3(), n = new V3();
+    for (let i = 0; i <= segs; i++) {
+      const tt = i / segs; cur.getPointAt(tt, P); const r = rad(tt), N = fr.normals[i], B = fr.binormals[i];
+      for (let j = 0; j <= M; j++) {
+        const a = j / M * Math.PI * 2 + twist * tt;
+        n.copy(N).multiplyScalar(Math.cos(a) * flat).addScaledVector(B, Math.sin(a));
+        pos.push(P.x + n.x * r, P.y + n.y * r, P.z + n.z * r); uv.push(j / M * 1.5, tt * 2.5);
+      }
+    }
+    for (let i = 0; i < segs; i++) for (let j = 0; j < M; j++) { const a = i * (M + 1) + j, b = a + M + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+    return { g, cur };
+  }
+  const SHELL = new Map();
+  function hairShell(F, H, key, geos) { // 以 F 头骨中心为原点的发型外轮廓（径向最大值），头皮兜底
+    if (SHELL.has(key)) return SHELL.get(key);
+    const SF = skullMap(F), R = new Float32Array(NT * NP), v = new V3(); let top = -1;
+    for (let k = 0; k < R.length; k++) R[k] = -1;
+    for (const g of geos) { const P = g.attributes.position; for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); if (v.y < SF.eyeY - 0.03) continue; if (v.y > top) top = v.y; v.sub(SF.c); const r = v.length(); if (r < 1e-5) continue; const k = binOf(v.x / r, v.y / r, v.z / r); if (r > R[k]) R[k] = r; } }
+    const S = { c: SF.c, R };
+    for (let a = 0; a < NT; a++) for (let b = 0; b < NP; b++) { const k = a * NP + b; R[k] = Math.max(R[k], SF.R[k] + 0.006); }
+    S.top = Math.max(top, F.meta.skullTop || 0.1);
+    SHELL.set(key, S); return S;
+  }
+  function onShell(S, x, y, z, inset = 0.004) { const d = new V3(x, y, z).normalize(); return d.multiplyScalar(radAt(S, d.x, d.y, d.z) - inset).add(S.c); }
+  function addHairX(hg, look, S, U, disposables) {
+    const hx = look.hx; if (!hx) return;
+    const st0 = strandTex(); const hm = hairMat({ map: st0, transparent: false, alphaTest: 0, depthWrite: true, name: 'hx' }, U, st0.userData.lum * 1.08); disposables.push(hm);
+    const rib = new THREE.MeshToonMaterial({ color: hx.rib || '#b01a2a', gradientMap: grad }); disposables.push(rib);
+    const add = (g) => { const m = new THREE.Mesh(g, hm); hg.add(m); disposables.push(g); return m; };
+    const L = hx.len || 1, rs = hx.seed || 1;
+    let s = rs * 9973 + 1; const rr = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+    const tie = (p, dir, r = 0.012) => { const tg = new THREE.TorusGeometry(r, 0.0035, 6, 16); disposables.push(tg); const m = new THREE.Mesh(tg, rib); m.position.copy(p); m.quaternion.setFromUnitVectors(new V3(0, 0, 1), dir.clone().normalize()); hg.add(m); };
+    const bundle = (A, ctrl, n, r0, spread) => { // 一束 = n 根带状细束，末端散开
+      for (let i = 0; i < n; i++) {
+        const a = i / n * Math.PI * 2 + rr(), o = new V3(Math.cos(a), 0, Math.sin(a)).multiplyScalar(spread * (0.4 + rr() * 0.6));
+        const lk = 0.85 + rr() * 0.2;
+        const pts = ctrl.map((c, k) => { const f = k / (ctrl.length - 1); return A.clone().add(c.clone().multiplyScalar(k ? lk : 1)).addScaledVector(o, 0.3 + f * 1.4); });
+        add(sweep(pts, t => r0 * (t < 0.12 ? 0.7 + t / 0.12 * 0.3 : Math.pow(1 - (t - 0.12) / 0.88, 0.75)) + 0.0008, 0.55 + rr() * 0.3, 32, 8, (rr() - 0.5) * 2).g);
+      }
+    };
+    const st = hx.s;
+    if (st === 'pony') {
+      const A = onShell(S, 0, 0.45, -1);
+      bundle(A, [new V3(0, 0, 0), new V3(0, 0.012, -0.035), new V3(0, -0.05 * L, -0.07), new V3(0.008, -0.15 * L, -0.065), new V3(0, -0.26 * L, -0.045)], 6, 0.016, 0.01);
+      tie(A.clone().add(new V3(0, 0.004, -0.012)), new V3(0, 0.3, -1), 0.013);
+    }
+    if (st === 'twin' || st === 'drill') {
+      for (const sd of [-1, 1]) {
+        const A = onShell(S, sd * 0.85, 0.5, -0.3);
+        if (st === 'twin') bundle(A, [new V3(0, 0, 0), new V3(sd * 0.035, 0.012, -0.012), new V3(sd * 0.062, -0.06 * L, -0.02), new V3(sd * 0.07, -0.16 * L, -0.012), new V3(sd * 0.055, -0.27 * L, 0)], 5, 0.014, 0.009);
+        else {
+          const pts = [], K = 44, turns = 3.2;
+          for (let k = 0; k <= K; k++) { const f = k / K, ang = f * turns * Math.PI * 2 * sd, R = 0.004 + 0.02 * Math.min(1, f * 1.6); pts.push(A.clone().add(new V3(sd * (0.028 + 0.02 * f) + Math.cos(ang) * R, 0.004 - 0.2 * L * f, -0.012 + Math.sin(ang) * R))); }
+          add(sweep(pts, t => 0.0105 * (1 - t * 0.55) * (t > 0.92 ? (1 - t) / 0.08 : 1) + 0.001, 0.8, 120, 10).g);
+          bundle(A, [new V3(0, 0, 0), new V3(sd * 0.02, 0, -0.008), new V3(sd * 0.03, -0.02, -0.012)], 3, 0.01, 0.004);
+        }
+        tie(A.clone().add(new V3(sd * 0.008, 0.002, -0.004)), new V3(sd, 0.3, -0.2), 0.012);
+      }
+    }
+    if (st === 'bun' || st === 'odango') {
+      const spots = st === 'bun' ? [[0, 0.8, -0.6, 0.034]] : [[-0.62, 0.75, -0.25, 0.026], [0.62, 0.75, -0.25, 0.026]];
+      for (const [x, y, z, r] of spots) {
+        const A = onShell(S, x, y, z, 0.006), d = new V3(x, y, z).normalize();
+        const sg = new THREE.SphereGeometry(r, 22, 16); sg.rotateX(Math.PI / 2); sg.scale(1, 1, 0.82);
+        const m = add(sg); m.position.copy(A).addScaledVector(d, r * 0.55); m.quaternion.setFromUnitVectors(new V3(0, 0, 1), d);
+        tie(A.clone().addScaledVector(d, 0.002), d, r * 0.78);
+        if (st === 'odango' && L > 1.0) bundle(A.clone().addScaledVector(d, r * 0.3), [new V3(0, 0, 0), new V3(x * 0.03, -0.03, -0.02), new V3(x * 0.04, -0.13 * L, -0.01)], 3, 0.009, 0.006);
+      }
+    }
+    if (st === 'braid' || st === 'braid2') {
+      const roots = st === 'braid' ? [[0, -0.1, -1, 0]] : [[-0.8, -0.25, -0.45, -1], [0.8, -0.25, -0.45, 1]];
+      for (const [x, y, z, sd] of roots) {
+        const A = onShell(S, x, y, z);
+        const axis = [new V3(0, 0, 0), new V3(sd * 0.012, -0.05, -0.02), new V3(sd * 0.018, -0.14 * L, -0.02), new V3(sd * 0.014, -0.25 * L, 0.0)].map(v => v.add(A));
+        const cur = new THREE.CatmullRomCurve3(axis), fr = cur.computeFrenetFrames(60, false);
+        for (let k = 0; k < 3; k++) {
+          const pts = []; for (let i = 0; i <= 60; i++) { const f = i / 60, ph = f * 7 * Math.PI * 2 / 3 * 3 + k * Math.PI * 2 / 3, w = 0.009 * (1 - f * 0.35); pts.push(cur.getPointAt(f).addScaledVector(fr.binormals[i], Math.sin(ph) * w).addScaledVector(fr.normals[i], Math.sin(2 * ph) * w * 0.45)); }
+          add(sweep(pts, t => 0.0078 * (1 - t * 0.3), 0.75, 140, 8).g);
+        }
+        const E = cur.getPointAt(1); tie(E, cur.getTangentAt(1), 0.0075);
+        bundle(E, [new V3(0, 0, 0), new V3(0, -0.02, 0), new V3(0, -0.045, 0.004)], 4, 0.007, 0.006);
+      }
+    }
+    if (hx.ahoge) {
+      const A = onShell(S, 0.1, 1, 0.25, 0.006);
+      for (let k = 0; k < (hx.ahoge > 1 ? 2 : 1); k++) {
+        const sd = k ? -1 : 1;
+        const pts = [new V3(0, 0, 0), new V3(sd * 0.004, 0.024, 0.006), new V3(sd * 0.018, 0.045, -0.004), new V3(sd * 0.034, 0.046, -0.02), new V3(sd * 0.04, 0.034, -0.026)].map(v => v.add(A));
+        add(sweep(pts, t => 0.0042 * (1 - t) + 0.0006, 0.3, 30, 6).g);
+      }
+    }
+  }
+
   function create(look) {
     let fi = idxOf(look.f); if (fi < 0) fi = 0;
     let hi = idxOf(look.h); if (hi < 0) hi = fi;
@@ -497,7 +620,9 @@ window.ModelHeads = (() => {
     const hairGeos = hi !== fi ? fitHair(F, H) : H.hairMeshes.map(m => m.geometry);
     H.hairMeshes.forEach((m, i) => { const c = new THREE.Mesh(hairGeos[i], getMat(m, H)); c.renderOrder = m.renderOrder; hg.add(c); });
     const disposables = [];
-    addAccessories(g, look, F.meta, U, disposables);
+    const S = hairShell(F, H, F.meta.file + '|' + H.meta.file + (hi === fi ? '|own' : ''), hairGeos);
+    if (look.hx && F.meta.grp !== 'godette') try { addHairX(hg, look, S, U, disposables); } catch (e) { console.warn('hairX', e); }
+    addAccessories(g, look, F.meta, U, disposables, S.top);
     const radius = 0.1;
     return {
       group: g, U, radius, meta: F.meta,

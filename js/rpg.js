@@ -133,7 +133,7 @@ window.RPG = (() => {
     beats.unshift(first); beats.push(last);
     return { beats, heads, q };
   }
-  function sigOf(l) { return [l.f, l.h, l.hn, l.hn2, l.en, l.en2, l.sk, l.feat || '', (l.acc || []).join('+'), l.exT, l.paint].join('|'); }
+  function sigOf(l) { return [l.f, l.h, l.hn, l.hn2, l.en, l.en2, l.sk, l.feat || '', (l.acc || []).join('+'), l.exT, l.paint, l.hx ? l.hx.s + (l.hx.ahoge || '') : ''].join('|'); }
 
   return { STATS, EQUIP, SLOTS, CONSUM, TRAIN, stats, eqSum, trainCost, expedition, sigOf };
 })();
