@@ -192,3 +192,21 @@
   14. 性能：9999 个头不卡（远处用 impostor/实例化、LOD）。
   15. 渲染：多几个画风方案（插画/赛璐璐/水彩式后处理）。
   16. 游戏更长。
+
+## 第八轮 · 本轮完成（commit 81b05f8 → 最新）
+- **旋转**：`b.rot` 现在是以 90° 为单位的浮点数（R/Shift+R 每次 0.125 = 11.25°）。`rotAabb`/`fpOf` 已按任意角度求外接 AABB。旧存档整数 rot 兼容。
+- **物理**：碰撞盒顶面接触改用 `supportH(h)`（朝向相关支撑高度），头在桌面/展台上不再按 RC 球浮空；休眠首级被推挤后统一做地面/洞壁约束（修“头在地里”）；手持首级不低于地面；展示位 `seatHead` 顶面 −3mm。断面材质 DoubleSide + polygonOffset（修偶发看不到断面）。
+- **首级不说话**：play.js 闲聊改为低频（45–105s）「残响」思绪气泡（斜体虚线框，记忆碎片），仍给 ×2 buff。
+- **隐藏解锁** `js/unlocks.js`：`S.unl = {key: 原因}`；未解锁建筑不显示（只显示 “??? × N”），达成后弹窗写原因。条件表 `Unlocks.R`（没写的按 depth）。新建筑记得在 R 里加条件，否则默认按 depth/直接解锁。
+- **头棋殿** `js/chess.js`（在 builds.js 之后加载，往 `BuildCat.C.chess` 注册建筑）：E 打开大厅（编队：点选/Shift或右键设首领/自动编队）；模式：挑战斯尼克 12 级（alpha-beta+静态搜索，深度 1–4，限时）或同屏双人（蓝方=另一队首级 / 木棋阵容）。独立 WebGLRenderer 全屏，`window.__pauseMain=true` 暂停主循环。走法按魂阶：凡=兵 灵=马 英=象 圣=车 神=后，异色/双魂印神魂=魂后(后+马)，首领=王；吃首领即胜，兵底线升后。奖励 `150×1.85^(lv-1)`，首胜×3，存 `S.chess={best,wins}`。首级模型面朝 +z（镜头侧）。调试：`Chess._st()`, `Chess._move([from,to])`, `Chess._think(T,S,side,lv)`。
+- **电影模式** P：自由飞行（WASD/空格/C/Shift/[ ]/滚轮 FOV），`body.film` 隐藏 HUD。**G** 键：把手中首级按当前朝向轻放到准星表面。
+- **倒袋**：改为自然倾倒（pivot 提袋底→倾斜 1.95rad→抖动→首级从袋口 `bag.localToWorld(0,0.5,0)` 按物理滚出→空袋甩地瘪掉）；仅圣魂+/异色给小光柱与音效，E/点击加速仍有效。
+- 测试：`_tools/smoke.py <page> <script.js> <wait> <afterExpr> <wait2>`；`_tools/mk_t.py` 从 index.html 生成轻量 `_t.html`。headless 下游戏时间约 0.1–0.3× 实时，动画测试要设 `cine.fast`。需 `sudo playwright install-deps`。
+
+### 第八轮 待办（按优先级，下一轮继续）
+1. 魂牌桌（扑克/昆特/炉石式卡牌，首级当卡牌，按特性个性出技能）——`Unlocks.R.cardtable` 已预留条件；同屏双人。
+2. 地区 BOSS（概率遭遇、可选挑战、可见模型+对话）；征服全部 BOSS 首级 = 通关；更多区域；初次/常去地区的不同文本；更多随机事件。
+3. NPC 招募（洞内闲逛、按个性评论首级、可一起玩小游戏、可驱逐）。
+4. 万首冰窖 vault（首级只存记录不生成 3D，支持 9999 颗；远处首级 LOD/隐藏头发摆动）。MAX_HEADS 目前 200。
+5. 画风方案：插画/赛璐璐描边/水彩后处理（自写全屏 shader，不依赖 EffectComposer）。
+6. 稀有度细分（星级）→ 装饰档次；更多 BGM（Kevin MacLeod CC-BY）；更多授权模型（仅 CC0/CC-BY/VRM 允许暴力再分发）。
