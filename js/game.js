@@ -272,6 +272,7 @@ window.startGame = function () {
     if (uiOpen) return;
     if (!playing) return;
     if (noLock && e.button === 0) { dragLook = true; dragMoved = 0; mouseDown = true; return; }
+    if (cine) { cine.fast = true; return; }
     if (e.button === 0) mouseDown = true;
     action(e.button);
   });
@@ -327,6 +328,7 @@ window.startGame = function () {
     else if (hit && hit.build && firstHead(hit.build)) poke(nearestHead(hit.build, hit.point), 'manual');
   }
   function interactE() {
+    if (cine) { cine.fast = true; return; }
     if (buildMode) return;
     if (bagCarrying) {
       if (player.pos.distanceTo(cave.exitPos) < 3.2) { toast('先把麻袋扛离洞口，到篝火旁的空地再按 E 倒出来。', '#ffd890', 2.5); return; }
@@ -365,26 +367,102 @@ window.startGame = function () {
     bagGroup.rotation.y = player.yaw; scene.add(bagGroup); save();
     toast(`背篓里有 ${recs.length} 颗首级。对着麻袋按 E 扛起，再到洞内按 E 倒出。`, '#ffd890', 5);
   }
+  // ---------------- 倒袋仪式：抽卡式揭晓 ----------------
+  // 麻袋悬空 → 按袋中最高稀有度发出预兆光 → 抖动 → 翻转 → 首级按稀有度从低到高依次抛出，落地升起光柱 + 卡片；E / 点击加速
+  let cine = null;
+  const beamTex = (() => { const c = document.createElement('canvas'); c.width = 4; c.height = 128; const g = c.getContext('2d'); const gr = g.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.55, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,1)'); g.fillStyle = gr; g.fillRect(0, 0, 4, 128); return new THREE.CanvasTexture(c); })();
+  const cineFx = [];
+  function spawnBeam(pos, col, rar, shiny) {
+    const H = 1.2 + rar * 0.9 + (shiny ? 1.5 : 0);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.16 + rar * 0.03, 0.2 + rar * 0.04, H, 20, 1, true), new THREE.MeshBasicMaterial({ map: beamTex, color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    m.position.set(pos.x, H / 2, pos.z); scene.add(m);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.1, 0.16, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    ring.rotation.x = -Math.PI / 2; ring.position.set(pos.x, 0.02, pos.z); scene.add(ring);
+    const life = 1.4 + rar * 0.35;
+    cineFx.push({ t: 0, life, upd(k) { m.material.opacity = (k < 0.15 ? k / 0.15 : 1 - (k - 0.15) / 0.85) * (0.55 + rar * 0.1); m.scale.x = m.scale.z = 0.6 + k * 0.7; m.rotation.y += 0.05; ring.scale.setScalar(1 + k * (6 + rar * 2)); ring.material.opacity = (1 - k) * 0.9; },
+      end() { scene.remove(m); scene.remove(ring); m.geometry.dispose(); m.material.dispose(); ring.geometry.dispose(); ring.material.dispose(); } });
+  }
+  let gachaBox = null;
+  function gachaCard(rec, isNew) {
+    if (!gachaBox) { gachaBox = document.createElement('div'); gachaBox.id = 'gacha'; document.body.appendChild(gachaBox); }
+    const c = rec.c, R = RAR[c.rar];
+    const el = document.createElement('div'); el.className = 'gcard r' + c.rar + (c.shiny ? ' shiny' : ''); el.style.setProperty('--c', R.c);
+    el.innerHTML = `<div class="gstars">${'★'.repeat(c.rar + 1)}</div>${isNew ? '<div class="gnew">NEW</div>' : ''}
+      <div class="grar">【${R.n}】${c.shiny ? ' ✨异色' : ''}</div>${c.title ? `<div class="gtitle">『${c.title}』</div>` : ''}<div class="gname">${c.name}</div>
+      <div class="gsub">${c.raceN} · ${c.idN} · ${c.age}岁</div>${(c.aff || []).length ? `<div class="gaff">${c.aff.map(k => RPG.AFF[k] ? `<span>${RPG.AFF[k].icon}${RPG.AFF[k].n}</span>` : '').join('')}</div>` : ''}`;
+    gachaBox.appendChild(el); requestAnimationFrame(() => el.classList.add('in'));
+    while (gachaBox.children.length > 3) gachaBox.firstChild.remove();
+    return el;
+  }
   function unloadBag() {
-    if (!bagCarrying) return;
+    if (!bagCarrying || cine) return;
     bagCarrying = false;
     const list = S.heads.filter(r => r.inBag);
     list.forEach(r => { r.inBag = false; });
     if (bagGroup) { scene.remove(bagGroup); bagGroup = null; }
-    SFX.sack(); burst(player.pos.clone().add(new V3(0, 0.4, -0.5)), '#c79548', 18, 1.1, 0.5, -2);
-    toast(`麻袋口一松，${list.length} 颗首级滚进洞里！`, '#ffd890', 3);
-    list.forEach((rec, i) => setTimeout(() => {
-      if (heads.length >= MAX_HEADS) { toast('洞里的首级已满，超出的留在麻袋里。', '#f88'); rec.inBag = true; return; }
-      const fwd = new V3(Math.sin(player.yaw), 0, -Math.cos(player.yaw));
-      const p = player.pos.clone().addScaledVector(fwd, 1.1).add(new V3((Math.random() - 0.5) * 0.45, 0.55 + (i % 3) * 0.13, (Math.random() - 0.5) * 0.45));
-      const h = createHead(rec, p, new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 0.7, Math.random() * 6, Math.random() * 0.7)));
-      h.vel.set((Math.random() - 0.5) * 0.5, 0.1, (Math.random() - 0.5) * 0.5); h.av.set((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4);
-      if (rec.c.rar >= 3) { SFX.fanfare(rec.c.rar); burst(p, RAR[rec.c.rar].c, 32, 1.4, 0.8, 0); }
-      save();
-    }, 650 + i * 620));
-    setTimeout(() => { const remain = S.heads.filter(r => r.inBag); if (remain.length) createReturnBag(remain); }, 800 + list.length * 620);
+    if (!list.length) return;
+    // 稀有度升序（最稀有压轴），同稀有度异色最后
+    list.sort((a, b) => (a.c.rar + (a.c.shiny ? 0.5 : 0)) - (b.c.rar + (b.c.shiny ? 0.5 : 0)));
+    const top = list[list.length - 1], topR = top.c.rar, topShiny = !!top.c.shiny;
+    const fwd = new V3(); camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize(); const right = new V3().crossVectors(fwd, UP).normalize();
+    const bag = makeBagMesh(); bag.scale.setScalar(0.8); bag.position.copy(player.pos).addScaledVector(fwd, 1.7).addScaledVector(right, -0.32); bag.position.y = 1.45; bag.rotation.y = player.yaw; scene.add(bag); const BY = 1.45;
+    const omen = new THREE.PointLight(topShiny ? 0xfff2b0 : new THREE.Color(RAR[topR].c).getHex(), 0, 4, 1.5); omen.position.copy(bag.position).add(new V3(0, 0.3, 0)); scene.add(omen);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, color: topShiny ? '#fff2b0' : RAR[topR].c, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })); glow.scale.setScalar(1.6); glow.position.copy(bag.position).add(new V3(0, 0.3, 0)); scene.add(glow);
+    player.pitch = -0.38;
+    S.codex = S.codex || {};
+    const ev = []; let at = 1.5 + (topR >= 3 || topShiny ? 0.9 : 0);
+    ev.push({ at: at - 0.35, fn() { SFX.sack(); SFX.play('heavy', 0.5, 0.8); burst(bag.position.clone().add(new V3(0, 0.55, 0)), '#c79548', 26, 1.4, 0.6, -2); } });
+    const n = list.length, landed = [];
+    list.forEach((rec, i) => {
+      const r = rec.c.rar, sh = !!rec.c.shiny;
+      ev.push({ at, fn() {
+        if (heads.length >= MAX_HEADS) { rec.inBag = true; return; }
+        const k = n === 1 ? 0 : i / (n - 1) - 0.5, dist = 1.0 + (i % 2) * 0.35 + (r >= 3 ? 0.2 : 0);
+        const T = player.pos.clone().addScaledVector(fwd, 1.05 + dist * 0.5).addScaledVector(right, k * 2.4 + (n === 1 ? 0.2 : 0)); T.y = 0.25;
+        const P0 = bag.position.clone().add(new V3(0, -0.15, 0)); const tf = 0.62;
+        const h = createHead(rec, P0, new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6)));
+        h.vel.set((T.x - P0.x) / tf, (T.y - P0.y) / tf - 0.5 * GRAV * tf, (T.z - P0.z) / tf); h.av.set((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14);
+        landed.push(h); SFX.play('sack', 0.35, 1 + Math.random() * 0.3); bag.userData.kick = 1;
+        const key = rec.c.race + '|' + rec.c.id, isNew = !S.codex[key]; S.codex[key] = (S.codex[key] || 0) + 1; rec.isNew = isNew;
+        ev.push({ at: cine.t + tf, fn() {
+          const col = sh ? '#fff2b0' : RAR[r].c; spawnBeam(h.g.position, col, r, sh); gachaCard(rec, isNew);
+          burst(h.g.position, col, 10 + r * 10 + (sh ? 30 : 0), 1 + r * 0.3, 0.8, 1);
+          if (r >= 2 || sh) SFX.fanfare(Math.min(4, r + (sh ? 1 : 0))); else SFX.soul(2, r);
+          if (r >= 3 || sh) { flash(sh ? 'rgba(255,240,170,.55)' : r >= 4 ? 'rgba(255,74,138,.5)' : 'rgba(255,176,32,.45)'); shake = Math.max(shake, 0.18); }
+          save();
+        } });
+      } });
+      at += [0.5, 0.7, 1.05, 1.7, 2.3][r] + (sh ? 1.0 : 0);
+    });
+    ev.push({ at: at + 0.3, fn() { cine.fold = 0.001; SFX.play('sack', 0.3, 0.7); burst(bag.position, '#c79548', 30, 1.5, 0.7, -3); } });
+    ev.push({ at: at + 1.1, fn() {
+      scene.remove(bag); scene.remove(omen); scene.remove(glow); glow.material.dispose();
+      const best = list[list.length - 1], nNew = list.filter(r => r.isNew).length;
+      toast(`倒出 ${list.length} 颗首级 · 最高【${RAR[best.c.rar].n}】${best.c.shiny ? '✨异色' : ''}${nNew ? ` · 图鉴 +${nNew}` : ''}`, RAR[best.c.rar].c, 4);
+      const remain = S.heads.filter(r => r.inBag); if (remain.length) createReturnBag(remain);
+      setTimeout(() => { if (gachaBox && !cine) gachaBox.innerHTML = ''; }, 2500);
+      cine = null; save();
+    } });
+    cine = { t: 0, ev, bag, omen, glow, topR, topShiny, fast: false, flipAt: at0(ev), fold: 0, BY };
+    function at0(e) { return e[0].at; }
+    toast(topR >= 3 || topShiny ? '麻袋在发光……里面有不得了的东西！' : '解开麻袋口……', topShiny ? '#fff2b0' : RAR[topR].c, 2);
+    SFX.play('heavy', 0.3, 0.6);
     save();
   }
+  function updateCine(dt) {
+    if (!cine) return;
+    const c = cine; c.t += dt * (c.fast ? 3.2 : 1);
+    const b = c.bag, pre = Math.min(1, c.t / c.flipAt);
+    // 预兆：光越来越亮，抖动越来越剧烈；稀有时带闪烁
+    const pulse = 0.5 + 0.5 * Math.sin(c.t * (8 + c.topR * 3));
+    c.omen.intensity = (c.topR >= 2 || c.topShiny ? 2.5 : 0.8) * pre * (0.6 + pulse * 0.4);
+    c.glow.material.opacity = (c.topR >= 2 || c.topShiny ? 0.55 : 0.18) * pre * (0.6 + pulse * 0.4);
+    if (c.t < c.flipAt) { const s = pre * pre * (0.05 + c.topR * 0.015); b.rotation.z = Math.sin(c.t * 38) * s; b.position.y = c.BY + Math.abs(Math.sin(c.t * 19)) * s * 0.8; }
+    else if (!c.fold) { const k = Math.min(1, (c.t - c.flipAt) / 0.35); b.rotation.z = 0; b.rotation.x = Math.PI * (k * k * (3 - 2 * k)); b.position.y = c.BY + 0.15 * k; b.userData.kick = Math.max(0, (b.userData.kick || 0) - dt * 5); b.scale.set(0.8 * (1 + b.userData.kick * 0.12), 0.8 * (1 - b.userData.kick * 0.15), 0.8 * (1 + b.userData.kick * 0.12)); }
+    else { c.fold = Math.min(1, c.fold + dt * 1.6); const k = (1 - c.fold) * 0.8; b.scale.set(k, k * 0.6, k); }
+    for (const e of c.ev) if (!e.done && c.t >= e.at) { e.done = true; e.fn(); if (!cine) return; }
+  }
+  function updateCineFx(dt) { for (let i = cineFx.length - 1; i >= 0; i--) { const f = cineFx[i]; f.t += dt; const k = f.t / f.life; if (k >= 1) { f.end(); cineFx.splice(i, 1); } else f.upd(k); } }
   function cycleHeldFace() {
     if (!held) return;
     const names = ['半阖死寂', '双目紧闭', '失焦凝视', '颌骨松垂', '极度惊恐', '狰狞痛苦'];
@@ -735,12 +813,12 @@ window.startGame = function () {
   function frame() {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, clock.getDelta()); const now = clock.elapsedTime;
-    updateAim(now); ModelHeads.tick(now);
+    updateAim(now); ModelHeads.tick(now); updateCine(dt); updateCineFx(dt);
     for (const h of heads) if (h.aura) { h.aura.position.copy(h.g.position); h.aura.rotation.y = now * 0.9 + h.rec.id; h.aura.visible = h.g.visible !== false; }
     // 自适应分辨率
     fpsAcc += dt; fpsN++; if (fpsAcc > 2) { const fps = fpsN / fpsAcc; if (fps < 40 && pixelRatio > 0.7) { pixelRatio = Math.max(0.7, pixelRatio - 0.15); renderer.setPixelRatio(pixelRatio); } else if (fps > 58 && pixelRatio < Math.min(devicePixelRatio, 1.5)) { pixelRatio = Math.min(Math.min(devicePixelRatio, 1.5), pixelRatio + 0.1); renderer.setPixelRatio(pixelRatio); } fpsAcc = 0; fpsN = 0; }
     // 玩家
-    if (playing && !uiOpen) {
+    if (playing && !uiOpen && !cine) {
       const f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
       const s = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
       const sp = keys.ShiftLeft ? 6 : 3.4;
@@ -884,6 +962,7 @@ window.startGame = function () {
 
   // ---------------- 对外 ----------------
   window.G = {
+    _dbg: { interactE: () => interactE(), carry() { bagCarrying = true; }, unloadBag: () => unloadBag(), get cine() { return cine; } },
     hasAff, yieldOf, S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
     save, wipe, setUI, lockPointer, spawnReturnHeads, addHeadRecs, createReturnBag, usedSig, usedNames, headOf, removeHead, refreshWeapon, burst, get cave() { return cave; },
     get playing() { return playing; }, get uiOpen() { return uiOpen; }, renderer, camera, scene, poke, mountHead, createHead, addBuild
