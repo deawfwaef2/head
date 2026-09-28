@@ -337,6 +337,8 @@ window.startGame = function () {
     const hit = lookHit();
     // 只拿准星对准的那颗（或准星 ~6° 小圆锥内最近的一颗，且不能隔着建筑）；不再“附近随便抓一颗”
     const pickup = targetHead(hit);
+    const shift = keys.ShiftLeft || keys.ShiftRight;
+    if (pickup && !held && !shift && pickup.mount && CAT[pickup.mount.type].seance) { startSeance(pickup); return; }
     if (pickup) { const h = pickup; unmount(h); held = h; heldYaw = 0; h.sleep = 0; SFX.sack(); poke(h, 'hold'); return; }
     if (bagGroup && !bagCarrying && player.pos.distanceTo(bagGroup.position) < 2.8) { bagCarrying = true; toast('麻袋扛上肩了！走到洞内空地按 E 倒出来；按 Q 可放下。', '#ffd890', 4); SFX.sack(); return; }
     // A portable sack can be collected even if the ray points past it.
@@ -346,7 +348,15 @@ window.startGame = function () {
       if (hit && hit.build && CAT[hit.build.type].mount && freeSlot(hit.build) >= 0) { mountHead(held, hit.build, freeSlot(hit.build, hit.point)); return; }
       dropHeld(); return;
     }
-    if (hit && hit.build) { const d = CAT[hit.build.type]; if (d.train) { UI.openTraining(d.train, d.n); return; } if (firstHead(hit.build)) { const h = nearestHead(hit.build, hit.point); unmount(h); held = h; return; } }
+    if (hit && hit.build) { const d = CAT[hit.build.type]; if (d.train) { UI.openTraining(d.train, d.n); return; } if (d.seance && !shift && firstHead(hit.build)) { startSeance(firstHead(hit.build)); return; } if (firstHead(hit.build)) { const h = nearestHead(hit.build, hit.point); unmount(h); held = h; return; } }
+  }
+  function startSeance(h) {
+    if (!window.Seance || Seance.active) return;
+    setUI(true); SFX.play('bell', 0.5, 0.8);
+    Seance.open(h.rec, {
+      onApply(ex, kind) { h.hb.setExpression(ex); if (kind === 'calm') burst(h.g.position, '#cfe8ff', 40, 1.2, 1.4, 0.5); else { burst(h.g.position, '#8a0010', 60, 2.4, 1.0); for (let i = 0; i < 12; i++) setTimeout(() => SFX.soul(i, h.rec.c.rar), i * 60); } },
+      onClose() { setUI(false); save(); if (window.UI && UI.refresh) UI.refresh(); lockPointer(); }
+    });
   }
   function makeBagMesh() {
     const g = new THREE.Group();
@@ -813,6 +823,7 @@ window.startGame = function () {
   function frame() {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, clock.getDelta()); const now = clock.elapsedTime;
+    if (window.Seance && Seance.active) return; // 通灵 MV 期间暂停主场景渲染
     updateAim(now); ModelHeads.tick(now); updateCine(dt); updateCineFx(dt);
     for (const h of heads) if (h.aura) { h.aura.position.copy(h.g.position); h.aura.rotation.y = now * 0.9 + h.rec.id; h.aura.visible = h.g.visible !== false; }
     // 自适应分辨率
@@ -888,6 +899,7 @@ window.startGame = function () {
         on.forEach(h => { const dx = h.g.position.x - b.x, dz = h.g.position.z - b.z; const a = dt * 0.5; const c = Math.cos(a), s = Math.sin(a); h.g.position.x = b.x + dx * c - dz * s; h.g.position.z = b.z + dx * s + dz * c; h.g.rotateY(-a); });
         if (b.timer >= d.period) { b.timer = 0; on.forEach((h, i) => setTimeout(() => { trigger(h, 'auto', 1); SFX.soul(i, h.rec.c.rar); }, i * 90)); }
       }
+      if (b.g.userData.float) { const f = b.g.userData.float; f.rotation.y += dt * 0.6; f.position.y = 1.1 + Math.sin(now * 1.5) * 0.02; }
       const u = b.g.userData;
       if (u.edge && u.edge.material.opacity > 0) u.edge.material.opacity = Math.max(0, u.edge.material.opacity - dt * 1.5);
       if (u.orb) u.orb.position.y = 1.1 + Math.sin(now * 2) * 0.08;
@@ -962,7 +974,7 @@ window.startGame = function () {
 
   // ---------------- 对外 ----------------
   window.G = {
-    _dbg: { interactE: () => interactE(), carry() { bagCarrying = true; }, unloadBag: () => unloadBag(), get cine() { return cine; } },
+    _dbg: { interactE: () => interactE(), startSeance: h => startSeance(h), carry() { bagCarrying = true; }, unloadBag: () => unloadBag(), get cine() { return cine; } },
     hasAff, yieldOf, S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
     save, wipe, setUI, lockPointer, spawnReturnHeads, addHeadRecs, createReturnBag, usedSig, usedNames, headOf, removeHead, refreshWeapon, burst, get cave() { return cave; },
     get playing() { return playing; }, get uiOpen() { return uiOpen; }, renderer, camera, scene, poke, mountHead, createHead, addBuild

@@ -579,7 +579,7 @@ window.ModelHeads = (() => {
     }
   }
 
-  function create(look) {
+  function create(look, opts = {}) {
     let fi = idxOf(look.f); if (fi < 0) fi = 0;
     let hi = idxOf(look.h); if (hi < 0) hi = fi;
     const F = T[fi], H = T[hi];
@@ -605,9 +605,11 @@ window.ModelHeads = (() => {
     };
     const presets = F.meta.presets || {};
     const byName = {};
+    const hlMeshes = [];
     for (const m of F.faceMeshes) {
-      if (m.userData.kind === 'hl') continue; // 死眼：去掉高光
+      if (m.userData.kind === 'hl' && !opts.alive) continue; // 死眼：去掉高光（通灵 MV 里的“生前”版本保留）
       const c = new THREE.Mesh(m.geometry, getMat(m, F)); c.name = m.name; c.renderOrder = m.renderOrder;
+      if (m.userData.kind === 'hl') hlMeshes.push(c);
       if (m.morphTargetInfluences) { c.morphTargetInfluences = new Array(m.morphTargetInfluences.length).fill(0); c.morphTargetDictionary = m.morphTargetDictionary; }
       byName[m.name] = c; g.add(c);
     }
@@ -637,7 +639,7 @@ window.ModelHeads = (() => {
     addAccessories(g, look, F.meta, U, disposables, S.top);
     const radius = 0.1;
     return {
-      group: g, U, radius, meta: F.meta,
+      group: g, U, radius, meta: F.meta, hl: hlMeshes, presets,
       setSway(v) { U.sway.value.copy(v); },
       setExpression,
       dispose() { own.forEach(m => m.dispose()); disposables.forEach(m => m.dispose()); }

@@ -133,6 +133,45 @@
   .trip-feed { flex: 1; overflow-y: auto; padding: 10px max(26px, calc(50% - 420px)); display: flex; flex-direction: column; gap: 12px; }
   .beat { font-size: 18px; line-height: 1.8; background: rgba(20,12,8,.8); border: 1px solid #3e2a1a; border-radius: 12px; padding: 12px 18px; opacity: 0; transform: translateY(14px); transition: all .35s; }
   .beat.in { opacity: 1; transform: none; }
+
+  #seance { position: fixed; inset: 0; z-index: 60; display: none; opacity: 0; transition: opacity .45s; cursor: pointer; overflow: hidden; background: #000; font-family: inherit; }
+  #seance.on { opacity: 1; }
+  #seance .sc-stage { position: absolute; inset: 0; transition: filter 2.2s ease; }
+  #seance.dead .sc-stage { filter: grayscale(1) brightness(.75) contrast(1.25); }
+  #seance.dead.calmed .sc-stage { filter: grayscale(.35) brightness(1) sepia(.2); }
+  #seance .sc-bg { position: absolute; inset: 0; transition: opacity 1.4s ease; opacity: 0; }
+  #seance .sc-halo { position: absolute; left: 50%; top: 42%; width: 70vmin; height: 70vmin; transform: translate(-50%,-50%); border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.35), rgba(255,255,255,0) 65%); animation: schalo 5s ease-in-out infinite alternate; }
+  #seance.dead .sc-halo { opacity: 0; transition: opacity 1s; }
+  @keyframes schalo { from { transform: translate(-50%,-50%) scale(.92); } to { transform: translate(-50%,-50%) scale(1.06); } }
+  #seance canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #seance .sc-fade { position: absolute; inset: 0; pointer-events: none; transition: background 1.4s; }
+  #seance .sc-red { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 45%, rgba(120,0,10,0) 30%, rgba(90,0,8,.85) 100%); mix-blend-mode: multiply; opacity: 0; transition: opacity 2.5s; pointer-events: none; }
+  #seance.dead .sc-red { opacity: 1; } #seance.calmed .sc-red { opacity: .25; }
+  #seance.squeezed .sc-red { background: rgba(160,0,10,.6); opacity: 1; }
+  #seance .sc-bar { position: absolute; left: 0; right: 0; height: 9vh; background: #000; }
+  #seance .sc-bar.top { top: 0; } #seance .sc-bar.bot { bottom: 0; }
+  #seance .sc-title { position: absolute; left: 0; right: 0; top: 13vh; text-align: center; color: #fff; opacity: 0; transform: translateY(-12px); transition: all 1s; text-shadow: 0 2px 18px rgba(0,0,0,.6); }
+  #seance .sc-title.in { opacity: 1; transform: none; }
+  #seance .sc-title .t1 { font-size: clamp(18px, 3vw, 26px); letter-spacing: 3px; color: #ffe6c0; } #seance .sc-title .t1 b { display: block; font-size: clamp(30px, 5.4vw, 52px); color: #fff; letter-spacing: 6px; margin-top: 4px; }
+  #seance .sc-title .t2 { font-size: clamp(13px, 1.8vw, 17px); opacity: .85; margin-top: 8px; letter-spacing: 2px; }
+  #seance .sc-quote { position: absolute; left: 6%; right: 6%; bottom: 25vh; text-align: center; color: #fff; font-size: clamp(22px, 3.6vw, 36px); font-weight: 700; letter-spacing: 2px; text-shadow: 0 0 14px rgba(0,0,0,.7), 0 2px 4px rgba(0,0,0,.8); opacity: 0; transition: opacity .5s; }
+  #seance .sc-cap { position: absolute; left: 8%; right: 8%; bottom: 13vh; text-align: center; color: #f4ece0; font-size: clamp(16px, 2.3vw, 22px); letter-spacing: 1.5px; text-shadow: 0 1px 8px rgba(0,0,0,.85); opacity: 0; transition: opacity .6s; }
+  #seance .sc-quote.in, #seance .sc-cap.in { opacity: 1; }
+  #seance .sc-cap.big { bottom: auto; top: calc(9vh + 34px); font-size: clamp(28px, 5vw, 50px); font-weight: 800; color: #fff; letter-spacing: 8px; text-shadow: 0 0 30px #a00010, 0 2px 6px #000; }
+  #seance .sc-prog { position: absolute; top: calc(9vh + 12px); left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
+  #seance .sc-prog i { width: 22px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.25); } #seance .sc-prog i.d { background: rgba(255,255,255,.7); } #seance .sc-prog i.c { background: #fff; box-shadow: 0 0 8px #fff; }
+  #seance .sc-skip { position: absolute; bottom: 3vh; right: 3vw; color: rgba(255,255,255,.45); font-size: 13px; }
+  #seance .sc-choice { position: absolute; left: 50%; bottom: 11vh; transform: translate(-50%, 20px); opacity: 0; transition: all .6s; text-align: center; pointer-events: none; width: min(92vw, 640px); cursor: default; }
+  #seance .sc-choice.in { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  #seance .sc-q { color: #eee; font-size: 18px; margin-bottom: 8px; text-shadow: 0 1px 6px #000; } #seance .sc-first { color: #d8b8ff; font-size: 15px; margin-bottom: 12px; }
+  #seance .sc-btns { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  #seance .sc-b { cursor: pointer; border: 2px solid; border-radius: 14px; padding: 12px 20px; min-width: 200px; font: inherit; color: #fff; display: flex; flex-direction: column; gap: 4px; align-items: center; transition: transform .15s, box-shadow .15s; }
+  #seance .sc-b:hover { transform: translateY(-3px) scale(1.03); }
+  #seance .sc-b b { font-size: 20px; } #seance .sc-b span { font-size: 13px; opacity: .85; line-height: 1.5; }
+  #seance .sc-b.calm { background: rgba(40,70,110,.85); border-color: #9fd0ff; box-shadow: 0 0 18px rgba(140,200,255,.4); }
+  #seance .sc-b.squeeze { background: rgba(110,10,20,.88); border-color: #ff5a6a; box-shadow: 0 0 18px rgba(255,60,80,.45); }
+  #seance .sc-b.close { background: rgba(30,30,40,.85); border-color: #aaa; min-width: 140px; }
+  #seance .sc-res { font-size: 24px; font-weight: 800; margin-bottom: 14px; text-shadow: 0 0 16px #000; } #seance .sc-res small { font-size: 15px; font-weight: 400; color: #eee; }
   #gacha { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); display: flex; gap: 12px; align-items: flex-end; z-index: 25; pointer-events: none; }
   .gcard { position: relative; min-width: 200px; max-width: 250px; padding: 12px 16px 12px; border-radius: 14px; background: linear-gradient(160deg, rgba(30,18,12,.94), rgba(12,8,6,.94)); border: 2px solid var(--c); box-shadow: 0 0 22px color-mix(in srgb, var(--c) 55%, transparent); color: #eee; text-align: center; transform: translateY(40px) scale(.8); opacity: 0; transition: all .35s cubic-bezier(.2,1.6,.4,1); }
   .gcard.in { transform: none; opacity: 1; }
@@ -232,6 +271,7 @@
 <script src="js/rpg.js"></script>
 <script src="js/game.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/seance.js"></script>
 <script>
 (async () => {
   const bar = document.querySelector('#loadbar i'), txt = document.getElementById('loadtxt');

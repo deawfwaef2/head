@@ -92,6 +92,18 @@ window.BuildCat = (() => {
       for (const s of [0, 2]) g.add(flame(Math.cos(s) * 0.3, 0.1, Math.sin(s) * 0.3, 0.7, '#ff4a3a'));
       return g; },
     cols: () => ring(5, 0.78, 0, a => 0).map(([x, , z]) => [x - 0.06, 0, z - 0.06, x + 0.06, 1.0, z + 0.06]) };
+  C.seance = { cat: 'func', n: '通灵台', icon: '🔮', base: 260, grow: 1.7, fp: [0.42, 0.42], stat: { soul: 2 }, desc: '放上一颗首级，对准按 E 通灵：观看她生前的记忆，再决定安抚还是榨取（Shift+E 取下）。每 30 秒 ×2 产出', mount: { y: 1.1, period: 30, mult: 2, labelY: 1.7 }, seance: true,
+    make() { const g = new THREE.Group();
+      g.add(cyl(0.36, 0.42, 0.14, M.dark, 0, 0.07, 0, 20)); g.add(cyl(0.12, 0.2, 0.8, M.stone, 0, 0.54, 0, 10)); g.add(cyl(0.26, 0.14, 0.12, M.stone, 0, 1.0, 0, 16));
+      const bowl = mesh(new THREE.TorusGeometry(0.2, 0.025, 8, 28), M.gold, 0, 1.06, 0); bowl.rotation.x = Math.PI / 2; g.add(bowl);
+      const runeC = mesh(new THREE.RingGeometry(0.55, 0.6, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color('#b06aff').multiplyScalar(1.4), transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false }), 0, 0.012, 0); runeC.rotation.x = -Math.PI / 2; g.add(runeC);
+      const float = new THREE.Group(); float.position.y = 1.1; g.add(float);
+      const halo = mesh(new THREE.TorusGeometry(0.3, 0.008, 6, 48), glowMat('#c88aff', 1.8), 0, 0.02, 0); halo.rotation.x = Math.PI / 2; float.add(halo);
+      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; const rn = box(0.05, 0.07, 0.006, glowMat(i % 2 ? '#8ad8ff' : '#d08aff', 1.6), Math.cos(a) * 0.3, 0.06, Math.sin(a) * 0.3); rn.rotation.y = -a + Math.PI / 2; float.add(rn); }
+      for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2 + 0.5; const w = mesh(new THREE.SphereGeometry(0.022, 8, 6), glowMat('#e0c8ff', 2), Math.cos(a) * 0.42, 0.25 + i * 0.07, Math.sin(a) * 0.42); float.add(w); }
+      for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + Math.PI / 4; g.add(cyl(0.025, 0.028, 0.16, M.bone, Math.cos(a) * 0.5, 0.08, Math.sin(a) * 0.5, 8)); g.add(flame(Math.cos(a) * 0.5, 0.16, Math.sin(a) * 0.5, 0.55, '#b07aff')); }
+      g.userData.float = float; return g; },
+    cols: () => [[-0.36, 0, -0.36, 0.36, 0.14, 0.36], [-0.2, 0, -0.2, 0.2, 1.06, 0.2]] };
   C.wheel = { cat: 'func', n: '魂轮', icon: '☸️', base: 900, grow: 1.5, fp: [0.62, 0.62], stat: { soul: 3 }, desc: '缓慢转动的刑轮，放上面的首级每 6 秒全部触发', radius: 0.58, surface: 0.14, period: 6, depth: 3,
     make() { const g = new THREE.Group(); g.add(cyl(0.64, 0.68, 0.08, M.dark, 0, 0.04, 0, 32)); const top = new THREE.Group(); top.position.y = 0.1; g.add(top);
       const disk = cyl(0.6, 0.6, 0.04, M.wood, 0, 0, 0, 40); top.add(disk);
