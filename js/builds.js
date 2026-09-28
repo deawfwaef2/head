@@ -1,125 +1,169 @@
-// 建造目录：功能建筑 / 装饰 / 升级。所有模型程序化生成（无外部资源）
+// 洞穴建造目录：功能 / 训练 / 装饰。所有装饰都提供属性加成（提升战力）。模型全部程序化。
 window.BuildCat = (() => {
+  const canvasTex = (w, h, fn, srgb = true) => { const c = document.createElement('canvas'); c.width = w; c.height = h; fn(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); if (srgb) t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
+  const noiseTex = (base, spots, n = 1400, size = 256) => canvasTex(size, size, (g, w, h) => { g.fillStyle = base; g.fillRect(0, 0, w, h); for (let i = 0; i < n; i++) { g.fillStyle = spots[Math.floor(Math.random() * spots.length)]; g.globalAlpha = 0.08 + Math.random() * 0.25; const r = 1 + Math.random() * 5; g.beginPath(); g.arc(Math.random() * w, Math.random() * h, r, 0, 6.283); g.fill(); } g.globalAlpha = 1; });
+  const woodTex = canvasTex(512, 128, (g) => { g.fillStyle = '#5a3a22'; g.fillRect(0, 0, 512, 128); for (let i = 0; i < 90; i++) { g.strokeStyle = `rgba(${30 + Math.random() * 30},${15 + Math.random() * 15},5,${0.2 + Math.random() * 0.3})`; g.lineWidth = 1 + Math.random() * 2; g.beginPath(); const y = Math.random() * 128; g.moveTo(0, y); for (let x = 0; x <= 512; x += 32) g.lineTo(x, y + Math.sin(x * 0.02 + i) * 3); g.stroke(); } });
+  const std = (color, o = {}) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.8 }, o));
   const M = {
-    white: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.2 }),
-    metal: new THREE.MeshStandardMaterial({ color: '#dfe3e8', metalness: 0.9, roughness: 0.25 }),
-    dark: new THREE.MeshStandardMaterial({ color: '#2a2d33', roughness: 0.4, metalness: 0.4 }),
-    red: new THREE.MeshStandardMaterial({ color: '#ff3b4e', emissive: '#ff1030', emissiveIntensity: 0.4, roughness: 0.3 }),
+    stone: std('#8a8378', { map: noiseTex('#8a8378', ['#5a544c', '#a8a298', '#6a645a']), roughness: 0.95 }),
+    dark: std('#3a3530', { map: noiseTex('#3a3530', ['#22201c', '#4a453e']), roughness: 0.95 }),
+    bone: std('#e6dcc4', { roughness: 0.6 }),
+    wood: std('#6a4a2a', { map: woodTex, roughness: 0.8 }),
+    iron: std('#4a4a50', { metalness: 0.8, roughness: 0.45 }),
+    rust: std('#6a3a24', { metalness: 0.5, roughness: 0.7 }),
+    fur: std('#6a4a32', { map: noiseTex('#6a4a32', ['#3a2a1a', '#8a6a4a', '#4a3222'], 3000), roughness: 1 }),
+    gold: std('#e0b040', { metalness: 1, roughness: 0.3 }),
+    blood: std('#5a0508', { roughness: 0.2, metalness: 0.1 }),
+    cloth: std('#7a1a1a', { roughness: 0.9, side: THREE.DoubleSide })
   };
-  const canvasTex = (w, h, fn, srgb = true) => { const c = document.createElement('canvas'); c.width = w; c.height = h; fn(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); if (srgb) t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t; };
-  const wood = canvasTex(512, 128, (g) => { g.fillStyle = '#d8b48a'; g.fillRect(0, 0, 512, 128); for (let i = 0; i < 90; i++) { g.strokeStyle = `rgba(${120 + Math.random() * 40},${70 + Math.random() * 30},30,${0.1 + Math.random() * 0.2})`; g.lineWidth = 1 + Math.random() * 2; g.beginPath(); const y = Math.random() * 128; g.moveTo(0, y); for (let x = 0; x <= 512; x += 32) g.lineTo(x, y + Math.sin(x * 0.02 + i) * 3); g.stroke(); } });
-  M.wood = new THREE.MeshStandardMaterial({ map: wood, roughness: 0.45 });
-  const std = (color, o = {}) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.6 }, o));
   const glowMat = (c, k = 2) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k) });
   const mesh = (geo, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); return m; };
   const box = (w, h, d, mat, x = 0, y = 0, z = 0) => mesh(new THREE.BoxGeometry(w, h, d), mat, x, y, z);
-  const cyl = (rt, rb, h, mat, x = 0, y = 0, z = 0, s = 24) => mesh(new THREE.CylinderGeometry(rt, rb, h, s), mat, x, y, z);
+  const cyl = (rt, rb, h, mat, x = 0, y = 0, z = 0, s = 16) => mesh(new THREE.CylinderGeometry(rt, rb, h, s), mat, x, y, z);
+  const rock = (r, mat, x = 0, y = 0, z = 0, det = 1) => { const g = new THREE.IcosahedronGeometry(r, det); const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const k = 0.75 + Math.random() * 0.4; p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k); } g.computeVertexNormals(); return mesh(g, mat, x, y, z); };
+  const skull = (s = 1, x = 0, y = 0, z = 0) => { const g = new THREE.Group(); const c = mesh(new THREE.SphereGeometry(0.09 * s, 12, 10), M.bone, 0, 0, 0); c.scale.set(1, 0.95, 1.1); g.add(c); const j = box(0.1 * s, 0.05 * s, 0.08 * s, M.bone, 0, -0.07 * s, 0.03 * s); g.add(j); for (const sx of [-1, 1]) g.add(mesh(new THREE.SphereGeometry(0.022 * s, 8, 6), std('#111'), sx * 0.035 * s, -0.005 * s, 0.085 * s)); g.position.set(x, y, z); return g; };
+  const flame = (x, y, z, s = 1, col = '#ff9a3a') => { const g = new THREE.Group(); const f = mesh(new THREE.ConeGeometry(0.05 * s, 0.16 * s, 8), glowMat(col, 2.4), 0, 0.08 * s, 0); g.add(f); const f2 = mesh(new THREE.ConeGeometry(0.03 * s, 0.1 * s, 6), glowMat('#fff0a0', 2.5), 0, 0.05 * s, 0); g.add(f2); g.position.set(x, y, z); g.userData.flame = true; return g; };
 
-  const TABLE = { w: 1.4, d: 0.8, h: 0.76 };
+  const TABLE = { w: 1.5, d: 0.85, h: 0.78 };
   const C = {};
-  // ---------------- 功能 ----------------
-  C.table = { cat: 'func', n: '桌子', icon: '🪵', base: 40, grow: 1.45, fp: [0.7, 0.4], desc: '把玩桌上任一头 → 桌上所有头连锁产出',
-    make() { const g = new THREE.Group(); g.add(box(TABLE.w, 0.05, TABLE.d, M.wood, 0, TABLE.h - 0.025, 0));
-      const edge = box(TABLE.w + 0.01, 0.012, TABLE.d + 0.01, new THREE.MeshBasicMaterial({ color: '#cfe8dc' }), 0, TABLE.h - 0.05, 0); g.add(edge); g.userData.edge = edge;
-      for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(cyl(0.025, 0.02, TABLE.h - 0.05, M.white, sx * (TABLE.w / 2 - 0.08), (TABLE.h - 0.05) / 2, sz * (TABLE.d / 2 - 0.08), 12));
+  // ============ 功能 ============
+  C.table = { cat: 'func', n: '石板祭桌', icon: '🪨', base: 60, grow: 1.45, fp: [0.75, 0.43], stat: { ter: 1 }, desc: '把玩桌上任一首级 → 桌上所有首级共鸣连锁产出',
+    make() { const g = new THREE.Group(); g.add(box(TABLE.w, 0.1, TABLE.d, M.stone, 0, TABLE.h - 0.05, 0));
+      const edge = box(TABLE.w + 0.01, 0.015, TABLE.d + 0.01, new THREE.MeshBasicMaterial({ color: '#ff4a3a', transparent: true, opacity: 0.0 }), 0, TABLE.h - 0.1, 0); g.add(edge); g.userData.edge = edge;
+      for (const sx of [-1, 1]) g.add(box(0.22, TABLE.h - 0.1, TABLE.d * 0.8, M.dark, sx * (TABLE.w / 2 - 0.2), (TABLE.h - 0.1) / 2, 0));
+      const stain = mesh(new THREE.CircleGeometry(0.2, 16), M.blood, 0.2, TABLE.h + 0.002, 0.1); stain.rotation.x = -Math.PI / 2; stain.scale.set(1.4, 0.7, 1); g.add(stain);
       return g; },
-    cols: (hx, hz) => [[-hx, TABLE.h - 0.05, -hz, hx, TABLE.h, hz]], surface: TABLE.h };
-  C.pole = { cat: 'func', n: '杆子', icon: '🍡', base: 30, grow: 1.4, fp: [0.22, 0.22], desc: '插一个头，每 10 秒自动触发一次', mount: { y: 1.32, period: 10, mult: 1 },
-    make() { const g = new THREE.Group(); g.add(cyl(0.2, 0.24, 0.05, M.white, 0, 0.025, 0, 32)); g.add(cyl(0.022, 0.022, 1.3, M.metal, 0, 0.675, 0, 16));
-      const cup = mesh(new THREE.TorusGeometry(0.06, 0.015, 8, 24), M.metal, 0, 1.32, 0); cup.rotation.x = Math.PI / 2; g.add(cup); return g; },
-    cols: () => [[-0.2, 0, -0.2, 0.2, 0.05, 0.2], [-0.025, 0, -0.025, 0.025, 1.3, 0.025]] };
-  C.pedestal = { cat: 'func', n: '展示台', icon: '🏛️', base: 220, grow: 1.5, fp: [0.28, 0.28], desc: '大理石台 + 聚光灯：每 20 秒触发 ×4 产出', mount: { y: 1.05, period: 20, mult: 4 },
-    make() { const g = new THREE.Group(); const marble = std('#f4f1ec', { roughness: 0.15 });
-      g.add(box(0.5, 0.08, 0.5, marble, 0, 0.04, 0)); g.add(cyl(0.16, 0.18, 0.9, marble, 0, 0.53, 0, 8)); g.add(box(0.44, 0.07, 0.44, marble, 0, 1.0, 0));
-      const cone = mesh(new THREE.ConeGeometry(0.35, 1.6, 32, 1, true), new THREE.MeshBasicMaterial({ color: '#ffe9a8', transparent: true, opacity: 0.05, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }), 0, 1.85, 0); g.add(cone);
+    cols: (hx, hz) => [[-hx, TABLE.h - 0.1, -hz, hx, TABLE.h, hz], [-hx, 0, -hz * 0.8, -hx + 0.22, TABLE.h, hz * 0.8], [hx - 0.22, 0, -hz * 0.8, hx, TABLE.h, hz * 0.8]], surface: TABLE.h };
+  C.pole = { cat: 'func', n: '首级枪桩', icon: '🔱', base: 50, grow: 1.4, fp: [0.22, 0.22], stat: { ter: 1 }, desc: '插一颗首级，每 10 秒自动渗出魂晶', mount: { y: 1.45, period: 10, mult: 1 },
+    make() { const g = new THREE.Group(); g.add(rock(0.24, M.stone, 0, 0.08, 0)); g.add(cyl(0.022, 0.03, 1.45, M.wood, 0, 0.72, 0, 8)); const tip = mesh(new THREE.ConeGeometry(0.028, 0.14, 6), M.iron, 0, 1.5, 0); g.add(tip);
+      const drip = cyl(0.012, 0.02, 0.4, M.blood, 0.015, 1.25, 0, 6); g.add(drip); return g; },
+    cols: () => [[-0.2, 0, -0.2, 0.2, 0.18, 0.2], [-0.03, 0, -0.03, 0.03, 1.45, 0.03]] };
+  C.shrine = { cat: 'func', n: '骨龛', icon: '💀', base: 400, grow: 1.5, fp: [0.32, 0.32], stat: { soul: 2 }, desc: '骸骨垒成的神龛：每 20 秒触发 ×4 产出', mount: { y: 1.12, period: 20, mult: 4 }, depth: 2,
+    make() { const g = new THREE.Group(); g.add(rock(0.35, M.dark, 0, 0.15, 0));
+      for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; g.add(skull(0.9, Math.cos(a) * 0.2, 0.35 + (i % 2) * 0.15, Math.sin(a) * 0.2)); }
+      g.add(cyl(0.16, 0.22, 0.6, M.bone, 0, 0.7, 0, 10)); g.add(cyl(0.22, 0.2, 0.08, M.bone, 0, 1.04, 0, 10));
+      for (const s of [-1, 1]) g.add(flame(s * 0.18, 1.08, 0, 0.8, '#7aff9a'));
       return g; },
-    cols: () => [[-0.25, 0, -0.25, 0.25, 1.03, 0.25]] };
-  C.clicker = { cat: 'func', n: '自动按钮器', icon: '🤖', base: 25, grow: 1.35, fp: [0.2, 0.2], desc: '每 2 秒自动帮你按一次按钮（可叠加）', rate: 0.5,
-    make() { const g = new THREE.Group();
-      g.add(box(0.36, 0.3, 0.36, M.white, 0, 0.15, 0));
-      const scr = box(0.22, 0.1, 0.01, glowMat('#40e0ff', 1.3), 0, 0.2, 0.181); g.add(scr);
-      g.add(cyl(0.05, 0.05, 0.2, M.metal, 0, 0.4, 0, 16));
-      const piston = new THREE.Group(); piston.add(cyl(0.03, 0.03, 0.25, M.metal, 0, 0.12, 0, 12)); piston.add(cyl(0.07, 0.07, 0.04, M.red, 0, 0.26, 0, 20)); piston.position.y = 0.45; g.add(piston); g.userData.piston = piston;
-      const led = mesh(new THREE.SphereGeometry(0.02, 10, 8), glowMat('#40ff90', 2), 0.13, 0.31, 0.13); g.add(led); g.userData.led = led;
-      return g; },
-    cols: () => [[-0.18, 0, -0.18, 0.18, 0.5, 0.18]] };
-  C.turntable = { cat: 'func', n: '转盘', icon: '💿', base: 150, grow: 1.5, fp: [0.62, 0.62], desc: '头放在转盘上会旋转，每 6 秒全部触发一次', period: 6, radius: 0.58,
-    make() { const g = new THREE.Group(); g.add(cyl(0.62, 0.64, 0.08, M.dark, 0, 0.04, 0, 48));
-      const top = new THREE.Group(); const tex = canvasTex(256, 256, (c) => { c.fillStyle = '#f7f7fa'; c.fillRect(0, 0, 256, 256); for (let i = 0; i < 12; i++) { c.fillStyle = i % 2 ? '#ff8fb8' : '#ffd1e2'; c.beginPath(); c.moveTo(128, 128); c.arc(128, 128, 128, i / 12 * Math.PI * 2, (i + 1) / 12 * Math.PI * 2); c.fill(); } c.fillStyle = '#fff'; c.beginPath(); c.arc(128, 128, 20, 0, 7); c.fill(); });
-      const disc = cyl(0.6, 0.6, 0.04, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.3 }), 0, 0.1, 0, 48); top.add(disc); g.add(top); g.userData.spin = top;
-      return g; },
-    cols: () => [[-0.6, 0, -0.6, 0.6, 0.12, 0.6]], surface: 0.12 };
-  C.speaker = { cat: 'func', n: '音箱', icon: '🔊', base: 120, grow: 1.5, fp: [0.22, 0.2], desc: '半径 1.8m 内的头产出 ×1.5（可叠加）', aura: 1.8,
-    make() { const g = new THREE.Group(); g.add(box(0.42, 0.8, 0.38, M.dark, 0, 0.4, 0));
-      const cone = std('#111', { roughness: 0.8 });
-      const w1 = cyl(0.14, 0.14, 0.02, cone, 0, 0.3, 0.19, 32); w1.rotation.x = Math.PI / 2; g.add(w1);
-      const w2 = cyl(0.07, 0.07, 0.02, cone, 0, 0.62, 0.19, 24); w2.rotation.x = Math.PI / 2; g.add(w2);
-      const ring = mesh(new THREE.RingGeometry(1.75, 1.8, 64), new THREE.MeshBasicMaterial({ color: '#b56bff', transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }), 0, 0.01, 0); ring.rotation.x = -Math.PI / 2; g.add(ring);
-      g.userData.woofers = [w1, w2]; return g; },
-    cols: () => [[-0.21, 0, -0.19, 0.21, 0.8, 0.19]] };
-
-  // ---------------- 装饰（每件 +舒适度 → 全局产出加成） ----------------
-  C.plant = { cat: 'decor', n: '盆栽', icon: '🪴', base: 20, grow: 1.15, fp: [0.2, 0.2], comfort: 3, desc: '绿意盎然',
-    make() { const g = new THREE.Group(); g.add(cyl(0.16, 0.12, 0.3, std('#e8d6c4', { roughness: 0.8 }), 0, 0.15, 0, 20));
-      const leaf = std('#4caf6a', { roughness: 0.7 }), leaf2 = std('#6fcf7f', { roughness: 0.7 });
-      for (let i = 0; i < 9; i++) { const l = mesh(new THREE.SphereGeometry(0.1 + Math.random() * 0.06, 10, 8), i % 2 ? leaf : leaf2, (Math.random() - 0.5) * 0.25, 0.4 + Math.random() * 0.35, (Math.random() - 0.5) * 0.25); l.scale.y = 1.3; g.add(l); }
-      return g; }, cols: () => [[-0.16, 0, -0.16, 0.16, 0.8, 0.16]] };
-  C.lamp = { cat: 'decor', n: '落地灯', icon: '💡', base: 35, grow: 1.15, fp: [0.2, 0.2], comfort: 4, desc: '暖光氛围',
-    make() { const g = new THREE.Group(); g.add(cyl(0.18, 0.2, 0.03, M.dark, 0, 0.015, 0)); g.add(cyl(0.015, 0.015, 1.5, M.metal, 0, 0.77, 0, 10));
-      g.add(cyl(0.16, 0.26, 0.3, new THREE.MeshStandardMaterial({ color: '#fff4e0', emissive: '#ffcc80', emissiveIntensity: 0.9, side: THREE.DoubleSide, transparent: true, opacity: 0.95 }), 0, 1.6, 0, 24));
-      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: GLOW(), color: '#ffcf80', transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending })); glow.scale.setScalar(1.3); glow.position.y = 1.55; g.add(glow);
-      return g; }, cols: () => [[-0.05, 0, -0.05, 0.05, 1.7, 0.05]] };
-  C.rug = { cat: 'decor', n: '地毯', icon: '🟣', base: 30, grow: 1.15, fp: [1.0, 0.7], comfort: 4, desc: '柔软圆毯（可以踩）',
-    make() { const hue = Math.random(); const tex = canvasTex(256, 256, (c) => { const col = new THREE.Color().setHSL(hue, 0.55, 0.72), col2 = new THREE.Color().setHSL(hue, 0.5, 0.85); c.fillStyle = '#' + col.getHexString(); c.fillRect(0, 0, 256, 256); c.strokeStyle = '#' + col2.getHexString(); c.lineWidth = 10; for (let r = 30; r < 128; r += 26) { c.beginPath(); c.ellipse(128, 128, r, r, 0, 0, 7); c.stroke(); } });
-      const g = new THREE.Group(); const m = mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshStandardMaterial({ map: tex, roughness: 1 }), 0, 0.006, 0); m.rotation.x = -Math.PI / 2; m.scale.set(1, 0.7, 1); g.add(m); m.receiveShadow = true; return g; },
+    cols: () => [[-0.3, 0, -0.3, 0.3, 1.08, 0.3]] };
+  C.wheel = { cat: 'func', n: '魂轮', icon: '☸️', base: 900, grow: 1.5, fp: [0.62, 0.62], stat: { soul: 3 }, desc: '缓慢转动的刑轮，放上面的首级每 6 秒全部触发', radius: 0.58, surface: 0.14, period: 6, depth: 3,
+    make() { const g = new THREE.Group(); g.add(cyl(0.64, 0.68, 0.08, M.dark, 0, 0.04, 0, 32)); const top = new THREE.Group(); top.position.y = 0.1; g.add(top);
+      const disk = cyl(0.6, 0.6, 0.04, M.wood, 0, 0, 0, 40); top.add(disk);
+      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; const sp = box(0.04, 0.03, 0.55, M.iron, Math.cos(a) * 0.3, 0.035, Math.sin(a) * 0.3); sp.rotation.y = -a + Math.PI / 2; top.add(sp); }
+      const ring = mesh(new THREE.TorusGeometry(0.6, 0.02, 6, 48), glowMat('#8a3aff', 1.6), 0, 0.03, 0); ring.rotation.x = Math.PI / 2; top.add(ring);
+      g.userData.spin = top; return g; },
+    cols: () => [[-0.6, 0, -0.6, 0.6, 0.12, 0.6]] };
+  C.bell = { cat: 'func', n: '招魂铃', icon: '🔔', base: 600, grow: 1.55, fp: [0.3, 0.3], stat: { soul: 2 }, desc: '半径 2m 内首级产出 ×1.5（可叠加）', aura: 2.0, auraMul: 1.5, depth: 2,
+    make() { const g = new THREE.Group(); g.add(cyl(0.04, 0.05, 1.6, M.wood, -0.25, 0.8, 0, 8)); g.add(cyl(0.04, 0.05, 1.6, M.wood, 0.25, 0.8, 0, 8)); g.add(box(0.6, 0.06, 0.08, M.wood, 0, 1.6, 0));
+      const bell = mesh(new THREE.CylinderGeometry(0.08, 0.16, 0.24, 16, 1, true), M.gold, 0, 1.42, 0); bell.material = M.gold; g.add(bell); g.userData.bell = bell;
+      g.add(rock(0.2, M.stone, -0.25, 0.05, 0)); g.add(rock(0.2, M.stone, 0.25, 0.05, 0)); return g; },
+    cols: () => [[-0.3, 0, -0.08, 0.3, 1.65, 0.08]] };
+  C.nest = { cat: 'func', n: '干草窝', icon: '🛏️', base: 120, grow: 1.6, fp: [0.9, 0.7], stat: { con: 1 }, regen: 1, desc: '睡觉的地方。生命恢复速度 +1%/10秒',
+    make() { const g = new THREE.Group(); const hay = std('#b09040', { map: noiseTex('#b09040', ['#8a6a20', '#d0b060', '#6a5018'], 3000), roughness: 1 });
+      const b = mesh(new THREE.SphereGeometry(0.8, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), hay, 0, 0, 0); b.scale.set(1.1, 0.3, 0.85); g.add(b);
+      const dip = mesh(new THREE.CircleGeometry(0.55, 20), M.fur, 0, 0.2, 0); dip.rotation.x = -Math.PI / 2; dip.scale.set(1.2, 0.9, 1); g.add(dip); return g; },
+    cols: () => [[-0.85, 0, -0.65, 0.85, 0.2, 0.65]], surface: 0.22 };
+  C.spring = { cat: 'func', n: '疗伤血泉', icon: '♨️', base: 1500, grow: 1.7, fp: [0.8, 0.8], stat: { con: 3 }, regen: 3, desc: '冒着热气的血色温泉。生命恢复 +3%/10秒', depth: 3,
+    make() { const g = new THREE.Group(); for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; g.add(rock(0.2, M.stone, Math.cos(a) * 0.72, 0.1, Math.sin(a) * 0.72)); }
+      const w = mesh(new THREE.CircleGeometry(0.7, 32), new THREE.MeshStandardMaterial({ color: '#8a1020', emissive: '#4a0508', roughness: 0.05, metalness: 0.2 }), 0, 0.12, 0); w.rotation.x = -Math.PI / 2; g.add(w); g.userData.water = w; return g; },
+    cols: () => [[-0.85, 0, -0.85, 0.85, 0.2, 0.85]] };
+  // ============ 训练 ============
+  const trainDesc = (s) => `按 E 开始训练：5 秒内疯狂点击，提升${s}。花费魂晶。建成本身也 +2 ${s}`;
+  C.t_str = { cat: 'train', n: '巨石杠铃', icon: '🏋️', base: 80, grow: 1.8, fp: [0.9, 0.3], stat: { str: 2 }, train: 'str', desc: trainDesc('力量'), max: 1,
+    make() { const g = new THREE.Group(); const bar = cyl(0.035, 0.035, 1.6, M.wood, 0, 0.35, 0, 8); bar.rotation.z = Math.PI / 2; g.add(bar); g.add(rock(0.32, M.stone, -0.75, 0.32, 0)); g.add(rock(0.32, M.stone, 0.75, 0.32, 0)); return g; },
+    cols: () => [[-1.05, 0, -0.3, 1.05, 0.62, 0.3]] };
+  C.t_agi = { cat: 'train', n: '木人桩', icon: '🪵', base: 80, grow: 1.8, fp: [0.35, 0.35], stat: { agi: 2 }, train: 'agi', desc: trainDesc('敏捷'), max: 1,
+    make() { const g = new THREE.Group(); g.add(cyl(0.14, 0.16, 1.6, M.wood, 0, 0.8, 0, 12)); for (let i = 0; i < 3; i++) { const a = box(0.5, 0.06, 0.06, M.wood, 0, 0.7 + i * 0.3, 0); a.rotation.y = i * 1.2; g.add(a); } g.add(skull(1.1, 0, 1.7, 0)); return g; },
+    cols: () => [[-0.18, 0, -0.18, 0.18, 1.7, 0.18]] };
+  C.t_con = { cat: 'train', n: '血肉沙袋', icon: '🥩', base: 80, grow: 1.8, fp: [0.35, 0.35], stat: { con: 2 }, train: 'con', desc: trainDesc('体魄'), max: 1,
+    make() { const g = new THREE.Group(); g.add(box(0.8, 0.08, 0.08, M.wood, 0, 2.1, 0)); g.add(cyl(0.03, 0.03, 2.1, M.wood, -0.38, 1.05, 0, 6)); const ch = cyl(0.008, 0.008, 0.4, M.iron, 0, 1.9, 0, 4); g.add(ch);
+      const bag = mesh(new THREE.CapsuleGeometry(0.2, 0.55, 6, 12), std('#8a3a2a', { roughness: 0.6 }), 0, 1.3, 0); g.add(bag); g.userData.bag = bag; return g; },
+    cols: () => [[-0.4, 0, -0.1, -0.35, 2.1, 0.1], [-0.2, 0.95, -0.2, 0.2, 1.65, 0.2]] };
+  C.t_ter = { cat: 'train', n: '咆哮深坑', icon: '😤', base: 120, grow: 1.8, fp: [0.7, 0.7], stat: { ter: 2 }, train: 'ter', desc: trainDesc('凶威'), max: 1, depth: 2,
+    make() { const g = new THREE.Group(); for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; g.add(rock(0.18, M.dark, Math.cos(a) * 0.62, 0.08, Math.sin(a) * 0.62)); }
+      const hole = mesh(new THREE.CircleGeometry(0.58, 24), new THREE.MeshBasicMaterial({ color: '#050303' }), 0, 0.02, 0); hole.rotation.x = -Math.PI / 2; g.add(hole);
+      for (let i = 0; i < 5; i++) g.add(skull(0.8, (Math.random() - 0.5) * 0.7, 0.05, (Math.random() - 0.5) * 0.7)); return g; },
     cols: () => [] };
-  C.sofa = { cat: 'decor', n: '沙发', icon: '🛋️', base: 80, grow: 1.2, fp: [0.8, 0.4], comfort: 8, desc: '头也可以放在沙发上',
-    make() { const g = new THREE.Group(); const hue = [0.95, 0.55, 0.12, 0.75][Math.floor(Math.random() * 4)]; const fab = std(new THREE.Color().setHSL(hue, 0.35, 0.62), { roughness: 0.95 });
-      g.add(box(1.6, 0.4, 0.8, fab, 0, 0.25, 0)); g.add(box(1.6, 0.5, 0.2, fab, 0, 0.6, -0.3)); g.add(box(0.2, 0.3, 0.8, fab, -0.7, 0.55, 0)); g.add(box(0.2, 0.3, 0.8, fab, 0.7, 0.55, 0));
-      for (const x of [-0.37, 0.37]) { const c = box(0.66, 0.1, 0.56, std(new THREE.Color().setHSL(hue, 0.3, 0.72), { roughness: 1 }), x, 0.5, 0.07); g.add(c); }
-      return g; }, cols: () => [[-0.8, 0, -0.4, 0.8, 0.55, 0.4], [-0.8, 0, -0.4, 0.8, 0.85, -0.2]], surface: 0.55 };
-  C.shelf = { cat: 'decor', n: '书架', icon: '📚', base: 60, grow: 1.2, fp: [0.5, 0.18], comfort: 6, desc: '五颜六色的书',
-    make() { const g = new THREE.Group(); g.add(box(1.0, 1.6, 0.03, M.wood, 0, 0.8, -0.15)); for (const x of [-0.5, 0.5]) g.add(box(0.03, 1.6, 0.34, M.wood, x, 0.8, 0));
-      for (let s = 0; s < 4; s++) { g.add(box(1.0, 0.03, 0.34, M.wood, 0, 0.02 + s * 0.52, 0)); if (s < 3) { let x = -0.46; while (x < 0.44) { const w = 0.03 + Math.random() * 0.04, h = 0.3 + Math.random() * 0.15; g.add(box(w, h, 0.24, std(new THREE.Color().setHSL(Math.random(), 0.5, 0.6)), x + w / 2, 0.035 + s * 0.52 + h / 2, 0)); x += w + 0.005; } } }
-      return g; }, cols: () => [[-0.5, 0, -0.17, 0.5, 1.6, 0.17]], surface: 1.6 };
-  C.easel = { cat: 'decor', n: '画架', icon: '🖼️', base: 45, grow: 1.2, fp: [0.35, 0.3], comfort: 5, desc: '随机抽象画',
-    make() { const g = new THREE.Group(); const art = canvasTex(256, 320, (c, w, h) => { c.fillStyle = '#fbfaf6'; c.fillRect(0, 0, w, h); for (let i = 0; i < 14; i++) { c.fillStyle = `hsla(${Math.random() * 360},70%,${55 + Math.random() * 20}%,0.8)`; c.beginPath(); c.arc(Math.random() * w, Math.random() * h, 20 + Math.random() * 70, 0, 7); c.fill(); } c.strokeStyle = '#222'; c.lineWidth = 4; c.beginPath(); for (let i = 0; i < 6; i++) c.lineTo(Math.random() * w, Math.random() * h); c.stroke(); });
-      const legs = std('#9a7650'); for (const x of [-0.25, 0.25]) { const l = box(0.03, 1.6, 0.03, legs, x, 0.78, 0); l.rotation.z = -x * 0.25; g.add(l); } const bl = box(0.03, 1.5, 0.03, legs, 0, 0.72, -0.25); bl.rotation.x = 0.35; g.add(bl);
-      const p = box(0.62, 0.78, 0.03, new THREE.MeshStandardMaterial({ map: art, roughness: 0.8 }), 0, 1.15, 0.04); p.rotation.x = -0.12; g.add(p); g.add(box(0.7, 0.04, 0.1, legs, 0, 0.74, 0.07)); return g; },
-    cols: () => [[-0.3, 0, -0.28, 0.3, 1.5, 0.12]] };
-  C.neon = { cat: 'decor', n: '霓虹灯牌', icon: '🌈', base: 90, grow: 1.2, fp: [0.5, 0.12], comfort: 7, desc: '闪烁的 HEAD 灯牌',
-    make() { const g = new THREE.Group(); const hue = Math.random() * 360; const tex = canvasTex(512, 200, (c) => { c.clearRect(0, 0, 512, 200); c.font = 'bold 140px Arial Black, Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.shadowColor = `hsl(${hue},100%,60%)`; c.shadowBlur = 30; c.fillStyle = `hsl(${hue},100%,85%)`; c.fillText('HEAD', 256, 105); c.fillText('HEAD', 256, 105); });
-      g.add(box(1.0, 0.45, 0.04, std('#1b1c22', { roughness: 0.3 }), 0, 1.2, -0.02)); const sign = mesh(new THREE.PlaneGeometry(1.0, 0.4), new THREE.MeshBasicMaterial({ map: tex, transparent: true, color: new THREE.Color(1.6, 1.6, 1.6) }), 0, 1.2, 0.005); g.add(sign); g.userData.neon = sign;
-      for (const x of [-0.4, 0.4]) g.add(cyl(0.015, 0.015, 1.0, M.metal, x, 0.5, -0.02, 8)); g.add(box(1.0, 0.04, 0.2, M.dark, 0, 0.02, 0)); return g; },
-    cols: () => [[-0.5, 0, -0.1, 0.5, 1.45, 0.1]] };
-  C.beanbag = { cat: 'decor', n: '懒人豆袋', icon: '🫘', base: 40, grow: 1.15, fp: [0.4, 0.4], comfort: 5, desc: '软乎乎',
-    make() { const g = new THREE.Group(); const m = mesh(new THREE.SphereGeometry(0.42, 24, 16), std(new THREE.Color().setHSL(Math.random(), 0.5, 0.6), { roughness: 1 }), 0, 0.25, 0); m.scale.set(1, 0.6, 1); g.add(m); return g; },
-    cols: () => [[-0.36, 0, -0.36, 0.36, 0.42, 0.36]], surface: 0.42 };
-  C.aquarium = { cat: 'decor', n: '鱼缸', icon: '🐠', base: 150, grow: 1.25, fp: [0.45, 0.25], comfort: 10, desc: '会游动的小鱼',
-    make() { const g = new THREE.Group(); g.add(box(0.9, 0.7, 0.5, M.wood, 0, 0.35, 0));
-      const water = box(0.86, 0.5, 0.46, new THREE.MeshStandardMaterial({ color: '#7fd0ff', transparent: true, opacity: 0.35, roughness: 0.05, depthWrite: false }), 0, 0.95, 0); g.add(water);
-      const fr = std('#222'); g.add(box(0.9, 0.03, 0.5, fr, 0, 0.71, 0)); g.add(box(0.9, 0.03, 0.5, fr, 0, 1.21, 0));
-      const fish = []; for (let i = 0; i < 6; i++) { const f = mesh(new THREE.ConeGeometry(0.025, 0.07, 8), std(new THREE.Color().setHSL(Math.random(), 0.9, 0.55), { emissive: '#331100' }), 0, 0.8 + Math.random() * 0.3, 0); f.rotation.z = Math.PI / 2; f.userData.ph = Math.random() * 6; f.userData.sp = 0.5 + Math.random(); g.add(f); fish.push(f); }
-      g.userData.fish = fish; return g; }, cols: () => [[-0.45, 0, -0.25, 0.45, 1.22, 0.25]], surface: 1.22 };
-  C.fairy = { cat: 'decor', n: '星星灯柱', icon: '✨', base: 55, grow: 1.15, fp: [0.15, 0.15], comfort: 5, desc: '缠绕的彩色小灯',
-    make() { const g = new THREE.Group(); g.add(cyl(0.03, 0.03, 1.8, std('#f0f0f0'), 0, 0.9, 0, 10)); g.add(cyl(0.14, 0.16, 0.04, M.white, 0, 0.02, 0));
-      const bulbs = []; for (let i = 0; i < 26; i++) { const a = i * 0.9, y = 0.15 + i * 0.062; const b = mesh(new THREE.SphereGeometry(0.018, 8, 6), glowMat(new THREE.Color().setHSL(i / 26, 1, 0.6), 2.2), Math.cos(a) * 0.06, y, Math.sin(a) * 0.06); g.add(b); bulbs.push(b); }
-      const star = mesh(new THREE.OctahedronGeometry(0.07), glowMat('#ffe066', 2.5), 0, 1.88, 0); g.add(star); g.userData.bulbs = bulbs; g.userData.star = star; return g; },
-    cols: () => [[-0.05, 0, -0.05, 0.05, 1.9, 0.05]] };
-  C.cat = { cat: 'decor', n: '猫咪抱枕', icon: '🐱', base: 25, grow: 1.15, fp: [0.2, 0.2], comfort: 3, desc: '圆滚滚的猫',
-    make() { const g = new THREE.Group(); const col = ['#f2c48d', '#ffffff', '#555555', '#f0a060'][Math.floor(Math.random() * 4)]; const fur = std(col, { roughness: 1 });
-      const b = mesh(new THREE.SphereGeometry(0.2, 20, 14), fur, 0, 0.17, 0); b.scale.set(1, 0.8, 1.1); g.add(b);
-      for (const s of [-1, 1]) { const e = mesh(new THREE.ConeGeometry(0.05, 0.09, 4), fur, s * 0.1, 0.33, 0.06); e.rotation.z = -s * 0.3; g.add(e); const eye = mesh(new THREE.SphereGeometry(0.018, 8, 6), std('#222'), s * 0.07, 0.2, 0.2); g.add(eye); }
-      return g; }, cols: () => [[-0.2, 0, -0.2, 0.2, 0.32, 0.2]], surface: 0.32 };
+  C.t_soul = { cat: 'train', n: '冥想石环', icon: '🔮', base: 200, grow: 1.8, fp: [0.8, 0.8], stat: { soul: 2 }, train: 'soul', desc: trainDesc('魂力'), max: 1, depth: 2,
+    make() { const g = new THREE.Group(); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; const s = box(0.2, 0.9 + Math.random() * 0.3, 0.14, M.stone, Math.cos(a) * 0.7, 0.5, Math.sin(a) * 0.7); s.rotation.y = -a; g.add(s); const rune = box(0.1, 0.1, 0.01, glowMat('#6affff', 1.8), Math.cos(a) * 0.62, 0.7, Math.sin(a) * 0.62); rune.rotation.y = -a + Math.PI / 2; g.add(rune); }
+      const orb = mesh(new THREE.IcosahedronGeometry(0.12, 1), glowMat('#6affff', 1.5), 0, 1.1, 0); g.add(orb); g.userData.orb = orb; return g; },
+    cols: () => [] };
+  // ============ 装饰（全部加属性） ============
+  const D = (k, o) => { C[k] = Object.assign({ cat: 'decor', grow: 1.25 }, o); };
+  D('torch', { n: '墙边火把', icon: '🔥', base: 25, fp: [0.15, 0.15], stat: { ter: 1 }, light: '#ff8a3a', desc: '照亮洞窟。凶威 +1',
+    make() { const g = new THREE.Group(); g.add(rock(0.14, M.stone, 0, 0.05, 0)); g.add(cyl(0.025, 0.035, 1.3, M.wood, 0, 0.65, 0, 6)); g.add(cyl(0.06, 0.04, 0.1, M.iron, 0, 1.32, 0, 8)); g.add(flame(0, 1.36, 0, 1.3)); return g; },
+    cols: () => [[-0.04, 0, -0.04, 0.04, 1.4, 0.04]] });
+  D('brazier', { n: '铁火盆', icon: '🏮', base: 90, fp: [0.3, 0.3], stat: { ter: 1, soul: 1 }, light: '#ff6a2a', desc: '熊熊燃烧的火盆。凶威 +1 魂力 +1',
+    make() { const g = new THREE.Group(); for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2; const l = cyl(0.02, 0.02, 0.7, M.iron, Math.cos(a) * 0.15, 0.35, Math.sin(a) * 0.15, 6); l.rotation.z = Math.cos(a) * 0.2; l.rotation.x = -Math.sin(a) * 0.2; g.add(l); }
+      g.add(mesh(new THREE.CylinderGeometry(0.28, 0.16, 0.18, 16, 1, true), M.iron, 0, 0.75, 0)); g.add(cyl(0.2, 0.2, 0.04, glowMat('#ff5a1a', 1.5), 0, 0.78, 0)); g.add(flame(0, 0.8, 0, 2.2)); g.add(flame(0.08, 0.8, 0.05, 1.5)); g.add(flame(-0.07, 0.8, -0.04, 1.6)); return g; },
+    cols: () => [[-0.28, 0, -0.28, 0.28, 0.85, 0.28]] });
+  D('skulls', { n: '骷髅堆', icon: '☠️', base: 70, fp: [0.45, 0.45], stat: { ter: 3 }, desc: '历代冒险者的遗骨。凶威 +3',
+    make() { const g = new THREE.Group(); for (let i = 0; i < 22; i++) { const a = Math.random() * 6.28, r = Math.random() * 0.35 * (1 - i / 30); const s = skull(0.9 + Math.random() * 0.4, Math.cos(a) * r, 0.07 + i * 0.022, Math.sin(a) * r); s.rotation.set(Math.random() - 0.5, Math.random() * 6, Math.random() - 0.5); g.add(s); } return g; },
+    cols: () => [[-0.4, 0, -0.4, 0.4, 0.45, 0.4]], surface: 0.5 });
+  D('pelt', { n: '熊皮地毯', icon: '🐻', base: 60, fp: [0.9, 0.6], stat: { con: 2 }, desc: '软乎乎的。体魄 +2',
+    make() { const g = new THREE.Group(); const s = new THREE.Shape(); for (let i = 0; i <= 40; i++) { const a = i / 40 * Math.PI * 2; const r = 1 + 0.25 * Math.sin(a * 4) + 0.1 * Math.sin(a * 9); s.lineTo(Math.cos(a) * 0.85 * r, Math.sin(a) * 0.55 * r); }
+      const m = mesh(new THREE.ShapeGeometry(s), M.fur, 0, 0.01, 0); m.rotation.x = -Math.PI / 2; g.add(m); const head = mesh(new THREE.SphereGeometry(0.16, 12, 8), M.fur, 0.95, 0.08, 0); head.scale.set(1.3, 0.6, 1); g.add(head); return g; },
+    cols: () => [] });
+  D('rack', { n: '武器架', icon: '⚔️', base: 150, fp: [0.8, 0.25], stat: { str: 3 }, desc: '战利品兵器。力量 +3',
+    make() { const g = new THREE.Group(); g.add(box(1.4, 0.06, 0.1, M.wood, 0, 0.3, 0)); g.add(box(1.4, 0.06, 0.1, M.wood, 0, 1.2, 0)); for (const s of [-1, 1]) g.add(box(0.08, 1.5, 0.12, M.wood, s * 0.68, 0.75, 0));
+      for (let i = 0; i < 5; i++) { const x = -0.5 + i * 0.25; const sw = box(0.04, 1.1, 0.012, M.iron, x, 0.8, 0.07); sw.rotation.z = (Math.random() - 0.5) * 0.2; g.add(sw); g.add(box(0.16, 0.03, 0.03, M.gold, x, 0.3 + 0.03, 0.07)); } return g; },
+    cols: () => [[-0.72, 0, -0.1, 0.72, 1.5, 0.1]] });
+  D('shroom', { n: '荧光蘑菇丛', icon: '🍄', base: 50, fp: [0.35, 0.35], stat: { agi: 2 }, light: '#4affc8', desc: '幽幽发光的洞穴蘑菇。敏捷 +2',
+    make() { const g = new THREE.Group(); const col = ['#4affc8', '#6ac8ff', '#c86aff'][Math.floor(Math.random() * 3)]; for (let i = 0; i < 7; i++) { const x = (Math.random() - 0.5) * 0.5, z = (Math.random() - 0.5) * 0.5, h = 0.1 + Math.random() * 0.35;
+      g.add(cyl(0.015, 0.025, h, std('#d8d0c0'), x, h / 2, z, 6)); const cap = mesh(new THREE.SphereGeometry(0.05 + h * 0.2, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), glowMat(col, 1.2), x, h, z); cap.scale.y = 0.6; g.add(cap); } return g; },
+    cols: () => [] });
+  D('crystal', { n: '魂晶簇', icon: '💎', base: 300, fp: [0.4, 0.4], stat: { soul: 4 }, light: '#b06aff', desc: '天然生长的魂晶矿。魂力 +4', depth: 2,
+    make() { const g = new THREE.Group(); const col = ['#b06aff', '#6ab0ff', '#ff6ab0'][Math.floor(Math.random() * 3)]; const m = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.6, roughness: 0.1, metalness: 0.3, transparent: true, opacity: 0.85 });
+      for (let i = 0; i < 8; i++) { const h = 0.3 + Math.random() * 0.7; const c = mesh(new THREE.CylinderGeometry(0, 0.07 + Math.random() * 0.05, h, 6), m, (Math.random() - 0.5) * 0.3, h / 2, (Math.random() - 0.5) * 0.3); c.rotation.set((Math.random() - 0.5) * 0.7, 0, (Math.random() - 0.5) * 0.7); g.add(c); } g.add(rock(0.2, M.dark, 0, 0.05, 0)); return g; },
+    cols: () => [[-0.25, 0, -0.25, 0.25, 0.8, 0.25]] });
+  D('banner', { n: '血色战旗', icon: '🚩', base: 180, fp: [0.3, 0.2], stat: { str: 2, ter: 2 }, desc: '从要塞抢来的战旗，被你涂上了血。力量 +2 凶威 +2', depth: 2,
+    make() { const g = new THREE.Group(); g.add(rock(0.2, M.stone, 0, 0.06, 0)); g.add(cyl(0.025, 0.03, 2.4, M.wood, 0, 1.2, 0, 6)); const cl = mesh(new THREE.PlaneGeometry(0.7, 1.0, 8, 8), M.cloth, 0.36, 1.8, 0); g.add(cl); g.userData.cloth = cl;
+      g.add(skull(1, 0.36, 1.85, 0.02)); return g; },
+    cols: () => [[-0.04, 0, -0.04, 0.04, 2.4, 0.04]] });
+  D('chest', { n: '战利品宝箱', icon: '🧰', base: 220, fp: [0.4, 0.3], stat: { soul: 2, agi: 1 }, desc: '塞满了抢来的金银首饰。魂力 +2 敏捷 +1',
+    make() { const g = new THREE.Group(); g.add(box(0.7, 0.4, 0.45, M.wood, 0, 0.2, 0)); const lid = mesh(new THREE.CylinderGeometry(0.225, 0.225, 0.7, 12, 1, false, 0, Math.PI), M.wood, 0, 0.4, 0); lid.rotation.z = Math.PI / 2; g.add(lid);
+      for (const s of [-1, 1]) g.add(box(0.05, 0.42, 0.47, M.iron, s * 0.25, 0.21, 0)); for (let i = 0; i < 12; i++) g.add(cyl(0.035, 0.035, 0.01, M.gold, (Math.random() - 0.5) * 0.9, 0.005, (Math.random() - 0.5) * 0.7, 10)); return g; },
+    cols: () => [[-0.36, 0, -0.24, 0.36, 0.62, 0.24]], surface: 0.62 });
+  D('candles', { n: '蜡烛祭坛', icon: '🕯️', base: 260, fp: [0.5, 0.35], stat: { soul: 3 }, light: '#ffc86a', desc: '点满黑蜡烛的小祭坛。魂力 +3', depth: 2,
+    make() { const g = new THREE.Group(); g.add(box(0.9, 0.7, 0.55, M.dark, 0, 0.35, 0)); g.add(box(1.0, 0.05, 0.62, M.stone, 0, 0.72, 0));
+      for (let i = 0; i < 9; i++) { const x = (Math.random() - 0.5) * 0.8, z = (Math.random() - 0.5) * 0.45, h = 0.08 + Math.random() * 0.2; g.add(cyl(0.02, 0.022, h, std('#1a1a1a'), x, 0.745 + h / 2, z, 8)); g.add(flame(x, 0.745 + h, z, 0.35, '#ffb04a')); }
+      g.add(skull(1.3, 0, 0.84, -0.1)); return g; },
+    cols: () => [[-0.5, 0, -0.31, 0.5, 0.75, 0.31]], surface: 0.75 });
+  D('cage', { n: '吊笼', icon: '⛓️', base: 350, fp: [0.35, 0.35], stat: { ter: 4 }, desc: '锈迹斑斑的铁笼，里面还有具骸骨。凶威 +4', depth: 3,
+    make() { const g = new THREE.Group(); g.add(cyl(0.3, 0.3, 0.04, M.rust, 0, 0.9, 0, 12)); g.add(cyl(0.3, 0.3, 0.04, M.rust, 0, 1.9, 0, 12)); for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; g.add(cyl(0.01, 0.01, 1, M.rust, Math.cos(a) * 0.3, 1.4, Math.sin(a) * 0.3, 4)); }
+      g.add(cyl(0.012, 0.012, 1.6, M.iron, 0, 2.7, 0, 4)); g.add(skull(1.2, 0, 1.05, 0)); g.userData.swing = true; return g; },
+    cols: () => [[-0.3, 0.88, -0.3, 0.3, 1.92, 0.3]] });
+  D('stalag', { n: '钟乳石灯', icon: '🪔', base: 200, fp: [0.3, 0.3], stat: { agi: 3 }, light: '#6ac8ff', desc: '镶着发光苔藓的石笋。敏捷 +3', depth: 2,
+    make() { const g = new THREE.Group(); const c = mesh(new THREE.ConeGeometry(0.22, 1.6, 8, 4), M.stone, 0, 0.8, 0); g.add(c); for (let i = 0; i < 6; i++) { const b = mesh(new THREE.SphereGeometry(0.04, 8, 6), glowMat('#6ac8ff', 1.6), (Math.random() - 0.5) * 0.25, 0.2 + Math.random() * 0.9, (Math.random() - 0.5) * 0.25); g.add(b); } return g; },
+    cols: () => [[-0.18, 0, -0.18, 0.18, 1.6, 0.18]] });
+  D('throne', { n: '白骨王座', icon: '🪑', base: 2500, grow: 2.5, fp: [0.6, 0.55], stat: { str: 4, con: 4, agi: 2, ter: 8, soul: 4 }, desc: '用一百颗头骨垒成的王座。全属性大幅提升', depth: 3, max: 1,
+    make() { const g = new THREE.Group(); g.add(box(1.1, 0.45, 0.9, M.dark, 0, 0.225, 0)); g.add(box(1.1, 1.6, 0.2, M.dark, 0, 1.2, -0.38));
+      for (let i = 0; i < 26; i++) { const r = Math.floor(i / 6), c = i % 6; g.add(skull(0.9, -0.45 + c * 0.18, 0.55 + r * 0.33, -0.27)); }
+      for (const s of [-1, 1]) { g.add(box(0.14, 0.4, 0.8, M.bone, s * 0.5, 0.65, 0)); g.add(skull(1.3, s * 0.5, 0.95, 0.3)); }
+      const h1 = mesh(new THREE.ConeGeometry(0.06, 0.5, 8), M.bone, -0.5, 2.2, -0.38); h1.rotation.z = 0.4; g.add(h1); const h2 = h1.clone(); h2.position.x = 0.5; h2.rotation.z = -0.4; g.add(h2); return g; },
+    cols: () => [[-0.55, 0, -0.45, 0.55, 0.45, 0.45], [-0.55, 0, -0.48, 0.55, 2.0, -0.28]], surface: 0.45 });
+  D('lava', { n: '熔岩池', icon: '🌋', base: 5000, grow: 2.2, fp: [0.9, 0.9], stat: { str: 6, ter: 6 }, light: '#ff4a0a', desc: '从地底引上来的熔岩。力量 +6 凶威 +6', depth: 4,
+    make() { const g = new THREE.Group(); for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; g.add(rock(0.24, M.dark, Math.cos(a) * 0.85, 0.1, Math.sin(a) * 0.85)); }
+      const l = mesh(new THREE.CircleGeometry(0.82, 32), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 0.7, 0.1), map: noiseTex('#ffa030', ['#ff4000', '#ffe060', '#a01000'], 2000) }), 0, 0.1, 0); l.rotation.x = -Math.PI / 2; g.add(l); g.userData.lava = l; return g; },
+    cols: () => [[-0.95, 0, -0.95, 0.95, 0.2, 0.95]] });
+  D('dragonskull', { n: '古龙头骨', icon: '🐲', base: 15000, grow: 2.5, fp: [1.2, 0.8], stat: { str: 10, con: 10, ter: 12, soul: 8 }, desc: '从龙骨圣山拖回来的古龙头骨。全属性巨幅提升', depth: 5, max: 1,
+    make() { const g = new THREE.Group(); const b = mesh(new THREE.SphereGeometry(0.7, 20, 14), M.bone, 0, 0.55, 0); b.scale.set(1.6, 0.8, 1); g.add(b); const snout = box(1.0, 0.35, 0.6, M.bone, 1.1, 0.4, 0); g.add(snout);
+      for (const s of [-1, 1]) { g.add(mesh(new THREE.SphereGeometry(0.16, 10, 8), std('#050505'), 0.5, 0.7, s * 0.4)); const h = mesh(new THREE.ConeGeometry(0.12, 1.2, 10), M.bone, -0.6, 1.1, s * 0.4); h.rotation.z = 0.9; g.add(h); }
+      for (let i = 0; i < 8; i++) { const t = mesh(new THREE.ConeGeometry(0.04, 0.22, 6), M.bone, 0.75 + i * 0.1, 0.15, (i % 2 ? 1 : -1) * 0.25); t.rotation.x = Math.PI; g.add(t); } return g; },
+    cols: () => [[-1.1, 0, -0.7, 1.6, 1.0, 0.7]] });
 
-  // ---------------- 升级 ----------------
-  C.luck = { cat: 'up', n: '幸运符', icon: '🍀', base: 60, grow: 1.8, desc: '提高高稀有度掉率' };
-  C.power = { cat: 'up', n: '按钮强化', icon: '💪', base: 50, grow: 2.0, desc: '每次按按钮 +1 次计数' };
-  C.theme = { cat: 'up', n: '房间主题', icon: '🎨', base: 80, grow: 1.0, desc: '切换墙面/地板配色（纯白→樱粉→薄荷→夜空→纯白…）' };
+  // 扩建/挖深（特殊：不是摆放物）
+  const DIG = [
+    { depth: 1, n: '初始洞窟', r: 7, cost: 0 },
+    { depth: 2, n: '挖深·第二层', r: 9, cost: 600, desc: '洞窟扩大，解锁骨龛、招魂铃、魂晶簇等' },
+    { depth: 3, n: '挖深·第三层', r: 11.5, cost: 3000, desc: '解锁魂轮、疗伤血泉、白骨王座等' },
+    { depth: 4, n: '挖深·第四层', r: 14, cost: 12000, desc: '解锁熔岩池' },
+    { depth: 5, n: '挖深·第五层', r: 16.5, cost: 45000, desc: '解锁古龙头骨' },
+    { depth: 6, n: '挖深·深渊层', r: 19, cost: 150000, desc: '洞窟的尽头……还是开始？' }
+  ];
 
   let _glow = null;
   function GLOW() { if (_glow) return _glow; const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const rg = g.createRadialGradient(32, 32, 0, 32, 32, 32); rg.addColorStop(0, 'rgba(255,255,255,1)'); rg.addColorStop(0.3, 'rgba(255,255,255,0.6)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.fillRect(0, 0, 64, 64); _glow = new THREE.CanvasTexture(c); return _glow; }
 
-  const CATS = [['func', '功能'], ['decor', '装饰'], ['up', '升级']];
-  return { C, CATS, TABLE, GLOW, M };
+  const CATS = [['func', '功能'], ['train', '训练'], ['decor', '装饰'], ['dig', '挖深洞窟']];
+  return { C, CATS, TABLE, GLOW, M, DIG, rock, skull, flame, noiseTex, std, mesh, box, cyl, glowMat };
 })();
