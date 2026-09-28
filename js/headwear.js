@@ -216,5 +216,6 @@ window.HeadWear = (() => {
   function leafGeo() { const s = new THREE.Shape(); s.moveTo(0, -0.011); s.quadraticCurveTo(0.006, 0, 0, 0.011); s.quadraticCurveTo(-0.006, 0, 0, -0.011); const G = new THREE.ExtrudeGeometry(s, { depth: 0.0006, bevelEnabled: true, bevelThickness: 0.0006, bevelSize: 0.0005, bevelSegments: 2, curveSegments: 10 }); return G; }
   function starGeo() { const s = new THREE.Shape(); for (let i = 0; i <= 10; i++) { const a = i / 10 * Math.PI * 2 + Math.PI / 2, r = i % 2 ? 0.0052 : 0.0115; const x = Math.cos(a) * r, y = Math.sin(a) * r; if (i) s.lineTo(x, y); else s.moveTo(x, y); } return new THREE.ExtrudeGeometry(s, { depth: 0.0015, bevelEnabled: true, bevelThickness: 0.0018, bevelSize: 0.0014, bevelSegments: 3 }); }
   function thornGeo() { const G = new THREE.ConeGeometry(0.0038, 0.03, 7, 6); G.translate(0, 0.015, 0); const p = G.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); p.setZ(i, p.getZ(i) + y * y * 9); } G.computeVertexNormals(); return G; }
-  return { roll, build, names, N };
+  const item = (k, seed) => { let s = (seed || Math.floor(Math.random() * 1e9)) >>> 0; const r = () => { s = (s + 0x6D2B79F5) | 0; let q = Math.imul(s ^ s >>> 15, 1 | s); q = q + Math.imul(q ^ q >>> 7, 61 | q) ^ q; return ((q ^ q >>> 14) >>> 0) / 4294967296; }; return mk(k, r); };
+  return { roll, build, names, N, GROUP, item };
 })();

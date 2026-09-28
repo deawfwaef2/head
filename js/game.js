@@ -121,6 +121,12 @@ window.startGame = function () {
     const p = new THREE.Points(g, new THREE.PointsMaterial({ map: auraTex, color: col, size: 0.05, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     return p;
   }
+  const HOOK = { frame: [], e: [], click: [], tip: [] };
+  function rebuildHead(h) {
+    const rec = h.rec, old = h.hb; h.g.remove(old.group); old.dispose();
+    const hb = ModelHeads.create(rec.look); hb.group.scale.setScalar(HS); hb.group.position.y = -0.005; h.g.add(hb.group);
+    if (old.glow) hb.glow = old.glow; h.hb = hb; h.yield = yieldOf(rec); return h;
+  }
   function createHead(rec, pos, quat) {
     if (rec.look.hw === undefined && window.HeadWear) rec.look.hw = HeadWear.roll(rec.look.seed || rec.id, rec.c, rec.look);
     if (!rec.look.mk) { let s = ((rec.look.seed || rec.id) * 9301 + 49297) % 233280; const rr = () => (s = (s * 9301 + 49297) % 233280) / 233280; rec.look.mk = [rr() < 0.5 ? +(0.35 + rr() * 0.6).toFixed(2) : 0, rr() < 0.2 ? 1 + Math.floor(rr() * 3) : 0, rr() < 0.13 ? 1 : 0]; }
@@ -333,6 +339,7 @@ window.startGame = function () {
   function action(btn) {
     if (buildMode) { if (btn === 0) placeBuild(); else cancelBuild(); return; }
     if (btn === 2) { if (bagCarrying) { bagCarrying = false; if (bagGroup) { bagGroup.position.copy(player.pos).add(new V3(0, 0, -0.8)); bagGroup.position.y = 0; } toast('麻袋放下了。', '#ccc'); } else if (held) throwHeld(false); return; }
+    if (btn === 0) for (const f of HOOK.click) { try { if (f()) return; } catch (e) { console.warn(e); } }
     swing = 1;
     if (held) { poke(held, 'hold'); return; }
     const hit = lookHit();
@@ -349,6 +356,7 @@ window.startGame = function () {
     const hit = lookHit();
     // 只拿准星对准的那颗（或准星 ~6° 小圆锥内最近的一颗，且不能隔着建筑）；不再“附近随便抓一颗”
     const pickup = targetHead(hit);
+    for (const f of HOOK.e) { try { if (f(hit, held, pickup)) return; } catch (e) { console.warn(e); } }
     const shift = keys.ShiftLeft || keys.ShiftRight;
     if (pickup && !held && !shift && pickup.mount && CAT[pickup.mount.type].seance) { startSeance(pickup); return; }
     if (pickup) { const h = pickup; unmount(h); held = h; heldYaw = 0; h.sleep = 0; SFX.sack(); poke(h, 'hold'); return; }
@@ -558,7 +566,7 @@ window.startGame = function () {
     { k: 'bounty', n: '📜 赏金日', d: '悬赏奖励 ×2' }
   ];
   const daily = (() => { const d = new Date(); return DAILY[(d.getFullYear() * 372 + d.getMonth() * 31 + d.getDate()) % DAILY.length]; })();
-  function globalMul() { return (1 + exhibit().tier * 0.08) * codexInfo().mul * (daily.k === 'harvest' ? 1.5 : 1); }
+  function globalMul() { return (window.Play ? Play.mul() : 1) * (1 + exhibit().tier * 0.08) * codexInfo().mul * (daily.k === 'harvest' ? 1.5 : 1); }
   // 悬赏
   const pickA = a => a[Math.floor(Math.random() * a.length)];
   function makeBounty() {
@@ -610,7 +618,7 @@ window.startGame = function () {
   function trigger(h, src, mult = 1) {
     const s = st();
     const cap = hasAff(h, 'charm') ? 20 : 10;
-    let v = h.yield * mult * s.yieldMul * globalMul() * auraMul(h.g.position) * beaconMul(h) * (src === 'manual' || src === 'hold' ? (1 + Math.min(combo, cap) * 0.1) : 1);
+    let v = h.yield * mult * s.yieldMul * globalMul() * auraMul(h.g.position) * beaconMul(h) * (h.buff && h.buff > clock.elapsedTime ? 2 : 1) * (src === 'manual' || src === 'hold' ? (1 + Math.min(combo, cap) * 0.1) : 1);
     let tag = '';
     if (src === 'auto' && hasAff(h, 'wrath') && Math.random() < 0.2) { v *= 5; tag = '怨念爆发！'; SFX.play('heavy', 0.4, 1.4); burst(h.g.position, '#b04aff', 30, 1.6, 0.8, 1); }
     if ((src === 'manual' || src === 'hold') && hasAff(h, 'lucky') && Math.random() < 0.06) { v *= 10; tag = '🍀幸运 ×10！'; SFX.fanfare(2); }
@@ -920,6 +928,7 @@ window.startGame = function () {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, clock.getDelta()); const now = clock.elapsedTime;
     if (window.Seance && Seance.active) return; // 通灵 MV 期间暂停主场景渲染
+    for (const f of HOOK.frame) { try { f(dt, now); } catch (e) { console.warn(e); } }
     updateAim(now); ModelHeads.tick(now); updateCine(dt); updateCineFx(dt);
     for (const h of heads) if (h.aura) { const ap = h.aura.geometry.attributes.position; for (let i = 0; i < ap.count; i++) { let y = ap.getY(i) + dt * (0.06 + (i % 5) * 0.015); if (y > 0.38) y = -0.15; ap.setY(i, y); } ap.needsUpdate = true; h.aura.position.copy(h.g.position); h.aura.rotation.y = now * 0.25 + h.rec.id; h.aura.visible = h.g.visible !== false; }
     // 自适应分辨率
@@ -1057,7 +1066,9 @@ window.startGame = function () {
       else {
         let hit = lookHit(); const th = targetHead(hit); if (th && !(hit && hit.head === th)) hit = { head: th, d: 1 };
         aimHead = th;
-        if (held) tip = `手持「${held.rec.c.name}」 · <b>左键</b>把玩 · <b>滚轮</b>转向 · <b>V</b>换表情 · <b>E</b>放下/插桩 · <b>右键</b>扔 · <b>F</b>查看`;
+        let htip = null; for (const f of HOOK.tip) { try { htip = f(hit, held); } catch (e) {} if (htip) break; }
+        if (htip) tip = htip;
+        else if (held) tip = `手持「${held.rec.c.name}」 · <b>左键</b>把玩 · <b>滚轮</b>转向 · <b>V</b>换表情 · <b>E</b>放下/插桩 · <b>右键</b>扔 · <b>F</b>查看`;
         else if (hit && hit.head) { const c = hit.head.rec.c; tip = `<span style="color:${RAR[c.rar].c}">【${RAR[c.rar].n}】</span>${c.shiny ? ' <span style="color:#ffe27a">✨异色</span>' : ''} <b>${c.name}</b>${c.title ? ` <small style="color:#e6c7a0">『${c.title}』</small>` : ''} · ${c.raceN}${c.idN}${(c.aff || []).length ? '<br><small>' + c.aff.map(k => RPG.AFF[k] ? RPG.AFF[k].icon + RPG.AFF[k].n : '').join(' ') + '</small>' : ''}<br><small>左键把玩 · E 拿起 · F 查看/回忆 · XX 碾碎</small>`; }
         else if (player.pos.distanceTo(cave.exitPos) < 2.6) tip = '<b>[E]</b> 离开洞窟，出去狩猎';
         else if (player.pos.distanceTo(cave.merchantPos) < 2.4) tip = '<b>[E]</b> 和地精行商斯尼克交易';
@@ -1075,8 +1086,10 @@ window.startGame = function () {
     _dbg: { submitBounty: h => submitBounty(h), interactE: () => interactE(), startSeance: h => startSeance(h), carry() { bagCarrying = true; }, unloadBag: () => unloadBag(), get cine() { return cine; } },
     hasAff, yieldOf, exhibit, codexInfo, daily, DAILY, bounties, rerollBounties, EX_T, fmtN, S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
     save, wipe, setUI, lockPointer, spawnReturnHeads, addHeadRecs, createReturnBag, usedSig, usedNames, headOf, removeHead, refreshWeapon, burst, get cave() { return cave; },
+    HOOK, rebuildHead, floatText, spawnBeam, gachaCard, lookHit, unmount, soulWisp, trigger, SAVE_KEY, get clock() { return clock; }, get held() { return held; }, set held(v) { held = v; }, get keys() { return keys; }, get cine() { return cine; }, setUIOpen: v => setUI(v),
     get playing() { return playing; }, get uiOpen() { return uiOpen; }, renderer, camera, scene, poke, mountHead, createHead, addBuild
   };
   window.__game = G;
+  if (window.Play) try { Play.init(); } catch (e) { console.warn('Play.init', e); }
   if (window.UI) UI.init();
 };

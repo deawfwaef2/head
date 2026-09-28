@@ -59,6 +59,7 @@ window.RPG = (() => {
   function eqSum(S) {
     const o = { atk: 0, def: 0, hp: 0, str: 0, con: 0, agi: 0, ter: 0, soul: 0, cap: 2 };
     for (const s of SLOTS) { const t = EQUIP[s].tiers[S.eq[s] || 0]; for (const k in t) if (typeof t[k] === 'number' && k !== 'cost') { if (k === 'cap') o.cap = t.cap; else o[k] += t[k]; } }
+    if (window.Play) o.cap += Play.cap();
     return o;
   }
   // 最终属性 = 基础 + 训练 + 装备 + 建筑加成
@@ -149,7 +150,7 @@ window.RPG = (() => {
   };
   const AFF_K = Object.keys(AFF);
   const EPI_A = ['银月', '绯红', '黄昏', '霜雪', '星坠', '蔷薇', '黑棘', '琉璃', '白夜', '灰烬', '苍穹', '深海', '晨曦', '夜樱', '雷鸣', '翡翠', '暮色', '圣焰', '鸦羽', '金穗', '雾中', '血月'];
-  function luckOf(S) { return (S.luckLv || 0) + Math.floor((S.fame || 0) / 3) + (window.G && G.daily && G.daily.k === 'moon' ? 3 : 0); }
+  function luckOf(S) { return (S.luckLv || 0) + Math.floor((S.fame || 0) / 3) + (window.G && G.daily && G.daily.k === 'moon' ? 3 : 0) + (window.Play ? Play.luck() : 0); }
   function rollExtras(r, c, look, luck) {
     const nA = [r() < 0.3 ? 1 : 0, 1, r() < 0.4 ? 2 : 1, 2, 3][c.rar];
     const shiny = r() < (0.025 + (luck || 0) * 0.004 + c.rar * 0.004) * (window.G && G.daily && G.daily.k === 'shiny' ? 3 : 1);
@@ -162,5 +163,20 @@ window.RPG = (() => {
   }
   function sigOf(l) { return [l.f, l.h, l.hn, l.hn2, l.en, l.en2, l.sk, l.feat || '', (l.acc || []).join('+'), l.exT, l.paint, l.hx ? l.hx.s + (l.hx.ahoge || '') : ''].join('|'); }
 
-  return { STATS, EQUIP, SLOTS, CONSUM, TRAIN, AFF, stats, eqSum, trainCost, expedition, sigOf, rollExtras, luckOf };
+  // 熔魂炉：凝聚出一颗指定稀有度的新首级
+  function forgeHead(S, rar, seed, usedNames, usedSig, luckBonus = 0) {
+    let s = seed >>> 0; const r = () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const L = Lore.LOCS, loc = L[Math.floor(r() * L.length)];
+    let c = null;
+    for (let i = 0; i < 40; i++) { const cc = Lore.makeCharacter(r, loc, usedNames, luckOf(S) + luckBonus); if (!c || Math.abs(cc.rar - rar) < Math.abs(c.rar - rar)) c = cc; if (cc.rar === rar) break; }
+    c.rar = rar;
+    const look = ModelHeads.randomLook(r, c.lookRace, c.rar);
+    let sig = sigOf(look), tries = 0;
+    while (usedSig.has(sig) && tries++ < 30) { Object.assign(look, ModelHeads.randomLook(r, c.lookRace, c.rar)); sig = sigOf(look); }
+    usedSig.add(sig); usedNames.add(c.name);
+    rollExtras(r, c, look, luckOf(S) + luckBonus);
+    const mem = Lore.memory(r, c, { weapon: '熔魂炉的烈焰', q: 2, hurt: 0 });
+    return { c, look, sig, mem, story: Lore.backstory(r, c), app: Lore.appearance(c, look), date: Date.now() };
+  }
+  return { STATS, EQUIP, SLOTS, CONSUM, TRAIN, AFF, stats, eqSum, trainCost, expedition, sigOf, rollExtras, luckOf, forgeHead };
 })();

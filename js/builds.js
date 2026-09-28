@@ -125,6 +125,74 @@ window.BuildCat = (() => {
       for (let i = 0; i < 3; i++) { const p = box(0.28, 0.36, 0.005, pm, -0.34 + i * 0.34, 1.36 + (i % 2 ? -0.03 : 0.03), 0.03); p.rotation.z = (i - 1) * 0.06; g.add(p); g.add(mesh(new THREE.SphereGeometry(0.014, 6, 4), M.blood, -0.34 + i * 0.34, 1.52 + (i % 2 ? -0.03 : 0.03), 0.036)); }
       g.add(skull(0.8, 0, 1.9, 0.02)); return g; },
     cols: () => [[-0.6, 0, -0.06, 0.6, 1.8, 0.06]] };
+  // ============ 第七轮：首级新玩法 ============
+  C.forge = { cat: 'func', n: '熔魂炉', icon: '⚗️', base: 800, grow: 1.8, max: 2, fp: [0.72, 0.72], stat: { soul: 3 }, depth: 1,
+    desc: '三座炉台各放一颗首级，对准炉心按 E 开炉：三颗熔成一颗更高阶的新首级，并继承一条魂印。三颗同阶必定升阶；三颗神魂 → 必出异色',
+    mount: { y: 0.92, top: 0.92, period: 99999, mult: 0, labelY: 1.35, slots: ring(3, 0.6, 0.92, a => Math.atan2(Math.cos(a), Math.sin(a))) }, forge: true,
+    make() { const g = new THREE.Group();
+      g.add(cyl(0.78, 0.84, 0.08, M.dark, 0, 0.04, 0, 36));
+      const pts = []; for (let i = 0; i <= 14; i++) { const u = i / 14; pts.push(new THREE.Vector2(0.18 + Math.sin(u * Math.PI * 0.85) * 0.2 + u * 0.04, 0.1 + u * 0.62)); }
+      const pot = mesh(new THREE.LatheGeometry(pts, 32), std('#2a2226', { metalness: 0.75, roughness: 0.45, side: THREE.DoubleSide })); g.add(pot);
+      const lip = mesh(new THREE.TorusGeometry(0.265, 0.03, 8, 36), M.gold, 0, 0.72, 0); lip.rotation.x = Math.PI / 2; g.add(lip);
+      const molten = mesh(new THREE.CircleGeometry(0.25, 32), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ff5a14') }), 0, 0.66, 0); molten.rotation.x = -Math.PI / 2; g.add(molten);
+      for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2 + Math.PI / 3; const leg = box(0.06, 0.16, 0.06, M.iron, Math.cos(a) * 0.3, 0.16, Math.sin(a) * 0.3); g.add(leg); }
+      for (const [x, y, z] of ring(3, 0.6, 0.92, () => 0)) {
+        g.add(cyl(0.1, 0.13, 0.84, M.stone, x, 0.42, z, 10)); g.add(cyl(0.15, 0.12, 0.06, M.stone, x, 0.87, z, 14));
+        const rim = mesh(new THREE.TorusGeometry(0.14, 0.012, 6, 24), M.gold, x, 0.9, z); rim.rotation.x = Math.PI / 2; g.add(rim);
+        const ch = mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.6, 4), M.iron); ch.position.set(x * 0.55, 0.78, z * 0.55); ch.lookAt(new THREE.Vector3(x, 0.9, z)); ch.rotateX(Math.PI / 2); g.add(ch);
+      }
+      for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; g.add(flame(Math.cos(a) * 0.12, 0.66, Math.sin(a) * 0.12, 0.7 + (i % 2) * 0.3, '#ff8a3a')); }
+      const runes = mesh(new THREE.RingGeometry(0.66, 0.7, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ff6a2a').multiplyScalar(1.3), transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }), 0, 0.085, 0); runes.rotation.x = -Math.PI / 2; g.add(runes);
+      g.userData.molten = molten; g.userData.runes = runes; return g; },
+    cols: () => [[-0.3, 0, -0.3, 0.3, 0.74, 0.3]] };
+  C.bowling = { cat: 'func', n: '魂球道', icon: '🎳', base: 500, grow: 2, max: 1, fp: [0.55, 2.1], stat: { agi: 3 }, depth: 1,
+    desc: '站在球道近端（有金线那头），拿起首级右键扔向远端的六根骷髅瓶：每击倒一根都触发那颗首级产出，全中 STRIKE 大爆发并累积连击倍率',
+    make() { const g = new THREE.Group();
+      g.add(box(1.0, 0.04, 4.1, M.wood, 0, 0.02, 0));
+      for (let i = -4; i <= 4; i++) g.add(box(0.004, 0.002, 4.0, std('#3a2412'), i * 0.11, 0.041, 0));
+      for (const sx of [-1, 1]) { g.add(box(0.1, 0.1, 4.1, M.dark, sx * 0.55, 0.05, 0)); g.add(box(0.03, 0.03, 4.1, M.gold, sx * 0.5, 0.1, 0)); }
+      g.add(box(1.0, 0.004, 0.05, glowMat('#ffd060', 1.3), 0, 0.043, 1.75));
+      for (let i = 0; i < 3; i++) g.add(box(0.03, 0.003, 0.08, glowMat('#ffd060', 1.1), (i - 1) * 0.2, 0.043, 1.2));
+      g.add(box(1.3, 0.9, 0.12, M.dark, 0, 0.45, -2.1)); g.add(box(1.36, 0.06, 0.16, M.gold, 0, 0.92, -2.1));
+      g.add(skull(1.4, 0, 1.05, -2.08));
+      for (const sx of [-1, 1]) { g.add(cyl(0.03, 0.03, 0.5, M.iron, sx * 0.6, 1.1, -2.1, 6)); g.add(flame(sx * 0.6, 1.35, -2.1, 0.9, '#7ad0ff')); }
+      const pinPts = [[0, 0], [0.042, 0.005], [0.05, 0.06], [0.044, 0.13], [0.024, 0.2], [0.021, 0.23], [0.03, 0.27], [0.026, 0.3], [0, 0.315]].map(([x, y]) => new THREE.Vector2(x, y));
+      const pinGeo = new THREE.LatheGeometry(pinPts, 16), stripe = std('#b01a2a', { roughness: 0.5 });
+      const pins = [];
+      [[0, 0], [-0.16, -0.26], [0.16, -0.26], [-0.32, -0.52], [0, -0.52], [0.32, -0.52]].forEach(([x, dz]) => {
+        const pg = new THREE.Group(); pg.position.set(x, 0.04, -1.3 + dz); pg.userData.s = 1.35; pg.scale.setScalar(1.35);
+        pg.add(mesh(pinGeo, M.bone)); const st = mesh(new THREE.CylinderGeometry(0.0235, 0.0235, 0.02, 16, 1, true), stripe, 0, 0.215, 0); pg.add(st);
+        const sk = skull(0.42, 0, 0.33, 0); pg.add(sk);
+        g.add(pg); pins.push({ g: pg, base: pg.position.clone(), fall: 0, dir: new THREE.Vector3(), up: 0 });
+      });
+      g.userData.pins = pins; return g; },
+    cols: () => [[-0.65, 0, -2.18, 0.65, 0.95, -2.02]] };
+  C.dresser = { cat: 'func', n: '化妆台', icon: '💄', base: 350, grow: 2, max: 1, fp: [0.55, 0.3], stat: { soul: 1 },
+    desc: '拿着首级对准化妆台按 E：换头饰、染发、换表情、点泪痣腮红——把你最爱的收藏打扮成你想要的样子',
+    make() { const g = new THREE.Group();
+      g.add(box(1.0, 0.05, 0.5, M.wood, 0, 0.76, 0)); for (const [x, z] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) g.add(cyl(0.025, 0.02, 0.74, M.wood, x * 0.45, 0.37, z * 0.2, 8));
+      g.add(box(0.3, 0.2, 0.44, M.wood, -0.3, 0.63, 0)); g.add(mesh(new THREE.SphereGeometry(0.015, 8, 6), M.gold, -0.3, 0.63, 0.225));
+      const cv = document.createElement('canvas'); cv.width = 128; cv.height = 192; const x = cv.getContext('2d'); const gr = x.createLinearGradient(0, 0, 128, 192); gr.addColorStop(0, '#dfe8f0'); gr.addColorStop(0.45, '#7a8a9a'); gr.addColorStop(0.55, '#b8c6d4'); gr.addColorStop(1, '#4a5664'); x.fillStyle = gr; x.fillRect(0, 0, 128, 192); x.fillStyle = 'rgba(255,255,255,0.35)'; x.beginPath(); x.moveTo(20, 30); x.lineTo(50, 20); x.lineTo(22, 120); x.fill();
+      const tx = new THREE.CanvasTexture(cv); tx.encoding = THREE.sRGBEncoding;
+      const mir = mesh(new THREE.CircleGeometry(0.26, 40), new THREE.MeshBasicMaterial({ map: tx }), 0, 1.22, -0.18); mir.scale.y = 1.3; g.add(mir);
+      const fr = mesh(new THREE.TorusGeometry(0.265, 0.02, 8, 48), M.gold, 0, 1.22, -0.18); fr.scale.y = 1.3; g.add(fr);
+      g.add(box(0.05, 0.3, 0.03, M.gold, 0, 0.9, -0.19));
+      const cols = ['#ff7aa8', '#b89aff', '#7ad0ff', '#ffd27a'];
+      cols.forEach((c, i) => { const b = mesh(new THREE.CylinderGeometry(0.022, 0.03, 0.09, 12), new THREE.MeshStandardMaterial({ color: c, roughness: 0.15, transparent: true, opacity: 0.85 }), 0.1 + i * 0.07, 0.83, 0.08 - (i % 2) * 0.06); g.add(b); g.add(mesh(new THREE.SphereGeometry(0.014, 8, 6), M.gold, 0.1 + i * 0.07, 0.885, 0.08 - (i % 2) * 0.06)); });
+      const puff = mesh(new THREE.SphereGeometry(0.05, 12, 8), std('#ffd0dc', { roughness: 1 }), 0.4, 0.8, 0.1); puff.scale.y = 0.45; g.add(puff);
+      const bow = mesh(new THREE.TorusGeometry(0.03, 0.01, 6, 12), std('#d81b3a'), 0, 1.6, -0.17); g.add(bow);
+      return g; },
+    cols: () => [[-0.5, 0, -0.25, 0.5, 0.8, 0.25]] };
+  C.altar = { cat: 'func', n: '轮回祭坛', icon: '♻️', base: 2000, grow: 3, max: 1, fp: [0.5, 0.5], stat: { soul: 4 }, depth: 2,
+    desc: '对准按 E：献上整座洞窟重新开始，换取永久的「魂核」天赋（产出、幸运、背篓、幽灵之手自动把玩……）。图鉴永久保留，可带走最珍贵的首级',
+    make() { const g = new THREE.Group();
+      g.add(cyl(0.55, 0.6, 0.1, M.dark, 0, 0.05, 0, 6)); g.add(cyl(0.42, 0.5, 0.12, M.stone, 0, 0.16, 0, 6)); g.add(cyl(0.18, 0.26, 0.7, M.stone, 0, 0.57, 0, 6)); g.add(cyl(0.34, 0.22, 0.1, M.stone, 0, 0.97, 0, 6));
+      const orb = new THREE.Group(); orb.position.y = 1.35; g.add(orb);
+      orb.add(mesh(new THREE.IcosahedronGeometry(0.1, 1), glowMat('#9adfff', 1.3)));
+      for (let i = 0; i < 3; i++) { const r = mesh(new THREE.TorusGeometry(0.19 + i * 0.05, 0.006, 6, 48), glowMat(['#9adfff', '#c79aff', '#ffd27a'][i], 1.2)); r.rotation.set(Math.random() * 3, Math.random() * 3, 0); orb.add(r); }
+      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; g.add(cyl(0.02, 0.025, 0.24, M.bone, Math.cos(a) * 0.52, 0.22, Math.sin(a) * 0.52, 6)); g.add(flame(Math.cos(a) * 0.52, 0.34, Math.sin(a) * 0.52, 0.5, '#9adfff')); }
+      g.userData.rorb = orb; return g; },
+    cols: () => [[-0.45, 0, -0.45, 0.45, 1.0, 0.45]] };
   C.wheel = { cat: 'func', n: '魂轮', icon: '☸️', base: 900, grow: 1.5, fp: [0.62, 0.62], stat: { soul: 3 }, desc: '缓慢转动的刑轮，放上面的首级每 6 秒全部触发', radius: 0.58, surface: 0.14, period: 6, depth: 3,
     make() { const g = new THREE.Group(); g.add(cyl(0.64, 0.68, 0.08, M.dark, 0, 0.04, 0, 32)); const top = new THREE.Group(); top.position.y = 0.1; g.add(top);
       const disk = cyl(0.6, 0.6, 0.04, M.wood, 0, 0, 0, 40); top.add(disk);
