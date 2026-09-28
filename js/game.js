@@ -269,6 +269,7 @@ window.startGame = function () {
   const keys = {};
   let locked = false, noLock = false, playing = false, uiOpen = false;
   const ray = new THREE.Raycaster(); ray.far = 3.4;
+  let film = null; // 电影模式：自由镜头
   let held = null, bagGroup = null, bagCarrying = false, heldYaw = 0, heldFace = 0, buildMode = null, buildRot = 0, ghost = null, ghostOk = false;
   const lastHeldPos = new V3(), heldVel = new V3();
   function lockPointer() { if (noLock) { startPlaying(); return; } try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => { noLock = true; startPlaying(); }); } catch (e) { noLock = true; startPlaying(); } }
@@ -298,12 +299,15 @@ window.startGame = function () {
   });
   document.addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; if (noLock && dragLook && e.button === 0) { dragLook = false; if (dragMoved < 6) action(0); } });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
-  canvas.addEventListener('wheel', e => { if (!playing || uiOpen) return; if (held) { e.preventDefault(); heldYaw += Math.sign(e.deltaY) * 0.32; } }, { passive: false });
+  canvas.addEventListener('wheel', e => { if (!playing || uiOpen) return; if (film && !held) { e.preventDefault(); camera.fov = Math.max(12, Math.min(95, camera.fov * (e.deltaY > 0 ? 1.06 : 0.94))); camera.updateProjectionMatrix(); return; } if (held) { e.preventDefault(); heldYaw += Math.sign(e.deltaY) * 0.32; } }, { passive: false });
   let lastX = 0;
   document.addEventListener('keydown', e => {
     keys[e.code] = true;
     if (window.UI && UI.onKey(e)) return;
     if (!playing || uiOpen) return;
+    if (e.code === 'KeyP') { toggleFilm(); return; }
+    if (e.code === 'KeyG' && held) { placeHeld(); return; }
+    if (film && (e.code === 'BracketLeft' || e.code === 'BracketRight')) { film.sp = Math.max(0.3, Math.min(12, film.sp * (e.code === 'BracketRight' ? 1.4 : 0.7))); toast('镜头速度 ' + film.sp.toFixed(1), '#ccc', 0.8); return; }
     if (e.code === 'KeyE') interactE();
     if (e.code === 'KeyF') inspectLook();
     if (e.code === 'KeyR' && buildMode) { buildRot = ((buildRot + (e.shiftKey ? -0.125 : 0.125)) % 4 + 4) % 4; SFX.click(); toast(`旋转 ${Math.round(buildRot * 90)}°（R / Shift+R，每次 11.25°）`, '#8fe0a0', 0.8); }
@@ -374,6 +378,22 @@ window.startGame = function () {
     }
     if (hit && hit.build) { const d = CAT[hit.build.type]; if (d.train) { UI.openTraining(d.train, d.n); return; } if (d.seance && !shift && firstHead(hit.build)) { startSeance(firstHead(hit.build)); return; } if (firstHead(hit.build)) { const h = nearestHead(hit.build, hit.point); unmount(h); held = h; return; } }
   }
+  function toggleFilm() {
+    if (film) { film = null; document.body.classList.remove('film'); camera.fov = 75; camera.updateProjectionMatrix(); toast('🎬 电影模式 关', '#ccc', 1.2); return; }
+    film = { pos: camera.position.clone(), vel: new V3(), sp: 2 };
+    document.body.classList.add('film'); toast('🎬 电影模式：WASD 飞行 · 空格/C 升降 · Shift 加速 · [ ] 调速 · 滚轮变焦 · 仍可拿头(E)/G 精确摆放 · P 退出', '#ffd890', 4);
+  }
+  // G：把手里的首级按当前朝向，轻放到准星指向的表面（之后照常受物理约束，不会浮空）
+  function placeHeld() {
+    if (!held) return; const h = held;
+    ray.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const objs = [cave.group]; for (const b of builds) objs.push(b.g);
+    const hit = ray.intersectObjects(objs, true).find(x => x.distance < 8 && !(x.object.material && x.object.material.transparent && x.object.material.opacity < 0.3));
+    if (!hit) { toast('没有可以放置的表面', '#f88', 1); return; }
+    held = null; const n = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : UP.clone();
+    const up = n.y > 0.5; h.g.position.copy(hit.point).addScaledVector(up ? UP : n, up ? supportH(h) + 0.005 : RC + 0.01);
+    h.vel.set(0, 0, 0); h.av.set(0, 0, 0); h.sleep = 0; SFX.thud(0.3, 1); toast('轻轻放下了。', '#ccc', 0.8);
+  }
   function startSeance(h) {
     if (!window.Seance || Seance.active) return;
     setUI(true); SFX.play('bell', 0.5, 0.8);
@@ -428,6 +448,7 @@ window.startGame = function () {
     while (gachaBox.children.length > 3) gachaBox.firstChild.remove();
     return el;
   }
+  // 第八轮：更自然的倒袋 —— 麻袋放到地上，食人魔抓住袋底提起、倾斜、抖两下，首级按物理从袋口一颗颗滚出来（无悬浮/光柱仪式）
   function unloadBag() {
     if (!bagCarrying || cine) return;
     bagCarrying = false;
@@ -435,65 +456,64 @@ window.startGame = function () {
     list.forEach(r => { r.inBag = false; });
     if (bagGroup) { scene.remove(bagGroup); bagGroup = null; }
     if (!list.length) return;
-    // 稀有度升序（最稀有压轴），同稀有度异色最后
-    list.sort((a, b) => (a.c.rar + (a.c.shiny ? 0.5 : 0)) - (b.c.rar + (b.c.shiny ? 0.5 : 0)));
-    const top = list[list.length - 1], topR = top.c.rar, topShiny = !!top.c.shiny;
-    const fwd = new V3(); camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize(); const right = new V3().crossVectors(fwd, UP).normalize();
-    const bag = makeBagMesh(); bag.scale.setScalar(0.8); bag.position.copy(player.pos).addScaledVector(fwd, 1.7).addScaledVector(right, -0.32); bag.position.y = 1.45; bag.rotation.y = player.yaw; scene.add(bag); const BY = 1.45;
-    const omen = new THREE.PointLight(topShiny ? 0xfff2b0 : new THREE.Color(RAR[topR].c).getHex(), 0, 4, 1.5); omen.position.copy(bag.position).add(new V3(0, 0.3, 0)); scene.add(omen);
-    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, color: topShiny ? '#fff2b0' : RAR[topR].c, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })); glow.scale.setScalar(1.6); glow.position.copy(bag.position).add(new V3(0, 0.3, 0)); scene.add(glow);
-    player.pitch = -0.38;
+    // 袋里的顺序是乱的：随机，但让最稀有的稍晚出来（压在袋底）
+    list.sort((a, b) => (a.c.rar + Math.random() * 2.2) - (b.c.rar + Math.random() * 2.2));
+    const fwd = new V3(); camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
+    const pivot = new THREE.Group(); pivot.position.copy(player.pos).addScaledVector(fwd, 1.25); pivot.position.y = 0; pivot.rotation.y = player.yaw; scene.add(pivot);
+    const bag = makeBagMesh(); bag.scale.setScalar(0.85); pivot.add(bag);
+    player.pitch = -0.5;
     S.codex = S.codex || {};
-    const ev = []; let at = 1.5 + (topR >= 3 || topShiny ? 0.9 : 0);
-    ev.push({ at: at - 0.35, fn() { SFX.sack(); SFX.play('heavy', 0.5, 0.8); burst(bag.position.clone().add(new V3(0, 0.55, 0)), '#c79548', 26, 1.4, 0.6, -2); } });
-    const n = list.length, landed = [];
+    const ev = []; let at = 1.25; const n = list.length;
+    ev.push({ at: 0.05, fn() { SFX.play('heavy', 0.45, 0.8); SFX.sack(); } });
+    ev.push({ at: 0.7, fn() { SFX.sack(); } });
     list.forEach((rec, i) => {
       const r = rec.c.rar, sh = !!rec.c.shiny;
       ev.push({ at, fn() {
         if (heads.length >= MAX_HEADS) { rec.inBag = true; return; }
-        const k = n === 1 ? 0 : i / (n - 1) - 0.5, dist = 1.0 + (i % 2) * 0.35 + (r >= 3 ? 0.2 : 0);
-        const T = player.pos.clone().addScaledVector(fwd, 1.05 + dist * 0.5).addScaledVector(right, k * 2.4 + (n === 1 ? 0.2 : 0)); T.y = 0.25;
-        const P0 = bag.position.clone().add(new V3(0, -0.15, 0)); const tf = 0.62;
-        const h = createHead(rec, P0, new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6)));
-        h.vel.set((T.x - P0.x) / tf, (T.y - P0.y) / tf - 0.5 * GRAV * tf, (T.z - P0.z) / tf); h.av.set((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14);
-        landed.push(h); SFX.play('sack', 0.35, 1 + Math.random() * 0.3); bag.userData.kick = 1;
-        const key = rec.c.race + '|' + rec.c.id, isNew = !S.codex[key]; S.codex[key] = (S.codex[key] || 0) + 1; rec.isNew = isNew; if (rec.c.shiny) S.shinySeen = (S.shinySeen || 0) + 1;
-        ev.push({ at: cine.t + tf, fn() {
-          const col = sh ? '#fff2b0' : RAR[r].c; spawnBeam(h.g.position, col, r, sh); gachaCard(rec, isNew);
-          burst(h.g.position, col, 10 + r * 10 + (sh ? 30 : 0), 1 + r * 0.3, 0.8, 1);
-          if (r >= 2 || sh) SFX.fanfare(Math.min(4, r + (sh ? 1 : 0))); else SFX.soul(2, r);
-          if (r >= 3 || sh) { flash(sh ? 'rgba(255,240,170,.55)' : r >= 4 ? 'rgba(255,74,138,.5)' : 'rgba(255,176,32,.45)'); shake = Math.max(shake, 0.18); }
-          save();
-        } });
+        const mouth = bag.localToWorld(new V3(0, 0.5, 0)), md = bag.localToWorld(new V3(0, 1.5, 0)).sub(mouth).normalize();
+        const h = createHead(rec, mouth.addScaledVector(md, 0.12), new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6)));
+        h.vel.copy(md).multiplyScalar(0.9 + Math.random() * 0.9).add(new V3((Math.random() - 0.5) * 0.9, 0.2, (Math.random() - 0.5) * 0.9));
+        h.av.set((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
+        SFX.play('sack', 0.25, 0.9 + Math.random() * 0.3); cine.jolt = 1;
+        const key = rec.c.race + '|' + rec.c.id, isNew = !S.codex[key]; S.codex[key] = (S.codex[key] || 0) + 1; rec.isNew = isNew; if (sh) S.shinySeen = (S.shinySeen || 0) + 1;
+        ev.push({ at: cine.t + 0.7, fn() { gachaCard(rec, isNew); if (r >= 3 || sh) { SFX.fanfare(Math.min(4, r + (sh ? 1 : 0))); spawnBeam(h.g.position, sh ? '#fff2b0' : RAR[r].c, Math.min(2, r), sh); } else if (r >= 2) SFX.soul(2, r); save(); } });
       } });
-      at += [0.5, 0.7, 1.05, 1.7, 2.3][r] + (sh ? 1.0 : 0);
+      // 一团一团地出来：有时连着滚出两三颗，有时卡住要抖一下
+      at += Math.random() < 0.3 ? 0.12 : 0.28 + Math.random() * 0.35;
+      if (Math.random() < 0.18 && i < n - 1) { at += 0.4; ev.push({ at: at - 0.3, fn() { cine.shakeT = 0.35; SFX.sack(); } }); }
     });
-    ev.push({ at: at + 0.3, fn() { cine.fold = 0.001; SFX.play('sack', 0.3, 0.7); burst(bag.position, '#c79548', 30, 1.5, 0.7, -3); } });
-    ev.push({ at: at + 1.1, fn() {
-      scene.remove(bag); scene.remove(omen); scene.remove(glow); glow.material.dispose();
-      const best = list[list.length - 1], nNew = list.filter(r => r.isNew).length;
+    ev.push({ at: at + 0.35, fn() { cine.drop = 0.001; SFX.play('sack', 0.35, 0.7); } });
+    ev.push({ at: at + 1.6, fn() {
+      scene.remove(pivot);
+      const best = list.slice().sort((a, b) => b.c.rar - a.c.rar)[0], nNew = list.filter(r => r.isNew).length;
       toast(`倒出 ${list.length} 颗首级 · 最高【${RAR[best.c.rar].n}】${best.c.shiny ? '✨异色' : ''}${nNew ? ` · 图鉴 +${nNew}` : ''}`, RAR[best.c.rar].c, 4);
       const remain = S.heads.filter(r => r.inBag); if (remain.length) createReturnBag(remain);
       setTimeout(() => { if (gachaBox && !cine) gachaBox.innerHTML = ''; }, 2500);
       cine = null; save();
     } });
-    cine = { t: 0, ev, bag, omen, glow, topR, topShiny, fast: false, flipAt: at0(ev), fold: 0, BY };
-    function at0(e) { return e[0].at; }
-    toast(topR >= 3 || topShiny ? '麻袋在发光……里面有不得了的东西！' : '解开麻袋口……', topShiny ? '#fff2b0' : RAR[topR].c, 2);
-    SFX.play('heavy', 0.3, 0.6);
+    cine = { t: 0, ev, bag, pivot, fast: false, pourAt: 1.1, drop: 0, jolt: 0, shakeT: 0 };
+    toast('解开袋口，抓住袋底……', '#d8c8a8', 1.6);
     save();
   }
   function updateCine(dt) {
     if (!cine) return;
     const c = cine; c.t += dt * (c.fast ? 3.2 : 1);
-    const b = c.bag, pre = Math.min(1, c.t / c.flipAt);
-    // 预兆：光越来越亮，抖动越来越剧烈；稀有时带闪烁
-    const pulse = 0.5 + 0.5 * Math.sin(c.t * (8 + c.topR * 3));
-    c.omen.intensity = (c.topR >= 2 || c.topShiny ? 2.5 : 0.8) * pre * (0.6 + pulse * 0.4);
-    c.glow.material.opacity = (c.topR >= 2 || c.topShiny ? 0.55 : 0.18) * pre * (0.6 + pulse * 0.4);
-    if (c.t < c.flipAt) { const s = pre * pre * (0.05 + c.topR * 0.015); b.rotation.z = Math.sin(c.t * 38) * s; b.position.y = c.BY + Math.abs(Math.sin(c.t * 19)) * s * 0.8; }
-    else if (!c.fold) { const k = Math.min(1, (c.t - c.flipAt) / 0.35); b.rotation.z = 0; b.rotation.x = Math.PI * (k * k * (3 - 2 * k)); b.position.y = c.BY + 0.15 * k; b.userData.kick = Math.max(0, (b.userData.kick || 0) - dt * 5); b.scale.set(0.8 * (1 + b.userData.kick * 0.12), 0.8 * (1 - b.userData.kick * 0.15), 0.8 * (1 + b.userData.kick * 0.12)); }
-    else { c.fold = Math.min(1, c.fold + dt * 1.6); const k = (1 - c.fold) * 0.8; b.scale.set(k, k * 0.6, k); }
+    const b = c.bag, pv = c.pivot, sm = k => k * k * (3 - 2 * k);
+    c.jolt = Math.max(0, c.jolt - dt * 6); c.shakeT = Math.max(0, c.shakeT - dt);
+    if (!c.drop) {
+      // 0~0.5s 放地上略塌；0.5~1.1s 提起袋底并倾斜到袋口朝前下方；倒的过程中持续轻微颠簸
+      const k1 = sm(Math.min(1, c.t / 0.5)), k2 = sm(Math.max(0, Math.min(1, (c.t - 0.5) / 0.6)));
+      b.scale.set(0.85 * (1 + 0.06 * (1 - k2) * k1), 0.85 * (1 - 0.08 * (1 - k2) * k1), 0.85 * (1 + 0.06 * (1 - k2) * k1));
+      const shake = Math.sin(c.t * 40) * (c.shakeT > 0 ? 0.12 : 0.025) * k2 + c.jolt * 0.05;
+      b.rotation.x = -(1.95 * k2) + shake; b.rotation.z = Math.sin(c.t * 7) * 0.05 * k2;
+      pv.position.y = 0.85 * k2 + (c.shakeT > 0 ? Math.abs(Math.sin(c.t * 30)) * 0.08 : 0);
+      b.position.y = 0; b.position.z = -0.2 * k2;
+    } else {
+      // 倒空：甩一下丢在地上，瘪下去
+      c.drop = Math.min(1, c.drop + dt * 1.4); const k = sm(c.drop);
+      pv.position.y = Math.max(0, 0.85 * (1 - k * 1.6)); b.rotation.x = -1.95 + k * 0.4; b.rotation.z = k * 0.9;
+      b.scale.set(0.85 * (1 + k * 0.25), 0.85 * (1 - k * 0.7), 0.85 * (1 + k * 0.1));
+    }
     for (const e of c.ev) if (!e.done && c.t >= e.at) { e.done = true; e.fn(); if (!cine) return; }
   }
   function updateCineFx(dt) { for (let i = cineFx.length - 1; i >= 0; i--) { const f = cineFx[i]; f.t += dt; const k = f.t / f.life; if (k >= 1) { f.end(); cineFx.splice(i, 1); } else f.upd(k); } }
@@ -941,7 +961,7 @@ window.startGame = function () {
     // 自适应分辨率
     fpsAcc += dt; fpsN++; if (fpsAcc > 2) { const fps = fpsN / fpsAcc; if (fps < 40 && pixelRatio > 0.7) { pixelRatio = Math.max(0.7, pixelRatio - 0.15); renderer.setPixelRatio(pixelRatio); } else if (fps > 58 && pixelRatio < Math.min(devicePixelRatio, 1.5)) { pixelRatio = Math.min(Math.min(devicePixelRatio, 1.5), pixelRatio + 0.1); renderer.setPixelRatio(pixelRatio); } fpsAcc = 0; fpsN = 0; }
     // 玩家
-    if (playing && !uiOpen && !cine) {
+    if (playing && !uiOpen && !cine && !film) {
       const f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
       const s = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
       const sp = keys.ShiftLeft ? 6 : 3.4;
@@ -970,6 +990,15 @@ window.startGame = function () {
     const bob = playing && player.onGround ? Math.sin(now * 9) * Math.min(1, moving / 3) * 0.03 : 0;
     camera.position.set(player.pos.x, player.pos.y + player.h + bob, player.pos.z);
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    if (film) { // 自由飞行：WASD 平移（沿视线）、空格上升、C 下降、Shift 加速、[ ] 调速、滚轮变焦
+      const f2 = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), s2 = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0), u2 = (keys.Space ? 1 : 0) - (keys.KeyC ? 1 : 0);
+      const dir3 = new V3(0, 0, -1).applyEuler(new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ')), rt3 = new V3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
+      const want3 = dir3.multiplyScalar(f2).addScaledVector(rt3, s2).addScaledVector(UP, u2); if (want3.lengthSq() > 0) want3.normalize().multiplyScalar(film.sp * (keys.ShiftLeft ? 3 : 1));
+      film.vel.lerp(want3, Math.min(1, dt * 4)); film.pos.addScaledVector(film.vel, dt);
+      const rr3 = Math.hypot(film.pos.x, film.pos.z), lim3 = cave.R + 1.5; if (rr3 > lim3) { film.pos.x *= lim3 / rr3; film.pos.z *= lim3 / rr3; }
+      film.pos.y = Math.max(0.08, Math.min(cave.H - 0.2, film.pos.y));
+      camera.position.copy(film.pos);
+    }
     if (shake > 0) { shake -= dt; camera.position.x += (Math.random() - 0.5) * shake * 0.1; camera.position.y += (Math.random() - 0.5) * shake * 0.1; }
     // 视角模型
     swing = Math.max(0, swing - dt * 5);
