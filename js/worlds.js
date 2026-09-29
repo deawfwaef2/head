@@ -584,10 +584,16 @@ window.Worlds = (() => {
     if (!W || !W.dom) return; const el = document.createElement('div'); el.className = 'wach'; el.innerHTML = `<div class="a1">🏆 成就解锁</div><div class="a2">${esc(name)}</div><div class="a3">${esc(d)}</div>`;
     W.dom.root.appendChild(el); SFX.fanfare && SFX.fanfare(3); setTimeout(() => el.classList.add('out'), 2600); setTimeout(() => el.remove(), 3400);
   }
+  function gainXp(n) { // 食人魔升级：经验来自战斗事件；升级永久加属性，回一部分血
+    const S = G.S, s0 = G.st(), up = RPG.addXp(S, n); if (!up) return; const s1 = G.st();
+    S.hp = Math.min(s1.maxHp, S.hp + Math.round(s1.maxHp * 0.35));
+    const d = [['str', '力量'], ['con', '体魄'], ['agi', '敏捷'], ['ter', '凶威'], ['soul', '魂力']].filter(([k]) => s1[k] > s0[k]).map(([k, n]) => `${n}+${s1[k] - s0[k]}`).concat(s1.maxHp > s0.maxHp ? [`生命+${s1.maxHp - s0.maxHp}`] : []).join(' · ');
+    achBanner(`升级！Lv.${up.to}`, d || '继续变强'); W && W.trip.log.push({ t: `⬆️ 食人魔升到 Lv.${up.to}（${d}）`, cls: 'gethead' }); SFX.levelup && SFX.levelup(); G.save && G.save();
+  }
   function foeEvent(t, fo, d) {
     if (!W) return; const now = performance.now() / 1000, st = W.stats = W.stats || { kill: 0, decap: 0, execute: 0, onecut: 0, sever: 0, halve: 0, parry: 0, combo: 0, maxCombo: 0, lastHit: 0, kills: [] };
     if (t === 'hit') { st.combo = now - st.lastHit < 2.5 ? st.combo + 1 : 1; st.lastHit = now; st.maxCombo = Math.max(st.maxCombo, st.combo); showCombo(st.combo, d && d.brk); if (st.combo >= 10) achAdd('combo', st.combo, true); return; }
-    const rw = REW[t]; if (rw) { const mul = 1 + (fo.rar || 0) * 0.5 + (fo.boss ? 3 : 0), c = Math.round(rw[0] * mul * (1 + Math.min(1, st.combo / 20))); G.addCoins(c); W.trip.coins += c;
+    const rw = REW[t]; if (rw) { const mul = 1 + (fo.rar || 0) * 0.5 + (fo.boss ? 3 : 0), c = Math.round(rw[0] * mul * (1 + Math.min(1, st.combo / 20))); G.addCoins(c); W.trip.coins += c; gainXp(Math.max(1, Math.round(rw[0] * mul * 0.8)));
       floatDmg(fo.anchor ? fo.anchor.pos : fo.pos, `${rw[1]} +${c}🔮`, t === 'execute' || t === 'onecut'); SFX.coins && SFX.coins(); }
     if (t in st) st[t]++;
     if (t === 'kill') { st.kills = st.kills.filter(x => now - x < 8); st.kills.push(now); if (st.kills.length >= 2) { const nm = ['', '', '双杀！', '三杀！', '四杀！', '屠戮！'][Math.min(5, st.kills.length)]; G.toast && G.toast(`💀 ${nm}`, '#ff7060', 1.6); achAdd('multi', st.kills.length, true); } }
@@ -1033,7 +1039,8 @@ window.Worlds = (() => {
     if (!W || !W.B || !DOM) return; const node = W.graph.nodes[W.cur], st = STYLES[node.style], s = G.st();
     DOM.top.querySelector('.n').textContent = node.name; DOM.top.querySelector('.s').textContent = `${node.loc.icon} ${node.loc.n} · ${st.n}${LAYOUTS[layOf(node)] ? ' · ' + LAYOUTS[layOf(node)].n : ''} · ${SIZES[node.size].n} · 已探索 ${W.graph.nodes.filter(n => n.visited).length}/${W.graph.nodes.length}`;
     const left = W.foes ? W.foes.filter(f => !f.dead).length : W.prey.filter(p => !p.gone).length;
-    DOM.stat.innerHTML = `<div class="hp"><i style="width:${clamp(G.S.hp / s.maxHp, 0, 1) * 100}%"></i></div>❤️ ${Math.round(G.S.hp)}/${s.maxHp} · ${(window.Sack && Sack.on()) ? (() => { const u = Sack.usage(), b = Sack.inv().belt.filter(Boolean); return `🩹${b.reduce((a, o) => a + o.n, 0)}<br>🎒 ${u[0]}/${u[1]}格 · 💀${u[2]}`; })() : `🧪${G.S.items.potion || 0}<br>🧺 ${W.trip.res.heads.length}/${s.cap}`} · 🔮 +${W.trip.coins}${W.stats && W.stats.kill ? `<br>⚔️ 放倒 ${W.stats.kill} · 🩸 斩首 ${W.stats.decap} · 连击 ${W.stats.maxCombo}` : ''}${left ? `<br><span style="color:#9fd0ff">✨ 此地还有 ${left} 缕魂光</span>` : ''}`;
+    const LVI = RPG.lvOf(G.S.xp), lvOn = s.lv > 1 || G.S.xp > 0;
+    DOM.stat.innerHTML = `<div class="hp"><i style="width:${clamp(G.S.hp / s.maxHp, 0, 1) * 100}%"></i></div>${lvOn ? `<span title="食人魔等级" style="color:#ffd27a">Lv.${LVI.lv}</span> <span style="opacity:.6;font-size:.85em">${LVI.need ? LVI.cur + '/' + LVI.need : 'MAX'}</span> · ` : ''}❤️ ${Math.round(G.S.hp)}/${s.maxHp} · ${(window.Sack && Sack.on()) ? (() => { const u = Sack.usage(), b = Sack.inv().belt.filter(Boolean); return `🩹${b.reduce((a, o) => a + o.n, 0)}<br>🎒 ${u[0]}/${u[1]}格 · 💀${u[2]}`; })() : `🧪${G.S.items.potion || 0}<br>🧺 ${W.trip.res.heads.length}/${s.cap}`} · 🔮 +${W.trip.coins}${W.stats && W.stats.kill ? `<br>⚔️ 放倒 ${W.stats.kill} · 🩸 斩首 ${W.stats.decap} · 连击 ${W.stats.maxCombo}` : ''}${left ? `<br><span style="color:#9fd0ff">✨ 此地还有 ${left} 缕魂光</span>` : ''}`;
     let h = 'WASD 走动 · <b>F</b> 拔刀（按住左键挥砍 / 连点刺 / 右键格挡）· <b>M</b> 地图 · <b>H</b> 喝药';
     if (W.headNear) h = `<b>E</b> 拾取首级 · 【${RN[W.headNear.h.c.rar]}】${esc(W.headNear.h.c.name)}`;
     else if (W.interNear) { const it = W.interNear, L = it.kind === 'loot' ? it.L : null; h = L ? `<b>E</b> ${L.kind === 'corpse' ? '搜身' : L.kind === 'pile' ? '翻' : '搜刮'} · ${esc(L.name)}${L.items && !L.items.length ? ' <span style="color:#999">（空）</span>' : ''}` : '<b>E</b> 打开宝箱'; }

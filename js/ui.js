@@ -140,7 +140,7 @@ window.UI = (() => {
       <div class="hpline"><div class="hpfill" style="width:${hpF * 100}%"></div><span>❤️ ${Math.round(S.hp)} / ${s.maxHp}</span></div>
       <div class="kv"><span>攻击</span><b>${s.atk}</b><span>防御</span><b>${s.def}</b><span>闪避</span><b>${(s.dodge * 100).toFixed(1)}%</b><span>背篓容量</span><b>${s.cap} 颗</b><span>魂晶产出</span><b>×${s.yieldMul.toFixed(2)}</b><span>生命恢复</span><b>${(1 + (bb.regen || 0))}%/10秒</b></div>
       <div class="items">${RPG.CONSUM.map(c => `<div class="item"><span class="ic">${c.icon}</span><b>${c.n}</b> ×${S.items[c.k] || 0}<button data-a="use" data-v="${c.k}" ${S.items[c.k] ? '' : 'disabled'}>使用</button></div>`).join('')}<small>快捷键 H 喝药</small></div>
-      <div class="kv small"><span>出猎次数</span><b>${S.stats.trips}</b><span>斩首总数</span><b>${S.stats.kills}</b><span>累计魂晶</span><b>${fmt(S.stats.earned)}</b><span>把玩次数</span><b>${fmt(S.stats.pokes)}</b></div>
+      <div class="kv small"><span>食人魔等级</span><b>Lv.${s.lv} <small style="opacity:.6">(${RPG.lvOf(S.xp).cur}/${RPG.lvOf(S.xp).need || 'MAX'})</small></b><span>出猎次数</span><b>${S.stats.trips}</b><span>斩首总数</span><b>${S.stats.kills}</b><span>累计魂晶</span><b>${fmt(S.stats.earned)}</b><span>把玩次数</span><b>${fmt(S.stats.pokes)}</b></div>
     </div><div class="col">${rows}<p class="hint2">提升属性：在洞里建造<b>训练器械</b>（建造 → 训练）后对着它按 E 训练；购买<b>装备</b>；每一件<b>建筑/装饰</b>都会永久提升属性。</p></div></div>`;
   }
   function equipBody() {
