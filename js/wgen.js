@@ -296,7 +296,7 @@ window.WGen = (() => {
     const t = new THREE.CanvasTexture(c); return softTex[key] = t;
   }
   function waterMat(g, sky, colHex) {
-    const m = new THREE.MeshStandardMaterial({ color: colHex, roughness: 0.05, metalness: 0.35, transparent: true, opacity: 0.9, envMap: sky && sky.env || null, envMapIntensity: 1.1 });
+    const m = new THREE.MeshStandardMaterial({ color: colHex, roughness: 0.04, metalness: 0.1, transparent: true, opacity: 0.93, side: THREE.DoubleSide, envMap: sky && sky.env || null, envMapIntensity: 0.65 });
     const U = { t: { value: 0 } }; m.userData.U = U;
     m.onBeforeCompile = (sh) => {
       sh.uniforms.wt = U.t;
@@ -384,7 +384,7 @@ window.WGen = (() => {
         for (let i = 0; i < N - 1; i++) for (let k = 0; k < S; k++) { const t = k / S, p0 = ch.pts[Math.max(0, i - 1)], p1 = ch.pts[i], p2 = ch.pts[i + 1], p3 = ch.pts[Math.min(N - 1, i + 2)], cr = (a, b, c, d) => 0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t); pts.push([cr(p0[0], p1[0], p2[0], p3[0]), cr(p0[1], p1[1], p2[1], p3[1])]); lv.push(lerp(W.lv[i], W.lv[Math.min(i + 1, W.lv.length - 1)], t)); }
         pts.push(ch.pts[N - 1].slice()); lv.push(W.lv[W.lv.length - 1]); const M = pts.length, hw = W.w + 1.4, pos = [], idx = [];
         for (let i = 0; i < M; i++) { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(M - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, nx = -dz / l, nz = dx / l, y = lv[i] - 0.06; pos.push(pts[i][0] + nx * hw, y, pts[i][1] + nz * hw, pts[i][0] - nx * hw, y, pts[i][1] - nz * hw); if (i < M - 1) { const a0 = i * 2; idx.push(a0, a0 + 1, a0 + 2, a0 + 1, a0 + 3, a0 + 2); } }
-        const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat); m.receiveShadow = false; m.frustumCulled = false; m.renderOrder = 1; sc.add(m);
+        const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat); m.receiveShadow = false; m.frustumCulled = false; m.renderOrder = 1; m.userData.wg = 1; sc.add(m);
         for (let i = 0; i < M; i += 3) mark(pts[i][0], pts[i][1], W.w + 0.6);
         // 芦苇/岸石
         const reeds = variants(['grass_medium_02#*']); const cn = new C(1, 1, 1).multiply(g.grassMul);
@@ -392,8 +392,8 @@ window.WGen = (() => {
         // 木桥
         const pv = variants(['modular_wooden_pier'])[0], cands = []; for (let i = 4; i < M - 4; i++) if (Math.hypot(pts[i][0], pts[i][1]) < R * 0.75) cands.push(i);
         if (pv && cands.length) { const i = cands[Math.floor(r() * cands.length)], a = pts[i - 1], b = pts[i + 1], dx = b[0] - a[0], dz = b[1] - a[1], th = Math.atan2(dz, dx) + Math.PI / 2, Lb = 2 * (W.w + 1.6) + 1.5, Lm = Math.max(pv.t.size.z, pv.t.size.x, 0.5), s = Lb / Lm, deck = lv[i] + 0.08;
-          put(pv.t, pts[i][0], pts[i][1], s, pv.t.size.x >= pv.t.size.z ? -th : Math.PI / 2 - th, deck - 1.0 * s); } }
-      else { for (const p of W.P) { const geo = new THREE.CircleGeometry(1, 40); geo.rotateX(-Math.PI / 2); const m = new THREE.Mesh(geo, mat); m.position.set(p.x, p.lv - 0.06, p.z); m.rotation.y = -p.th; m.scale.set(p.r * 1.45 * p.sx, 1, p.r * 1.45); m.frustumCulled = false; m.renderOrder = 1; sc.add(m); cols.push({ x: p.x, z: p.z, r: p.r * 0.75 }); mark(p.x, p.z, p.r * 1.3);
+          put(pv.t, pts[i][0], pts[i][1], s, pv.t.size.x >= pv.t.size.z ? -th : Math.PI / 2 - th, deck - 1.0 * s); const PL = X.inst && X.inst.get(pv.t); if (PL && PL.length) PL[PL.length - 1].keep = 1; } }
+      else { for (const p of W.P) { const geo = new THREE.CircleGeometry(1, 40); geo.rotateX(-Math.PI / 2); const m = new THREE.Mesh(geo, mat); m.position.set(p.x, p.lv - 0.06, p.z); m.rotation.y = -p.th; m.scale.set(p.r * 1.45 * p.sx, 1, p.r * 1.45); m.frustumCulled = false; m.renderOrder = 1; m.userData.wg = 1; sc.add(m); cols.push({ x: p.x, z: p.z, r: p.r * 0.75 }); mark(p.x, p.z, p.r * 1.3);
           const reeds = variants(['grass_medium_02#*']); for (let i = 0; i < 26 && reeds.length; i++) { const a = r() * 6.28, d = p.r * (1.05 + r() * 0.35), x = p.x + Math.cos(a) * d * p.sx, z = p.z + Math.sin(a) * d; if (!g.wd || g.wd(x, z).d < 0.2 || g.wd(x, z).d > 2.6) continue; put(reeds[Math.floor(r() * reeds.length)].t, x, z, 2 + r() * 1.4, r() * 6.28, undefined, false, ic0(g, 'grass', x, z, r)); } } }
     }
     // -- 布景
@@ -401,12 +401,12 @@ window.WGen = (() => {
     // -- 光束
     const sd = X.sunDir; if (g.shafts && sd && sd.y > 0.15) { const grp = new THREE.Group(), n = 7 + Math.floor(r() * 6), mats = [], q = new THREE.Quaternion().setFromUnitVectors(new V3(0, 1, 0), sd.clone().normalize());
       for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * R * 0.95, x = Math.cos(a) * d, z = Math.sin(a) * d, Lh = 26 + r() * 14, w = 1.6 + r() * 3.4, mt = new THREE.MeshBasicMaterial({ map: softTex('beam'), color: g.sunCol, transparent: true, opacity: 0.1 + r() * 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }); mt.userData.b = mt.opacity; mt.userData.ph = r() * 6.28; mats.push(mt);
-        for (let k = 0; k < 2; k++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, Lh), mt), o = new THREE.Group(); o.add(m); m.rotation.y = k * Math.PI / 2; o.position.set(x, H(x, z), z).addScaledVector(sd, Lh * 0.5 - 1); o.quaternion.copy(q); o.frustumCulled = false; m.frustumCulled = false; grp.add(o); } }
+        for (let k = 0; k < 2; k++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, Lh), mt), o = new THREE.Group(); o.add(m); m.rotation.y = k * Math.PI / 2; o.position.set(x, H(x, z), z).addScaledVector(sd, Lh * 0.5 - 1); o.quaternion.copy(q); o.frustumCulled = false; m.frustumCulled = false; m.userData.wg = 1; grp.add(o); } }
       sc.add(grp); upd.push((dt, p, now) => { for (const mt of mats) mt.opacity = mt.userData.b * (0.75 + 0.25 * Math.sin(now * 0.6 + mt.userData.ph)); }); }
     // -- 地雾团
     if (g.mist > 0 && sc.fog) { const n = Math.round((R < 20 ? 8 : 14) * g.mist), fc = sc.fog.color.clone().lerp(new C(1, 1, 1), 0.25), grp = new THREE.Group(), mm = [];
       for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * R * 0.85, x = Math.cos(a) * d, z = Math.sin(a) * d, s = 9 + r() * 12; let hm = -1e9; for (let k = 0; k < 6; k++) hm = Math.max(hm, H(x + Math.cos(k) * s * 0.3, z + Math.sin(k) * s * 0.3)); const mt = new THREE.MeshBasicMaterial({ map: softTex('mist'), color: fc, transparent: true, opacity: (0.1 + r() * 0.12) * Math.min(1, g.mist + 0.2), depthWrite: false, fog: true }); mt.userData.b = mt.opacity; mt.userData.ph = r() * 6.28; mm.push(mt);
-        const m = new THREE.Mesh(new THREE.PlaneGeometry(s, s), mt); m.rotation.x = -Math.PI / 2; m.position.set(x, hm + 0.25 + r() * 0.3, z); m.frustumCulled = false; m.renderOrder = 2; grp.add(m); }
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(s, s), mt); m.rotation.x = -Math.PI / 2; m.position.set(x, hm + 0.25 + r() * 0.3, z); m.frustumCulled = false; m.renderOrder = 2; m.userData.wg = 1; grp.add(m); }
       sc.add(grp); upd.push((dt, p, now) => { for (const mt of mm) mt.opacity = mt.userData.b * (0.8 + 0.2 * Math.sin(now * 0.35 + mt.userData.ph)); }); }
     return { update(dt, p, now) { for (const f of upd) f(dt, p, now); } };
   }

@@ -426,7 +426,7 @@ window.Worlds = (() => {
     const spots = []; try { layPlace(LY, { sc, H, put, variants, mark, cols, doorList, spots, st, sky, node }); } catch (e) { console.warn('layout', LY.k, e); }
     const mk = pick(r, st.marks.filter(m => !(LY.k === 'camp' && m === 'campfire') && !(LY.k === 'henge' && m === 'stones'))); let mx = (r() - 0.5) * R * 0.5, mz = (r() - 0.5) * R * 0.5; for (let t = 0; t < 25 && !free(mx, mz, 4.5); t++) { const a = r() * 6.28, d = R * (0.25 + r() * 0.55); mx = Math.cos(a) * d; mz = Math.sin(a) * d; } sc.userData.mark = mk; placeMark(mk, mx, mz);
     const LPX = LP ? WLayout.dress(LP, { sc, H, R, cols, free, mark, put, variants }) : null;
-    const GD = g ? (() => { try { return WGen.dress(g, { sc, H, R, cols, put, variants, mark, free, spots, doorList, LP, sky, sunDir }); } catch (e) { console.warn('wgen dress', e); return null; } })() : null;
+    const GD = g ? (() => { try { return WGen.dress(g, { sc, H, R, cols, put, variants, mark, free, spots, doorList, LP, sky, sunDir, inst }); } catch (e) { console.warn('wgen dress', e); return null; } })() : null;
     function placeMark(k, x, z) {
       const y = H(x, z);
       if (k === 'campfire' && window.Assets && Assets.has('stone_fire_pit')) { const f = Assets.fit('stone_fire_pit', { w: 1.3, x, y, z }); if (f) { sc.add(f); } const fl = Assets.flame(x, y + 0.15, z, 5.5); if (fl) sc.add(fl); const pl = new THREE.PointLight('#ff9a50', 2.2, 12, 2); pl.position.set(x, y + 0.9, z); sc.add(pl); sc.userData.fire = pl; cols.push({ x, z, r: 0.8 }); mark(x, z, 2.2); }
@@ -455,6 +455,7 @@ window.Worlds = (() => {
         const a = r() * 6.28, d = RM * Math.sqrt(r()) * 0.97, x = Math.cos(a) * d, z = Math.sin(a) * d, v = pick(r, vs), s = s0 + r() * (s1 - s0);
         if (LP && (d > Rf(a) * 0.97 || !WLayout.keep(LP, x, z, kind, r))) continue;
         if (g && !WGen.keep(g, kind, x, z, r, fkind)) continue;
+        if (g && g.wd && g.wd(x, z).d < 0.7) continue;
         const fr = Math.max(v.t.size.x, v.t.size.z) * s * 0.5;
         const rad = kind === 'grass' ? 0 : kind === 'plant' ? 0.4 : kind === 'tree' ? 1.0 : kind === 'wall' ? fr : Math.min(fr, 2.5);
         if (rad && !free(x, z, rad)) continue;
@@ -491,6 +492,7 @@ window.Worlds = (() => {
       }
     }
     // 实例化
+    if (g && g.wd) for (const M of [inst, instNS]) for (const [tm, ms] of M) { const k = ms.filter(m => m.keep || g.wd(m.elements[12], m.elements[14]).d >= 0); if (k.length !== ms.length) M.set(tm, k); } // 水里不长树/石头
     for (const [M, ns] of [[inst, false], [instNS, true]]) for (const [tm, ms] of M) for (const p of tm.parts) {
       const im = new THREE.InstancedMesh(p.geo, p.mat, ms.length);
       ms.forEach((m, i) => im.setMatrixAt(i, new THREE.Matrix4().multiplyMatrices(m, p.m)));
@@ -735,7 +737,7 @@ window.Worlds = (() => {
   function disposeNode() {
     const B = W.B; if (!B) return;
     if (window.Foe) Foe.clear();
-    B.sc.traverse(o => { if (o.isInstancedMesh) o.dispose && o.dispose(); if (o.userData.sky) { o.geometry.dispose(); o.material.dispose(); } if (o.isSprite && o.material.map && o.material.map.isCanvasTexture && o.material.map !== glowTex) { o.material.map.dispose(); o.material.dispose(); } });
+    B.sc.traverse(o => { if (o.isInstancedMesh) o.dispose && o.dispose(); if (o.userData.sky) { o.geometry.dispose(); o.material.dispose(); } if (o.userData.wg) { o.geometry.dispose(); o.material.dispose(); } if (o.isSprite && o.material.map && o.material.map.isCanvasTexture && o.material.map !== glowTex) { o.material.map.dispose(); o.material.dispose(); } });
     B.terr.geometry.dispose(); B.terr.material.dispose && B.terr.material.dispose();
     if (B.sun.shadow && B.sun.shadow.map) B.sun.shadow.map.dispose();
     W.say.forEach(s => s.el.remove()); W.say = []; W.B = null;
