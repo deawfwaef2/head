@@ -15,7 +15,11 @@ window.startGame = function () {
   let pixelRatio = Math.min(devicePixelRatio, (window.Mods && Mods.on('lowspec')) ? 0.85 : 1.5);
   renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth, innerHeight);
   renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
-  const post = window.Post ? Post.create(renderer) : null; // 画风 MOD 后处理链
+  // 第十三轮：默认走大师画质管线（master.js）；开了画风 MOD 才用旧的 render.js 链；lowspec 两者都不开
+  const FORCE_Q = new URLSearchParams(location.search).get('q');
+  const LOWSPEC = window.Mods && Mods.on('lowspec');
+  renderer.shadowMap.enabled = !LOWSPEC; renderer.shadowMap.type = THREE.PCFShadowMap;
+  const post = (window.Post && Post.STYLE !== 'classic') ? Post.create(renderer) : (window.Master && !LOWSPEC ? Master.create(renderer, { tier: FORCE_Q || 'ultra' }) : (window.Post ? Post.create(renderer) : null));
   document.getElementById('game').appendChild(renderer.domElement);
   const canvas = renderer.domElement;
   const scene = new THREE.Scene();
@@ -26,8 +30,20 @@ window.startGame = function () {
   const hemi = new THREE.HemisphereLight(0x8a7a6a, 0x201510, 0.55); scene.add(hemi);
   const moon = new THREE.DirectionalLight(0xaab4ff, 0.18); moon.position.set(-3, 8, 2); scene.add(moon);
   const LIGHTS = []; for (let i = 0; i < 6; i++) { const l = new THREE.PointLight(0xff8a3a, 0, 9, 1.6); scene.add(l); LIGHTS.push(l); }
+  // 篝火主光投射柔和阴影（立方体阴影贴图 + PCF 半径模糊）
+  LIGHTS[0].castShadow = true; LIGHTS[0].shadow.mapSize.set(1024, 1024); LIGHTS[0].shadow.bias = -0.0025; LIGHTS[0].shadow.normalBias = 0.025; LIGHTS[0].shadow.radius = 5; LIGHTS[0].shadow.camera.near = 0.15; LIGHTS[0].shadow.camera.far = 16;
+  const shadowize = (o) => { o.traverse(m => { if (m.isMesh && !m.userData.noShadow) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
+  let shadowT = 0; const shadowHeads = new Set();
+  function updateHeadShadows(dt) { // 只有离镜头最近的 24 颗首级投射真实阴影（其余保留软阴影贴花）
+    if ((shadowT -= dt) > 0 || !renderer.shadowMap.enabled) return; shadowT = 0.5;
+    const cp = camera.getWorldPosition(new V3());
+    const near = heads.filter(h => h.g.visible !== false && !h.impostor).map(h => [h, h.g.position.distanceToSquared(cp)]).filter(a => a[1] < 36).sort((a, b) => a[1] - b[1]).slice(0, 24).map(a => a[0]);
+    const want = new Set(near);
+    for (const h of shadowHeads) if (!want.has(h) || !heads.includes(h)) { h.g.traverse(m => { if (m.isMesh) m.castShadow = false; }); shadowHeads.delete(h); if (h.blob) h.blob.material = blobMat; }
+    for (const h of want) if (!shadowHeads.has(h)) { h.hb.group.traverse(m => { if (m.isMesh && !/_mask$/.test(m.name)) m.castShadow = true; }); shadowHeads.add(h); }
+  }
   const exitLight = new THREE.PointLight(0xfff0d0, 1.4, 10, 1.5); scene.add(exitLight);
-  let lodStat = null;
+  let lodStat = null; let fpsHi = 0; const _rayP = new V3();
   const lod = LOD_ON ? HeadLOD.create(renderer, scene) : null; // 远处静止首级 → 图集替身，一次 draw call
 
   // ---------------- 状态 ----------------
@@ -42,6 +58,7 @@ window.startGame = function () {
   function buildCave() {
     if (cave) Cave.dispose(cave);
     const R = BuildCat.DIG[S.depth - 1].r;
+    if (window.Assets) Assets.env(renderer);
     cave = Cave.build(scene, R, S.depth);
     exitLight.position.set(cave.exitPos.x, 2.2, cave.exitPos.z - 1.5);
     scene.fog.density = 0.05 - S.depth * 0.004;
@@ -195,7 +212,7 @@ window.startGame = function () {
   function rebuildColliders() { colliders.length = 0; for (const b of builds) { const d = CAT[b.type]; const [hx, hz] = CAT[b.type].fp; for (const a of (d.cols ? d.cols(hx, hz) : [])) colliders.push(Object.assign(rotAabb(a, b.rot, b.x, b.z), { b })); } bonusCache = null; }
   function addBuild(type, x, z, rot = 0, save = true) {
     const d = CAT[type]; const g = d.make(); g.position.set(x, 0, z); g.rotation.y = -rot * Math.PI / 2;
-    scene.add(g);
+    shadowize(g); scene.add(g);
     const b = { type, x, z, rot, g, heads: d.mount ? slotsOf(d).map(() => null) : null, timer: Math.random() * (d.mount ? d.mount.period : d.period || 5) };
     if (d.mount) {
       const lab = document.createElement('div'); lab.className = 'wlabel'; lab.innerHTML = '<div class="pbar"><i></i></div>'; ui.labels.appendChild(lab); b.label = lab;
@@ -266,7 +283,7 @@ window.startGame = function () {
     const src = lightSources(); const cp = camera.position;
     src.sort((a, b) => a.p.distanceToSquared(cp) - b.p.distanceToSquared(cp));
     lightList = src.slice(0, LIGHTS.length);
-    LIGHTS.forEach((l, i) => { const s = lightList[i]; if (!s) { l.intensity = 0; return; } l.position.copy(s.p); l.color.set(s.c); l.userData.k = s.k; l.userData.fire = s.fire; l.distance = s === src[0] && s.fire ? 12 : 7; });
+    LIGHTS.forEach((l, i) => { const s = lightList[i]; if (!s) { l.intensity = 0; return; } l.position.copy(s.p); if (i === 0 && s.fire) l.position.y = Math.max(l.position.y, 0.95); l.color.set(s.c); l.userData.k = s.k; l.userData.fire = s.fire; l.distance = s === src[0] && s.fire ? 12 : 7; });
   }
 
   // ---------------- 视角模型（食人魔的手+武器） ----------------
@@ -288,7 +305,28 @@ window.startGame = function () {
     g.rotation.set(-0.6, 0, -0.35); g.position.set(0, 0.02, -0.06);
     return g;
   }
-  function refreshWeapon() { if (weaponMesh) vm.remove(weaponMesh); weaponMesh = makeWeapon(S.eq.weapon || 0); vm.add(weaponMesh); }
+  // 第十三轮：Poly Haven CC0 武器模型（自动找长轴、细端为握柄），缺失时退回旧模型
+  const WPN_ASSET = [['baseball_bat', 0.8], ['ornate_medieval_mace', 0.72], ['machete', 0.72], ['ornate_war_hammer', 0.8], ['wooden_axe_02', 0.85], ['antique_katana_01', 1.0, '#6a4aff'], ['antique_estoc', 1.08, '#ff2020']];
+  function assetWeapon(tier) {
+    const W = WPN_ASSET[Math.min(tier, WPN_ASSET.length - 1)]; if (!window.Assets || !Assets.has(W[0])) return null;
+    const src = Assets.clone(W[0]); src.updateMatrixWorld(true);
+    const pts = []; src.traverse(o => { if (o.isMesh) { const pa = o.geometry.attributes.position; const v = new V3(); for (let i = 0; i < pa.count; i += 3) { v.fromBufferAttribute(pa, i).applyMatrix4(o.matrixWorld); pts.push(v.clone()); } } });
+    const bb = new THREE.Box3().setFromPoints(pts), sz = bb.getSize(new V3()), c = bb.getCenter(new V3());
+    const ax = sz.x > sz.y ? (sz.x > sz.z ? 'x' : 'z') : (sz.y > sz.z ? 'y' : 'z'); const len = sz[ax];
+    // 两端 15% 段的横截面散布：细的一端是握柄
+    let lo = 0, hi = 0, nl = 0, nh = 0; const others = ['x', 'y', 'z'].filter(k => k !== ax);
+    for (const q of pts) { const t = (q[ax] - bb.min[ax]) / len; const w = Math.hypot(q[others[0]] - c[others[0]], q[others[1]] - c[others[1]]); if (t < 0.15) { lo += w; nl++; } else if (t > 0.85) { hi += w; nh++; } }
+    const handleAtMin = (lo / Math.max(1, nl)) < (hi / Math.max(1, nh));
+    const inner = new THREE.Group(); src.position.sub(c); inner.add(src);
+    const dir = new V3(ax === 'x' ? 1 : 0, ax === 'y' ? 1 : 0, ax === 'z' ? 1 : 0).multiplyScalar(handleAtMin ? 1 : -1);
+    inner.quaternion.setFromUnitVectors(dir, new V3(0, 1, 0));
+    const k = W[1] / len; const g = new THREE.Group(); inner.scale.setScalar(k); inner.position.y = W[1] / 2 - 0.12; g.add(inner);
+    if (W[2]) src.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(W[2]); o.material.emissiveIntensity = 0.35; o.material.emissiveMap = o.material.map; } });
+    g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+    g.rotation.set(-0.6, 0, -0.35); g.position.set(0, 0.02, -0.06); g.userData.asset = 1;
+    return g;
+  }
+  function refreshWeapon() { if (weaponMesh) vm.remove(weaponMesh); weaponMesh = assetWeapon(S.eq.weapon || 0) || makeWeapon(S.eq.weapon || 0); fist.visible = !weaponMesh.userData.asset; vm.add(weaponMesh); }
   refreshWeapon();
   let swing = 0;
 
@@ -1098,7 +1136,10 @@ window.startGame = function () {
     updateAim(now); ModelHeads.tick(now); updateCine(dt); updateCineFx(dt);
     for (const h of heads) if (h.aura) { const ap = h.aura.geometry.attributes.position; for (let i = 0; i < ap.count; i++) { let y = ap.getY(i) + dt * (0.06 + (i % 5) * 0.015); if (y > 0.38) y = -0.15; ap.setY(i, y); } ap.needsUpdate = true; h.aura.position.copy(h.g.position); h.aura.rotation.y = now * 0.25 + h.rec.id; h.aura.visible = h.g.visible !== false; }
     // 自适应分辨率
-    fpsAcc += dt; fpsN++; if (fpsAcc > 2) { const fps = fpsN / fpsAcc; if (fps < 40 && pixelRatio > 0.7) { pixelRatio = Math.max(0.7, pixelRatio - 0.15); renderer.setPixelRatio(pixelRatio); } else if (fps > 58 && pixelRatio < Math.min(devicePixelRatio, 1.5)) { pixelRatio = Math.min(Math.min(devicePixelRatio, 1.5), pixelRatio + 0.1); renderer.setPixelRatio(pixelRatio); } fpsAcc = 0; fpsN = 0; }
+    fpsAcc += dt; fpsN++; if (fpsAcc > 2 && !FORCE_Q && post && post.setTier && post.style === 'master') { const fps = fpsN / fpsAcc; // 先降画质档，再降分辨率
+      if (fps < 38 && post.tier !== 'mid') { post.setTier(post.tier === 'ultra' ? 'high' : 'mid'); if (post.tier === 'mid') renderer.shadowMap.enabled = false; fpsAcc = 0; fpsN = 0; }
+      else if (fps > 58 && pixelRatio >= Math.min(devicePixelRatio, 1.5) - 0.01 && post.tier !== 'ultra' && (fpsHi = (fpsHi || 0) + 1) > 3) { post.setTier(post.tier === 'mid' ? 'high' : 'ultra'); renderer.shadowMap.enabled = !LOWSPEC; fpsHi = 0; fpsAcc = 0; fpsN = 0; } }
+    if (fpsAcc > 2) { const fps = fpsN / fpsAcc; if (fps < 40 && pixelRatio > 0.7 && !FORCE_Q) { pixelRatio = Math.max(0.7, pixelRatio - 0.15); renderer.setPixelRatio(pixelRatio); } else if (fps > 58 && pixelRatio < Math.min(devicePixelRatio, 1.5)) { pixelRatio = Math.min(Math.min(devicePixelRatio, 1.5), pixelRatio + 0.1); renderer.setPixelRatio(pixelRatio); } fpsAcc = 0; fpsN = 0; }
     // 玩家
     if (playing && !uiOpen && !cine && !film) {
       const f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
@@ -1211,7 +1252,7 @@ window.startGame = function () {
     // 灯光闪烁
     lightTimer -= dt; if (lightTimer <= 0) { assignLights(); lightTimer = 0.7; }
     LIGHTS.forEach((l, i) => { if (!lightList[i]) return; const k = l.userData.k || 1; l.intensity = l.userData.fire ? k * (0.85 + Math.sin(now * 13 + i) * 0.08 + Math.sin(now * 29 + i * 3) * 0.05 + (Math.random() - 0.5) * 0.06) : k; });
-    cave.flames.forEach((f, i) => { f.scale.y = 1 + Math.sin(now * 12 + i * 2) * 0.25 + Math.sin(now * 31 + i) * 0.1; f.scale.x = f.scale.z = 1 + Math.sin(now * 17 + i) * 0.08; f.rotation.y = now * 2 + i; });
+    if (cave.update) cave.update(now); else cave.flames.forEach((f, i) => { f.scale.y = 1 + Math.sin(now * 12 + i * 2) * 0.25 + Math.sin(now * 31 + i) * 0.1; f.scale.x = f.scale.z = 1 + Math.sin(now * 17 + i) * 0.08; f.rotation.y = now * 2 + i; });
     if (Math.random() < dt * 14) burst(new V3(cave.firePos.x + (Math.random() - 0.5) * 0.3, 0.25, cave.firePos.z + (Math.random() - 0.5) * 0.3), Math.random() < 0.5 ? '#ff7a20' : '#ffb040', 1, 0.5, 1.4, 1.2);
     scene.traverseVisible && null;
     // 连击
@@ -1221,6 +1262,8 @@ window.startGame = function () {
     // HUD
     hudT -= dt; if (hudT <= 0) { hudT = 0.15; updateHud(); }
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) ui.toast.classList.remove('show'); }
+    updateHeadShadows(dt);
+    if (post && post.setRayLight && cave) post.setRayLight(_rayP.set(cave.firePos.x, 0.75, cave.firePos.z), 1);
     if (post && post.on) post.render(scene, camera); else renderer.render(scene, camera);
   }
   function floorOf(p) { return cave && cave.floorAt ? cave.floorAt(p.x, p.z) : 0; }

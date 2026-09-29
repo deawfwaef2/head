@@ -22,89 +22,160 @@ window.Cave = (() => {
     floorTex = mk('#4a4036', ['#2e2620', '#5e5244', '#3a3028', '#6a5a48', '#201a14'], 3500, 30);
   }
 
+  // 第十三轮画质重做：Poly Haven CC0 资产（三平面 PBR 岩壁/地面、真实岩体、石砌火坑、铁门、商摊道具）+ 序列帧火焰
+  const A = () => window.Assets;
+  const rnd = (seed) => () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+  function place(g, name, x, y, z, s, ry) { const o = A() && A().clone(name); if (!o) return null; o.position.set(x, y, z); o.scale.setScalar(s); o.rotation.y = ry || 0; g.add(o); return o; }
+  function placePart(g, name, node, x, y, z, s, ry) { const o = A() && A().part(name, node); if (!o) return null; o.position.set(x, y, z); o.scale.setScalar(s); o.rotation.y = ry || 0; g.add(o); return o; }
+
+  let _glowT = null;
+  function flameGlowTex() { if (_glowT) return _glowT; const gc = document.createElement('canvas'); gc.width = gc.height = 64; const gg = gc.getContext('2d'); const gr = gg.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,200,120,1)'); gr.addColorStop(0.35, 'rgba(255,120,40,0.4)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); gg.fillStyle = gr; gg.fillRect(0, 0, 64, 64); return (_glowT = new THREE.CanvasTexture(gc)); }
+  function flameSprites(parent) {
+    const img = A() && A().img('fire'); const out = [];
+    if (!img) return out;
+    const L = [[0, 0, 0, 1.25, 0], [0.13, 0, 0.06, 0.85, 7], [-0.12, 0, -0.05, 0.9, 13], [0.02, 0, -0.14, 0.7, 19], [-0.05, 0, 0.14, 0.62, 4], [0.0, 0.05, 0.0, 0.55, 10]];
+    for (const [x, y, z, sc, ph] of L) {
+      const t = img.clone(); t.needsUpdate = true; t.repeat.set(0.2, 0.2);
+      const m = new THREE.SpriteMaterial({ map: t, color: new THREE.Color(2.3, 1.35, 0.78), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false });
+      const sp = new THREE.Sprite(m); sp.center.set(0.5, 0.06); sp.position.set(x, 0.12 + y, z); sp.scale.set(sc * 0.72, sc, 1); sp.userData.noShadow = true;
+      sp.userData.fl = { ph, sc, sp: 26 + (ph % 5) * 2 }; parent.add(sp); out.push(sp);
+    }
+    // 底部辉光
+    const gc = document.createElement('canvas'); gc.width = gc.height = 64; const gg = gc.getContext('2d'); const gr = gg.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,160,70,1)'); gr.addColorStop(0.4, 'rgba(255,90,20,0.35)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); gg.fillStyle = gr; gg.fillRect(0, 0, 64, 64);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(gc), color: new THREE.Color(0.7, 0.42, 0.26), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false }));
+    glow.position.set(0, 0.2, 0); glow.scale.set(0.95, 0.55, 1); parent.add(glow);
+    return out;
+  }
+
   function build(scene, R, depth) {
-    textures();
+    const useA = !!(A() && A().has('stone_fire_pit') && A().tex('dark_rock'));
+    if (!useA) textures();
     const g = new THREE.Group(); g.name = 'cave';
     const H = 3.6 + R * 0.28;
-    // 地面
-    // 第十二轮修复：原 CircleGeometry 只有圆心+外圈顶点，外圈抬高后整个地面变成缓坡锥面（离中心越远越高，头"陷进地里"）。
-    // 改为带径向分环的 RingGeometry：中间严格平坦，只有墙根处起伏；并导出 floorAt 供物理使用。
+    const rand = rnd(9173 + Math.round(R * 100));
     const floorAt = (x, z) => { const d = Math.hypot(x, z) / R; return d > 0.85 ? (d - 0.85) * 2.5 * fbm(x * 0.5, 0, z * 0.5) : 0; };
     const fg = new THREE.RingGeometry(0.001, R + 0.8, 96, Math.max(24, Math.round((R + 0.8) * 5))); fg.rotateX(-Math.PI / 2);
-    { const p = fg.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); p.setY(i, floorAt(x, z)); } fg.computeVertexNormals();
+    { const p = fg.attributes.position; const col = new Float32Array(p.count * 3);
+      for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); p.setY(i, floorAt(x, z));
+        // 宏观明暗变化：打破贴图平铺感；火坑周围焦黑，墙根更暗
+        const n = fbm(x * 0.35 + 3, 0.5, z * 0.35 - 7), d = Math.hypot(x, z); const burn = Math.max(0, 1 - d / 1.8);
+        const c = (0.62 + n * 0.55) * (1 - burn * 0.55) * (1 - Math.max(0, d / R - 0.7) * 0.9);
+        col[i * 3] = c; col[i * 3 + 1] = c * 0.95; col[i * 3 + 2] = c * 0.9; }
+      fg.setAttribute('color', new THREE.BufferAttribute(col, 3)); fg.computeVertexNormals();
       const uv = fg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, p.getX(i) / 3, p.getZ(i) / 3); }
-    const floor = new THREE.Mesh(fg, new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.95, color: '#b8a898' })); floor.receiveShadow = true; g.add(floor);
+    const floorMat = useA ? A().triplanar(A().tex('rock_ground'), { scale: 0.42, flat: 1, vertexColors: true, normal: 1.4, env: 0.25, color: '#d8cfc4' })
+      : new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.95, color: '#b8a898' });
+    const floor = new THREE.Mesh(fg, floorMat); floor.receiveShadow = true; g.add(floor);
     // 穹顶岩壁
-    const dg = new THREE.SphereGeometry(1, 96, 40, 0, Math.PI * 2, 0, Math.PI * 0.62);
+    const dg = new THREE.SphereGeometry(1, 128, 48, 0, Math.PI * 2, 0, Math.PI * 0.62);
     { const p = dg.attributes.position; const col = new Float32Array(p.count * 3);
       for (let i = 0; i < p.count; i++) {
         let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-        const n = fbm(x * 3 + 10, y * 3, z * 3 + 5);
-        const k = 0.82 + n * 0.36;
+        const n = fbm(x * 3 + 10, y * 3, z * 3 + 5), n2 = fbm(x * 9 - 4, y * 9, z * 9 + 2);
+        const k = 0.82 + n * 0.36 + (n2 - 0.5) * 0.06;
         let X = x * R * k, Z = z * R * k, Y = y * H * (0.85 + n * 0.3);
-        if (y < 0) { Y = y * 2.2; } // 裙边插入地下
-        // 出口：在 -Z 方向开一道口
+        if (y < 0) { Y = y * 2.2; }
         const ang = Math.atan2(x, -z);
         if (Math.abs(ang) < 0.16 && Y < 2.6) { X *= 1.6; Z *= 1.6; }
         p.setXYZ(i, X, Math.max(-1, Y), Z);
-        const c = 0.55 + n * 0.5; col[i * 3] = c * 1.0; col[i * 3 + 1] = c * 0.92; col[i * 3 + 2] = c * 0.82;
+        const c = 0.5 + n * 0.6; col[i * 3] = c * 1.0; col[i * 3 + 1] = c * 0.93; col[i * 3 + 2] = c * 0.86;
       }
       dg.setAttribute('color', new THREE.BufferAttribute(col, 3)); dg.computeVertexNormals();
       const uv = dg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * R * 1.2, uv.getY(i) * H / 2); }
-    const wall = new THREE.Mesh(dg, new THREE.MeshStandardMaterial({ map: rockTex, vertexColors: true, roughness: 0.95, side: THREE.BackSide, color: '#c8b8a8' })); wall.receiveShadow = true; g.add(wall);
-    // 钟乳石 / 石笋
-    const M = B().M;
-    const stal = new THREE.Group(); g.add(stal);
-    const nStal = Math.round(R * R * 0.35); const pillars = []; // 地面石笋/岩石：简单圆柱碰撞
-    const cg = new THREE.ConeGeometry(1, 1, 7, 3);
-    for (let i = 0; i < nStal; i++) {
-      const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * R * 0.85; const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      if (Math.abs(Math.atan2(x, -z)) < 0.3 && r > R * 0.5) continue;
-      const h = 0.3 + Math.random() * 1.4 * (1 - r / R * 0.5);
-      const m = new THREE.Mesh(cg, M.stone); m.scale.set(0.08 + h * 0.12, h, 0.08 + h * 0.12);
-      const ceilY = H * (0.85 + 0.15) * Math.sqrt(Math.max(0, 1 - (r / R) ** 2)) * 0.95;
-      m.position.set(x, ceilY - h / 2 + 0.2, z); m.rotation.x = Math.PI; stal.add(m);
-    }
-    for (let i = 0; i < Math.round(R * 2.2); i++) {
-      const a = Math.random() * Math.PI * 2; const r = R * (0.8 + Math.random() * 0.12); const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      if (Math.abs(Math.atan2(x, -z)) < 0.35) continue;
-      const h = 0.3 + Math.random() * 1.2; const m = new THREE.Mesh(cg, M.stone); m.scale.set(0.12 + h * 0.15, h, 0.12 + h * 0.15); m.position.set(x, h / 2 - 0.05, z); stal.add(m);
-      pillars.push({ x, z, r: 0.12 + h * 0.15, h });
-      if (Math.random() < 0.5) { const rs = 0.2 + Math.random() * 0.35, rx = x + (Math.random() - 0.5) * 0.8, rz = z + (Math.random() - 0.5) * 0.8; const rr = B().rock(rs, M.stone, rx, 0.05, rz); stal.add(rr); pillars.push({ x: rx, z: rz, r: rs * 0.9, h: rs }); }
+    const wallMat = useA ? A().triplanar(A().tex('dark_rock'), { scale: 0.3, side: THREE.BackSide, vertexColors: true, normal: 1.6, env: 0.75, color: '#ffe6c8' })
+      : new THREE.MeshStandardMaterial({ map: rockTex, vertexColors: true, roughness: 0.95, side: THREE.BackSide, color: '#c8b8a8' });
+    const wall = new THREE.Mesh(dg, wallMat); wall.receiveShadow = true; g.add(wall);
+    const stal = new THREE.Group(); g.add(stal); const pillars = [];
+    const inExit = (x, z, w) => Math.abs(Math.atan2(x, -z)) < w;
+    // 与穹顶同一噪声：角度 a 处（贴地高度）墙面的实际半径
+    const wallR = (a) => { const x = Math.sin(a), z = -Math.cos(a); return R * (0.82 + fbm(x * 3 + 10, 0.15, z * 3 + 5) * 0.36); };
+    if (useA) {
+      // 岩壁崖面：沿墙一圈，正面朝向洞心，打破穹顶轮廓
+      const nFace = Math.max(6, Math.round(R * 1.3));
+      for (let i = 0; i < nFace; i++) {
+        const a = (i + rand() * 0.5) / nFace * Math.PI * 2; const s = 0.6 + rand() * 0.4, rr = wallR(a) - 1.4 * s; const x = Math.sin(a) * rr, z = -Math.cos(a) * rr;
+        if (inExit(x, z, 0.42)) continue;
+        const th = Math.atan2(-x, -z) + (rand() - 0.5) * 0.4; place(stal, 'rock_face_01', x, -0.2 - rand() * 0.3, z, s, th);
+        // 崖面前缘碰撞（局部坐标 → 世界）
+        for (const lx of [-1.3, 0.4, 2.0]) { const lz = -0.7; pillars.push({ x: x + (lx * Math.cos(th) + lz * Math.sin(th)) * s, z: z + (-lx * Math.sin(th) + lz * Math.cos(th)) * s, r: 0.95 * s, h: 1.6 * s }); }
+      }
+      // 巨石 / 苔石：墙根散布（带碰撞）
+      const MOSS = A().names('rock_moss_set_02');
+      const nB = Math.round(R * 2.0);
+      for (let i = 0; i < nB; i++) {
+        const a = rand() * Math.PI * 2, r = Math.min(R * 0.9, wallR(a) - 0.5 - rand() * 0.9); const x = Math.sin(a) * r, z = -Math.cos(a) * r;
+        if (inExit(x, z, 0.38)) continue;
+        const k = rand(); let o, rad, h, s;
+        if (k < 0.35) { s = 0.55 + rand() * 0.4; o = place(stal, rand() < 0.5 ? 'namaqualand_boulder_02' : 'namaqualand_boulder_05', x, -0.05, z, s, rand() * 6.28); rad = 0.55 * s; h = 0.7 * s; }
+        else { s = 0.6 + rand() * 0.5; o = placePart(stal, 'rock_moss_set_02', MOSS[Math.floor(rand() * MOSS.length)], x, -0.06, z, s, rand() * 6.28); rad = 0.7 * s; h = 0.9 * s; }
+        if (o) pillars.push({ x, z, r: rad, h });
+      }
+    } else {
+      const M = B().M; const cg = new THREE.ConeGeometry(1, 1, 7, 3);
+      for (let i = 0; i < Math.round(R * 2.2); i++) {
+        const a = Math.random() * Math.PI * 2; const r = R * (0.8 + Math.random() * 0.12); const x = Math.cos(a) * r, z = Math.sin(a) * r;
+        if (inExit(x, z, 0.35)) continue;
+        const h = 0.3 + Math.random() * 1.2; const m = new THREE.Mesh(cg, M.stone); m.scale.set(0.12 + h * 0.15, h, 0.12 + h * 0.15); m.position.set(x, h / 2 - 0.05, z); stal.add(m);
+        pillars.push({ x, z, r: 0.12 + h * 0.15, h });
+      }
     }
     // 出口隧道与天光
     const exitZ = -R * 1.05;
     const tunnel = new THREE.Group(); tunnel.position.set(0, 0, exitZ); g.add(tunnel);
-    const tg = new THREE.CylinderGeometry(1.5, 1.5, 6, 20, 6, true, Math.PI / 2, Math.PI); tg.rotateX(Math.PI / 2); tg.rotateZ(Math.PI);
+    const tg = new THREE.CylinderGeometry(1.5, 1.5, 6, 32, 12, true, Math.PI / 2, Math.PI); tg.rotateX(Math.PI / 2); tg.rotateZ(Math.PI);
     { const p = tg.attributes.position; for (let i = 0; i < p.count; i++) { const n = fbm(p.getX(i) * 2, p.getY(i) * 2, p.getZ(i) * 2); p.setXYZ(i, p.getX(i) * (0.85 + n * 0.3), Math.max(0, p.getY(i) * (0.9 + n * 0.3) + 0.2), p.getZ(i)); } tg.computeVertexNormals(); }
-    const tm = new THREE.Mesh(tg, new THREE.MeshStandardMaterial({ map: rockTex, side: THREE.DoubleSide, roughness: 1, color: '#9a8a7a' })); tm.position.z = -2.6; tunnel.add(tm);
-    const sky = new THREE.Mesh(new THREE.CircleGeometry(1.6, 24), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.1, 1.8) })); sky.position.set(0, 1.1, -5.4); tunnel.add(sky);
-    const shaft = new THREE.Mesh(new THREE.ConeGeometry(1.8, 6, 20, 1, true), new THREE.MeshBasicMaterial({ color: '#fff4d8', transparent: true, opacity: 0.07, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
-    shaft.rotation.x = -Math.PI / 2; shaft.position.set(0, 1.1, -2.2); tunnel.add(shaft);
-    const sign = makeSign('⟵ 出洞狩猎 [E]'); sign.position.set(0, 2.3, 0.6); tunnel.add(sign);
+    const tunMat = useA ? A().triplanar(A().tex('dark_rock'), { scale: 0.3, side: THREE.DoubleSide, normal: 1.6, env: 0.3, color: '#cfc0b0' }) : new THREE.MeshStandardMaterial({ map: rockTex, side: THREE.DoubleSide, roughness: 1, color: '#9a8a7a' });
+    const tm = new THREE.Mesh(tg, tunMat); tm.position.z = -2.6; tunnel.add(tm);
+    const sky = new THREE.Mesh(new THREE.CircleGeometry(1.6, 24), new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 3.0, 2.6), fog: false })); sky.position.set(0, 1.1, -5.4); tunnel.add(sky);
+    const shaft = new THREE.Mesh(new THREE.ConeGeometry(1.8, 6, 20, 1, true), new THREE.MeshBasicMaterial({ color: '#fff4d8', transparent: true, opacity: 0.06, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+    shaft.rotation.x = -Math.PI / 2; shaft.position.set(0, 1.1, -2.2); shaft.userData.noShadow = true; if (!useA) tunnel.add(shaft);
+    if (useA) { const gate = place(tunnel, 'large_iron_gate', 0, 0, -0.6, 0.78, 0); if (gate) gate.traverse(o => { if (o.isMesh) o.castShadow = false; });
+      for (const sx of [-1, 1]) { place(tunnel, 'Lantern_01', sx * 1.25, 0, 0.75, 2.2, sx * 0.6); const pl = new THREE.PointLight('#ffa850', 1.3, 5.5, 2); pl.position.set(sx * 1.25, 0.45, 0.85); tunnel.add(pl);
+        const hs = new THREE.Sprite(new THREE.SpriteMaterial({ color: new THREE.Color(1.8, 1.0, 0.5), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false, map: flameGlowTex() })); hs.position.set(sx * 1.25, 0.24, 0.75); hs.scale.set(0.35, 0.35, 1); tunnel.add(hs); } }
+    const sign = makeSign('⟵ 出洞狩猎 [E]'); sign.position.set(0, 2.55, 0.6); tunnel.add(sign);
     // 中央篝火
     const fire = new THREE.Group(); g.add(fire); fire.position.set(0, 0, 0);
-    for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2; fire.add(B().rock(0.14, M.stone, Math.cos(a) * 0.45, 0.06, Math.sin(a) * 0.45)); }
-    for (let i = 0; i < 5; i++) { const l = B().cyl(0.04, 0.05, 0.7, M.wood, 0, 0.12, 0, 6); l.rotation.set(Math.PI / 2 - 0.4, i * 1.26, 0); l.position.set(Math.cos(i * 1.26) * 0.12, 0.15, Math.sin(i * 1.26) * 0.12); fire.add(l); }
-    const flames = []; for (let i = 0; i < 5; i++) { const f = B().flame((Math.random() - 0.5) * 0.2, 0.1, (Math.random() - 0.5) * 0.2, 2.2 + Math.random() * 1.2); fire.add(f); flames.push(f); }
-    const spit = B().cyl(0.015, 0.015, 1.4, M.iron, 0, 0.9, 0, 4); spit.rotation.z = Math.PI / 2; fire.add(spit); for (const s of [-1, 1]) { const st = B().cyl(0.02, 0.02, 0.95, M.iron, s * 0.62, 0.47, 0, 4); fire.add(st); }
+    let flames = [];
+    if (useA) {
+      place(fire, 'stone_fire_pit', 0, 0.16, 0, 0.85, 0.4);
+      flames = flameSprites(fire);
+    } else {
+      const M = B().M;
+      for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2; fire.add(B().rock(0.14, M.stone, Math.cos(a) * 0.45, 0.06, Math.sin(a) * 0.45)); }
+      for (let i = 0; i < 5; i++) { const f = B().flame((Math.random() - 0.5) * 0.2, 0.1, (Math.random() - 0.5) * 0.2, 2.2 + Math.random() * 1.2); fire.add(f); flames.push(f); }
+    }
     // 地精商人
     const merchant = new THREE.Group(); const ma = Math.PI * 0.62; merchant.position.set(Math.sin(ma) * (R - 1.6), 0, -Math.cos(ma) * (R - 1.6)); merchant.rotation.y = -ma + Math.PI; g.add(merchant);
     {
       const stall = new THREE.Group(); merchant.add(stall);
-      stall.add(B().box(1.6, 0.8, 0.6, M.wood, 0, 0.4, 0.4)); for (const s of [-1, 1]) stall.add(B().cyl(0.04, 0.04, 2.0, M.wood, s * 0.78, 1.0, 0.65, 6));
-      const roof = B().box(1.8, 0.05, 1.0, B().M.cloth, 0, 2.0, 0.35); roof.rotation.x = 0.2; stall.add(roof);
+      if (useA) {
+        place(stall, 'WoodenTable_01', 0, 0, 0.42, 0.9, 0);
+        place(stall, 'treasure_chest', 0.25, 0.495, 0.42, 0.55, -0.2);
+        place(stall, 'Lantern_01', -0.55, 0.495, 0.5, 1.6, 0.5);
+        place(stall, 'wine_barrel_01', 1.1, 0, 0.2, 0.9, 1.1);
+        place(stall, 'wooden_crate_01', -1.05, 0, 0.25, 1, 0.3); place(stall, 'wooden_crate_01', -1.02, 0.34, 0.22, 1, -0.2);
+        const lg = new THREE.PointLight('#ffb060', 0.9, 3.2, 2); lg.position.set(-0.55, 0.72, 0.55); stall.add(lg);
+      } else {
+        stall.add(B().box(1.6, 0.8, 0.6, B().M.wood, 0, 0.4, 0.4));
+      }
       const skin = B().std('#6a9a3a', { roughness: 0.7 });
       const body = B().mesh(new THREE.CapsuleGeometry(0.22, 0.35, 6, 12), B().std('#5a3a6a'), 0, 0.95, -0.05); stall.add(body);
       const head = B().mesh(new THREE.SphereGeometry(0.2, 16, 12), skin, 0, 1.45, -0.02); head.scale.set(1.1, 0.95, 1); stall.add(head);
       for (const s of [-1, 1]) { const e = B().mesh(new THREE.ConeGeometry(0.06, 0.32, 6), skin, s * 0.26, 1.5, -0.02); e.rotation.z = -s * 1.2; stall.add(e); stall.add(B().mesh(new THREE.SphereGeometry(0.035, 8, 6), B().glowMat('#ffe040', 1.6), s * 0.075, 1.48, 0.16)); }
       const nose = B().mesh(new THREE.ConeGeometry(0.04, 0.14, 6), skin, 0, 1.42, 0.2); nose.rotation.x = Math.PI / 2; stall.add(nose);
-      const lantern = B().mesh(new THREE.SphereGeometry(0.09, 10, 8), B().glowMat('#ffb050', 2), 0.6, 1.7, 0.65); stall.add(lantern);
-      for (let i = 0; i < 5; i++) stall.add(B().mesh(new THREE.OctahedronGeometry(0.06), new THREE.MeshStandardMaterial({ color: '#b06aff', emissive: '#6a2aaa' }), -0.6 + i * 0.25, 0.86, 0.45));
-      const sg = makeSign('地精行商·斯尼克 [E]'); sg.position.set(0, 2.35, 0.5); merchant.add(sg);
+      const sg = makeSign('地精行商·斯尼克 [E]'); sg.position.set(0, 2.1, 0.5); merchant.add(sg);
     }
     scene.add(g);
-    return { group: g, R, H, exitPos: new THREE.Vector3(0, 0, exitZ + 0.3), merchantPos: merchant.position.clone(), flames, firePos: new THREE.Vector3(0, 0.4, 0), sky, floorAt, pillars };
+    const FR = 25;
+    function update(now) {
+      for (const f of flames) {
+        const d = f.userData.fl;
+        if (!d) { continue; }
+        const fr = Math.floor(now * d.sp + d.ph) % FR; f.material.map.offset.set((fr % 5) * 0.2, 1 - (Math.floor(fr / 5) + 1) * 0.2);
+        const k = 1 + Math.sin(now * 7 + d.ph) * 0.07 + Math.sin(now * 19 + d.ph * 2) * 0.04; f.scale.set(d.sc * 0.72 * (2 - k), d.sc * k, 1);
+      }
+    }
+    return { group: g, R, H, exitPos: new THREE.Vector3(0, 0, exitZ + 0.3), merchantPos: merchant.position.clone(), flames, firePos: new THREE.Vector3(0, 0.4, 0), sky, floorAt, pillars, update: useA ? update : null };
   }
 
   function makeSign(text) {
