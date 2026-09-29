@@ -196,5 +196,17 @@ window.RPG = (() => {
     const mem = Lore.memory(r, c, { weapon: '熔魂炉的烈焰', q: 2, hurt: 0 });
     return { c, look, sig, mem, story: Lore.backstory(r, c), app: Lore.appearance(c, look), date: Date.now() };
   }
-  return { STATS, EQUIP, SLOTS, CONSUM, TRAIN, AFF, stats, eqSum, trainCost, expedition, sigOf, rollExtras, luckOf, forgeHead, bossHead };
+  // 第十四轮：世界里的一个敌人（她活着站在那里；砍下首级才算到手，所以这里不占用名字/外观签名）
+  function foe(S, loc, seed, usedNames, usedSig) {
+    let s = seed >>> 0; const r = () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const c = Lore.makeCharacter(r, loc, usedNames, luckOf(S));
+    const look = ModelHeads.randomLook(r, c.lookRace, c.rar);
+    let sig = sigOf(look), tries = 0;
+    while (usedSig.has(sig) && tries++ < 30) { Object.assign(look, ModelHeads.randomLook(r, c.lookRace, c.rar)); sig = sigOf(look); }
+    rollExtras(r, c, look, luckOf(S));
+    const wpn = EQUIP.weapon.tiers[S.eq.weapon || 0].n;
+    const mem = Lore.memory(r, c, { weapon: wpn, q: 1, hurt: 0.1 });
+    return { c, look, sig, mem, story: Lore.backstory(r, c), app: Lore.appearance(c, look), date: Date.now() };
+  }
+  return { STATS, EQUIP, SLOTS, CONSUM, TRAIN, AFF, stats, eqSum, trainCost, expedition, sigOf, rollExtras, luckOf, forgeHead, bossHead, foe };
 })();

@@ -293,6 +293,10 @@ window.UI = (() => {
     return `<div class="loc-boss" style="margin-top:4px;font-size:12.5px;color:${done ? '#ffd060' : '#c8b8d8'}">${done ? `👑 已征服：${esc(B.title)}·${esc(B.n)}` : `👑 霸主：${(G.S.visits && G.S.visits[l.k]) ? esc(B.title) : '？？？'}（随机现身）`}</div>`;
   }
   function openExpedition() {
+    if (window.Worlds && (!window.Mods || Mods.on('worldgraph'))) { // 第十四轮：没有选关——直接走进那片大陆
+      const S = G.S, s0 = G.st(); if (S.hp < s0.maxHp * 0.35) G.toast(`⚠️ 你只剩 ${Math.round(S.hp)}/${s0.maxHp} 血，死在外面一切归零`, '#ff8060', 3.5);
+      startTrip('village'); return;
+    }
     const S = G.S, s = G.st();
     const hpF = S.hp / s.maxHp;
     const cards = Lore.LOCS.map(l => {
@@ -313,7 +317,8 @@ window.UI = (() => {
   function startTrip(k) {
     const loc = Lore.LOCS.find(l => l.k === k); if (!loc) return;
     const s = G.st();
-    const res = RPG.expedition(G.S, s, loc, (Math.random() * 4294967296) >>> 0, G.usedNames, G.usedSig);
+    const worldOn = window.Worlds && (!window.Mods || Mods.on('worldgraph'));
+    const res = worldOn ? { beats: [{ t: '' }, { t: '' }], heads: [] } : RPG.expedition(G.S, s, loc, (Math.random() * 4294967296) >>> 0, G.usedNames, G.usedSig);
     const n = res.beats.length;
     // 第一段立刻出现，其余均匀分布在 60 次点击上，最后一段在第 60 下
     const at = res.beats.map((b, i) => i === 0 ? 0 : Math.round(i / (n - 1) * TAPS));
