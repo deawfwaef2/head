@@ -308,6 +308,29 @@ window.UI3A = (() => {
     else new MutationObserver((ms, mo) => { const g2 = $('#gacha'); if (g2) { attach(g2); mo.disconnect(); } }).observe(document.body, { childList: true });
   }
 
+  // ------------------------------------------------------------------ 出猎世界反馈：命中标记 / 成就 / 连击里程碑（只观察 #wRoot 里 worlds.js 生成的 DOM）
+  function worldWatch() {
+    let hm; const marker = heavy => {
+      if (!hm) { hm = document.createElement('div'); hm.id = 'u-hm'; hm.innerHTML = [45, 135, 225, 315].map(r => `<i style="--r:${r}deg"></i>`).join(''); document.body.appendChild(hm); }
+      hm.classList.toggle('heavy', !!heavy); hm.classList.remove('go'); void hm.offsetWidth; hm.classList.add('go');
+    };
+    let lastCombo = 0;
+    const onNode = n => {
+      if (n.nodeType !== 1) return; const cl = n.classList;
+      if (cl.contains('wsay') && cl.contains('rew')) { A.ping(760); const r = n.getBoundingClientRect(); burst(r.left + r.width / 2, r.top + r.height / 2, { n: 10, color: '#c79bff', speed: 150, life: .7, size: 1.2, g: -40 }); }
+      else if (cl.contains('wsay') && cl.contains('dmg')) { const v = parseInt(n.textContent, 10) || 0; marker(v >= 60); }
+      else if (cl.contains('wach')) { A.ping(523); A.ping(784); burst(innerWidth / 2, innerHeight * .2, { n: 46, color: '#ffd27a', speed: 420, life: 1.2, size: 1.8, g: 260 }); }
+    };
+    const attach = root => {
+      new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) onNode(n); }).observe(root, { childList: true, subtree: true });
+      new MutationObserver(() => { const c = $('.wcombo b', root), v = c ? parseInt(c.textContent, 10) || 0 : 0;
+        if (v > lastCombo && [5, 10, 15, 20, 30, 50].includes(v)) { A.ping(440 * Math.pow(2, Math.min(v, 30) / 24)); burst(innerWidth * .86, innerHeight * .4, { n: 18 + v, color: '#ff8a4a', speed: 320, life: .8, size: 1.7, g: 200 }); }
+        lastCombo = v; }).observe(root, { childList: true, subtree: true, characterData: true });
+    };
+    const r = $('#wRoot'); if (r) attach(r);
+    else new MutationObserver((ms, mo) => { const r2 = $('#wRoot'); if (r2) { attach(r2); mo.disconnect(); } }).observe(document.body, { childList: true });
+  }
+
   // ------------------------------------------------------------------ 菜单：存档信息 / 继续按钮 / 快捷键提示条
   function menuInfo() {
     const m = $('#menu'), sb = $('#startBtn'); if (!m || !sb) return;
@@ -350,7 +373,7 @@ window.UI3A = (() => {
   // ------------------------------------------------------------------ 启动
   function init() {
     if (window.Mods && Mods.on('lowspec')) document.body.classList.add('u-lite');
-    sprite(); loadTips(); startIconObserver(); ensureFx(); hudInit(); gachaWatch(); menuInfo(); hintInit(); stagger(); curtain();
+    sprite(); loadTips(); startIconObserver(); ensureFx(); hudInit(); gachaWatch(); worldWatch(); menuInfo(); hintInit(); stagger(); curtain();
     embers($('#menu')); embers($('#loading'));
     document.addEventListener('mouseover', hoverIn, true); document.addEventListener('pointermove', move, { passive: true }); document.addEventListener('pointerdown', down, true);
     setInterval(pollHud, 100);

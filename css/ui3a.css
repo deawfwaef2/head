@@ -386,4 +386,10 @@ body.ui3a #u-tip b { color: var(--u-gold); font-weight: 700; }
 #u-curtain { position: fixed; inset: 0; z-index: 90; pointer-events: none; background: #000; opacity: 0; }
 #u-curtain.go { animation: u-curtain 1.05s ease-in-out; } @keyframes u-curtain { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0; } }
 
+/* 命中标记（ui3a.js 观察 #wRoot 里出现的伤害飘字触发） */
+#u-hm { position: fixed; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; z-index: 41; pointer-events: none; opacity: 0; }
+#u-hm i { position: absolute; left: 50%; top: 50%; width: 11px; height: 2.5px; margin: -1px 0 0 -5px; background: #fff; box-shadow: 0 0 6px #fff, 0 0 12px var(--hc, #ffd27a); transform: rotate(var(--r)) translateX(13px); }
+#u-hm.go { animation: u-hm .22s ease-out; } @keyframes u-hm { 0% { opacity: 1; transform: scale(.6); } 30% { opacity: 1; transform: scale(1.15); } 100% { opacity: 0; transform: scale(1.5); } }
+#u-hm.heavy { --hc: #ff3a4a; } #u-hm.heavy i { background: #ffd0c0; width: 15px; height: 3.5px; }
+
 @media (prefers-reduced-motion: reduce) { body.ui3a *, body.ui3a *::before, body.ui3a *::after { animation-duration: .01ms !important; } }
