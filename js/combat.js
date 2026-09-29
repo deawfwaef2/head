@@ -97,8 +97,8 @@ window.Combat = (() => {
   // 返回镜头转动系数：挥砍/格挡时鼠标主要用于控制武器
   function onMove(dx, dy) {
     if (!drawn) return 1;
-    if (S.lmb) { const k = 0.0062; S.ctrl.x += dx * k; S.ctrl.y -= dy * k; S.drag += Math.hypot(dx, dy) * k; const r = Math.hypot(S.ctrl.x, S.ctrl.y); if (r > 1.25) { S.ctrl.x *= 1.25 / r; S.ctrl.y *= 1.25 / r; } return 0.12; }
-    if (S.rmb) { S.guard.x += dx * 0.03; S.guard.y -= dy * 0.03; const r = Math.hypot(S.guard.x, S.guard.y); if (r > 1) { S.guard.x /= r; S.guard.y /= r; } return 0.3; }
+    if (S.lmb) { const k = 0.0062; S.ctrl.x += dx * k; S.ctrl.y -= dy * k; S.drag += Math.hypot(dx, dy) * k; const r = Math.hypot(S.ctrl.x, S.ctrl.y); if (r > 1.25) { S.ctrl.x *= 1.25 / r; S.ctrl.y *= 1.25 / r; } return 1; }
+    if (S.rmb) { S.guard.x += dx * 0.03; S.guard.y -= dy * 0.03; const r = Math.hypot(S.guard.x, S.guard.y); if (r > 1) { S.guard.x /= r; S.guard.y /= r; } return 1; }
     return 1;
   }
   function queueThrust() { if (S.thrust > 0.55 || S.thrust === 0) { S.thrust = 0.0001; S.thrustSide = -S.thrustSide; S.stam -= 9; SFX.play('draw', 0.35, 1.5); } else S.thrustQ = Math.min(2, S.thrustQ + 1); }

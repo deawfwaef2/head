@@ -339,14 +339,18 @@ window.startGame = function () {
   let hplace = null, eDown = 0, eLong = false;
   let held = null, bagGroup = null, bagCarrying = false, heldYaw = 0, heldFace = 0, buildMode = null, buildRot = 0, ghost = null, ghostOk = false;
   const lastHeldPos = new V3(), heldVel = new V3();
-  function lockPointer() { if (noLock) { startPlaying(); return; } try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => { noLock = true; startPlaying(); }); } catch (e) { noLock = true; startPlaying(); } }
+  // 锁鼠标失败（比如刚退出锁定 1 秒内再请求、或不是用户手势触发）只是暂时的：下次点画面就重锁，不再永久退回拖拽模式
+  let lockRetry = false;
+  if (!canvas.requestPointerLock) noLock = true;
+  function lockFailed() { lockRetry = true; startPlaying(); try { toast('🖱️ 点一下画面锁定鼠标'); } catch (e) {} }
+  function lockPointer() { if (noLock) { startPlaying(); return; } try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => lockFailed()); } catch (e) { lockFailed(); } }
   function startPlaying() { playing = true; $('menu').classList.add('hidden'); SFX.music('cave'); if (uiOpen && document.pointerLockElement) document.exitPointerLock(); }
   document.addEventListener('pointerlockchange', () => {
     locked = document.pointerLockElement === canvas;
-    if (locked) startPlaying();
-    else if (!noLock && !uiOpen) { playing = false; $('menu').classList.remove('hidden'); save(); }
+    if (locked) { lockRetry = false; startPlaying(); }
+    else if (!noLock && !uiOpen && !lockRetry) { playing = false; $('menu').classList.remove('hidden'); save(); }
   });
-  document.addEventListener('pointerlockerror', () => { noLock = true; startPlaying(); });
+  document.addEventListener('pointerlockerror', () => lockFailed());
   function setUI(open) { uiOpen = open; if (open) { if (document.pointerLockElement) document.exitPointerLock(); } }
   let dragLook = false, dragMoved = 0, mouseDown = false;
   document.addEventListener('mousemove', e => {
@@ -360,6 +364,7 @@ window.startGame = function () {
   canvas.addEventListener('mousedown', e => {
     if (uiOpen) return;
     if (!playing) return;
+    if (lockRetry && !locked) { lockRetry = false; lockPointer(); return; }
     if (window.Worlds && Worlds.active) { Worlds.onDown(e.button); return; }
     if (window.Combat && Combat.drawn && !hplace && !buildMode && !held && Combat.onDown(e.button)) { if (noLock && e.button === 0) { dragLook = true; dragMoved = 99; } return; }
     if (noLock && e.button === 0) { dragLook = true; dragMoved = 0; mouseDown = true; return; }
