@@ -694,3 +694,11 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 测试：`_w.html`（gitignore）是独立的地点查看器，不走 `Worlds.start`。2GB 沙箱里完整游戏加世界会 OOM。
 
 **提醒其他 Agent**：本沙箱会被整体重置，`/var/work` 与未推送的提交都会丢失。本 Agent 已吃过一次亏，请务必做完一步就 push。
+- **[UI Agent · 首轮完成 · commit 见 git log「第十九轮(UI Agent)」]**
+  - 新增 `css/ui3a.css`（皮肤）、`js/ui3a.js`（增强层）、`index.html` 的 `<link>`/`<script>`/`body.ui3a` 内联脚本 + HUD/提示/菜单快捷键的**静态 DOM 重写**（保留全部原 id；新增 `.u-top .u-gem .u-lbl .u-pow #hpghost`）、`js/mods.js` 追加 MOD `ui3a`（默认开，`?` 关闭 = 旧界面，index 内有兜底样式）。
+  - 已覆盖：加载页/主菜单（余烬粒子、金属渐变标题、继续游戏+存档摘要、键帽提示）、HUD（魂晶渐变+增量飘字+粒子、血条残影、受击红边/HUD 抖动/低血心跳+红脉冲）、准星（金色括角）、交互提示（键帽）、Toast、飘字描边、全部 `.modal`（括角面板、斜切按钮、下划线页签、聚光灯卡片、错峰入场、金色光标）、MOD 管理器、抽卡卡片（扫光+稀有度爆粒子+提示音）、死亡/开场、出猎世界 HUD（`#wStat #wTop #wHint #wBoss #wBanner .wskills .wcombo .wach .wsay`，Boss 血条移到顶部避免与技能栏重叠）、开局转场幕布。出猎世界激活时给 body 加 `u-world` 隐藏洞内 HUD（旧版两个 HUD 重叠）。
+  - **图标**：`UI3A.MAP` 把约 120 个 emoji 换成内联 SVG（MutationObserver，排除 `#labels #seance .float .wlabel #chessRoot`）。未收录的 emoji 仍显示原生 emoji，并套 `.u-emo`（降饱和统一色调）。**新增图标**：在 `js/ui3a.js` 的 `P`（路径）与 `MAP`（emoji→key）各加一行。不要在 `.u-i` 里再嵌 emoji。
+  - **音效**：`UI3A.sfx`（合成，接 `SFX.ctx/SFX.out`）：悬停 tick、点击 press、拒绝、受击重击、低血心跳、魂晶 ping。如别的 Agent 想加 UI 音效，请复用它，避免重复叠音。
+  - **其他 Agent 请注意**：① 需要新弹窗就沿用 `.modal/.m-head/.m-title/.hint2/.bp-grid/.bp-item/.eq/.loc/.hd/.log/.btns` 等既有 class，皮肤自动生效；② 新增 HUD 元素别直接写死颜色/圆角，请用 `css/ui3a.css` 顶部 `--u-*` 变量；③ `#tip`/`#hud` 的内容仍由 game.js 每帧写入，别给它们的子元素加入场动画（会每帧重播）；④ 卡片/按钮的 hover 用 `transform`，别给同元素再加 `animation-fill-mode: forwards`，会锁住 hover。
+  - 测试：`_tools/mock.py mock_combat.html out.png`（秒出 HUD 静态样机，无需加载游戏）；`_tools/multi.py _t.html steps.json [W H]`（一次加载多次截图，约 3~5 分钟）；`_tools/mk_t.py 4` 生成 4 模型轻量页。这些在 `_tools/`（gitignored）。
+  - 待办（UI）：seance/chess/explore 自带全屏 UI 未换肤（各有独立风格，谨慎处理）；旧“点 60 次”旅途 UI 仅通用换肤；技能栏冷却可做环形遮罩；可加设置面板（音量/UI 缩放/受击闪屏强度）。

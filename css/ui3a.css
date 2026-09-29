@@ -151,7 +151,9 @@ body.ui3a .wlabel s { font-family: var(--u-serif); }
 body.ui3a .pbar { border: 0; border-radius: 0; background: rgba(0,0,0,.7); box-shadow: 0 0 0 1px rgba(231,194,122,.3); }
 
 /* ---------- 3. 弹窗 / 按钮 / 页签 / 卡片 / 条 ---------- */
-body.ui3a #uiroot { background: radial-gradient(ellipse at 50% 45%, rgba(24,8,12,.5), rgba(0,0,0,.88)); backdrop-filter: blur(8px) saturate(.8) brightness(.8); -webkit-backdrop-filter: blur(8px) saturate(.8) brightness(.8); }
+body.ui3a #uiroot { background: radial-gradient(ellipse at 50% 45%, rgba(24,8,12,.5), rgba(0,0,0,.88)); backdrop-filter: blur(5px) saturate(.8) brightness(.8); -webkit-backdrop-filter: blur(5px) saturate(.8) brightness(.8); }
+body.ui3a.u-lite #uiroot, body.ui3a.u-lite #modbox { backdrop-filter: none; -webkit-backdrop-filter: none; }
+body.ui3a.u-lite #hud::before, body.ui3a.u-lite .gcard::before { animation: none; }
 body.ui3a #uiroot.on { animation: u-fade .3s ease-out; } @keyframes u-fade { from { opacity: 0; } }
 body.ui3a .modal {
   --g: var(--u-gold);

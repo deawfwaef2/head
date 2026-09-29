@@ -349,6 +349,7 @@ window.UI3A = (() => {
 
   // ------------------------------------------------------------------ 启动
   function init() {
+    if (window.Mods && Mods.on('lowspec')) document.body.classList.add('u-lite');
     sprite(); loadTips(); startIconObserver(); ensureFx(); hudInit(); gachaWatch(); menuInfo(); hintInit(); stagger(); curtain();
     embers($('#menu')); embers($('#loading'));
     document.addEventListener('mouseover', hoverIn, true); document.addEventListener('pointermove', move, { passive: true }); document.addEventListener('pointerdown', down, true);
