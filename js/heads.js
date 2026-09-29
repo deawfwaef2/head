@@ -25,7 +25,7 @@ window.ModelHeads = (() => {
     '灰紫': '#a8a0c4', '暗青': '#7e86a4', '淡紫': '#e0c4ea', '苍白': '#e8e8ec', '赤红': '#e89a8a', '青灰': '#a8b4b0'
   };
 
-  const grad = (() => { const d = new Uint8Array([120, 190, 235, 255]); const t = new THREE.DataTexture(d, 4, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
+  const grad = (() => { const d = new Uint8Array([120, 190, 235, 255]); const t = new THREE.DataTexture(d, 4, 1, THREE.RedFormat); const sm = !!(window.Mods && Mods.on('smooth_faces')); t.minFilter = t.magFilter = sm ? THREE.LinearFilter : THREE.NearestFilter; t.needsUpdate = true; return t; })();
 
   function b64ToBuf(b64) { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
 
@@ -37,6 +37,27 @@ window.ModelHeads = (() => {
       let s = 0, w = 0; for (let i = 0; i < d.length; i += 4) { const a = d[i + 3] / 255; if (a < 0.3) continue; s += (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / 255 * a; w += a; }
       return w > 0 ? Math.max(0.15, s / w) : 0.6;
     } catch (e) { return 0.6; }
+  }
+  function skinColorFix(tex) {
+    try {
+      const img = tex && tex.image; if (!img) return 0;
+      const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d', { willReadFrequently: true });
+      g.drawImage(img, 0, 0, 32, 32); const d = g.getImageData(0, 0, 32, 32).data; let r = 0, gg = 0, b = 0, n = 0;
+      for (let i = 0; i < d.length; i += 4) { if (d[i + 3] < 64) continue; r += d[i]; gg += d[i + 1]; b += d[i + 2]; n++; }
+      if (!n) return 0; r /= n; gg /= n; b /= n; const sum = Math.max(1, r + gg + b);
+      // 只轻度压低贴图本身的青绿偏色；有意设置的幻想肤色仍由 uSkin 保留。
+      return THREE.MathUtils.clamp(2.2 * Math.max(0, gg - r) / sum + 1.3 * Math.max(0, b - r) / sum, 0, 1.0);
+    } catch (e) { return 0; }
+  }
+  function softenSkinNormals(geo) {
+    const p = geo.attributes.position, n = geo.attributes.normal; if (!p || !n) return;
+    const bins = new Map(), keys = new Array(p.count);
+    for (let i = 0; i < p.count; i++) {
+      const k = Math.round(p.getX(i) * 1e5) + ',' + Math.round(p.getY(i) * 1e5) + ',' + Math.round(p.getZ(i) * 1e5); keys[i] = k;
+      let a = bins.get(k); if (!a) bins.set(k, a = [0, 0, 0]); a[0] += n.getX(i); a[1] += n.getY(i); a[2] += n.getZ(i);
+    }
+    for (let i = 0; i < p.count; i++) { const a = bins.get(keys[i]), l = Math.hypot(a[0], a[1], a[2]); if (l > 1e-6) n.setXYZ(i, a[0] / l, a[1] / l, a[2] / l); }
+    n.needsUpdate = true;
   }
 
   function kindOf(mesh, matName, meta) {
@@ -56,19 +77,32 @@ window.ModelHeads = (() => {
           entry.glb = null;
           const meshes = [];
           gltf.scene.traverse(o => { if (o.isMesh && !(entry.skip || []).includes(o.name)) meshes.push(o); });
-          const lum = new Map();
+          const lum = new Map(), greenFixes = new Map(), textureLums = new Map();
+          const greenFixFor = src => { if (!greenFixes.has(src)) greenFixes.set(src, skinColorFix(src.map)); return greenFixes.get(src); };
+          const textureLumFor = src => { if (!textureLums.has(src)) textureLums.set(src, avgLum(src.map)); return textureLums.get(src); };
           meshes.forEach(m => {
             const src = m.material; const nm = src.name || '';
             SRC.set(m, src);
             // 第十二轮：部分 VRoid 导出的眼部三角形绕序相反（MToon _CullMode=0 未体现在 glTF 里），单面会被整块剔除 → 空眼窝。眼/眉一律双面。
             if (/Eye|Iris|Brow|Lash|Highlight/i.test(nm)) src.side = THREE.DoubleSide;
             m.userData.kind = kindOf(m, nm, entry);
+            // 有些 VRoid 将脸/下颌的绿色皮肤贴图导出成无材质名的普通网格；用大面积、亮度足够的绿偏贴图补识别，避开暗色眼线/瞳孔。
+            if (m.userData.kind === 'other' && !nm && src.map && m.geometry.attributes.position && m.geometry.attributes.position.count >= 320) {
+              const bias = greenFixFor(src); if (bias > 0.55 && textureLumFor(src) > 0.32) m.userData.kind = 'skin';
+            }
+            if (m.userData.kind === 'skin') {
+              if (window.Mods && Mods.on('head_repair')) {
+                src.userData._headGreenFix = greenFixFor(src);
+                src.side = THREE.DoubleSide; // 背颈薄面不因单面绕序/剔除而漏光
+              }
+              if (window.Mods && Mods.on('smooth_faces')) softenSkinNormals(m.geometry); // 模板解析期仅预处理一次，保留共享几何体，避免每个皮肤网格多占一份内存
+            }
             if (m.userData.kind === 'cut') fixCutUV(m.geometry);
             m.renderOrder = /Highlight/i.test(nm) ? 4 : /Iris/i.test(nm) ? 3 : /Eyeline|Eyelash|Brow/i.test(nm) ? 3 : /EyeWhite/i.test(nm) ? 2 : 0;
             if ((m.userData.kind === 'hair' || m.userData.kind === 'iris' || m.userData.kind === 'brow') && !lum.has(src)) lum.set(src, avgLum(src.map));
             m.geometry.computeBoundingSphere();
           });
-          try { fitCut(meshes, entry); } catch (e) { console.warn('fitCut', entry.file, e); }
+          try { if (window.Mods && Mods.on('head_repair')) fitCut(meshes, entry); else fitCutLegacy(meshes, entry); } catch (e) { console.warn('fitCut', entry.file, e); }
           const hairMeshes = meshes.filter(m => m.userData.kind === 'hair');
           let hairMinY = 0; hairMeshes.forEach(m => { m.geometry.computeBoundingBox(); hairMinY = Math.min(hairMinY, m.geometry.boundingBox.min.y); });
           T.push({ meta: entry, meshes, hairMeshes, faceMeshes: meshes.filter(m => m.userData.kind !== 'hair'), lum, hairMinY, shared: new Map() });
@@ -89,34 +123,94 @@ window.ModelHeads = (() => {
     return ready;
   }
 
-  // 第十一轮：断面按脖子真实轮廓重建。原来的圆盘半径取自带衣领/肩部的顶点，部分模型（K/L/S）断口比脖子大一圈。
-  // 做法：收集落在切面上的皮肤顶点（颈部开口的边缘），按 48 个方向取半径，平滑后生成多边形扇面替换圆盘。
+  // 断面修复（MOD head_repair）：切面高度以模型元数据 bottom 为准，不再平均原圆片的翘起顶点；
+  // 从切平面上的真实皮肤顶点取凸轮廓并三角化，避免 48 段圆扇与颈部错位/留缝。
   function fitCut(meshes, entry) {
     const cut = meshes.find(m => m.userData.kind === 'cut'); if (!cut) return;
-    cut.updateMatrixWorld(true); const cp = cut.geometry.attributes.position; const toCut = cut.matrixWorld.clone().invert();
+    cut.updateMatrixWorld(true); const toCut = cut.matrixWorld.clone().invert(), v = new THREE.Vector3();
+    const cp = cut.geometry.attributes.position;
+    let plane = Number.isFinite(entry.bottom) ? entry.bottom : (entry.cut && Number.isFinite(entry.cut.y) ? entry.cut.y : NaN);
+    if (!Number.isFinite(plane)) { for (let i = 0; i < cp.count; i++) { v.fromBufferAttribute(cp, i).applyMatrix4(cut.matrixWorld); plane = (Number.isFinite(plane) ? plane : 0) + v.y / cp.count; } }
+    const ly = new THREE.Vector3(0, plane, 0).applyMatrix4(toCut).y;
+    const expected = new THREE.Vector3(entry.cut && entry.cut.x || 0, plane, entry.cut && entry.cut.z || 0).applyMatrix4(toCut);
+    const r0 = entry.cut && entry.cut.r || 0.03, maxR = Math.min(0.12, Math.max(0.075, r0 * 2.5 + 0.01));
+    const gather = tol => {
+      const out = new Map();
+      for (const m of meshes) {
+        if (m.userData.kind !== 'skin') continue;
+        m.updateMatrixWorld(true); const p = m.geometry.attributes.position; if (!p) continue;
+        for (let i = 0; i < p.count; i++) {
+          v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld);
+          if (Math.abs(v.y - plane) > tol) continue;
+          const q = v.clone().applyMatrix4(toCut), dx = q.x - expected.x, dz = q.z - expected.z;
+          if (dx * dx + dz * dz > maxR * maxR) continue;
+          out.set(Math.round(q.x * 1e5) + ',' + Math.round(q.z * 1e5), { x: q.x, z: q.z });
+        }
+      }
+      return Array.from(out.values());
+    };
+    let pts = gather(0.0008); if (pts.length < 8) pts = gather(0.0035);
+    let hull = [];
+    if (pts.length >= 8) {
+      pts.sort((a, b) => a.x - b.x || a.z - b.z);
+      const turn = (a, b, c) => (b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x);
+      const lo = [], hi = [];
+      for (const p of pts) { while (lo.length > 1 && turn(lo[lo.length - 2], lo[lo.length - 1], p) <= 1e-12) lo.pop(); lo.push(p); }
+      for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (hi.length > 1 && turn(hi[hi.length - 2], hi[hi.length - 1], p) <= 1e-12) hi.pop(); hi.push(p); }
+      hull = lo.slice(0, -1).concat(hi.slice(0, -1));
+    }
+    let g = null, cx = expected.x, cz = expected.z, meanR = r0;
+    if (hull.length >= 6) {
+      const contour = hull.map(p => new THREE.Vector2(p.x, p.z));
+      const faces = THREE.ShapeUtils.triangulateShape(contour, []);
+      if (faces && faces.length) {
+        let a2 = 0, sx = 0, sz = 0;
+        for (let i = 0; i < hull.length; i++) { const a = hull[i], b = hull[(i + 1) % hull.length], k = a.x * b.z - b.x * a.z; a2 += k; sx += (a.x + b.x) * k; sz += (a.z + b.z) * k; }
+        if (Math.abs(a2) > 1e-8) { cx = sx / (3 * a2); cz = sz / (3 * a2); }
+        const pos = new Float32Array(hull.length * 3), nor = new Float32Array(hull.length * 3), ids = [];
+        let rs = 0;
+        for (let i = 0; i < hull.length; i++) { const x = cx + (hull[i].x - cx) * 1.002, z = cz + (hull[i].z - cz) * 1.002; pos[i * 3] = x; pos[i * 3 + 1] = ly; pos[i * 3 + 2] = z; nor[i * 3 + 1] = -1; rs += Math.hypot(x - cx, z - cz); }
+        faces.forEach(f => ids.push(f[0], f[1], f[2]));
+        g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setIndex(ids); meanR = rs / hull.length;
+      }
+    }
+    if (!g) {
+      // 极少数缺少颈圈采样点的旧模型：保留原始封盖轮廓，但强制压回真实切平面。
+      g = cut.geometry.clone(); const p = g.attributes.position;
+      for (let i = 0; i < p.count; i++) p.setY(i, ly);
+      p.needsUpdate = true; const n = new Float32Array(p.count * 3); for (let i = 0; i < p.count; i++) n[i * 3 + 1] = -1;
+      g.setAttribute('normal', new THREE.BufferAttribute(n, 3));
+    }
+    cut.geometry.dispose(); cut.geometry = g; fixCutUV(g); g.computeBoundingBox(); g.computeBoundingSphere();
+    if (entry.cut) {
+      const worldC = new THREE.Vector3(cx, ly, cz).applyMatrix4(cut.matrixWorld);
+      entry.cut.r0 = entry.cut.r0 || entry.cut.r; entry.cut.r = meanR; entry.cut.x = worldC.x; entry.cut.y = plane; entry.cut.z = worldC.z;
+    }
+  }
+  function fitCutLegacy(meshes, entry) {
+    const cut = meshes.find(m => m.userData.kind === 'cut'); if (!cut) return;
+    cut.updateMatrixWorld(true); const cp = cut.geometry.attributes.position, toCut = cut.matrixWorld.clone().invert();
     let cy = 0, cx = 0, cz = 0; const v = new THREE.Vector3();
     for (let i = 0; i < cp.count; i++) { v.fromBufferAttribute(cp, i).applyMatrix4(cut.matrixWorld); cy += v.y; } cy /= cp.count;
-    const gather = (pred) => { const pts = []; for (const m of meshes) { if (!pred(m)) continue; m.updateMatrixWorld(true); const p = m.geometry.attributes.position;
+    const gather = () => { const pts = []; for (const m of meshes) { if (m.userData.kind !== 'skin') continue; m.updateMatrixWorld(true); const p = m.geometry.attributes.position;
       for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld); if (Math.abs(v.y - cy) < 0.004) pts.push(v.clone().applyMatrix4(toCut)); } } return pts; };
-    let pts = gather(m => m.userData.kind === 'skin');
-    if (pts.length < 16) pts = gather(m => m.userData.kind !== 'hair' && m.userData.kind !== 'cut');
-    if (pts.length < 16) return;
+    const pts = gather(); if (pts.length < 16) return;
     pts.forEach(q => { cx += q.x; cz += q.z; }); cx /= pts.length; cz /= pts.length;
     const NB = 48, R = new Array(NB).fill(0);
-    for (const q of pts) { const a = Math.atan2(q.z - cz, q.x - cx); const b = ((Math.floor((a + Math.PI) / (Math.PI * 2) * NB) % NB) + NB) % NB; R[b] = Math.max(R[b], Math.hypot(q.x - cx, q.z - cz)); }
-    const filled = R.filter(r => r > 0).length; if (filled < NB * 0.5) return;
+    for (const q of pts) { const a = Math.atan2(q.z - cz, q.x - cx), b = ((Math.floor((a + Math.PI) / (Math.PI * 2) * NB) % NB) + NB) % NB; R[b] = Math.max(R[b], Math.hypot(q.x - cx, q.z - cz)); }
+    if (R.filter(r => r > 0).length < NB * 0.5) return;
     for (let b = 0; b < NB; b++) if (!R[b]) { let l = b, r = b; while (!R[(l + NB) % NB]) l--; while (!R[r % NB]) r++; const a = R[(l + NB) % NB], c = R[r % NB]; R[b] = a + (c - a) * (b - l) / (r - l); }
     const Rs = R.map((r, b) => { const a = [R[(b + NB - 1) % NB], r, R[(b + 1) % NB]].sort((x, y) => x - y); return a[1] * 0.99; });
-    const ly = new THREE.Vector3(0, cy, 0).applyMatrix4(toCut).y;
-    const pos = [cx, ly, cz], idx = [];
+    const ly = new THREE.Vector3(0, cy, 0).applyMatrix4(toCut).y, pos = [cx, ly, cz], idx = [];
     for (let b = 0; b < NB; b++) { const a = (b + 0.5) / NB * Math.PI * 2 - Math.PI; pos.push(cx + Math.cos(a) * Rs[b], ly, cz + Math.sin(a) * Rs[b]); }
     for (let b = 0; b < NB; b++) idx.push(0, 1 + (b + 1) % NB, 1 + b);
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(pos.length).fill(0).map((_, i) => i % 3 === 1 ? -1 : 0), 3)); g.setIndex(idx);
+    const n = new Float32Array(pos.length); for (let i = 0; i < n.length; i += 3) n[i + 1] = -1; g.setAttribute('normal', new THREE.BufferAttribute(n, 3)); g.setIndex(idx);
     cut.geometry.dispose(); cut.geometry = g; fixCutUV(g);
     const mean = Rs.reduce((s, r) => s + r, 0) / NB;
     if (entry.cut) { entry.cut.r0 = entry.cut.r; entry.cut.r = Math.min(entry.cut.r || mean, mean); entry.cut.x = cx; entry.cut.z = cz; }
   }
+
   // ---------- 断面材质（黑暗奇幻：皮、肉、颈椎、气管） ----------
   let cutMat = null;
   // 断面 UV 按实际几何重新映射（部分模型转换时按错误半径算 UV，导致整个断面落在外圈肤色区）
@@ -132,6 +226,13 @@ window.ModelHeads = (() => {
   }
   function getCut() {
     if (cutMat) return cutMat;
+    if (window.Mods && Mods.on('head_repair') && window.Assets) {
+      const t = Assets.tex('cut_wagyu');
+      if (t && t.diff) {
+        cutMat = new THREE.MeshStandardMaterial({ map: t.diff, normalMap: t.nor || null, roughnessMap: t.rough || null, roughness: 0.82, metalness: 0, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1, name: '__CUT__ CC0 PBR' });
+        cutMat.normalScale.set(0.42, 0.42); return cutMat;
+      }
+    }
     const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
     const rg = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
     rg.addColorStop(0, '#6a0710'); rg.addColorStop(0.55, '#8e0f1a'); rg.addColorStop(0.8, '#b0303a'); rg.addColorStop(0.9, '#e8b8a0'); rg.addColorStop(1, '#f0c8b0');
@@ -235,17 +336,18 @@ window.ModelHeads = (() => {
   function skinMat(src, U) {
     const m = new THREE.MeshToonMaterial({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: src.depthWrite });
     m.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, { uMk: U.mk, uHover: U.hover, uSkin: U.skin, uPale: U.pale, uBlood: U.blood, uSpat: U.spat, uSeed: U.seed, uCutY: U.cutY, uH: U.hH, uScar: U.scar, uPaint: U.paint, uPaintC: U.paintC, uEye: U.eye });
+      Object.assign(sh.uniforms, { uMk: U.mk, uHover: U.hover, uSkin: U.skin, uSkinFix: { value: (window.Mods && Mods.on('head_repair') && src.userData ? src.userData._headGreenFix || 0 : 0) }, uPale: U.pale, uBlood: U.blood, uSpat: U.spat, uSeed: U.seed, uCutY: U.cutY, uH: U.hH, uScar: U.scar, uPaint: U.paint, uPaintC: U.paintC, uEye: U.eye });
       injectVertex(sh, false);
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <dithering_fragment>', '\n#include <dithering_fragment>\n gl_FragColor.rgb += uHover * (0.1 + 0.6 * pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 2.2)) * vec3(1.0, 0.8, 0.5);')
-        .replace('void main() {', `varying vec3 vHP; uniform float uHover; uniform vec3 uMk; uniform vec3 uSkin; uniform float uPale; uniform float uBlood; uniform float uSpat; uniform float uSeed; uniform float uCutY; uniform float uH;
+        .replace('void main() {', `varying vec3 vHP; uniform float uHover; uniform vec3 uMk; uniform vec3 uSkin; uniform float uSkinFix; uniform float uPale; uniform float uBlood; uniform float uSpat; uniform float uSeed; uniform float uCutY; uniform float uH;
           uniform vec4 uScar; uniform float uPaint; uniform vec3 uPaintC; uniform vec3 uEye; ${NOISE}
           float segD(vec2 p, vec2 a, vec2 b){ vec2 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0); return length(pa-ba*h); }
           void main() {`)
-        .replace('#include <map_fragment>', `#include <map_fragment>
+        .replace('#include <color_fragment>', `#include <color_fragment>
           if (vHP.y < uCutY + 0.0012) discard; // 断面以下的皮肤（部分 VRoid 2.x 模型颈部超出切面、盖住断面）一律裁掉
-          diffuseColor.rgb *= uSkin;
+          float _skinY = dot(diffuseColor.rgb, vec3(0.299,0.587,0.114));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(_skinY), uSkinFix) * uSkin;
           float gl = dot(diffuseColor.rgb, vec3(0.3,0.59,0.11));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(gl) * vec3(0.9, 0.93, 1.0), uPale);
           bool front = vHP.z > 0.0;
@@ -663,7 +765,13 @@ window.ModelHeads = (() => {
       else if (k === 'skin') { out = skinMat(src, U); own.push(out); }
       else {
         out = t.shared.get(key);
-        if (!out) { const ew = /EyeWhite/i.test(src.name || ''); out = new THREE.MeshToonMaterial({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: ew ? false : src.depthWrite }); t.shared.set(key, out); } // 眼白是最底层：不写深度，否则部分 VRoid 2.x 模型的虹膜（略在眼白后面）被挡住→白眼
+        if (!out) {
+          const ew = /EyeWhite/i.test(src.name || '');
+          if (ew && window.Mods && Mods.on('head_repair')) {
+            out = new THREE.MeshBasicMaterial({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), transparent: src.transparent, opacity: src.opacity, alphaTest: src.alphaTest ? Math.min(src.alphaTest, 0.25) : 0.15, side: THREE.DoubleSide, depthWrite: false, name: src.name + ' · readable sclera' });
+          } else out = new THREE.MeshToonMaterial({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: ew ? false : src.depthWrite });
+          t.shared.set(key, out);
+        } // 修复 MOD：眼白不再被幽暗洞窟光照压黑；关闭 MOD 时保留原 toon 路径
       }
       matMap.set(key, out); return out;
     };
@@ -672,7 +780,7 @@ window.ModelHeads = (() => {
     const hlMeshes = [];
     for (const m of F.faceMeshes) {
       if (m.userData.kind === 'hl' && !opts.alive) continue; // 死眼：去掉高光（通灵 MV 里的“生前”版本保留）
-      const c = new THREE.Mesh(m.geometry, getMat(m, F)); c.name = m.name; c.renderOrder = m.renderOrder;
+      const c = new THREE.Mesh(m.geometry, getMat(m, F)); c.name = m.name; c.renderOrder = m.renderOrder; c.userData.kind = m.userData.kind;
       if (m.userData.kind === 'hl') hlMeshes.push(c);
       if (m.morphTargetInfluences) { c.morphTargetInfluences = new Array(m.morphTargetInfluences.length).fill(0); c.morphTargetDictionary = m.morphTargetDictionary; }
       byName[m.name] = c; g.add(c);

@@ -17,9 +17,16 @@ window.Mods = (() => {
     { id: 'bloom', cat: 'render', icon: '🌟', n: '魂光泛光', d: '魂光、火焰、稀有光柱发出柔和泛光。', def: false },
     // ---------- 性能 ----------
     { id: 'lod', cat: 'perf', icon: '⚡', n: '万首优化', d: '远处首级自动降级 / 隐藏，休眠首级不再计算物理，支持上万颗首级（冰窖存储）。强烈建议开启。', def: true },
+    { id: 'steady_save', cat: 'perf', icon: '💾', n: '平滑自动存档', d: '每 20 秒在浏览器空闲时自动保存（离开页面仍会立即保存），减少周期性卡顿；关闭后恢复旧的 8 秒同步存档。', def: true },
+    { id: 'ground_contact', cat: 'perf', icon: '🪨', n: '贴地首级', d: '以皮肤和断面几何计算支撑高度，排除发尾、面罩与头饰造成的虚高；旧存档兼容。', def: true },
     { id: 'lowspec', cat: 'perf', icon: '🥔', n: '低配模式', d: '关闭所有后处理和发丝摆动，降低分辨率。与所有画风（原版除外）/泛光/发丝微风冲突。', conflicts: ['r_illust', 'r_anime', 'r_water', 'r_oil', 'r_film', 'r_ink', 'bloom', 'breeze', 'outline'] },
     // ---------- 角色外观 ----------
+    { id: 'head_repair', cat: 'look', icon: '🩹', n: '首级外观修复', d: '对齐真实切颈平面、按颈部轮廓封口；使用 CC0 肉质 PBR 贴图，并减轻异常绿肤与暗黑眼白。', def: true },
+    { id: 'smooth_faces', cat: 'look', icon: '🫧', n: '柔化头模', d: '平滑皮肤网格接缝法线，并柔化卡通明暗阶梯；只影响显示，不改模型存档。', def: true },
     { id: 'headwear', cat: 'look', icon: '🎀', n: '头饰', d: '14 种精细头饰（蝴蝶结、兔耳、女仆头饰、花冠……），按身份掷骰。', def: true },
+    // ---------- 场景资产 ----------
+    { id: 'cave_detail', cat: 'asset', icon: '🕯️', n: '洞窟地表与小装饰', d: '降低岩地贴图重复感，并用少量 InstancedMesh 摆放网上 CC0 小物（酒杯、花瓶、灯笼、烛台、木箱、酒桶）；不增加每件物品的独立 draw call。', def: true },
+
     { id: 'makeup', cat: 'look', icon: '🌸', n: '妆容', d: '腮红、泪痣、雀斑。', def: true },
     { id: 'breeze', cat: 'look', icon: '🍃', n: '发丝微风', d: '头发始终有轻微的风动。', def: true },
     { id: 'species', cat: 'look', icon: '🧬', n: '异种族质感', d: '史莱姆娘（半透明果冻）、幽灵、人偶（瓷肌+关节线）、机娘（面板线+发光）、石像、冰晶、暗影等全新材质种族。', def: true },
@@ -50,6 +57,7 @@ window.Mods = (() => {
   // 第十轮：画风 MOD 冻结不再维护，默认回原版且关泛光（减少开局卡顿）；旧存档迁移一次
   if (!st.__v || st.__v < 2) { for (const m of LIST) if (m.group === 'render') st[m.id] = (m.id === 'r_classic'); st.bloom = false; st.__v = 2; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
   if (st.__v < 3) { st.explore3d = false; st.__v = 3; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+  if (st.__v < 4) { for (const id of ['steady_save', 'ground_contact', 'head_repair', 'smooth_faces', 'cave_detail']) st[id] = true; st.__v = 4; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
   for (const m of LIST) if (st[m.id] === undefined) st[m.id] = !!m.def;
   // 修正非法状态（互斥组恰好一个；冲突；依赖）
   function normalize() {
@@ -123,7 +131,7 @@ window.Mods = (() => {
     if (window.G && G.setUIOpen) G.setUIOpen(true);
     box = document.createElement('div'); box.id = 'modbox';
     const changed = JSON.stringify(st) !== boot;
-    const cats = ['render', 'perf', 'look', 'play'];
+    const cats = ['render', 'perf', 'look', 'asset', 'play'];
     box.innerHTML = `<div class="mb"><h2>🧩 MOD 管理</h2><div class="sub">每个改动都可单独开关。冲突会自动处理（画风只能选一个；低配模式会关掉后处理类 MOD；依赖项会连带开关）。修改后点「应用并重新载入」（会先自动存档）。</div>
       ${cats.map(c => `<h3>${CATN[c]}</h3><div class="grid">${LIST.filter(m => m.cat === c).map(m => `<div class="mod ${st[m.id] ? 'on' : ''}" data-id="${m.id}"><div class="ic">${m.icon}</div><div><b>${m.n}</b>${!!st[m.id] !== !!bootSt[m.id] ? '<span class="chg">待应用</span>' : ''}<small>${m.d}${m.requires ? `<br>依赖：${m.requires.map(r => BY[r].n).join('、')}` : ''}${m.conflicts && !m.group ? `<br>冲突：${m.conflicts.map(r => BY[r].n).join('、')}` : ''}</small></div><div class="tg"></div></div>`).join('')}</div>`).join('')}
       <div class="note" id="modnote">${box._note || ''}</div>

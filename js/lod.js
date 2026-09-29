@@ -8,7 +8,7 @@
   function create(renderer, scene, opts) {
     opts = opts || {};
     const CELL = 112, ATL = 2048, PER = Math.floor(ATL / CELL), NCELL = PER * PER; // 18×18 = 324 格
-    const NEAR = opts.near || 4.5, FAR2 = 30 * 30, BUDGET = 3, COS_RESNAP = Math.cos(22 * Math.PI / 180);
+    const NEAR = opts.near || 4.5, FAR2 = 30 * 30, BUDGET = 1, COS_RESNAP = Math.cos(22 * Math.PI / 180); // 转镜头时每帧最多重拍 1 颗，限制附加渲染峰值
     const rt = new THREE.WebGLRenderTarget(ATL, ATL, { depthBuffer: true, stencilBuffer: true, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false });
     const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10); cam.layers.set(L5);
     const free = []; for (let i = NCELL - 1; i >= 0; i--) free.push(i);

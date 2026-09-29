@@ -87,3 +87,6 @@
 - AvatarSample_A：pixiv VRoid 官方样例（VRoid Studio sample, 许可见 VRM 元数据）。
 - 动作：Quaternius — Universal Animation Library 1 & 2（CC0）。
 - 武器：Poly Haven（CC0）。
+
+## 断面 PBR 贴图（head_repair MOD）
+- `assets/tex_cut_wagyu.js`：TextureCan「A5 Wagyu Beef Steak with Marbling Texture (Others 0003)」PBR 底色、OpenGL 法线与粗糙度贴图；下载后缩至 512 px，许可为 CC0 1.0 Universal，允许修改、商业使用与随项目再分发，无署名义务（仍记录来源）。[资产页](https://www.texturecan.com/details/154/) · [许可条款](https://www.texturecan.com/terms/)

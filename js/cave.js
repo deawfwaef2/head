@@ -28,6 +28,53 @@ window.Cave = (() => {
   function place(g, name, x, y, z, s, ry) { const o = A() && A().clone(name); if (!o) return null; o.position.set(x, y, z); o.scale.setScalar(s); o.rotation.y = ry || 0; g.add(o); return o; }
   function placePart(g, name, node, x, y, z, s, ry) { const o = A() && A().part(name, node); if (!o) return null; o.position.set(x, y, z); o.scale.setScalar(s); o.rotation.y = ry || 0; g.add(o); return o; }
 
+  // CC0 小物分批实例化：用现成资产变体装饰地表，不为每个物件单独创建 draw call。
+  function scatterSmallProps(parent, R, floorAt, rand, merchantPos) {
+    if (!(window.Mods && Mods.on('cave_detail'))) return 0;
+    const am = A(), pack = window.PropModels && PropModels.T;
+    const specs = [
+      { name: 'brass_goblets', count: 18, h: 0.09, root: () => am && am.models.brass_goblets },
+      { name: 'brass_candleholders', count: 12, h: 0.17, root: () => am && am.models.brass_candleholders },
+      { name: 'wooden_lantern_01', count: 10, h: 0.28, root: () => am && am.models.wooden_lantern_01 },
+      { name: 'wooden_crate_01', count: 8, h: 0.24, root: () => am && am.models.wooden_crate_01 },
+      { name: 'wine_barrel_01', count: 6, h: 0.32, root: () => am && am.models.wine_barrel_01 },
+      { name: 'antique_ceramic_vase_01', count: 10, h: 0.24, root: () => pack && pack.antique_ceramic_vase_01 && pack.antique_ceramic_vase_01.scene }
+    ];
+    const minR = Math.max(1.7, R * 0.16), maxR = R - 1.25, density = Math.min(1.8, Math.max(1, Math.pow(R / 7, 0.72)));
+    const rootInv = new THREE.Matrix4(), norm = new THREE.Matrix4(), srcM = new THREE.Matrix4(), M = new THREE.Matrix4(), T = new THREE.Matrix4(), Y = new THREE.Matrix4(), S = new THREE.Matrix4();
+    let total = 0;
+    for (const spec of specs) {
+      const root = spec.root(); if (!root) continue;
+      root.updateMatrixWorld(true); const bounds = new THREE.Box3().setFromObject(root); if (bounds.isEmpty()) continue;
+      const size = bounds.getSize(new THREE.Vector3()), center = bounds.getCenter(new THREE.Vector3());
+      const baseScale = spec.h / Math.max(0.001, size.y);
+      norm.makeScale(baseScale, baseScale, baseScale).multiply(new THREE.Matrix4().makeTranslation(-center.x, -bounds.min.y, -center.z));
+      rootInv.copy(root.matrixWorld).invert();
+      const placements = [], wanted = Math.max(1, Math.round(spec.count * density));
+      for (let tries = 0; tries < wanted * 18 && placements.length < wanted; tries++) {
+        const a = rand() * Math.PI * 2, r = Math.sqrt(minR * minR + rand() * Math.max(0.01, maxR * maxR - minR * minR));
+        const x = Math.sin(a) * r, z = -Math.cos(a) * r;
+        if (Math.hypot(x - merchantPos.x, z - merchantPos.z) < 2.0) continue;
+        if (r > R * 0.45 && Math.abs(Math.atan2(x, -z)) < 0.38) continue; // 留出通往洞口的走廊
+        placements.push({ x, y: floorAt(x, z), z, yaw: rand() * Math.PI * 2, s: 0.88 + rand() * 0.24 });
+      }
+      if (!placements.length) continue;
+      const meshes = [];
+      root.traverse(o => { if (o.isMesh && o.geometry && o.material) { o.geometry.__shared = true; meshes.push({ geo: o.geometry, mat: o.material, local: srcM.copy(rootInv).multiply(o.matrixWorld).clone() }); } });
+      for (const part of meshes) {
+        const inst = new THREE.InstancedMesh(part.geo, part.mat, placements.length); inst.name = 'cave_decor_' + spec.name; inst.castShadow = false; inst.receiveShadow = false; inst.frustumCulled = false; inst.raycast = () => {};
+        inst.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+        for (let i = 0; i < placements.length; i++) {
+          const q = placements[i]; T.makeTranslation(q.x, q.y, q.z); Y.makeRotationY(q.yaw); S.makeScale(baseScale * q.s, baseScale * q.s, baseScale * q.s);
+          M.copy(T).multiply(Y).multiply(S).multiply(norm).multiply(part.local); inst.setMatrixAt(i, M);
+        }
+        inst.instanceMatrix.needsUpdate = true; parent.add(inst);
+      }
+      total += placements.length;
+    }
+    return total;
+  }
+
   let _glowT = null;
   function flameGlowTex() { if (_glowT) return _glowT; const gc = document.createElement('canvas'); gc.width = gc.height = 64; const gg = gc.getContext('2d'); const gr = gg.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,200,120,1)'); gr.addColorStop(0.35, 'rgba(255,120,40,0.4)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); gg.fillStyle = gr; gg.fillRect(0, 0, 64, 64); return (_glowT = new THREE.CanvasTexture(gc)); }
   function flameSprites(parent) {
@@ -63,7 +110,7 @@ window.Cave = (() => {
         col[i * 3] = c; col[i * 3 + 1] = c * 0.95; col[i * 3 + 2] = c * 0.9; }
       fg.setAttribute('color', new THREE.BufferAttribute(col, 3)); fg.computeVertexNormals();
       const uv = fg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, p.getX(i) / 3, p.getZ(i) / 3); }
-    const floorMat = useA ? A().triplanar(A().tex('rock_ground'), { scale: 0.42, flat: 1, vertexColors: true, normal: 1.4, env: 0.25, color: '#d8cfc4' })
+    const floorMat = useA ? A().triplanar(A().tex('rock_ground'), { scale: window.Mods && Mods.on('cave_detail') ? 0.18 : 0.42, flat: 1, vertexColors: true, normal: window.Mods && Mods.on('cave_detail') ? 1.0 : 1.4, env: 0.25, color: '#d8cfc4' })
       : new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.95, color: '#b8a898' });
     const floor = new THREE.Mesh(fg, floorMat); floor.receiveShadow = true; g.add(floor);
     // 穹顶岩壁
@@ -165,6 +212,7 @@ window.Cave = (() => {
       const nose = B().mesh(new THREE.ConeGeometry(0.04, 0.14, 6), skin, 0, 1.42, 0.2); nose.rotation.x = Math.PI / 2; stall.add(nose);
       const sg = makeSign('地精行商·斯尼克 [E]'); sg.position.set(0, 2.1, 0.5); merchant.add(sg);
     }
+    if (window.Mods && Mods.on('cave_detail')) scatterSmallProps(stal, R, floorAt, rand, merchant.position);
     scene.add(g);
     const FR = 25;
     function update(now) {
@@ -190,7 +238,7 @@ window.Cave = (() => {
   function dispose(cave) {
     if (!cave) return;
     cave.group.parent && cave.group.parent.remove(cave.group);
-    cave.group.traverse(o => { if (o.isMesh && o.geometry && !o.geometry.__shared) o.geometry.dispose(); });
+    cave.group.traverse(o => { if (o.isInstancedMesh && o.dispose) o.dispose(); if (o.isMesh && o.geometry && !o.geometry.__shared) o.geometry.dispose(); });
   }
   return { build, dispose, fbm };
 })();

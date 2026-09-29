@@ -494,3 +494,16 @@
 3. 死亡首级的切口盘偏大的问题（衣领把 cut 半径撑大）见 C补充。
 4. 头目前没有眨眼。
 5. 无头浏览器里整个游戏切换节点会 OOM（2GB 沙箱），测试敌人用 `_f.html`（gitignored）+ `_tools/fshot.py`。
+
+## 2026-09-29 · 第十五轮：首级/洞窟/卡顿 BUG 修复（追加）
+- **本轮基线**：工作树从 `9704e7c52f907901232031cb56ff1d3f0aa1ad4d` 开始；只在下列项目文件上实施本轮改动，未触碰既有未跟踪 `js/cardgame.js`、`js/cards.js`、`js/contraptions.js`。
+- **MOD 与旧存档**：`js/mods.js` 新增默认开启的 `steady_save`、`ground_contact`、`head_repair`、`smooth_faces`、`cave_detail`，设置迁移到 `__v=4`；MOD UI 加 `asset` 分类。各项通过 `Mods.on(id)` 控制，关闭 `head_repair` 时保留旧切面/材质路径。
+- **头部外观**：`js/heads.js` 在 `head_repair` 下以模型元数据 `bottom` 对齐切颈平面，从现有皮肤网格截面顶点求凸轮廓并三角化封盖，失败时回退旧封口；切面优先使用 TextureCan A5 Wagyu 的 CC0 512px PBR（WebP 色彩/OpenGL 法线/粗糙度），`index.html` 已引入 `assets/tex_cut_wagyu.js`，来源与许可已追加到 `CREDITS.md`。对强绿偏皮肤贴图做受控去色后再乘目标肤色；眼白走较亮的 MeshBasic 路径；皮肤接缝法线平滑在模板解析期原位处理一次，避免每个皮肤几何体多复制一份。所有视觉改动均有 MOD 开关。
+- **洞窟装饰**：`js/cave.js` 在 `cave_detail` 下用现有 CC0 模型散布酒杯、烛台、灯笼、箱子、酒桶、花瓶；第 1 层约 64 件，每个模型的子网格合并为 InstancedMesh 批次（完整资产场景 23 批、6 种资产），不投实时阴影、无碰撞、禁用射线。Three r147 的 `InstancedMesh` 没有 `computeBoundingSphere()`，所以使用 `frustumCulled=false`；洞窟重建时发出 InstancedMesh dispose 事件回收实例缓冲。`cave_detail` 同时将三平面地面贴图尺度调为 0.18，降低重复感。
+- **性能**：`ground_contact` 将首级支撑采样限制为皮肤/断面并缩小安全余量；`steady_save` 从每 8 秒同步存档改为每 20 秒安排空闲存档（页面隐藏/离开仍保存）；LOD 替身失效重拍预算降至每帧 1 个。
+- **验证**：`node --check`（全部改动 JS）、`git diff --check` 通过；39 个头模解析/切面元数据检查通过，无缺少切口、无浏览器控制台错误；5 模型头部页（眼睛睁开）在 HTTP 与 `file://` 下均通过，CC0 WebP 切面加载成功，`head_repair/smooth_faces` 关闭路径也通过；洞窟完整六类资产测试通过，构建→渲染→dispose→重建无错误（23 个实例批次）；缩减为 5 个头模的整合游戏页到达开始菜单、R=7 洞窟成功构建且无控制台错误。当前项目工作树约 78 MB（低于 128 MB）。
+- **限制/待验证**：完整游戏（39 个头模 + 全场景资源）在本沙箱的 headless Chromium 约 56 秒后崩溃，符合第十四轮记录的 2GB/SwiftShader OOM 限制；这不等同于真实浏览器故障。尚未完成完整 39 模型游戏的互动/长时间性能回归，也未测量自动存档前后帧时间；需在普通 Chrome/Edge 与目标设备验证首级支撑、深层洞窟密度和卡顿。
+- **保存/同步状态**：实现已本地提交 `e6ccd9a`（`fix: repair head cuts and reduce cave stalls`）；尝试推送 `origin/main` 时环境无可交互 GitHub 凭据，未能推送。下一位如有认证环境可推送本地提交。提交后仍保留的 3 个未跟踪 JS 文件是既有用户文件，未暂存/未修改。
+
+## 2026-09-29 · 发布恢复说明（追加）
+- 上一轮的 Git 元数据在 `/home/user/.cache/headgit`；该目录不进入跨轮工作区快照，因此当前轮重新从 GitHub 获取 `origin/main`（基线 `24730db`），并用三方补丁重放第十五轮修复，保留了第十四轮身体/敌人上游更改。旧记录中的 `e6ccd9a` 是上一轮的本地提交号，不应视为远端已包含。

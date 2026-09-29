@@ -865,12 +865,13 @@ window.startGame = function () {
     const g = h.g, q0 = g.quaternion.clone(), p0 = g.position.clone(), sc = h.hb.group.scale.clone();
     g.quaternion.identity(); g.position.set(0, 0, 0); h.hb.group.scale.setScalar(HS); g.updateMatrixWorld(true); _hi.copy(g.matrixWorld).invert();
     const best = new Float32Array(HULL_DIRS.length).fill(-1e9), pts = new Array(HULL_DIRS.length);
-    const lim = 0.16 * HS; // 头发只取贴近头部中心的部分
+    const lim = 0.16 * HS, skinOnly = !!(window.Mods && Mods.on('ground_contact')); // 平滑贴地 MOD 只让皮肤/断口承担支撑，避免头饰与长发虚抬
     h.hb.group.traverse(o => {
       if (!o.isMesh || !o.geometry || !o.geometry.attributes.position || o.isSprite) return;
+      if (skinOnly && o.userData.kind !== 'skin' && o.userData.kind !== 'cut') return;
       const P = o.geometry.attributes.position, step = Math.max(1, Math.floor(P.count / 1500)); // 第十二轮：新 VRoid 模型网格更密，350 采样会漏掉耳朵/领口等突出点
       _hm.multiplyMatrices(_hi, o.matrixWorld);
-      // 第十二轮：只有头发子组受半径限制（排除长发尾）；脸层网格（兔耳/猫耳/蝴蝶结等刚性饰品）全部计入，否则耳朵会插进地里
+      // 旧模式仅限制头发子组半径；新模式上面已筛为皮肤和封盖
       const faceLvl = o.parent === h.hb.group;
       for (let i = 0; i < P.count; i += step) {
         _hv.fromBufferAttribute(P, i).applyMatrix4(_hm);
@@ -890,7 +891,7 @@ window.startGame = function () {
     const x = q.x, y = q.y, z = q.z, w = q.w;
     const r0 = 2 * (x * y + w * z), r1 = 1 - 2 * (x * x + z * z), r2 = 2 * (y * z - w * x); // 旋转矩阵第二行（原来误用了第二列=逆旋转，长耳/角的头侧躺时会插进地里）
     let mn = 0; for (let i = 0; i < H.length; i += 3) { const yy = r0 * H[i] + r1 * H[i + 1] + r2 * H[i + 2]; if (yy < mn) mn = yy; }
-    return Math.max(0.06, -mn + 0.004);
+    return window.Mods && Mods.on('ground_contact') ? Math.max(0.02, -mn + 0.0015) : Math.max(0.06, -mn + 0.004);
   }
   function impact(h, v) {
     if (h.lastHit > 0) return; h.lastHit = 0.08;
@@ -1127,7 +1128,16 @@ window.startGame = function () {
   setTimeout(() => { try { const t0 = performance.now(); renderer.compile(scene, camera); if (post && post.warm) post.warm(); console.log('shader prewarm ms', Math.round(performance.now() - t0)); } catch (e) { console.warn('prewarm', e); } }, 50);
   if (S.heads.some(r => r.inBag)) createReturnBag(S.heads.filter(r => r.inBag));
   S.hp = Math.min(S.hp, st().maxHp);
-  setInterval(save, 8000);
+  if (window.Mods && Mods.on('steady_save')) {
+    let autoSavePending = false;
+    const queueAutoSave = () => {
+      if (autoSavePending) return; autoSavePending = true;
+      const run = () => { autoSavePending = false; save(); };
+      if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 8000 }); else setTimeout(run, 1200);
+    };
+    setInterval(queueAutoSave, 20000); // 高频交互仍显式 save；这里只把物理姿态快照移到空闲时段
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(); });
+  } else setInterval(save, 8000);
   addEventListener('beforeunload', save);
   function wipe() { S.dead = true; localStorage.removeItem(SAVE_KEY); if (window.Store) Store.wipeVault(); }
 
