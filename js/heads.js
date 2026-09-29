@@ -65,6 +65,7 @@ window.ModelHeads = (() => {
             if ((m.userData.kind === 'hair' || m.userData.kind === 'iris' || m.userData.kind === 'brow') && !lum.has(src)) lum.set(src, avgLum(src.map));
             m.geometry.computeBoundingSphere();
           });
+          try { fitCut(meshes, entry); } catch (e) { console.warn('fitCut', entry.file, e); }
           const hairMeshes = meshes.filter(m => m.userData.kind === 'hair');
           let hairMinY = 0; hairMeshes.forEach(m => { m.geometry.computeBoundingBox(); hairMinY = Math.min(hairMinY, m.geometry.boundingBox.min.y); });
           T.push({ meta: entry, meshes, hairMeshes, faceMeshes: meshes.filter(m => m.userData.kind !== 'hair'), lum, hairMinY, shared: new Map() });
@@ -85,6 +86,34 @@ window.ModelHeads = (() => {
     return ready;
   }
 
+  // 第十一轮：断面按脖子真实轮廓重建。原来的圆盘半径取自带衣领/肩部的顶点，部分模型（K/L/S）断口比脖子大一圈。
+  // 做法：收集落在切面上的皮肤顶点（颈部开口的边缘），按 48 个方向取半径，平滑后生成多边形扇面替换圆盘。
+  function fitCut(meshes, entry) {
+    const cut = meshes.find(m => m.userData.kind === 'cut'); if (!cut) return;
+    cut.updateMatrixWorld(true); const cp = cut.geometry.attributes.position; const toCut = cut.matrixWorld.clone().invert();
+    let cy = 0, cx = 0, cz = 0; const v = new THREE.Vector3();
+    for (let i = 0; i < cp.count; i++) { v.fromBufferAttribute(cp, i).applyMatrix4(cut.matrixWorld); cy += v.y; } cy /= cp.count;
+    const gather = (pred) => { const pts = []; for (const m of meshes) { if (!pred(m)) continue; m.updateMatrixWorld(true); const p = m.geometry.attributes.position;
+      for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld); if (Math.abs(v.y - cy) < 0.004) pts.push(v.clone().applyMatrix4(toCut)); } } return pts; };
+    let pts = gather(m => m.userData.kind === 'skin');
+    if (pts.length < 16) pts = gather(m => m.userData.kind !== 'hair' && m.userData.kind !== 'cut');
+    if (pts.length < 16) return;
+    pts.forEach(q => { cx += q.x; cz += q.z; }); cx /= pts.length; cz /= pts.length;
+    const NB = 48, R = new Array(NB).fill(0);
+    for (const q of pts) { const a = Math.atan2(q.z - cz, q.x - cx); const b = ((Math.floor((a + Math.PI) / (Math.PI * 2) * NB) % NB) + NB) % NB; R[b] = Math.max(R[b], Math.hypot(q.x - cx, q.z - cz)); }
+    const filled = R.filter(r => r > 0).length; if (filled < NB * 0.5) return;
+    for (let b = 0; b < NB; b++) if (!R[b]) { let l = b, r = b; while (!R[(l + NB) % NB]) l--; while (!R[r % NB]) r++; const a = R[(l + NB) % NB], c = R[r % NB]; R[b] = a + (c - a) * (b - l) / (r - l); }
+    const Rs = R.map((r, b) => { const a = [R[(b + NB - 1) % NB], r, R[(b + 1) % NB]].sort((x, y) => x - y); return a[1] * 0.99; });
+    const ly = new THREE.Vector3(0, cy, 0).applyMatrix4(toCut).y;
+    const pos = [cx, ly, cz], idx = [];
+    for (let b = 0; b < NB; b++) { const a = (b + 0.5) / NB * Math.PI * 2 - Math.PI; pos.push(cx + Math.cos(a) * Rs[b], ly, cz + Math.sin(a) * Rs[b]); }
+    for (let b = 0; b < NB; b++) idx.push(0, 1 + (b + 1) % NB, 1 + b);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(pos.length).fill(0).map((_, i) => i % 3 === 1 ? -1 : 0), 3)); g.setIndex(idx);
+    cut.geometry.dispose(); cut.geometry = g; fixCutUV(g);
+    const mean = Rs.reduce((s, r) => s + r, 0) / NB;
+    if (entry.cut) { entry.cut.r0 = entry.cut.r; entry.cut.r = Math.min(entry.cut.r || mean, mean); entry.cut.x = cx; entry.cut.z = cz; }
+  }
   // ---------- 断面材质（黑暗奇幻：皮、肉、颈椎、气管） ----------
   let cutMat = null;
   // 断面 UV 按实际几何重新映射（部分模型转换时按错误半径算 UV，导致整个断面落在外圈肤色区）

@@ -155,16 +155,23 @@ eyeC = EP.mean(0); cxm = (FP[:, 0].min() + FP[:, 0].max()) / 2
 # 头顶：脸部皮肤 + 身体皮肤中高于眼睛的最高点（VRoid 头皮在 Face 皮肤里）
 skinTop = FP[:, 1].max()
 yEye = eyeC[1]
-yCut = yEye - 0.81 * (skinTop - yEye)
-hairCut = yCut - A.hair_drop
+yCut0 = yEye - 0.81 * (skinTop - yEye)   # 比例基准（保持与其他模型同样的头部大小）
+# 第十一轮：切口不许切到下巴——取脸前半部分皮肤的最低点，切面至少在它下面 6mm
+_front = FP[FP[:, 2] > np.median(FP[:, 2])]
+chinY = float(_front[:, 1].min()) if len(_front) else yCut0
+yCut = min(yCut0, chinY - 0.006)
+hairCut = yCut0 - A.hair_drop
 
 # 颈部中心 / 半径
 body = [p for p in prims if p['kind'] == 'body']
 BP = np.concatenate([up(p) for p in body]) if body else FP
 band = BP[(BP[:, 1] > yCut) & (BP[:, 1] < yCut + 0.015)]
 if len(band) < 8: band = FP[FP[:, 1] < FP[:, 1].min() + 0.01]
+# 只取颈柱附近的顶点（排除锁骨/肩膀/衣领皮肤把半径撑大）
+nx, nz = np.median(band[:, 0]), np.median(band[:, 2])
+_rr = np.hypot(band[:, 0] - nx, band[:, 2] - nz); band = band[_rr < max(0.02, np.median(_rr) * 1.5)]
 nx, nz = band[:, 0].mean(), band[:, 2].mean()
-nr = float(np.percentile(np.hypot(band[:, 0] - nx, band[:, 2] - nz), 90)) * 1.03
+nr = float(np.percentile(np.hypot(band[:, 0] - nx, band[:, 2] - nz), 90)) * 1.02
 
 # ---------- 选择三角形 ----------
 out = []  # (name, kind, matIndex, pos, nrm, uv, idx, targets)
@@ -200,10 +207,10 @@ assert out, 'nothing selected'
 hairOut = [o for o in out if o[0]['kind'] == 'hair']
 allP = np.concatenate([o[1] for o in out])
 skullTopAbs = skinTop
-yMid = (skullTopAbs + yCut) / 2
+yMid = (skullTopAbs + yCut0) / 2
 czm = (FP[:, 2].min() + FP[:, 2].max()) / 2 - 0.01  # 头骨中心略靠后（脸前突）
 origin = np.array([cxm, yMid, czm])
-SC = A.norm / (skullTopAbs - yCut) if A.norm > 0 else 1.0
+SC = A.norm / (skullTopAbs - yCut0) if A.norm > 0 else 1.0
 
 # ---------- 表情预设 ----------
 PRESET_MAP = {'aa': 'aa', 'ih': 'ih', 'ou': 'ou', 'ee': 'ee', 'oh': 'oh', 'blink': 'blink', 'blinkLeft': 'blinkleft', 'blinkRight': 'blinkright',
