@@ -425,3 +425,9 @@
 5. **世界生成 `js/worlds.js`**：区域（9 区对应现有 BOSS）→ 每次出门随机生成世界图；世界 = 地名（音节组合）+ 风格（森林/沼泽/废墟/雪原/城镇/墓地/洞穴…）+ 大小 + 2–5 个门；门通往同区其他世界或下一区；场景用 Poly Haven 资产 + HDRI 天空布置（骑砍式可走动场景）。
 6. **肉鸽技能**：每次出门清空的临时技能（战斗中升级三选一）+ 永久解锁（用魂晶在洞里解锁技能树）。
 7. 旧面板出行保留为 MOD 备选；与决斗数值对接；平衡与节奏（第十二轮要求“游戏节奏慢一点”）。
+
+### B 补充 · BUG 精确代码位置（总管理师追记，供画质协作者直接定位）
+- **#5 首级悬空（“机制在哪里”）**：`js/game.js` → `hullKey(h)`（约 851 行，按模型网格生成凸包缓存键）、`hullOf(h)`（852，取首级凸包顶点）、`supportH(h)`（877，算首级静止时最低支撑点到原点的高度，落地/上桌/上架都用它）、`groundY(p)`（1270，地面高度 = `cave.floorAt` + 建筑表面 `surface`/`cols`）。第十二轮为修“陷地”把支撑点取得偏保守（凸包含头发/饰品外壳），所以现在是**轻微悬空**。修法方向：支撑点只取**皮肤/断口封盖**顶点（排除头发、`_mask`、头饰），并用 `_tools/sink.py` 同时测陷地 >2cm 与悬空 >1cm。注意 `faceLvl`（摆正时的朝向）也参与。
+- **#2 眼白发黑**：`js/heads.js` 约 666 行 `getMat()` 里 `EyeWhite` 分支（MeshToonMaterial 重建）、约 696–712 行眼部 stencil `_mask` 网格（`alphaTest: 0.35, colorWrite: false`）、约 67 行 `renderOrder`（EyeWhite=2）。先确认原 VRM 眼白贴图有无 alpha，再看 `tools/glbpack.py` 转 WebP/JPEG 时是否丢了 alpha（JPEG 没有 alpha → 透明区变黑）。
+- **#3 断口圆片**：`js/heads.js` 约 92 行“第十一轮：断面按脖子真实轮廓重建”那段 + `tools/vrm2head.py` 的封盖步骤；`uCutY` uniform（约 238 行）控制断面着色高度。
+- **#4 皮肤发绿**：`js/heads.js` 约 238–248 行皮肤着色注入 `diffuseColor.rgb *= uSkin`，`uSkin = 目标肤色 / baseSkin('#fbe6da')`（约 458–466 行）；若某模型原贴图本身偏色或 `randomLook` 给了异常肤色值，除法会放大偏色。逐模型打印 `U.skin`。
