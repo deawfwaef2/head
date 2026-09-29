@@ -784,3 +784,30 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - （补）水面 = 单个 MeshStandardMaterial + onBeforeCompile 的正弦法线扰动（河带 Catmull 加密、单调下坡水位；池塘是椭圆盘）；水里不长树/石（buildNode 在实例化前按 `g.wd` 过滤）；`userData.wg` 的网格在 `disposeNode` 里释放。
 - （补）调试钩子：`window.__wgenForce = {节点序号: '布景键'}` 可强制某节点的布景（仅调试）。
 - 提醒：用户给过的 GitHub token 出现在聊天里，建议轮换。
+
+## 第二十一轮（Arena Agent）：敌人 AI 重做 + 挥砍动量 + 疾跑体力 + 门逃跑
+
+### 用户本轮反馈（原意摘要）
+敌人太弱、追不上玩家、AI 傻、“一直追着”、经常卡住，要更高智商更多技能；战斗无聊、反馈不爽，要“大师级”手感；**快速左右乱晃应该伤害很低，真砍/真刺才疼（算动量）**；地图更有趣、更多搜刮材料；加掉材料不掉头的野怪；食人魔可升级加属性；人物像恐怖游戏、眼白仍不对；每个地点进入时先冻结剧情弹窗再触发事件；**角色逃跑到门附近可以成功跑掉**；UI 闪烁、麻袋 UI 太小（要 3D 物品模型）；刚进游戏卡顿。
+
+### 本轮已完成（commit 2f467c1，均为可开关 MOD，默认开）
+- `swing_momentum`（js/combat.js）：按住左键时累计连贯挥幅 `S.arc`（|鼠标速度|·dt，速度>160px/s 才累计；方向反转 dot<0.2 → arc×0.08；1 秒内≥5 次反转判为 `S.wiggle`）。`commitK()`：突刺=1、蓄力=1.25、否则 clamp((arc-40)/300, 0.1, 1.2)。sweep 伤害速度 × commit，info.commit 传出；乱晃命中低于阈值时提示“🌀 来回乱晃没有冲力…”（≤1 次/2.5s）。HUD 体力条下 3px 冲力条。
+- `foe_smart`（js/foe.js update）：关掉时走原第十九轮 chase/flee 代码（保留在 `!SMART &&` 分支）。开启时：
+  - 追击：疾跑速度 4.9+iq·1.1+rar·0.15（BOSS 5.9）；按玩家速度 `ctx.pvel` 预判拦截；近距离接近速度 = max(基础, 玩家远离速度+1.4)，否则慢跑的玩家永远追不上。
+  - 玩家转身逃跑（远离速度>2.2）且 2.3–5.2m → 高概率 Sword_Dash 冲刺斩。
+  - 包抄：多名敌人按玩家朝向分配角度槽（strafe=3 走向槽位），不再全挤正面。
+  - 重伤撤退：hp<30%、iq>0.45、非 BOSS，一次性 `retreat` 状态 3–5.5s，退到 7.5m 外每秒回 5% 血后再战。
+  - 丢失目标：视线外 1.2s → 去 `fo.lastSeen` 搜索，7s 找不到回 idle（这就是“不再一直追”）；追踪距离 22m（有视线时），放弃距离 26→34m。
+  - **防卡住**：导航网格（0.8m 格，障碍=cols 圆+0.3，地图边缘 R-1.3）+ BFS 距离场（玩家场 ≤5 次/秒重算，门场静态缓存，`NAV` 在 clear() 与 cols 变化时重建）。直线畅通 → 直走+切线绕障（`avoid`，选定绕行方向坚持 1.5s）；被挡 → 沿流场。卡住检测（0.5s 位移<期望 30%）→ `unstick` 探测 8 个方向取畅通的。每敌人规划 ~8 次/秒错开帧。
+  - 台词 `SAY2`（受伤/再战/找不到/想跑/包围/单挑/门口）。
+- `foe_door_escape`：逃跑的猎物沿门流场冲向最近的门（绕开挡在门前的玩家）；到门 1.7m 内要“开门”1.2s（toast 提示玩家追砍，挨刀重置），成功则 `escape()`：标记 dead+escaped、移出场景，`ctx.escaped` 从 node.prey 移除（本趟拿不到这颗头）并记入行程日志。`Foe.targets()` 跳过 escaped。
+- `sprint_stamina`（js/worlds.js）：Shift 疾跑 14/秒 消耗 `W.run`（独立于战斗体力），耗尽→“跑不动了”，恢复到 35 才能再跑，疲惫时步速 3.1；屏幕下方 4px 体力条（满时隐藏）。
+- 玩家门逃跑：被追杀时站门口按 E 优先过门（不会被附近尸体/战利品抢 E），toast “你甩开了追兵”。**修 bug**：麻袋 MOD 开启时门口提示原本永远不显示（`else if` 链），现在门提示正常显示。
+- 性能：foe.js `collide/collideList` 与 worlds.js 两处碰撞循环改为平方距离先判（`Math.hypot` 在 V8 很慢）：10 敌人 + 1200 碰撞圆 每帧 1.4ms → 0.21ms。首帧建网格+BFS ≈5ms（R=60）。
+
+### 测试方法（本轮新增）
+- `/tmp/sim/sim.js`、`sim2.js`、`perf.js`（未入库）：Node `vm` 载入真实 `lib/three.min.js` + foe.js（把 `return { hasHead` 替换成 `return { _ctx:(c)=>{CTX=c}, hasHead` 注入 CTX），假身体（clips:{}，所以不会真出招），脚本化玩家逃跑/追赶。密林 180 棵树 10 个种子：卡住秒数 旧 AI 160 → 新 24（≈每敌 1s 起步误差）；门逃跑 0 卡住。
+- Playwright 需要 `sudo playwright install-deps chromium-headless-shell` + `playwright install chromium-headless-shell`（完整 chromium 下载失败）。/tmp 是内存 tmpfs，仓库本身占 ~330MB，整页游戏仍会 OOM（原版对照同样崩），只能验证加载阶段无 pageerror。
+
+### 下一步（未做）
+升级系统（rpg.js 等级→属性）、野怪（CC0 资源，掉材料不掉头）、UI 闪烁、麻袋 3D 物品大 UI、眼白/恐怖感、进入卡顿、更多搜刮物。
