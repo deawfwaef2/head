@@ -666,5 +666,5 @@ window.Worlds = (() => {
       if (n.i === W.cur) { g.fillStyle = '#ffd060'; g.font = 'bold 13px sans-serif'; g.fillText('你在这里', x, y + rad + (n.prey.length ? 30 : 15)); } });
   }
 
-  return { start, frame, onKey, onDown, stop, get active() { return !!W; }, get _W() { return W; }, STYLES, REGION, genGraph, need, _debug: { goto: (i) => W && goto(i, W.cur), buildNode } };
+  return { start, frame, onKey, onDown, stop, get active() { return !!W; }, get _W() { return W; }, STYLES, REGION, genGraph, need, _debug: { goto: (i) => W && goto(i, W.cur), buildNode, targets } };
 })();
