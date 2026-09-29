@@ -41,6 +41,7 @@ window.Mods = (() => {
     { id: 'dresser', cat: 'play', icon: '💄', n: '化妆台', d: '给首级换头饰、染发、换表情。需要「头饰」。', def: true, requires: ['headwear'] },
     { id: 'worldgraph', cat: 'play', icon: '🗺️', n: '地点图出猎（第十四轮·默认）', d: '出洞后进入随机生成的地点网络：每个地点是一个可自由走动搜索的小场景（偶尔是大场景），多扇门通往别处；最深处是地区霸主。关闭本项 = 旧的“点击 60 次 + 屏幕 UI 板”旅途。', def: true },
     { id: 'explore3d', cat: 'play', icon: '🌄', n: '第一人称出猎（旧·实验）', d: '【第十一轮用户判定不合格，默认关闭】3D 地区沿路前进。关闭时使用“点击 60 次 + 屏幕 UI 板”的旅途。', def: false },
+    { id: 'oddities', cat: 'play', icon: '🎪', n: '恶趣味陈列馆', d: '7 座把首级放进日常生活的新建筑：亡者茶会、名媛肖像廊（画框随魂阶升格）、奶奶的摇椅、猎首纪念台、首级鉴定台（品相抽卡）、亡者沙发影院（换台）、首级菜园（浇水收获）。全部 Poly Haven CC0 模型。', def: true },
     { id: 'chess', cat: 'play', icon: '♟️', n: '头棋殿', d: '首级当棋子，和斯尼克下棋或同屏双人。', def: true },
     { id: 'rebirth', cat: 'play', icon: '♻️', n: '轮回祭坛', d: '献祭一世换永久魂核天赋。', def: true },
     { id: 'thief', cat: 'play', icon: '👻', n: '盗魂灵入侵', d: '盗魂灵定期来偷首级，左键打散。', def: true },
