@@ -359,3 +359,69 @@
 - 已换装的旧类型：table / chest / candles / rack / brazier / torch / bounty / dresser / nest(改名哥特大床) / throne。**下一批**：showcase、seance、headrack、pole、forge、altar、lava、cage、banner、训练器材；缺骷髅/水晶/蘑菇/毛皮/龙骨等 Poly Haven 没有的模型，需另找来源（禁止程序化）。
 - 已知重复：GothicCommode_01 / ornate_mirror_01 / wine_barrel_01 / large_iron_gate 在 `assets/` 与 `props_pack.js` 各有一份（约 2MB），以后可统一到 `Assets`。
 - `Assets.fit(名, {w|h|d, x,y,z, ry, rx, rz, node})` 可按目标尺寸摆放任意资产；`Assets.flame(x,y,z,s,col)` 序列帧火焰；`Assets.clone()` 共享几何体已标 `__shared`，移除建筑时不会被 dispose。
+
+---
+
+# 📌 协作总则（总管理师：主 Agent 撰写，所有协作者开工前必读）
+
+> 用户指定：**主 Agent = 总管理师**，负责整体设计、玩法、任务分配与合并把关；协作者负责分配到的专项（当前：**画质 + BUG**）。
+> 本文件（HANDOFF.md）**只追加、不覆盖、不删除**。每次开工前从头阅读，尤其是各轮“用户反馈（原话要点，长期有效）”与本节。
+
+## A. 协作者必须遵守的规则
+1. **开工前**：完整阅读 HANDOFF.md（所有轮次的用户约束都长期有效，除非用户明确撤销）。
+2. **提交**：小步提交、频繁推送。每次 push 前 `git pull --rebase`；**禁止 force-push**，禁止改写/删除别人的提交。
+3. **文件归属**（避免冲突）：
+   - 总管理师：`js/game.js` 的玩法/战斗/探索部分、新玩法模块（`js/combat.js`、`js/worlds.js` 等）、HANDOFF 的设计章节。
+   - 画质协作者：`js/master.js`、`js/assets.js`、`js/builds_ph.js`、`js/cave.js`、`js/heads.js` 的材质/显示部分、`tools/vrm2head.py` 的切颈/封盖/材质部分、`assets/*.js`、`models/props_pack.js`、`js/sanctum.js`。
+   - 必须改对方文件时：改动尽量小，commit 信息写清楚原因，并在 HANDOFF 追加一行说明。
+4. **硬性约束（用户原话，违者返工）**：
+   - **禁止自制/程序化的模型、身体、贴图**（第十一轮）。一律使用网上找到的资产（Poly Haven CC0 优先，其次 CC-BY / VRM 许可；用户允许侵权但仓库尽量用宽松授权）。程序化**布局/生成**（地形摆放、世界生成）可以，程序化**几何造型**不行。
+   - **角色身体不许删**（第十四轮新增）：VRM 原模型的身体要保留/找回，以后任何工具都不得再把身体裁掉丢弃。
+   - `index.html` 必须能 **file:// 双击运行**：classic script、base64 的 `.js` 资产，不用 CDN、不用 fetch。
+   - 工作区（/home/user）**< 128MB**；git 目录放在 `/home/user/.cache/headgit`（.cache 不进快照，会话重置后按下方恢复流程重建）。
+   - 所有改动做成**可开关的 MOD**，并处理冲突（第九轮）。
+   - 生物/NPC 要可爱，不许恶心；文本不写虐待/求饶/色情内容。
+   - 不要把 GitHub token 写进任何仓库文件。不要改仓库可见性（用户自己改私有）。
+   - 性能：9999 颗首级不卡（洞内最多 320 个 3D，其余进魂库）；启动不卡。
+5. **测试**：`_tools/` 下有 `mk_t.py`（生成少模型的 `_t.html`）、`smoke.py`、`sink.py`（陷地/悬空检测）、`scene.py`（截图）。headless SwiftShader 很慢，截图约 2–4 分钟，`scene.py` 已设 180s 超时，用 `?q=ultra` 防自动降档。
+6. **会话重置恢复**（.cache 会被清空）：
+   `git clone --depth 8 --no-checkout <url> .cache/hc && mv .cache/hc/.git .cache/headgit && echo "gitdir: /home/user/.cache/headgit" > head/.git && git -C head config core.worktree /home/user/head && git -C head reset && git -C head branch -u origin/main`；
+   playwright：`pip install --target .cache/pylib playwright`，`PLAYWRIGHT_BROWSERS_PATH=.cache/pw python3 -m playwright install chromium`，`sudo … install-deps chromium`；meshoptimizer：`pip install --target .cache/pylib2 meshoptimizer numpy`。
+
+## B. 画质协作者 · BUG 清单（第十四轮用户原话整理，按优先级）
+| # | 问题（用户原话） | 线索 / 可能位置 |
+|---|---|---|
+| 1 | **很多模型脖子后面是透明的** | `tools/vrm2head.py` 切颈后颈后皮肤/头发背面被剔除或 alpha；`heads.js` 材质 side/alphaTest/transparent；检查 `__CUT__` 封盖是否覆盖后颈。 |
+| 2 | **很多模型眼白是黑色的** | VRM 眼白材质多为 MToon + alpha（BLEND/MASK）；WebP 转换丢 alpha 或 alphaTest 过高、或 eye stencil（第十二轮第二步加的眼/刘海 stencil）顺序错误；逐个模型核对。 |
+| 3 | **断口贴图就是一个圆片，位置都不对** | `vrm2head.py` 第 3 步“平面切颈 + 圆形封盖”：封盖圆心/半径用的是估算，颈部截面不是圆 → 应按实际截面轮廓三角化封口，并对齐切面；断口贴图需要真实的断面纹理（找现成的血肉/断面贴图，禁止程序化画）。 |
+| 4 | **很多模型皮肤是绿色的？** | 颜色空间/贴图通道：WebP 转换时 RGBA 通道顺序、MToon `_ShadeColor`/shadeMultiply 被当成 base color、或 vertex color 残留；对比原 VRM 截图排查。 |
+| 5 | **头都有点轻微的悬空** | `game.js` `supportH` / `hullKey` / `faceLvl`（第十二轮修陷地时加的）可能偏保守；`_tools/sink.py` 目前只测“陷地 >2cm”，请加“悬空 >1cm”判定，39 个模型逐个过。注意新 SAO/阴影让缝隙更明显。 |
+| 6 | **地图还是非常劣质，只是换了一个劣质的风格**：地板看起来就像贴图；各种模型棱角分明 | 地面：`Assets.triplanar` 只有 1k 平铺贴图 → 需要：高度/视差（POM）或真实位移几何、细节贴图叠加、宏观变化、贴花（焦痕、水渍、血迹，用现成贴图）、地面散落物。棱角：`tools/phpack.py` 默认 `--tris` 太低（3000）+ 量化法线 → 提高面数、保留原法线/平滑组、岩体用 LOD 而不是一刀切减面。 |
+| 7 | **更多小装饰，各种各样，而且节约性能**：感觉小东西装饰非常多 | 用 `InstancedMesh` + 距离剔除散布大量小物：碎石、骨头、树根、苔藓、蜡烛、蛛网、碗罐、木屑、铁链……（Poly Haven：namaqualand_stones_01、rock_moss_set、root_cluster、bark_debris_01、dry_branches_medium_01、moss_01、wooden_bowl、jug_01、brass_pot、wooden_bucket、book_encyclopedia_set_01、wooden_candlestick 等）。每类共享几何+材质，远处隐藏。 |
+
+**验收**：每修一项，用 `scene.py` 截图对比前后；39 个头模用 `_tools/grid.py` 出网格图逐个检查（眼白、皮肤色、后颈、断口）。
+
+## C. 总管理师 · 第十四轮新玩法设计（用户原话 → 设计）
+**用户原话要点**：
+- 攻击模式改成**手势砍击**：按住左键 = 攻击手势（鼠标轨迹决定挥砍方向：从下往上滑 = 上撩，从上往下 = 下劈，左右同理）；**连点左键 = 刺**；**按住右键 = 防御**，按住右键轻微移动 = 防御对应方向。碰撞体按武器实际形状做。
+- 各种**技能，肉鸽式解锁**。
+- 探索：**完全程序生成的各种世界**，地名/风格/大小全随机；每个世界有**数个门（数量随机）**通往其他世界，类似《骑马与砍杀》进入地点后的场景；每次出门地图随机，但**分区域**。
+- 敌人可以战斗，有**战斗过程**；敌人有 **AI 等级**，**会说话**；动作要**大师级**。
+- **把每个角色的身体找回来，以后也记住别删。**
+
+**与现有内容的重复/冲突检查**：
+- 与现有**决斗面板**（UI 里 heavy/rapid/spell ↔ dodge/block/attack 意图克制）功能重叠 → 新手势战斗**取代**它；原数值（`q = power/(rec·B.pow)`、伤害公式、BOSS 概率、9 区 BOSS 胜利条件）保留，作为战斗平衡基础。
+- 与第十轮 `js/explore.js` / `explore_world.js`（第一人称沿路 + 程序身体）重叠 → 那套用了**程序化几何和程序化身体**，第十一轮已被否决；新世界系统**只复用其“地区主题/节奏”思路，不复用其几何**，全部改用现成资产。
+- 与第十一轮约束“不要第一人称 3D 出行世界，出行 = 点 60 次 + 面板”**冲突** → 以本轮新指示为准（用户新想法覆盖旧约束），但旧的“面板出行”保留为 MOD 备选（第九轮：所有改动可开关）。
+- 与 `tale.js` 叙事、`RPG.expedition` 事件不冲突 → 用作敌人台词、世界事件、门后奖励的文本来源。
+- 与“首级不说话，只有低频回忆气泡”（第八轮）不冲突 → **活着的敌人**会说话，被斩下后的首级仍遵守第八轮规则。
+- 外部参考（不是抄袭，是同类机制）：骑马与砍杀（方向攻防）、For Honor（三向架势）、Hellish Quart / Exanima（鼠标控制武器轨迹）、Hades / Slay the Spire（肉鸽选门）。本作特色 = 斩首收藏 + 洞窟陈列闭环。
+
+**落地分步（每步推送）**：
+1. **战斗内核 `js/combat.js`（MOD：gesture_combat）**：鼠标轨迹识别（8 方向挥砍 / 连点刺 / 蓄力）、右键方向格挡（4 向）、武器沿轨迹运动、武器碰撞体（沿刃线的胶囊序列）、命中判定/格挡判定/弹刀/硬直/体力、打击感（顿帧、屏震、火花、音效）。先在洞里放训练假人验证。
+2. **找回身体**：VRM 原模型重新下载，新工具 `tools/vrm2body.py` 保留完整身体（骨骼+蒙皮+表情），头部与现有首级一致；敌人死亡时斩首 → 头进首级系统、身体倒地。为控制体积：身体贴图 512、网格减面，按需加载。**以后禁止删身体。**
+3. **动作**：找现成的 CC0/免费人形动画（Mixamo 类授权受限则找 CC0 替代，如 Quaternius Universal Animation Library CC0），重定向到 VRM 骨骼：待机、走跑、四向挥砍、刺、格挡、受击、硬直、倒地。
+4. **敌人 AI `js/foe.js`**：AI 等级（反应时间、格挡正确率、连招长度、佯攻、闪避）、状态机、战斗台词气泡（开战/受伤/格挡成功/求援/濒死挑衅——符合文本约束）。
+5. **世界生成 `js/worlds.js`**：区域（9 区对应现有 BOSS）→ 每次出门随机生成世界图；世界 = 地名（音节组合）+ 风格（森林/沼泽/废墟/雪原/城镇/墓地/洞穴…）+ 大小 + 2–5 个门；门通往同区其他世界或下一区；场景用 Poly Haven 资产 + HDRI 天空布置（骑砍式可走动场景）。
+6. **肉鸽技能**：每次出门清空的临时技能（战斗中升级三选一）+ 永久解锁（用魂晶在洞里解锁技能树）。
+7. 旧面板出行保留为 MOD 备选；与决斗数值对接；平衡与节奏（第十二轮要求“游戏节奏慢一点”）。
