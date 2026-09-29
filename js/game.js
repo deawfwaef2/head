@@ -360,6 +360,7 @@ window.startGame = function () {
   canvas.addEventListener('mousedown', e => {
     if (uiOpen) return;
     if (!playing) return;
+    if (window.Worlds && Worlds.active) { Worlds.onDown(e.button); return; }
     if (window.Combat && Combat.drawn && !hplace && !buildMode && !held && Combat.onDown(e.button)) { if (noLock && e.button === 0) { dragLook = true; dragMoved = 99; } return; }
     if (noLock && e.button === 0) { dragLook = true; dragMoved = 0; mouseDown = true; return; }
     if (cine) { cine.fast = true; return; }
@@ -373,6 +374,7 @@ window.startGame = function () {
   document.addEventListener('keydown', e => {
     keys[e.code] = true;
     if (hplace && e.code === 'Escape') { cancelHP(); return; }
+    if (window.Worlds && Worlds.active && playing && !uiOpen && Worlds.onKey(e)) return;
     if (window.UI && UI.onKey(e)) return;
     if (!playing || uiOpen) return;
     if (e.code === 'KeyP' && (!window.Mods || Mods.on('film'))) { toggleFilm(); return; }
@@ -1133,6 +1135,7 @@ window.startGame = function () {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, clock.getDelta()); const now = clock.elapsedTime;
     if ((window.Seance && Seance.active) || window.__pauseMain) return; // 通灵 MV / 头棋等全屏小游戏期间暂停主场景渲染
+    if (window.Worlds && Worlds.active) { Worlds.frame(dt, now); return; } // 第十四轮：出猎世界（地点图）接管主循环
     for (const f of HOOK.frame) { try { f(dt, now); } catch (e) { console.warn(e); } }
     if (eDown && !eLong && performance.now() - eDown > 350) { eLong = true; if (playing && !uiOpen && !cine && !bagCarrying) { const tgt = held || targetHead(lookHit()); if (tgt) startHP(tgt); else eLong = false; } }
     if (hplace) updateHP();

@@ -30,6 +30,7 @@ window.Mods = (() => {
     { id: 'forge', cat: 'play', icon: '⚗️', n: '熔魂炉', d: '三颗首级熔成一颗更高阶的新首级。', def: true },
     { id: 'bowling', cat: 'play', icon: '🎳', n: '魂球道', d: '把首级扔向骷髅瓶，全中 STRIKE 连击。', def: true },
     { id: 'dresser', cat: 'play', icon: '💄', n: '化妆台', d: '给首级换头饰、染发、换表情。需要「头饰」。', def: true, requires: ['headwear'] },
+    { id: 'worldgraph', cat: 'play', icon: '🗺️', n: '地点图出猎（第十四轮·默认）', d: '出洞后进入随机生成的地点网络：每个地点是一个可自由走动搜索的小场景（偶尔是大场景），多扇门通往别处；最深处是地区霸主。关闭本项 = 旧的“点击 60 次 + 屏幕 UI 板”旅途。', def: true },
     { id: 'explore3d', cat: 'play', icon: '🌄', n: '第一人称出猎（旧·实验）', d: '【第十一轮用户判定不合格，默认关闭】3D 地区沿路前进。关闭时使用“点击 60 次 + 屏幕 UI 板”的旅途。', def: false },
     { id: 'chess', cat: 'play', icon: '♟️', n: '头棋殿', d: '首级当棋子，和斯尼克下棋或同屏双人。', def: true },
     { id: 'rebirth', cat: 'play', icon: '♻️', n: '轮回祭坛', d: '献祭一世换永久魂核天赋。', def: true },

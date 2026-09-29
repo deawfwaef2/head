@@ -9,6 +9,7 @@ from PIL import Image
 CACHE = os.path.expanduser('~/.cache/ph')
 DT = {5120: np.int8, 5121: np.uint8, 5122: np.int16, 5123: np.uint16, 5125: np.uint32, 5126: np.float32}
 NC = {'SCALAR': 1, 'VEC2': 2, 'VEC3': 3, 'VEC4': 4}
+ERR = 0.02  # meshopt 目标误差（foliage.py 对树干放宽）
 NORM = {5120: 127.0, 5121: 255.0, 5122: 32767.0, 5123: 65535.0}
 
 UA = {'User-Agent': 'soulhead-asset-packer/1.0'}
@@ -61,7 +62,7 @@ def pack(gltf_path, tris=8000, tex=512, q=82, texmap=None):
         idx = read(G, bins, p['indices']).reshape(-1).astype(np.uint32)
         if keep < 0.999 and len(idx) > 300:
             tgt = max(96, int(len(idx) * keep) // 3 * 3)
-            dst = np.zeros_like(idx); n = mo.simplify(dst, idx, pos, target_index_count=tgt, target_error=0.02)
+            dst = np.zeros_like(idx); n = mo.simplify(dst, idx, pos, target_index_count=tgt, target_error=ERR)
             if n >= 3: idx = dst[:n]
         used = np.unique(idx); remap = np.full(len(pos), 0, np.int64); remap[used] = np.arange(len(used)); idx = remap[idx]
         at = {}

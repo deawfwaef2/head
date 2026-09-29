@@ -319,6 +319,11 @@ window.UI = (() => {
     const at = res.beats.map((b, i) => i === 0 ? 0 : Math.round(i / (n - 1) * TAPS));
     trip = { loc, res, at, taps: 0, shown: 0, hp0: G.S.hp, coins: 0, log: [], dead: false, done: false, choose: null,
       ev: [Math.round(TAPS * (0.3 + Math.random() * 0.1)), Math.round(TAPS * (0.62 + Math.random() * 0.1))], evPool: EVENTS.slice().sort(() => Math.random() - 0.5) };
+    if (window.Worlds && (!window.Mods || Mods.on('worldgraph'))) { // 第十四轮：地点图出猎（默认）
+      root.classList.remove('on'); cur = null;
+      Worlds.start(trip, { finish: finishTrip, die, fallback: () => textTrip() });
+      return;
+    }
     if (window.Explore && window.ExWorld && (!window.Mods || Mods.on('explore3d'))) {
       root.classList.remove('on'); cur = null; if (document.pointerLockElement) document.exitPointerLock();
       Explore.start(trip, { choose: applyChoice, finish: finishTrip, die, fallback: () => textTrip() });

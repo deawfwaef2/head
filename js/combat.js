@@ -116,7 +116,7 @@ window.Combat = (() => {
   // ---------- 目标：散落在地上的首级（挂载/手持的不受影响）----------
   const _hp = new V3();
   function headTargets(center) {
-    const out = []; if (!G.heads) return out;
+    const out = []; if (!G.heads || (window.Worlds && Worlds.active)) return out;
     for (const h of G.heads) {
       if (!h || h.mount || h === G.held || !h.g.visible) continue;
       _hp.copy(h.g.position); _hp.y += 0.02; if (_hp.distanceToSquared(center) > 9) continue;
@@ -219,5 +219,6 @@ window.Combat = (() => {
   // 屏震（在相机就位后、渲染前调用）
   function prerender() { if (drawn && S.shake > 0.0005) { cam.position.x += (Math.random() - 0.5) * S.shake * 1.5; cam.position.y += (Math.random() - 0.5) * S.shake * 1.5; } }
 
-  return { init, toggle, onWeapon, onDown, onUp, onMove, update, prerender, addProvider, get drawn() { return drawn; }, get enabled() { return enabled; }, get state() { return S; }, get guardDir() { return S.rmb ? S.gdir : null; } };
+  const attach = (sc) => { if (trail && trail.m) sc.add(trail.m); if (trail) trail.pts.length = 0; };
+  return { attach, init, toggle, onWeapon, onDown, onUp, onMove, update, prerender, addProvider, get drawn() { return drawn; }, get enabled() { return enabled; }, get state() { return S; }, get guardDir() { return S.rmb ? S.gdir : null; } };
 })();
