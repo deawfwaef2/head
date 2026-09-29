@@ -342,6 +342,33 @@ window.Worlds = (() => {
   function glow() { if (glowTex) return glowTex; const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,255,255,.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); glowTex = new THREE.CanvasTexture(c); return glowTex; }
 
   // ================= 猎物（魂光，第 4 步换真实身体）=================
+  function spot(B, r) { let x = 0, z = 0; for (let t = 0; t < 30; t++) { const a = r() * 6.28, d = B.R * (0.3 + r() * 0.55); x = Math.cos(a) * d; z = Math.sin(a) * d; if (B.cols.every(c => Math.hypot(c.x - x, c.z - z) > c.r + 0.8) && B.doors.every(dd => Math.hypot(dd.x - x, dd.z - z) > 5)) break; } return new V3(x, 0, z); }
+  // 给 js/foe.js 的接口
+  function foeCtx(B, node) {
+    return {
+      sc: B.sc, H: B.H, cols: B.cols, R: B.R, player: { pos: W.pos, get yaw() { return G.player.yaw; }, get crouch() { return G.player.crouch; } },
+      st: () => G.st(), sees: (pos, maxD) => sees({ pos }, maxD), say: (anchor, text, col) => { if (text) say(anchor, text, col); },
+      floatDmg: (pos, n, big) => floatDmg(pos, n, big), toast: (t, c, d) => G.toast && G.toast(t, c, d), shake: (k) => { W.shake = Math.max(W.shake || 0, k); },
+      playerSwinging: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.thrust > 0)),
+      power: (fo) => { const q = G.st().power / ((fo.boss ? node.loc.rec * (fo.boss.pow || 2) : node.loc.rec * [0.7, 0.9, 1.15, 1.5, 2.1][fo.rar])); return Math.pow(clamp(q, 0.25, 3), 0.7); },
+      hitPlayer: (fo, n) => { const s = G.st(); n = Math.max(1, Math.round(n * (1 - s.dodge * 0.5) * (1 - Math.min(0.5, s.def / (s.def + 300)))));
+        if (guardFacing(fo.pos)) { n = Math.round(n * 0.25); G.toast && G.toast('🛡️ 格挡！', '#cfe0ff', 0.6); SFX.thud && SFX.thud(0.8); fo.stag = fo.boss ? 0.8 : 0.6; }
+        else { G.flash && G.flash('#a00000', 0.4, 280); W.shake = Math.max(W.shake || 0, fo.boss ? 0.5 : 0.25); }
+        if (n > 0) { G.damage(n); W.trip.log.push({ t: `${fo.h.c.name}${fo.boss ? '' : '反击'}，你受了伤。`, d: `-${n} HP` }); } },
+      bossMeet: (fo) => { W.dom.boss.style.display = 'block'; W.boss = { B: fo.boss, pos: fo.pos, foe: fo, hp: 100, dead: false, sayT: 0 }; bossSay(fo.boss.say || pick(Math.random, fo.boss.taunt), 3); },
+      bossHp: (fo) => { W.dom.bossHp.style.width = Math.max(0, fo.hp / fo.maxHp * 100) + '%'; if (W.boss && W.boss.sayT <= 0 && Math.random() < 0.3) { bossSay(pick(Math.random, fo.boss.hurt), 2); W.boss.sayT = 4; } },
+      onDeath: (fo) => { const nd = W.graph.nodes[W.cur], i = nd.prey.indexOf(fo.h); if (i >= 0) nd.prey.splice(i, 1);
+        if (fo.boss) { bossSay(fo.boss.lose, 4); W.dom.boss.style.display = 'none'; G.flash && G.flash('#ffffff', 0.8, 600); SFX.fanfare && SFX.fanfare(3); W.shake = 1; setTimeout(() => G.toast && G.toast(`👑 ${fo.boss.title}倒下了——砍下她的头，带回去！`, fo.boss.col || '#ffd060', 4), 1200); } }
+    };
+  }
+  function takeHead(hd) { // 拾取砍下的首级
+    const fo = hd.fo, c = hd.h.c, s = G.st(), node = W.graph.nodes[W.cur];
+    if (fo.boss) { bossWin(hd.h, fo.boss); return true; }
+    if (W.trip.res.heads.length >= s.cap) { G.toast(`麻袋满了（${s.cap} 颗）`, '#aaa', 2.5); return false; }
+    W.trip.res.heads.push(hd.h); W.trip.log.push({ t: `你在「${node.name}」砍下了${c.name}的头。`, cls: 'gethead' });
+    G.toast(`💀 获得首级【${RN[c.rar]}】${c.name}`, RC[c.rar], 3); SFX.squish && SFX.squish(1); if (c.rar >= 2) SFX.fanfare && SFX.fanfare(c.rar);
+    return true;
+  }
   function spawnPrey(B, node) {
     const r = mulberry(node.seed ^ 0x5bd1e995), out = [];
     node.prey.forEach((h, k) => {
@@ -409,8 +436,19 @@ window.Worlds = (() => {
     W.cur = i; node.visited = true; node.known = true; node.adj.forEach(b => W.graph.nodes[b].known = true); remember(node);
     if (!node.prey) populate(node);
     const B = W.B = buildNode(node);
-    W.prey = spawnPrey(B, node);
-    W.boss = node.boss && !(G.S.bosses || {})[node.region] ? spawnBoss(B, node) : null;
+    W.foes = null; W.prey = []; W.boss = null;
+    const wantBoss = node.boss && !(G.S.bosses || {})[node.region] && window.Explore && Explore.BOSSES[node.region];
+    if (window.Foe && !/[?&]nofoe=1/.test(location.search) && !(window.Mods && !Mods.on('foe_bodies'))) {
+      try {
+        const r = mulberry(node.seed ^ 0x5bd1e995), list = [];
+        node.prey.forEach(h => { list.push({ h, pos: spot(B, r) }); });
+        if (wantBoss) { const Bo = Explore.BOSSES[node.region]; node.bossH = node.bossH || RPG.bossHead(G.S, G.st(), node.loc, Bo, G.usedNames, G.usedSig); list.push({ h: node.bossH, pos: new V3(0, 0, 0), boss: Bo, bossK: node.region }); }
+        W.dom.loadT.textContent = `「${node.name}」里有人……`;
+        W.foes = await Foe.populate(foeCtx(B, node), list);
+        if (W.foes && !W.foes.length && list.length) W.foes = null;
+      } catch (e) { console.warn('Foe', e); W.foes = null; }
+    }
+    if (!W.foes) { W.prey = spawnPrey(B, node); W.boss = wantBoss ? spawnBoss(B, node) : null; }
     // 门牌
     B.doors.forEach(d => { d.label.userData.set(doorName(node, d)); });
     // 出生点：来的那扇门内侧
@@ -426,6 +464,7 @@ window.Worlds = (() => {
   }
   function disposeNode() {
     const B = W.B; if (!B) return;
+    if (window.Foe) Foe.clear();
     B.sc.traverse(o => { if (o.isInstancedMesh) o.dispose && o.dispose(); if (o.userData.sky) { o.geometry.dispose(); o.material.dispose(); } if (o.isSprite && o.material.map && o.material.map.isCanvasTexture && o.material.map !== glowTex) { o.material.map.dispose(); o.material.dispose(); } });
     B.terr.geometry.dispose(); B.terr.material.dispose && B.terr.material.dispose();
     if (B.sun.shadow && B.sun.shadow.map) B.sun.shadow.map.dispose();
@@ -486,7 +525,8 @@ window.Worlds = (() => {
     W.doorNear = null; for (const d of B.doors) { const dd = Math.hypot(W.pos.x - d.x, W.pos.z - d.z); if (dd < 2.6) W.doorNear = d; d.label.visible = Math.hypot(cam.position.x - d.x, cam.position.z - d.z) < 34; }
     W.interNear = null; for (const it of B.inter) if (!it.done && Math.hypot(W.pos.x - it.x, W.pos.z - it.z) < 1.9) W.interNear = it;
     // 猎物 / 霸主
-    updatePrey(dt, now); if (W.boss) updateBoss(dt, now);
+    if (W.foes) { Foe.update(dt, now); if (W.boss) W.boss.sayT -= dt; } else { updatePrey(dt, now); if (W.boss) updateBoss(dt, now); }
+    W.headNear = W.foes ? Foe.nearHead(W.pos, G.player.yaw) : null;
     updateSay();
     if (window.Combat) { try { Combat.update(dt, now); Combat.prerender(); } catch (e) { console.warn(e); } }
     W.hintT -= dt; if (W.hintT <= 0) { W.hintT = 0.12; hud(); }
@@ -581,18 +621,20 @@ window.Worlds = (() => {
     if (bo.sayT <= 0 && Math.random() < 0.35) { bossSay(pick(Math.random, bo.B.hurt), 2); bo.sayT = 4; }
     if (bo.hp <= 0) bossWin();
   }
-  function bossWin() {
-    const bo = W.boss, Bo = bo.B, loc = W.graph.nodes[W.cur].loc; bo.dead = true;
-    const h = RPG.bossHead(G.S, G.st(), loc, Bo, G.usedNames, G.usedSig);
+  function bossWin(hIn, BoIn) {
+    const bo = W.boss, Bo = BoIn || bo.B, loc = W.graph.nodes[W.cur].loc; if (bo) bo.dead = true;
+    const h = hIn || RPG.bossHead(G.S, G.st(), loc, Bo, G.usedNames, G.usedSig);
     W.trip.res.heads.push(h); G.S.bosses = G.S.bosses || {}; G.S.bosses[loc.k] = { n: Bo.n, t: Bo.title, date: Date.now() }; G.S.rep = G.S.rep || {}; G.S.rep[loc.k] = (G.S.rep[loc.k] || 0) + 5;
-    bossSay(Bo.lose, 4); G.flash && G.flash('#ffffff', 1, 700); SFX.fanfare && SFX.fanfare(4); SFX.levelup && SFX.levelup(); W.shake = 1.2;
+    if (!hIn) bossSay(Bo.lose, 4); G.flash && G.flash('#ffffff', 1, 700); SFX.fanfare && SFX.fanfare(4); SFX.levelup && SFX.levelup(); W.shake = 1.2;
     W.trip.log.push({ t: `你击败了${Bo.title}${Bo.n}，带走了她的首级。`, cls: 'gethead' });
-    setTimeout(() => { if (!W || !W.B) return; W.B.sc.remove(bo.g); W.dom.boss.style.display = 'none'; G.toast(`👑 击败了${Bo.title}「${Bo.n}」！获得霸主首级`, Bo.col || '#ffd060', 5); W.graph.nodes[W.cur].boss = false; }, 1400);
+    const nd = W.graph.nodes[W.cur];
+    setTimeout(() => { if (!W || !W.B) return; if (bo && bo.g) W.B.sc.remove(bo.g); W.dom.boss.style.display = 'none'; G.toast(`👑 ${Bo.title}「${Bo.n}」的首级到手了！`, Bo.col || '#ffd060', 5); nd.boss = false; }, hIn ? 200 : 1400);
   }
   function targets(center) {
     if (!W || !W.B || W.busy) return [];
     const out = [];
     for (const p of W.prey) if (!p.gone) out.push({ id: p.id, pos: p.pos, r: 0.38, kind: 'prey', onHit: (info) => { p.hp -= info.speed > 9 ? 2 : 1; p.flash = 0.15; p.seen = true; if (p.hp <= 0) capture(p); else if (p.sayT <= 0) { say(p, pick(Math.random, PREY_SAY.hit), '#ffb0a0'); p.sayT = 2; } } });
+    if (W.foes) return out.concat(Foe.targets());
     if (W.boss && !W.boss.dead) out.push({ id: 'boss', pos: W.boss.pos, r: 0.8, kind: 'boss', onHit: bossHit });
     return out;
   }
@@ -615,6 +657,7 @@ window.Worlds = (() => {
     if (e.code === 'KeyM') { toggleMap(); return true; }
     if (W.mapOpen) return true;
     if (e.code === 'KeyE' && !e.repeat) {
+      if (W.headNear) { const hd = W.headNear; if (takeHead(hd)) Foe.pickup(hd); return true; }
       if (W.interNear) { openChest(W.interNear); return true; }
       if (W.doorNear) { const d = W.doorNear; if (d.home) leaveHome(); else { SFX.open && SFX.open(); goto(d.to, W.cur); } return true; }
     }
@@ -675,10 +718,11 @@ window.Worlds = (() => {
   function hud() {
     if (!W || !W.B || !DOM) return; const node = W.graph.nodes[W.cur], st = STYLES[node.style], s = G.st();
     DOM.top.querySelector('.n').textContent = node.name; DOM.top.querySelector('.s').textContent = `${node.loc.icon} ${node.loc.n} · ${st.n} · ${SIZES[node.size].n} · 已探索 ${W.graph.nodes.filter(n => n.visited).length}/${W.graph.nodes.length}`;
-    const left = W.prey.filter(p => !p.gone).length;
+    const left = W.foes ? W.foes.filter(f => !f.dead).length : W.prey.filter(p => !p.gone).length;
     DOM.stat.innerHTML = `<div class="hp"><i style="width:${clamp(G.S.hp / s.maxHp, 0, 1) * 100}%"></i></div>❤️ ${Math.round(G.S.hp)}/${s.maxHp} · 🧪${G.S.items.potion || 0}<br>🧺 ${W.trip.res.heads.length}/${s.cap} · 🔮 +${W.trip.coins}${left ? `<br><span style="color:#9fd0ff">✨ 此地还有 ${left} 缕魂光</span>` : ''}`;
     let h = 'WASD 走动 · <b>F</b> 拔刀（按住左键挥砍 / 连点刺 / 右键格挡）· <b>M</b> 地图 · <b>H</b> 喝药';
-    if (W.interNear) h = '<b>E</b> 打开宝箱';
+    if (W.headNear) h = `<b>E</b> 拾取首级 · 【${RN[W.headNear.h.c.rar]}】${esc(W.headNear.h.c.name)}`;
+    else if (W.interNear) h = '<b>E</b> 打开宝箱';
     else if (W.doorNear) { const d = W.doorNear, cn = W.graph.nodes[W.cur]; h = d.home ? '<b>E</b> 回到魂首窟（结束狩猎，带回首级）' : `<b>E</b> 穿过门 → ${esc(doorName(cn, d))}` + (W.graph.nodes[d.to].region !== cn.region ? ` <span style="color:#f0a060">（推荐战力 ${W.graph.nodes[d.to].loc.rec}）</span>` : ''); }
     DOM.hint.innerHTML = h;
   }

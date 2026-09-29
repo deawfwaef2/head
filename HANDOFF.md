@@ -464,3 +464,33 @@
 - `?wlite=1`：worlds 调试开关，不散布植被/远环（仅测试用）。`Worlds._debug.targets(center)` 可直接拿到战斗目标。
 - 画面：草甸（meadow）草仍偏稀——草丛模型面数高（grass_medium_01），加密要么做草卡片要么 LOD，**交给画面协作者**；王城（capital）夜景已看过，OK。沼泽/荒野/要塞/山巅风格尚未截图。
 - 平衡待真人手感：霸主 6 刀偏快，等第 4 步 foe.js 身体+动作做完一起调。
+
+---
+## 第十四轮 14b 进度 · 巨大世界 + 原 VRM 身体 + 真人敌人（总管理师）
+
+**巨大持久世界（f25ab3b）**：开局一次性 `Worlds.genWorld(seed)` 生成 ~270 节点的连通大地图，存档 `G.S.world = {seed, vis[], known[], stone}`；不再选地点、不再每趟随机关卡图。节点之间靠门连接，M 看地图（只显示走过/看见的）。
+
+**身体（用户硬性要求：必须是角色自己的原 VRM 身体和衣服，禁止程序化身体）**
+- `tools/vrm2body.py src.vrm File "名" "credit"` → `big/body/<File>.js`（`window.BODY_MODELS[File]={meta,glb}`）：原骨骼+蒙皮+原衣服，只去掉原头，脖子切口封一个 `__CUT__` 圆片。
+- 18 具：AvatarSample_A, Jean, Noelle, Amber, Rosaria, Lisa, Sucrose, Xiangling, Ningguang, Furina, Kokomi, YaeMiko, Shenhe, Mona, Eula, Beidou, HikariCape, HikariScholar。
+- **原神（MMD 转）身体皮肤和衣服是同一张贴图，不能染色** → 深色/异色皮肤的头只配可染色身体（HikariCape/HikariScholar/AvatarSample_A），否则头的肤色被改成浅色跟身体一致（`foe.js bodyFor`）。
+- 身份 → 身体表：`Foe.IDENT`；霸主按地域：`BOSS_BODY`。AvatarSample_A 是现代服装，不进池。
+- 按需加载（file:// 下插 script），同地点最多 ~3 种身体，模板缓存上限 5 个（LRU 释放）。
+
+**动作**：Quaternius Universal Animation Library（CC0）UAL1+UAL2 → `tools/anim_bake.py` → `big/anim/ual.js`（51 段，世界空间旋转增量，重定向到任意 VRM 骨骼，见 `Foe.clipsFor`）。
+
+**真人敌人（js/foe.js，MOD `foe_bodies` 默认开，关掉退回光团猎物）**
+- AI：idle（干活动作）→ 看见你说话 → 勇敢的追击/其余逃跑（逃到边界贴边滑，被逼近会反击）→ 攻击（剑 A/B/C/重连击；空手拳）命中帧判定 → 格挡（Sword_Block）→ 受击硬直 → 死亡。
+- 持武器身份（knight/guard/merc/…）右手握 Poly Haven 武器（katana/estoc/machete/mace/hammer/axe）。
+- 伤害判定按骨段：头 ×1.6、脖子 ×1.8、四肢 ×0.7；**脖子横砍（速度>6，对方 HP<40% 或致命）= 斩首**；刺击不斩首。
+- **只有砍下来的头能带回家**：头变成物理拾取物（弹跳滚动），走近按 E 拾取；霸主也必须砍头才算胜利（`bossWin(h, Bo)`）。
+- **布娃娃**：Verlet 粒子（躯干全连接刚性 + 四肢链 + 防对折最小距离）驱动真骨骼；死亡时从当前动作姿势开始。
+- **尸体可继续砍**：脖子→斩首；四肢（速度>6.5）→断肢（按当前姿势把该骨段子树的三角形拍成静态网格飞出）；腰（速度>9）→腰斩，头若还在跟上半身走，仍可砍下。
+- worlds.js 通过 `foeCtx(B,node)` 提供接口（sees/say/hitPlayer/power/bossMeet/bossHp/onDeath…）。
+
+**给协作者（画面/bug）**：
+1. 断肢切面是空心的（没有封口），可以加红色切面盖片。
+2. 血滴是简单 Sprite，可以换成更好的血雾/地面血迹贴花。
+3. 死亡首级的切口盘偏大的问题（衣领把 cut 半径撑大）见 C补充。
+4. 头目前没有眨眼。
+5. 无头浏览器里整个游戏切换节点会 OOM（2GB 沙箱），测试敌人用 `_f.html`（gitignored）+ `_tools/fshot.py`。
