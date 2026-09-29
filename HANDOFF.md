@@ -308,3 +308,13 @@
 - 根因：cave.js 地面用 CircleGeometry（只有圆心+外圈顶点），外圈抬高后整个地面成了缓坡锥面（离中心越远越高，R 的 80% 处约 20cm），而物理按 y=0。改为分环 RingGeometry（中间严格平坦），导出 `cave.floorAt(x,z)`、`cave.pillars`（墙根石笋/岩石圆柱碰撞）。
 - supportH 改为真实形状：每个头预计算约 96 个极值点（脸/耳/角/饰品 + 头部中心 0.16 以内的头发，不含长发尾），按外观签名缓存（HULLC），休眠头懒计算。
 - 修复女巫帽 NaN（Math.pow 负数）。测试：_tools/sink.py（随机抛掷 90 次，无 >2cm 穿透）。
+
+### 第十二轮 · 第二步：新增 22 个基础头模（进行中记录）
+- 新增 22 个 VRoid 社区 VRM 头模（DN_07273 Hikari Touka Hinata Iris Judy Kohaku LIA Lookmouse MDK2 Mel Neleac Pink1 Pink2 Pink4 RP_C Seph TS_Girl TS_Enemy XiaoYun Zat EE），总计 39 个基础头；头发可跨模混搭 → 组合数 ≈ 39×39×发色×瞳色×肤色×表情×附加发型。作者见 CREDITS.md。
+- 管线：`tools/vrm2head.py`（裁头）→ `tools/glbsimp.py`（meshoptimizer 头发减面，需 pip meshoptimizer）→ `tools/glbpack.py`（int16 顶点 / int8 法线 / 稀疏 morph）。稀疏 morph 的值必须保持 float（GLTFLoader 用 setXYZ 会二次归一化 → 巨型面片）。
+- 旧 17 个模型也用 glbpack 重新压缩（19.6→12.6 MB）。
+- 剔除：Anata（材质合并，眼睛进了皮肤材质）、AvatarSample_F（无眼白）、Goddess（圣诞帽/皮肤坏）、Lily（嘴/脸纹坏）、RP_B（棒球帽焊在头发上）、LB2（低模感）、Nemesia/Olivia（无脖子，断面跑偏）。
+- 修复"白眼"：部分 VRoid 导出的眼部三角形绕序反了（MToon _CullMode=0 不进 glTF），单面剔除后眼窝全空、透出后脑头发。眼/眉/睫毛材质一律双面。
+- 新增"眼睛透过刘海"：眼部先写本头专属模板值（只在脸前方可见处），本头头发跳过这些像素；LOD 渲染目标也开了模板缓冲。
+- 陷地修复（第二轮）：supportH 误用旋转矩阵第二列（=逆旋转），长耳/角/侧躺时插进地里；改为第二行。外壳：脸层网格（兔耳/猫耳/蝴蝶结）不受半径限制；采样 350→1500；方向 96→200；缓存键加网格数+顶点数。陷地测试 32 头 0 穿透。
+- 仓库 .git 已移到 /home/user/.cache/headgit（head/.git 是 gitdir 指针文件），工作区快照不再计入 .git；若 .cache 丢失：`git clone --no-checkout <url> /tmp/x && mv /tmp/x/.git /home/user/.cache/headgit` 再写回指针。

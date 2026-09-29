@@ -4,6 +4,7 @@ window.ModelHeads = (() => {
   const SRC = new WeakMap();  // mesh -> src material（不要放 userData，clone 会 JSON 序列化贴图）
   let ready = false;
   const V3 = THREE.Vector3;
+  let stencilSeq = 0;
   const GT = { value: 0 }; // 全局时间（异色流光 / 魂火眼）
 
   // ---------- 调色板 ----------
@@ -59,6 +60,8 @@ window.ModelHeads = (() => {
           meshes.forEach(m => {
             const src = m.material; const nm = src.name || '';
             SRC.set(m, src);
+            // 第十二轮：部分 VRoid 导出的眼部三角形绕序相反（MToon _CullMode=0 未体现在 glTF 里），单面会被整块剔除 → 空眼窝。眼/眉一律双面。
+            if (/Eye|Iris|Brow|Lash|Highlight/i.test(nm)) src.side = THREE.DoubleSide;
             m.userData.kind = kindOf(m, nm, entry);
             if (m.userData.kind === 'cut') fixCutUV(m.geometry);
             m.renderOrder = /Highlight/i.test(nm) ? 4 : /Iris/i.test(nm) ? 3 : /Eyeline|Eyelash|Brow/i.test(nm) ? 3 : /EyeWhite/i.test(nm) ? 2 : 0;
@@ -660,7 +663,7 @@ window.ModelHeads = (() => {
       else if (k === 'skin') { out = skinMat(src, U); own.push(out); }
       else {
         out = t.shared.get(key);
-        if (!out) { out = new THREE.MeshToonMaterial({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: src.depthWrite }); t.shared.set(key, out); }
+        if (!out) { const ew = /EyeWhite/i.test(src.name || ''); out = new THREE.MeshToonMaterial({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: ew ? false : src.depthWrite }); t.shared.set(key, out); } // 眼白是最底层：不写深度，否则部分 VRoid 2.x 模型的虹膜（略在眼白后面）被挡住→白眼
       }
       matMap.set(key, out); return out;
     };
@@ -688,15 +691,35 @@ window.ModelHeads = (() => {
       }
     };
     setExpression(look.ex || {});
+    // 第十二轮：二次元"眼睛透过刘海"——眼白/虹膜/眼线/睫毛/眉毛先写入本头专属模板值（只在被脸皮深度测试通过、真正可见处），
+    // 本头的头发跳过这些像素。长刘海盖住眼睛的模型不再"白眼"。每个头用不同的 ref，别的头的头发不受影响。
+    const SREF = (stencilSeq = stencilSeq % 254 + 1);
+    const maskMats = new Map();
+    for (const m of F.faceMeshes) {
+      const nm = (SRC.get(m) || {}).name || '', k = m.userData.kind;
+      if (!(k === 'iris' || k === 'brow' || /EyeWhite|Eyeline|Eyelash|Iris|Brow/i.test(nm))) continue;
+      const c0 = byName[m.name]; if (!c0) continue;
+      const src = SRC.get(m); let mm = maskMats.get(src);
+      if (!mm) { mm = new THREE.MeshBasicMaterial({ map: src.map || null, alphaTest: 0.35, colorWrite: false, depthWrite: false, side: src.side, stencilWrite: true, stencilRef: SREF, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp, stencilFail: THREE.KeepStencilOp, stencilZFail: THREE.KeepStencilOp }); mm.onBeforeCompile = (sh) => { // 只在镜头位于脸前方时生效；从背后/侧后看（VRoid 后脑没有皮肤遮挡）不许在头发上开洞
+          sh.vertexShader = sh.vertexShader.replace('void main() {', 'varying float vFront;\nvoid main() {').replace('#include <project_vertex>', '#include <project_vertex>\n vec4 wpM = modelMatrix * vec4(transformed, 1.0); vFront = dot(normalize((modelMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz), normalize(cameraPosition - wpM.xyz));');
+          sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'varying float vFront;\nvoid main() {\n if (vFront < 0.2) discard;');
+        };
+        mm.customProgramCacheKey = () => 'eyemask1';
+        maskMats.set(src, mm); own.push(mm); }
+      const mk = new THREE.Mesh(m.geometry, mm); mk.renderOrder = 1; mk.name = m.name + '_mask';
+      if (c0.morphTargetInfluences) { mk.morphTargetInfluences = c0.morphTargetInfluences; mk.morphTargetDictionary = c0.morphTargetDictionary; }
+      g.add(mk);
+    }
+    const stencilHair = (mat) => { mat.stencilWrite = true; mat.stencilRef = SREF; mat.stencilFunc = THREE.NotEqualStencilFunc; mat.stencilFail = THREE.KeepStencilOp; mat.stencilZFail = THREE.KeepStencilOp; mat.stencilZPass = THREE.KeepStencilOp; };
     // 发型
     const hg = new THREE.Group(); g.add(hg);
     // 借用发型：按头皮高度图精确贴合（见 fitHair），不再整体缩放
     if (hi === fi) { hg.scale.set(1.008, 1.008, 1.008); hg.position.z = 0.002; }
     const hairGeos = hi !== fi ? fitHair(F, H) : H.hairMeshes.map(m => m.geometry);
-    H.hairMeshes.forEach((m, i) => { const c = new THREE.Mesh(hairGeos[i], getMat(m, H)); c.renderOrder = m.renderOrder; hg.add(c); });
+    H.hairMeshes.forEach((m, i) => { const mt = getMat(m, H); stencilHair(mt); const c = new THREE.Mesh(hairGeos[i], mt); c.renderOrder = Math.max(2, m.renderOrder); hg.add(c); });
     const disposables = [];
     const S = hairShell(F, H, F.meta.file + '|' + H.meta.file + (hi === fi ? '|own' : ''), hairGeos);
-    if (look.hx && F.meta.grp !== 'godette') try { addHairX(hg, look, S, U, disposables); } catch (e) { console.warn('hairX', e); }
+    if (look.hx && F.meta.grp !== 'godette') try { addHairX(hg, look, S, U, disposables); hg.traverse(o => { if (o.isMesh && o.material && o.material.customProgramCacheKey && o.material.customProgramCacheKey() === 'hair4') { stencilHair(o.material); o.renderOrder = 2; } }); } catch (e) { console.warn('hairX', e); }
     addAccessories(g, look, F.meta, U, disposables, S.top);
     if (window.HeadWear && look.hw && look.hw.length && (!window.Mods || Mods.on('headwear'))) try { HeadWear.build({ g, look, S, onShell, grad, disp: disposables }); } catch (e) { console.warn('headwear', e); }
     const radius = 0.1;

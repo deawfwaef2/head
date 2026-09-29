@@ -807,10 +807,10 @@ window.startGame = function () {
   const _ld = new V3(), _iq = new THREE.Quaternion();
   // 第十二轮：按真实形状求支撑高度——预计算约 160 个极值点（脸/耳/角/饰品 + 贴近头骨的头发，不含长发尾），
   // 支撑高度 = 当前朝向下最低点的深度；旧的椭球近似会让侧躺/带角的头陷进地面。
-  const HULL_DIRS = (() => { const a = [], n = 96, ga = Math.PI * (3 - Math.sqrt(5)); for (let i = 0; i < n; i++) { const y = 1 - (i + 0.5) / n * 2, r = Math.sqrt(1 - y * y), t = ga * i; a.push(new V3(Math.cos(t) * r, y, Math.sin(t) * r)); } return a; })();
+  const HULL_DIRS = (() => { const a = [], n = 200, ga = Math.PI * (3 - Math.sqrt(5)); for (let i = 0; i < n; i++) { const y = 1 - (i + 0.5) / n * 2, r = Math.sqrt(1 - y * y), t = ga * i; a.push(new V3(Math.cos(t) * r, y, Math.sin(t) * r)); } return a; })();
   const _hv = new V3(), _hm = new THREE.Matrix4(), _hi = new THREE.Matrix4();
   const HULLC = new Map(); // 同外观签名共享
-  function hullKey(h) { const l = h.rec && h.rec.look; return l ? [l.f, l.h, (l.acc || []).join('+'), l.feat || '', l.hx ? l.hx.s + (l.hx.ahoge || '') + (l.hx.len || '') : '', (l.hw || []).map(w => w.k || w).join('+')].join('|') : null; }
+  function hullKey(h) { const l = h.rec && h.rec.look; let nm = 0, nv = 0; h.hb.group.traverse(o => { if (o.isMesh && o.geometry && o.geometry.attributes.position) { nm++; nv += o.geometry.attributes.position.count; } }); return l ? [nm + ':' + nv, l.f, l.h, (l.acc || []).join('+'), l.feat || '', l.hx ? l.hx.s + (l.hx.ahoge || '') + (l.hx.len || '') : '', (l.hw || []).map(w => w.k || w).join('+')].join('|') : null; }
   function hullOf(h) {
     if (h._hullHb === h.hb && h._hull) return h._hull;
     const hk = hullKey(h); if (hk && HULLC.has(hk)) { h._hull = HULLC.get(hk); h._hullHb = h.hb; return h._hull; }
@@ -820,11 +820,13 @@ window.startGame = function () {
     const lim = 0.16 * HS; // 头发只取贴近头部中心的部分
     h.hb.group.traverse(o => {
       if (!o.isMesh || !o.geometry || !o.geometry.attributes.position || o.isSprite) return;
-      const P = o.geometry.attributes.position, step = Math.max(1, Math.floor(P.count / 350));
+      const P = o.geometry.attributes.position, step = Math.max(1, Math.floor(P.count / 1500)); // 第十二轮：新 VRoid 模型网格更密，350 采样会漏掉耳朵/领口等突出点
       _hm.multiplyMatrices(_hi, o.matrixWorld);
+      // 第十二轮：只有头发子组受半径限制（排除长发尾）；脸层网格（兔耳/猫耳/蝴蝶结等刚性饰品）全部计入，否则耳朵会插进地里
+      const faceLvl = o.parent === h.hb.group;
       for (let i = 0; i < P.count; i += step) {
         _hv.fromBufferAttribute(P, i).applyMatrix4(_hm);
-        if (_hv.length() > lim) continue;
+        if (!faceLvl && _hv.length() > lim) continue;
         for (let k = 0; k < HULL_DIRS.length; k++) { const d = _hv.dot(HULL_DIRS[k]); if (d > best[k]) { best[k] = d; pts[k] = _hv.clone(); } }
       }
     });
@@ -838,7 +840,7 @@ window.startGame = function () {
     const H = hullOf(h), q = h.g.quaternion;
     // 局部点旋转后的 y 分量：y' = 2(xy+wz)x·... 用矩阵第二行更快
     const x = q.x, y = q.y, z = q.z, w = q.w;
-    const r0 = 2 * (x * y - w * z), r1 = 1 - 2 * (x * x + z * z), r2 = 2 * (y * z + w * x);
+    const r0 = 2 * (x * y + w * z), r1 = 1 - 2 * (x * x + z * z), r2 = 2 * (y * z - w * x); // 旋转矩阵第二行（原来误用了第二列=逆旋转，长耳/角的头侧躺时会插进地里）
     let mn = 0; for (let i = 0; i < H.length; i += 3) { const yy = r0 * H[i] + r1 * H[i + 1] + r2 * H[i + 2]; if (yy < mn) mn = yy; }
     return Math.max(0.06, -mn + 0.004);
   }

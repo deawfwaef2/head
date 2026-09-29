@@ -51,8 +51,18 @@ if not ok and not A.force:
 CT = {5120: np.int8, 5121: np.uint8, 5122: np.int16, 5123: np.uint16, 5125: np.uint32, 5126: np.float32}
 NC = {'SCALAR': 1, 'VEC2': 2, 'VEC3': 3, 'VEC4': 4, 'MAT4': 16}
 def acc(i):
-    a = J['accessors'][i]; bv = J['bufferViews'][a['bufferView']]
+    a = J['accessors'][i]
     dt = CT[a['componentType']]; n = NC[a['type']]; cnt = a['count']
+    if 'bufferView' not in a:  # 稀疏访问器（UniVRM 导出的 morph）：零底 + 稀疏值
+        out = np.zeros((cnt, n) if n > 1 else cnt, np.float64 if dt == np.float32 else dt)
+        sp = a.get('sparse')
+        if sp:
+            ib = J['bufferViews'][sp['indices']['bufferView']]; vb = J['bufferViews'][sp['values']['bufferView']]
+            ii = np.frombuffer(BIN, CT[sp['indices']['componentType']], count=sp['count'], offset=ib.get('byteOffset', 0) + sp['indices'].get('byteOffset', 0))
+            vv = np.frombuffer(BIN, dt, count=sp['count'] * n, offset=vb.get('byteOffset', 0) + sp['values'].get('byteOffset', 0))
+            out[ii.astype(np.int64)] = vv.reshape(-1, n) if n > 1 else vv
+        return out
+    bv = J['bufferViews'][a['bufferView']]
     start = bv.get('byteOffset', 0) + a.get('byteOffset', 0); stride = bv.get('byteStride', 0)
     isz = np.dtype(dt).itemsize * n
     if stride and stride != isz:
@@ -159,7 +169,7 @@ yCut0 = yEye - 0.81 * (skinTop - yEye)   # 比例基准（保持与其他模型�
 # 第十一轮：切口不许切到下巴——取脸前半部分皮肤的最低点，切面至少在它下面 6mm
 _front = FP[FP[:, 2] > np.median(FP[:, 2])]
 chinY = float(_front[:, 1].min()) if len(_front) else yCut0
-yCut = min(yCut0, chinY - 0.006)
+yCut = max(min(yCut0, chinY - 0.006), yCut0 - 0.02)  # 最多比比例切口低 2cm（否则会切进肩膀）
 hairCut = yCut0 - A.hair_drop
 
 # 颈部中心 / 半径
@@ -172,6 +182,7 @@ nx, nz = np.median(band[:, 0]), np.median(band[:, 2])
 _rr = np.hypot(band[:, 0] - nx, band[:, 2] - nz); band = band[_rr < max(0.02, np.median(_rr) * 1.5)]
 nx, nz = band[:, 0].mean(), band[:, 2].mean()
 nr = float(np.percentile(np.hypot(band[:, 0] - nx, band[:, 2] - nz), 90)) * 1.02
+nr = min(0.055, max(0.025, nr))  # 真实脖子半径范围（米）
 
 # ---------- 选择三角形 ----------
 out = []  # (name, kind, matIndex, pos, nrm, uv, idx, targets)
@@ -195,7 +206,7 @@ for p in prims:
             r[0][:, 1] = np.maximum(r[0][:, 1], hairCut)
     elif p['kind'] == 'body':
         rad = np.hypot(P[T][:, :, 0] - nx, P[T][:, :, 2] - nz).max(1)
-        m = (ty.min(1) > yCut - 0.03) & (rad < nr * 1.6) & (ty.max(1) > yCut)
+        m = (ty.min(1) > yCut - 0.03) & (rad < nr * 1.3) & (ty.max(1) > yCut)
         r = subset(p, m, yCut)
     else:  # 衣物：只要牢牢挂在头骨上的（帽子、发饰）
         m = (p['hw'][T].min(1) > 0.95) & (ty.min(1) > yEye - 0.02)

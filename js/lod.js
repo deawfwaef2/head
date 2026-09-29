@@ -9,7 +9,7 @@
     opts = opts || {};
     const CELL = 112, ATL = 2048, PER = Math.floor(ATL / CELL), NCELL = PER * PER; // 18×18 = 324 格
     const NEAR = opts.near || 4.5, FAR2 = 30 * 30, BUDGET = 3, COS_RESNAP = Math.cos(22 * Math.PI / 180);
-    const rt = new THREE.WebGLRenderTarget(ATL, ATL, { depthBuffer: true, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false });
+    const rt = new THREE.WebGLRenderTarget(ATL, ATL, { depthBuffer: true, stencilBuffer: true, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false });
     const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10); cam.layers.set(L5);
     const free = []; for (let i = NCELL - 1; i >= 0; i--) free.push(i);
     // 灯光在第 5 层也要生效（r147 按相机图层收集灯光）
@@ -63,7 +63,7 @@
       scene.background = null; mesh.visible = false;
       const x = (h._cell % PER) * CELL, y = Math.floor(h._cell / PER) * CELL;
       rt.viewport.set(x, y, CELL, CELL); rt.scissor.set(x, y, CELL, CELL); rt.scissorTest = true; renderer.setRenderTarget(rt); // 必须先设视口/裁剪再绑定（setRenderTarget 时才拷贝）
-      renderer.setClearColor(0x000000, 0); renderer.autoClear = false; renderer.clear(true, true, false);
+      renderer.setClearColor(0x000000, 0); renderer.autoClear = false; renderer.clear(true, true, true);
       renderer.render(scene, cam);
       rt.scissorTest = false; rt.viewport.set(0, 0, ATL, ATL); rt.scissor.set(0, 0, ATL, ATL);
       renderer.setRenderTarget(prevRT); renderer.setClearColor(cc, ca); renderer.autoClear = ac;

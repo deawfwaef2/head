@@ -40,3 +40,31 @@
 ## 之后寻找模型的筛选标准
 
 用户接受私下测试时使用非商业/有限许可素材，但仓库目前保持公开，因此不能据此把“仅限私用”“禁止暴力”或禁止再分发的模型打包进来。欢迎推荐明确允许公开分发、改造、暴力表现的中世纪奇幻女性模型；偏好 CC0 / CC-BY，并需要逐个检查模型本身及其贴图许可。
+
+
+## 第十二轮新增头部基础模型（VRM，经 tools/vrm2head.py 裁切、glbsimp 减面、glbpack 压缩）
+
+- DN_07273（宝煲）— 咸小夏
+- Hikari（光莉）— あわ
+- Nemesia（涅墨西亚）— awa
+- Touka（冻香）— あわ
+- Hinata（日向）— rosspeili
+- Iris（艾瑞丝）— antem
+- Judy（茱蒂）— antem
+- Kohaku（琥珀御影）— Sunwood-ai-labs
+- LIA（莉娅）— LIA project
+- Lookmouse（绯鼠）— lookmouse
+- MDK2（鸥）— KamomeAshizawa
+- Mel（夜空梅露）— 風籟
+- Neleac（茶发水手）— 水銀メイド
+- Olivia（奥莉维亚）— xishensoft
+- Pink1（冬樱）— Hopu
+- Pink2（苍猫）— Hopu
+- Pink4（花洛丽）— Hopu
+- RP_C（薄荷镜）— eric chow
+- Seph（翠妖瑟芙）— Marin
+- TS_Girl（青瞳）— Tyreece
+- TS_Enemy（翠焰）— Tyreece
+- XiaoYun（小云）— YunYouJun
+- Zat（夜猫）— kekw
+- EE（金砂）— EE
