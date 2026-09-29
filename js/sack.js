@@ -25,6 +25,10 @@ window.Sack = (() => {
   def('bigpotion', { n: '巨魔再生药', icon: '⚗️', kind: 'use', h: 2, st: 1, heal: 1, rar: 2, desc: '立刻恢复全部生命。' });
   def('bandage', { n: '绷带', icon: '🩹', kind: 'use', st: 5, heal: 0.2, desc: '恢复 20% 生命。' });
   def('whet', { n: '磨刀石', icon: '🪨', kind: 'use', st: 3, buff: 1, rar: 1, desc: '本次出猎 120 秒内伤害 +25%。' });
+  def('meat', { n: '生肉', icon: '🥩', st: 10, desc: '还带着体温的兽肉。炖汤、熬药都行。' });
+  def('fang', { n: '兽牙', icon: '🦷', st: 10, rar: 1, desc: '尖利的犬齿。磨成刀尖能让武器更锋利。' });
+  def('horn', { n: '兽角', icon: '🐂', h: 2, st: 5, rar: 1, desc: '弯曲坚硬的角，能做护具与背篓的骨架。' });
+  def('stew', { n: '炖肉', icon: '🍲', kind: 'use', st: 3, heal: 0.5, desc: '热腾腾的浓汤。恢复 50% 生命。' });
   def('head', { n: '首级', icon: '💀', kind: 'head', w: 2, h: 2 });
   const WICON = ['🏏', '🔨', '🔪', '⛓️', '🪓', '🌙', '⚔️'], WSZ = [[1, 3], [1, 3], [1, 3], [2, 3], [2, 4], [2, 4], [2, 5]];
   const BAGSZ = [[4, 4], [5, 4], [6, 4], [6, 5], [7, 6], [8, 7]];
@@ -39,11 +43,14 @@ window.Sack = (() => {
   const RECIPES = [
     { out: 'potion', n: 1, need: { herb: 2, dust: 1 }, coin: 20 },
     { out: 'bandage', n: 2, need: { cloth: 2 }, coin: 5 },
+    { out: 'stew', n: 1, need: { meat: 2, herb: 1 }, coin: 5 },
+    { out: 'whet', n: 2, need: { fang: 2, iron: 1 }, coin: 15 },
     { out: 'whet', n: 1, need: { iron: 2, wood: 1 }, coin: 30 },
     { out: 'bigpotion', n: 1, need: { potion: 2, gem: 1 }, coin: 80 },
     { out: 'b1', n: 1, need: { hide: 4, cloth: 2 }, coin: 150 },
     { out: 'b2', n: 1, need: { wood: 6, cloth: 4, hide: 2 }, coin: 600 },
     { out: 'b3', n: 1, need: { iron: 10, wood: 4, hide: 4 }, coin: 2000 },
+    { out: 'b3', n: 1, need: { hide: 8, horn: 3, iron: 4 }, coin: 1500 },
     { out: 'b4', n: 1, need: { cloth: 16, bone: 6, dust: 10 }, coin: 6000 },
     { out: 'b5', n: 1, need: { gem: 5, dust: 30, iron: 10 }, coin: 20000 }
   ];
@@ -131,6 +138,11 @@ window.Sack = (() => {
   function corpse(fo, W) { // 敌人死后：尸体可搜
     if (!on() || !W || !W.B) return; const nd = W.graph.nodes[W.cur];
     const L = { kind: 'corpse', name: `${fo.h.c.name}的尸体`, lv: lvOf(nd), seed: ((((fo.h.look && fo.h.look.seed) || Math.floor(Math.random() * 1e6)) * 2654435761) >>> 0), items: null, extra: { armed: fo.armed, boss: !!fo.boss }, x: fo.pos.x, z: fo.pos.z, fo };
+    W.B.inter.push({ kind: 'loot', L, x: L.x, z: L.z, corpse: true });
+  }
+  function carcass(b, W) { // 第二十二轮：野兽尸骸（不掉首级，只有材料）
+    if (!on() || !W || !W.B || !window.Beasts) return; const nd = W.graph.nodes[W.cur];
+    const L = { kind: 'corpse', name: `${b.T.n}的尸骸`, lv: lvOf(nd), seed: b.e.seed >>> 0, items: Beasts.dropsOf(b).map(([id, n]) => mk(id, n)), extra: {}, x: b.pos.x, z: b.pos.z };
     W.B.inter.push({ kind: 'loot', L, x: L.x, z: L.z, corpse: true });
   }
   const itemsOf = (L) => L.items || (L.items = L.kind === 'pile' ? [] : roll(L.kind, L.lv || 0, L.seed || 1, L.extra));
@@ -390,5 +402,5 @@ window.Sack = (() => {
     if (e.code === 'KeyH') { e.preventDefault(); e.stopImmediatePropagation(); quickUse(); return; }
   }, true);
   function frame(dt) { if (buffT > 0) buffT -= dt; tick(dt); }
-  return { on, IT, RECIPES, inv, lvOf, genLoot, placeLoot, corpse, openWild, toggleWild, closePanel, mountCave, frame, interrupt, queueHead, capture, heads, tripEnd, onDeath, pourPending, homeArrive, quickUse, dmgMul, usage, itemsOf, roll, addTo, canAdd, get panelOpen() { return mode === 'wild' && !!panel; }, get queue() { return Q; } };
+  return { on, IT, RECIPES, inv, lvOf, genLoot, placeLoot, corpse, carcass, openWild, toggleWild, closePanel, mountCave, frame, interrupt, queueHead, capture, heads, tripEnd, onDeath, pourPending, homeArrive, quickUse, dmgMul, usage, itemsOf, roll, addTo, canAdd, get panelOpen() { return mode === 'wild' && !!panel; }, get queue() { return Q; } };
 })();

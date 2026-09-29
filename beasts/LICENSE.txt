@@ -1,0 +1,2 @@
+Beast models: Quaternius "Ultimate Animated Animals" (CC0 1.0), https://quaternius.com/packs/ultimateanimatedanimals.html
+Converted to GLB with unused animations stripped (Wolf, Fox, Bull, Stag).

@@ -527,6 +527,11 @@ window.Worlds = (() => {
   // ================= 猎物（魂光，第 4 步换真实身体）=================
   function spot(B, r) { if (B.spots && B.spots.length) { const s = B.spots.shift(); return new V3(s.x, 0, s.z); } let x = 0, z = 0; for (let t = 0; t < 30; t++) { const a = r() * 6.28, d = B.R * (0.3 + r() * 0.55); x = Math.cos(a) * d; z = Math.sin(a) * d; if (B.cols.every(c => Math.hypot(c.x - x, c.z - z) > c.r + 0.8) && B.doors.every(dd => Math.hypot(dd.x - x, dd.z - z) > 5)) break; } return new V3(x, 0, z); }
   // 给 js/foe.js 的接口
+  function beastCtx(B, node) { // 给 js/beasts.js 的接口：复用 foeCtx 的受击/格挡/事件/伤害换算
+    const fc = foeCtx(B, node), sp = mulberry(node.seed ^ 0x2545F491);
+    return { sc: B.sc, H: B.H, cols: B.cols, R: B.R, doors: B.doors, pos: () => W.pos, st: () => G.st(), sees: (pos, maxD) => sees({ pos }, maxD), spot: () => spot(B, sp),
+      hitPlayer: fc.hitPlayer, event: fc.event, floatDmg: fc.floatDmg, power: fc.power, toast: (t, c, s) => G.toast && G.toast(t, c, s), shake: (v) => { W.shake = Math.max(W.shake || 0, v); }, W: () => W };
+  }
   function foeCtx(B, node) {
     return {
       sc: B.sc, H: B.H, cols: B.cols, R: B.R, doors: B.doors, pvel: W.vel, escaped: (fo) => { const nd = W.graph.nodes[W.cur], i = nd.prey.indexOf(fo.h); if (i >= 0) nd.prey.splice(i, 1); G.toast && G.toast(`🚪 ${fo.h.c.name} 从门逃走了……（首级没了）`, '#ffb080', 2.4); W.trip.log.push({ t: `${fo.h.c.name}从「${nd.name}」的门逃走了。` }); if (W.stats) W.stats.combo = 0; }, player: { pos: W.pos, get yaw() { return G.player.yaw; }, get crouch() { return G.player.crouch; } },
@@ -747,6 +752,9 @@ window.Worlds = (() => {
     const d0 = B.doors.find(d => d.to === from) || B.doors.find(d => d.home) || B.doors[0];
     const ins = d0 ? new V3(-Math.cos(d0.a), 0, -Math.sin(d0.a)) : new V3(0, 0, 1);
     W.pos.set((d0 ? d0.x : 0) + ins.x * 2.4, 0, (d0 ? d0.z : 0) + ins.z * 2.4); W.pos.y = B.H(W.pos.x, W.pos.z); W.vel.set(0, 0, 0);
+    if (window.Beasts && !/[?&]nobeast=1/.test(location.search) && !(window.Mods && Mods.on('beasts') === false)) { // 第二十二轮：野兽（掉材料，不掉首级）
+      try { W.dom.loadT.textContent = `「${node.name}」的荒野里有野兽的气味……`; await Beasts.spawn(beastCtx(B, node, r0 => r0), node); } catch (e) { console.warn('Beasts', e); }
+    }
     G.player.yaw = Math.atan2(-ins.x, -ins.z); G.player.pitch = -0.05;
     B.sc.add(G.camera); G.camera.far = 400; G.camera.updateProjectionMatrix();
     if (window.Combat && Combat.attach) Combat.attach(B.sc);
@@ -758,7 +766,7 @@ window.Worlds = (() => {
   }
   function disposeNode() {
     const B = W.B; if (!B) return;
-    if (window.Foe) Foe.clear();
+    if (window.Foe) Foe.clear(); if (window.Beasts) Beasts.clear();
     B.sc.traverse(o => { if (o.isInstancedMesh) o.dispose && o.dispose(); if (o.userData.sky) { o.geometry.dispose(); o.material.dispose(); } if (o.userData.wg) { o.geometry.dispose(); o.material.dispose(); } if (o.isSprite && o.material.map && o.material.map.isCanvasTexture && o.material.map !== glowTex) { o.material.map.dispose(); o.material.dispose(); } });
     B.terr.geometry.dispose(); B.terr.material.dispose && B.terr.material.dispose();
     if (B.sun.shadow && B.sun.shadow.map) B.sun.shadow.map.dispose();
@@ -828,6 +836,7 @@ window.Worlds = (() => {
     if (window.Sack) Sack.frame(dt);
     // 猎物 / 霸主
     if (W.foes) { Foe.update(dt, now); if (W.boss) W.boss.sayT -= dt; } else { updatePrey(dt, now); if (W.boss) updateBoss(dt, now); }
+    if (window.Beasts && Beasts.list.length) Beasts.update(dt, now);
     W.headNear = W.foes ? Foe.nearHead(W.pos, G.player.yaw) : null;
     updateSay();
     if (window.Combat) { try { Combat.update(dt, now); Combat.prerender(); } catch (e) { console.warn(e); } }
@@ -938,6 +947,7 @@ window.Worlds = (() => {
     if (!W || !W.B || W.busy) return [];
     const out = [];
     for (const p of W.prey) if (!p.gone) out.push({ id: p.id, pos: p.pos, r: 0.38, kind: 'prey', onHit: (info) => { p.hp -= info.speed > 9 ? 2 : 1; p.flash = 0.15; p.seen = true; if (p.hp <= 0) capture(p); else if (p.sayT <= 0) { say(p, pick(Math.random, PREY_SAY.hit), '#ffb0a0'); p.sayT = 2; } } });
+    if (window.Beasts && Beasts.list.length) for (const t of Beasts.targets()) out.push(t);
     if (W.foes) return out.concat(Foe.targets());
     if (W.boss && !W.boss.dead) out.push({ id: 'boss', pos: W.boss.pos, r: 0.8, kind: 'boss', onHit: bossHit });
     return out;

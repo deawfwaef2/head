@@ -827,3 +827,16 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 ## 第二十二轮（续）：食人魔升级（MOD `ogre_level`，默认开）
 - `js/rpg.js`：`lvOf/lvBonus/addXp/lvNeed`（经验曲线 30×1.3^(lv-1)，上限 60 级）；`stats()` 加入等级加成（每级约 力量+0.8/体魄+1.1/敏捷+0.5/凶威+0.4/魂力+0.25/生命+5，取整）并输出 `s.lv`。存档字段 `S.xp`（缺省 0，旧档兼容）。
 - `js/worlds.js`：`foeEvent` 里凡有 REW 奖励的战斗事件（击杀/斩首/处决/一刀斩首/断肢/腰斩/完美格挡/破防…）调用 `gainXp`；升级弹成就式横幅、日志、回复 35% 生命、存档。狩猎 HUD 显示 `Lv.x 经验/需求`；洞窟属性页 `ui.js` 显示等级。
+
+## 第二十二轮（续）：荒野野兽（MOD `beasts`，默认开）——掉材料、不掉首级
+- 资产：`beasts/{wolf,fox,bull,stag}.js`（base64 GLB，按需 `<script>` 加载，file:// 可用，共 ~4.4MB）+ `beasts/LICENSE.txt`。来源 Quaternius「Ultimate Animated Animals」（CC0），取自 GitHub 镜像 benjaminpjones/catch-the-animal 的 gltf，脚本剥掉了不用的动画（只留 Idle/Walk/Gallop/Attack/Death/Idle_HitReact1），颜色为材质色（无贴图）。
+- `js/beasts.js`（新，独立于 foe.js）：`Beasts.spawn(ctx,node)/update/targets/clear/plan/dropsOf`。每个地点由 `node.seed` 决定有无野兽（非家、非 BOSS 点约 72%）、种类与数量，结果存 `node.bst`，被杀的不再刷新。AI：
+  - 灰狼 `pack`：群体发现→绕圈逼近→最多 2 只同时“伏低 0.5s→扑咬”，咬完退回绕圈；同伴受惊会一起追。
+  - 赤狐 `hitrun`：突进咬一口就跑开，再回头。
+  - 野牛 `charger`：靠近(9m)/挨打后刨地 1s，锁定方向直线冲撞（重击，格挡不住，要 Q 闪身）；撞墙/冲完喘息 1.5–2.4s，此时 `broken` 双倍伤害。
+  - 白角鹿 `skittish`：见人就跑，被逼到角落/挨打才踢。
+  - 移动：绕障碍、卡住侧滑、不进门、不叠在玩家身上；伤害按玩家最大生命的百分比（狼 5%/狐 3%/牛 14%/鹿 7%），复用 `foeCtx.hitPlayer` 的闪身无敌/格挡/完美格挡逻辑（`beastCtx` 在 worlds.js，`stub` 冒充 fo）。
+  - 受击：`targets()` 与 Foe 同格式（球形判定），伤害公式同人类敌人；击杀触发 `kill` 事件 → 连杀/成就/**食人魔经验**；尸体保留 Death 动画末帧。
+- `js/sack.js`：新材料 `meat 生肉 / fang 兽牙 / horn 兽角`、消耗品 `stew 炖肉(+50%)`，配方：炖肉、兽牙磨刀石、兽角版“铁笼背架”；`Sack.carcass(b,W)` 生成 kind:'corpse' 的尸骸（按 `dropsOf` 预生成物品，按 E 搜身）。
+- `js/worlds.js`：`goto` 里出生点确定后 `Beasts.spawn`（保证离出生点 ≥14m）；`disposeNode`→`Beasts.clear`；帧更新与 `targets` 拼接。`?nobeast=1` 可关。
+- 测试：`_tools/wv/beasts.html`（gitignored）最小场景，模拟 ctx 验证 AI/受击/死亡。整游戏 headless 会 OOM，未端到端跑过——若实机有报错请先看 `Beasts` 相关 console。
