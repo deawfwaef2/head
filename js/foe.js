@@ -792,5 +792,5 @@ window.Foe = (() => {
     const pinv = new M4().copy(par.matrixWorld).invert().multiply(root.matrixWorld); hips.position.copy(want.applyMatrix4(pinv));
   }
   function has(name) { return !!(window.BODY_LIST && BODY_LIST.includes(name)); }
-  return { warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, attack, ATK, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
+  return { hasHead: (h) => HEADS.includes(h), warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, attack, ATK, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
 })();

@@ -59,6 +59,7 @@ window.RPG = (() => {
   function eqSum(S) {
     const o = { atk: 0, def: 0, hp: 0, str: 0, con: 0, agi: 0, ter: 0, soul: 0, cap: 2 };
     for (const s of SLOTS) { const t = EQUIP[s].tiers[S.eq[s] || 0]; for (const k in t) if (typeof t[k] === 'number' && k !== 'cost') { if (k === 'cap') o.cap = t.cap; else o[k] += t[k]; } }
+    if (S.eqPlus && S.eqPlus.weapon) o.atk += Math.round(EQUIP.weapon.tiers[S.eq.weapon || 0].atk * 0.15 * S.eqPlus.weapon); // 第十九轮：附魔每级 +15% 武器攻击
     if (window.Play) o.cap += Play.cap();
     return o;
   }

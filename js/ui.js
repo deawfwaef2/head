@@ -113,7 +113,7 @@ window.UI = (() => {
 
   // ---------------- 主菜单 ----------------
   const menuState = { tab: 'stats', sub: 'func' };
-  const TABS = [['stats', '👹 属性'], ['equip', '🪓 装备·斯尼克'], ['build', '🔨 建造'], ['heads', '💀 首级收藏'], ['codex', '📖 图鉴·展厅'], ['logs', '📜 狩猎日志']];
+  const TABS = [['stats', '👹 属性'], ['equip', window.Sack && Sack.on() ? '🎒 储物·附魔·合成' : '🪓 装备·斯尼克'], ['build', '🔨 建造'], ['heads', '💀 首级收藏'], ['codex', '📖 图鉴·展厅'], ['logs', '📜 狩猎日志']];
   function openMenu(tab = menuState.tab, sub) {
     menuState.tab = tab; if (sub) menuState.sub = sub;
     const S = G.S;
@@ -121,6 +121,7 @@ window.UI = (() => {
       <div class="m-coins">🔮 ${fmt(S.coins)}</div><button class="m-close" data-a="close">✕ 关闭</button></div>`;
     let body = '';
     if (tab === 'stats') body = statsBody();
+    else if (tab === 'equip' && window.Sack && Sack.on()) { body = '<div id="skHost"></div>'; setTimeout(() => Sack.mountCave(document.getElementById('skHost')), 0); } // 第十九轮：储物·附魔·合成
     else if (tab === 'equip') body = equipBody();
     else if (tab === 'build') body = buildBody();
     else if (tab === 'heads') { body = headsBody(); setTimeout(bindHeads, 0); }
@@ -488,6 +489,7 @@ window.UI = (() => {
     S.stats.trips++; S.stats.kills += trip.res.heads.length;
     const recs = G.addHeadRecs(trip.res.heads);
     const n = recs.length; trip = null;
+    if (window.Sack) Sack.homeArrive(n);
     close();
     SFX.music('cave');
     setTimeout(() => { if (n) G.createReturnBag(recs); else G.toast('这趟什么都没带回来……', '#aaa', 3); }, 200);

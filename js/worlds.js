@@ -340,6 +340,7 @@ window.Worlds = (() => {
       if (h) node.prey.push(h);
     }
     if (r() < 0.3 + (node.size === 'l' ? 0.3 : 0)) { const lo = node.loc.loot || [10, 30]; node.chests.push({ coin: Math.round((lo[0] + r() * (lo[1] - lo[0])) * (1.5 + r() * 2)), potion: r() < 0.25 + ri * 0.02 }); }
+    node.loot = window.Sack ? Sack.genLoot(node, r) : []; // 第十九轮：可搜刮容器（MOD sack_grid）
   }
   // 第十四轮 14c（用户改回）：每次出门选地区，这一趟随机生成这个地区的地点图（入口=回洞门，最深处=霸主）
   function genTrip(loc, seed) {
@@ -441,8 +442,9 @@ window.Worlds = (() => {
     node.chests.forEach((c, k) => {
       let x = 0, z = 0; for (let t = 0; t < 40; t++) { const a = r() * 6.28, d = R * (0.2 + r() * 0.65); x = Math.cos(a) * d; z = Math.sin(a) * d; if (free(x, z, 1.5)) break; }
       mark(x, z, 1.5); const g = window.Assets && Assets.fit('treasure_chest', { w: 0.9, x, y: H(x, z) - 0.02, z, ry: r() * 6.3 });
-      if (g) { sc.add(g); c.g = g; } c.x = x; c.z = z; if (!c.opened) inter.push({ kind: 'chest', c, x, z }); cols.push({ x, z, r: 0.5 });
+      if (g) { sc.add(g); c.g = g; } c.x = x; c.z = z; if (!c.opened || (c.items && c.items.length)) inter.push({ kind: 'chest', c, x, z }); cols.push({ x, z, r: 0.5 });
     });
+    if (window.Sack) Sack.placeLoot(node, { sc, H, free, mark, cols, inter, R, r });
     // 普通散布
     const area = Math.PI * R * R / 100;
     if (!LITE) for (const [list, dens, s0, s1, kind, fkind] of st.props) {
@@ -538,7 +540,7 @@ window.Worlds = (() => {
         return Math.atan2(CS.hand.y + 0.1, CS.hand.x - 0.04); },
       clang: (p, type) => { Foe.spark(p, type === 'break' ? 26 : 14, type === 'break' ? 'blue' : null); SFX.play && SFX.play('bell', type === 'break' ? 0.5 : 0.3, type === 'break' ? 1.6 : 2.4); SFX.thud && SFX.thud(0.9);
         if (type === 'block' && window.Combat) { Combat.recoil(1); G.toast && G.toast('🛡️ 被她挡住了——换个方向砍，或蓄力重斩破防', '#9fd0ff', 1.1); } if (type === 'break') { W.shake = Math.max(W.shake || 0, 0.35); G.toast && G.toast('💥 破防！', '#9fd0ff', 1.1); } },
-      power: (fo) => { const q = G.st().power / ((fo.boss ? node.loc.rec * (fo.boss.pow || 2) : node.loc.rec * [0.7, 0.9, 1.15, 1.5, 2.1][fo.rar])); return Math.pow(clamp(q, 0.25, 3), 0.7); },
+      power: (fo) => { const q = G.st().power / ((fo.boss ? node.loc.rec * (fo.boss.pow || 2) : node.loc.rec * [0.7, 0.9, 1.15, 1.5, 2.1][fo.rar])); return Math.pow(clamp(q, 0.25, 3), 0.7) * (window.Sack ? Sack.dmgMul() : 1); },
       hitPlayer: (fo, n, h = {}) => { const s = G.st(); n = Math.max(1, Math.round(n * (1 - s.dodge * 0.5) * (1 - Math.min(0.5, s.def / (s.def + 300)))));
         const now = performance.now() / 1000, CS = window.Combat && Combat.drawn && Combat.state;
         // 闪身无敌帧
@@ -557,10 +559,10 @@ window.Worlds = (() => {
           else { G.toast && G.toast('❌ 格挡方向错了！', '#ff9080', 0.8); G.flash && G.flash('#a00000', 0.4, 280); W.shake = Math.max(W.shake || 0, 0.25); }
         } else { G.flash && G.flash('#a00000', 0.4, 280); W.shake = Math.max(W.shake || 0, fo.boss ? 0.5 : 0.25); }
         if (W.stats) W.stats.combo = 0;
-        if (n > 0) { G.damage(n); W.trip.log.push({ t: `${fo.h.c.name}${fo.boss ? '' : '反击'}，你受了伤。`, d: `-${n} HP` }); } },
+        if (n > 0) { if (window.Sack) Sack.interrupt(); G.damage(n); W.trip.log.push({ t: `${fo.h.c.name}${fo.boss ? '' : '反击'}，你受了伤。`, d: `-${n} HP` }); } },
       bossMeet: (fo) => { W.dom.boss.style.display = 'block'; W.boss = { B: fo.boss, pos: fo.pos, foe: fo, hp: 100, dead: false, sayT: 0 }; bossSay(fo.boss.say || pick(Math.random, fo.boss.taunt), 3); },
       bossHp: (fo) => { W.dom.bossHp.style.width = Math.max(0, fo.hp / fo.maxHp * 100) + '%'; if (W.boss && W.boss.sayT <= 0 && Math.random() < 0.3) { bossSay(pick(Math.random, fo.boss.hurt), 2); W.boss.sayT = 4; } },
-      onDeath: (fo) => { const nd = W.graph.nodes[W.cur], i = nd.prey.indexOf(fo.h); if (i >= 0) nd.prey.splice(i, 1);
+      onDeath: (fo) => { const nd = W.graph.nodes[W.cur], i = nd.prey.indexOf(fo.h); if (i >= 0) nd.prey.splice(i, 1); if (window.Sack) Sack.corpse(fo, W);
         if (fo.boss) { bossSay(fo.boss.lose, 4); W.dom.boss.style.display = 'none'; G.flash && G.flash('#ffffff', 0.8, 600); SFX.fanfare && SFX.fanfare(3); W.shake = 1; setTimeout(() => G.toast && G.toast(`👑 ${fo.boss.title}倒下了——砍下她的头，带回去！`, fo.boss.col || '#ffd060', 4), 1200); } }
     };
   }
@@ -629,8 +631,9 @@ window.Worlds = (() => {
   function takeHead(hd) { // 拾取砍下的首级
     const fo = hd.fo, c = hd.h.c, s = G.st(), node = W.graph.nodes[W.cur];
     if (fo.boss) { bossWin(hd.h, fo.boss); return true; }
-    if (W.trip.res.heads.length >= s.cap) { G.toast(`麻袋满了（${s.cap} 颗）`, '#aaa', 2.5); return false; }
-    W.trip.res.heads.push(hd.h); W.trip.log.push({ t: `你在「${node.name}」砍下了${c.name}的头。`, cls: 'gethead' });
+    if ((window.Sack && Sack.on())) { /* 麻袋格子：Sack 已把首级放进格子（5 秒翻找完成后才调用这里）*/ }
+    else if (W.trip.res.heads.length >= s.cap) { G.toast(`麻袋满了（${s.cap} 颗）`, '#aaa', 2.5); return false; }
+    else W.trip.res.heads.push(hd.h); W.trip.log.push({ t: `你在「${node.name}」砍下了${c.name}的头。`, cls: 'gethead' });
     G.toast(`💀 获得首级【${RN[c.rar]}】${c.name}`, RC[c.rar], 3); SFX.squish && SFX.squish(1); if (c.rar >= 2) SFX.fanfare && SFX.fanfare(c.rar);
     return true;
   }
@@ -755,11 +758,12 @@ window.Worlds = (() => {
   function leaveHome() {
     const api = W.api, won = window.Explore && Explore.checkVictory ? Explore.checkVictory() : false;
     W.busy = true; fadeTo(1);
+    if ((window.Sack && Sack.on())) { W.trip.res.heads = W.trip.res.heads.filter(h => h.__boss).concat(Sack.heads()); Sack.tripEnd(); }
     tripStats();
     setTimeout(() => { stop(); api.finish(); G.setUI(false); try { G.lockPointer(); } catch (e) {} if (won) setTimeout(() => Explore.victoryScreen(), 900); }, 400);
   }
   function dieNow() {
-    if (!W || W.dead) return; W.dead = true; W.busy = true;
+    if (!W || W.dead) return; W.dead = true; W.busy = true; if (window.Sack) Sack.onDeath();
     G.flash && G.flash('#600000', 0.9, 1500); W.trip.log.push({ t: `你倒在了「${W.graph.nodes[W.cur].name}」。` });
     const api = W.api; setTimeout(() => { stop(); api.die(); }, 1200);
   }
@@ -797,7 +801,8 @@ window.Worlds = (() => {
     if (B.sc.userData.fire) B.sc.userData.fire.intensity = 2.2 * (0.85 + Math.sin(now * 13) * 0.08 + Math.sin(now * 29) * 0.05);
     // 门：靠近提示
     W.doorNear = null; for (const d of B.doors) { const dd = Math.hypot(W.pos.x - d.x, W.pos.z - d.z); if (dd < 2.6) W.doorNear = d; d.label.visible = Math.hypot(cam.position.x - d.x, cam.position.z - d.z) < 34; }
-    W.interNear = null; for (const it of B.inter) if (!it.done && Math.hypot(W.pos.x - it.x, W.pos.z - it.z) < 1.9) W.interNear = it;
+    W.interNear = null; { let bd = 9; for (const it of B.inter) { const dd = Math.hypot(W.pos.x - it.x, W.pos.z - it.z); if (!it.done && dd < (it.corpse ? 2.3 : 1.9) && dd < bd) { bd = dd; W.interNear = it; } } }
+    if (window.Sack) Sack.frame(dt);
     // 猎物 / 霸主
     if (W.foes) { Foe.update(dt, now); if (W.boss) W.boss.sayT -= dt; } else { updatePrey(dt, now); if (W.boss) updateBoss(dt, now); }
     W.headNear = W.foes ? Foe.nearHead(W.pos, G.player.yaw) : null;
@@ -846,14 +851,15 @@ window.Worlds = (() => {
     let n = Math.max(1, Math.round(s.maxHp * (0.03 + p.rar * 0.015) * (1 - s.dodge)));
     if (guardFacing(p.pos)) { n = Math.round(n * 0.25); G.toast && G.toast('🛡️ 格挡！', '#cfe0ff', 0.6); SFX.thud && SFX.thud(0.6); }
     else { G.flash && G.flash('#a00000', 0.35, 250); W.shake = 0.25; }
-    if (n > 0) { G.damage(n); W.trip.log.push({ t: `猎物反扑，你受了伤。`, d: `-${n} HP` }); }
+    if (n > 0) { if (window.Sack) Sack.interrupt(); G.damage(n); W.trip.log.push({ t: `猎物反扑，你受了伤。`, d: `-${n} HP` }); }
   }
   function capture(p) {
     p.gone = true; W.B.sc.remove(p.g);
     const node = W.graph.nodes[W.cur]; node.prey.splice(node.prey.indexOf(p.h), 1);
     const s = G.st(), c = p.h.c;
-    if (W.trip.res.heads.length >= s.cap) { G.toast(`麻袋满了（${s.cap} 颗），【${RN[c.rar]}】${c.name}的魂光散去了……`, '#aaa', 3); return; }
-    W.trip.res.heads.push(p.h); W.trip.log.push({ t: `你在「${node.name}」追上了${c.name}。`, cls: 'gethead' });
+    if ((window.Sack && Sack.on())) { if (!Sack.capture(p.h)) { G.toast(`麻袋里没有 2×2 的空位，【${RN[c.rar]}】${c.name}的魂光散去了……`, '#aaa', 3); return; } }
+    else if (W.trip.res.heads.length >= s.cap) { G.toast(`麻袋满了（${s.cap} 颗），【${RN[c.rar]}】${c.name}的魂光散去了……`, '#aaa', 3); return; }
+    else W.trip.res.heads.push(p.h); W.trip.log.push({ t: `你在「${node.name}」追上了${c.name}。`, cls: 'gethead' });
     G.toast(`💀 获得首级【${RN[c.rar]}】${c.name}`, RC[c.rar], 3); SFX.chop && SFX.chop(); SFX.squish && SFX.squish(1); if (c.rar >= 2) SFX.fanfare && SFX.fanfare(c.rar);
   }
   // ---- 霸主：实时战斗（手势战斗命中 + 决斗公式）----
@@ -899,7 +905,7 @@ window.Worlds = (() => {
     achAdd('boss', 1);
     const bo = W.boss, Bo = BoIn || bo.B, loc = W.graph.nodes[W.cur].loc; if (bo) bo.dead = true;
     const h = hIn || RPG.bossHead(G.S, G.st(), loc, Bo, G.usedNames, G.usedSig);
-    W.trip.res.heads.push(h); G.S.bosses = G.S.bosses || {}; G.S.bosses[loc.k] = { n: Bo.n, t: Bo.title, date: Date.now() }; G.S.rep = G.S.rep || {}; G.S.rep[loc.k] = (G.S.rep[loc.k] || 0) + 5;
+    h.__boss = 1; W.trip.res.heads.push(h); G.S.bosses = G.S.bosses || {}; G.S.bosses[loc.k] = { n: Bo.n, t: Bo.title, date: Date.now() }; G.S.rep = G.S.rep || {}; G.S.rep[loc.k] = (G.S.rep[loc.k] || 0) + 5;
     if (!hIn) bossSay(Bo.lose, 4); G.flash && G.flash('#ffffff', 1, 700); SFX.fanfare && SFX.fanfare(4); SFX.levelup && SFX.levelup(); W.shake = 1.2;
     W.trip.log.push({ t: `你击败了${Bo.title}${Bo.n}，带走了她的首级。`, cls: 'gethead' });
     const nd = W.graph.nodes[W.cur];
@@ -927,6 +933,7 @@ window.Worlds = (() => {
   // ================= 输入（game.js 在世界里把按键转给这里）=================
   function onKey(e) {
     if (!W) return false;
+    if ((e.code === 'Tab' || e.code === 'KeyB') && (window.Sack && Sack.on()) && !W.busy && !W.dead) { e.preventDefault(); Sack.toggleWild(); return true; }
     if (e.code === 'Tab' || e.code === 'Escape') { if (W.mapOpen && e.code === 'Escape') { toggleMap(false); return true; } return false; }
     if (W.busy || W.dead) return true;
     if (e.code === 'KeyM') { toggleMap(); return true; }
@@ -934,16 +941,25 @@ window.Worlds = (() => {
     if (!e.repeat && (e.code === 'KeyQ' || e.code === 'KeyR' || e.code === 'KeyG')) { skill(e.code); return true; }
     if (e.code === 'KeyE' && !e.repeat) {
       if (W.foes) { const bf = Foe.brokenNear(W.pos, G.player.yaw); if (bf) { Foe.execute(bf, new V3(Math.cos(G.player.yaw), 0, -Math.sin(G.player.yaw))); return true; } }
-      if (W.headNear) { const hd = W.headNear; if (takeHead(hd)) Foe.pickup(hd); return true; }
-      if (W.interNear) { openChest(W.interNear); return true; }
+      if (W.headNear) { const hd = W.headNear;
+        if ((window.Sack && Sack.on()) && !hd.fo.boss) { Sack.queueHead(hd, () => Foe.hasHead(hd), () => { if (takeHead(hd)) Foe.pickup(hd); }); return true; }
+        if (takeHead(hd)) Foe.pickup(hd); return true; }
+      if (W.interNear) { const it = W.interNear; if (it.kind === 'loot') Sack.openWild(it.L); else openChest(it); return true; }
       if (W.doorNear) { const d = W.doorNear; if (d.home) leaveHome(); else { SFX.open && SFX.open(); goto(d.to, W.cur); } return true; }
     }
     if (e.code === 'KeyF' && window.Combat && Combat.enabled) { Combat.toggle(); return true; }
+    if (e.code === 'KeyH' && (window.Sack && Sack.on())) { Sack.quickUse(); return true; }
     if (e.code === 'KeyH') { const S = G.S, s = G.st(); G.useItem(S.items.bigpotion && s.maxHp - S.hp > s.maxHp * 0.6 ? 'bigpotion' : 'potion'); return true; }
     return true; // 其余洞窟按键（建造/投掷/碾碎……）在外面无效
   }
   function onDown(btn) { if (!W || W.busy) return true; if (window.Combat && Combat.enabled) { if (!Combat.drawn) { Combat.toggle(true); return true; } Combat.onDown(btn); } return true; }
   function openChest(it) {
+    if ((window.Sack && Sack.on())) { // 宝箱：魂晶照给，物品进容器面板（和其它容器一样 5 秒一件）
+      const c = it.c, nd = W.graph.nodes[W.cur]; if (!c.opened) { c.opened = true; G.addCoins(c.coin); W.trip.coins += c.coin; SFX.coins && SFX.coins(); G.toast(`📦 宝箱：🔮+${c.coin}`, '#ffd060', 2);
+        W.trip.log.push({ t: `你在「${nd.name}」撬开了一只宝箱。`, d: `魂晶+${c.coin}` }); if (c.g) { c.g.rotation.z = 0.08; c.g.position.y += 0.02; } }
+      c.kind = 'chest'; c.name = '宝箱'; if (!c.items) { c.items = Sack.roll('chest', Sack.lvOf(nd), (c.coin * 7919 + W.cur * 104729 + nd.seed) >>> 0); if (c.potion) c.items.push({ u: 900000 + Math.floor(Math.random() * 99999), id: 'potion', n: 1 }); }
+      Sack.openWild(c); return;
+    }
     it.done = true; const c = it.c; c.opened = true; W.B.inter.splice(W.B.inter.indexOf(it), 1);
     G.addCoins(c.coin); W.trip.coins += c.coin; SFX.coins && SFX.coins();
     let msg = `📦 宝箱：🔮+${c.coin}`; if (c.potion) { G.S.items.potion = (G.S.items.potion || 0) + 1; msg += ' · 🧪×1'; }
@@ -996,10 +1012,11 @@ window.Worlds = (() => {
     if (!W || !W.B || !DOM) return; const node = W.graph.nodes[W.cur], st = STYLES[node.style], s = G.st();
     DOM.top.querySelector('.n').textContent = node.name; DOM.top.querySelector('.s').textContent = `${node.loc.icon} ${node.loc.n} · ${st.n}${LAYOUTS[layOf(node)] ? ' · ' + LAYOUTS[layOf(node)].n : ''} · ${SIZES[node.size].n} · 已探索 ${W.graph.nodes.filter(n => n.visited).length}/${W.graph.nodes.length}`;
     const left = W.foes ? W.foes.filter(f => !f.dead).length : W.prey.filter(p => !p.gone).length;
-    DOM.stat.innerHTML = `<div class="hp"><i style="width:${clamp(G.S.hp / s.maxHp, 0, 1) * 100}%"></i></div>❤️ ${Math.round(G.S.hp)}/${s.maxHp} · 🧪${G.S.items.potion || 0}<br>🧺 ${W.trip.res.heads.length}/${s.cap} · 🔮 +${W.trip.coins}${W.stats && W.stats.kill ? `<br>⚔️ 放倒 ${W.stats.kill} · 🩸 斩首 ${W.stats.decap} · 连击 ${W.stats.maxCombo}` : ''}${left ? `<br><span style="color:#9fd0ff">✨ 此地还有 ${left} 缕魂光</span>` : ''}`;
+    DOM.stat.innerHTML = `<div class="hp"><i style="width:${clamp(G.S.hp / s.maxHp, 0, 1) * 100}%"></i></div>❤️ ${Math.round(G.S.hp)}/${s.maxHp} · ${(window.Sack && Sack.on()) ? (() => { const u = Sack.usage(), b = Sack.inv().belt.filter(Boolean); return `🩹${b.reduce((a, o) => a + o.n, 0)}<br>🎒 ${u[0]}/${u[1]}格 · 💀${u[2]}`; })() : `🧪${G.S.items.potion || 0}<br>🧺 ${W.trip.res.heads.length}/${s.cap}`} · 🔮 +${W.trip.coins}${W.stats && W.stats.kill ? `<br>⚔️ 放倒 ${W.stats.kill} · 🩸 斩首 ${W.stats.decap} · 连击 ${W.stats.maxCombo}` : ''}${left ? `<br><span style="color:#9fd0ff">✨ 此地还有 ${left} 缕魂光</span>` : ''}`;
     let h = 'WASD 走动 · <b>F</b> 拔刀（按住左键挥砍 / 连点刺 / 右键格挡）· <b>M</b> 地图 · <b>H</b> 喝药';
     if (W.headNear) h = `<b>E</b> 拾取首级 · 【${RN[W.headNear.h.c.rar]}】${esc(W.headNear.h.c.name)}`;
-    else if (W.interNear) h = '<b>E</b> 打开宝箱';
+    else if (W.interNear) { const it = W.interNear, L = it.kind === 'loot' ? it.L : null; h = L ? `<b>E</b> ${L.kind === 'corpse' ? '搜身' : L.kind === 'pile' ? '翻' : '搜刮'} · ${esc(L.name)}${L.items && !L.items.length ? ' <span style="color:#999">（空）</span>' : ''}` : '<b>E</b> 打开宝箱'; }
+    if ((window.Sack && Sack.on()) && !W.headNear) h += ' · <b>Tab</b> 麻袋';
     else if (W.doorNear) { const d = W.doorNear, cn = W.graph.nodes[W.cur]; h = d.home ? '<b>E</b> 回到魂首窟（结束狩猎，带回首级）' : `<b>E</b> 穿过门 → ${esc(doorName(cn, d))}` + (W.graph.nodes[d.to].region !== cn.region ? ` <span style="color:#f0a060">（推荐战力 ${W.graph.nodes[d.to].loc.rec}）</span>` : ''); }
     DOM.hint.innerHTML = h;
   }

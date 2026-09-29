@@ -737,3 +737,13 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **js/wgen.js（新，MOD `wgen`，默认开；Mods.on('wgen')===false 回到旧效果）**：`WGen.style(node, base)` 由 `node.seed` 派生“基因组”（纯函数，加载前即可算出 → 只下需要的资产、邻居可精确预热；家节点保持原样）。维度：天空(9 HDRI 混用+任意朝向+色调) × 12 种光照氛围 × 8 种季节(实例着色) × 10 种地形原型(丘陵/梯田/盆地/山脊/沙丘/土墩/高台/陨坑/干沟/平地) × 水(溪流+木桥+芦苇 / 池塘) × 植被子集与成片生长(`WGen.keep`) × 顶点着色地表 × 12 种布景(倒木/哨塔/荒墓/补给/无门之门/神像/巨岩/花环/灯径/客厅/焚烧堆/立石环) × 光束 × 地雾。模型全部是现成 CC0 资产；程序化的仅有布局/地形/着色/水面。
 - **worlds.js 接入点（buildNode）**：`styleOf` → `st.g`；`WGen.prepare`→`H=g.h`；`WGen.paint`（顶点色）；天空 tint/yaw；雾/太阳/半球按氛围；`put(...,uc)` 实例色；树上限 64 + `_lo` 远景 LOD；`WGen.dress`（水/布景/光束/雾，返回 update 接进 `B.wx`）；雾浓度上限 `1.15/(R+14)`（防止远处糊成一堵灰墙）。
 - **调试**：`_tools/`（gitignored，本机）有 wv 无头预览工具；`?nogen=1` 关基因组，`?seed=N` 固定行程。
+### 第十九轮 · 第 3 批（总管理师）：麻袋格子 · 搜刮经济（MOD `sack_grid`，默认开）
+- **新文件 `js/sack.js`（我负责）**：物品表（武器/头盔/护甲/护符/背篓取自 `RPG.EQUIP` 各档；材料 铁片/布条/草药/魂尘/兽皮/骨头/木料/血玉；消耗品 血肉药剂/巨魔再生药/绷带/磨刀石；首级 2×2）。麻袋格子尺寸由背篓档位决定 4×4 → 8×7，首次适配自动摆放（可旋转）。
+  - 野外：Tab/B 打开麻袋；E 搜刮容器（木箱/酒桶/藤篮/木桶/武器架/宝箱，CC0 资产 `Assets.fit`）与尸体（`onDeath` → 尸体容器，持械者可能掉武器，霸主必掉高档装备+血玉）。
+  - 翻找：放入/取出/使用/装备/丢弃 每件 5 秒，排队（最多 8），受击打断（`hitPlayer` → `Sack.interrupt`），挥刀时暂停。捡首级 = 5 秒入袋（需 2×2 空位）；霸主首级不占格。倒空麻袋 = 瞬间倒在脚下成一堆（可再翻）。
+  - 腰带 3 格：H 瞬间用药（优先按缺血量选）。
+  - 回洞：`leaveHome` 时 `trip.res.heads` = 霸主首级 + 麻袋里的首级；其余物品进 `S.inv.pending`，洞里倒袋结束（`unloadBag`）或无首级时倒进储物箱并提示。死亡 = 麻袋内容丢失（装备、腰带保留）。
+  - 洞里：菜单「🎒 储物·附魔·合成」替换原斯尼克商店（**不再能买装备/药**）：储物箱 ↔ 麻袋/腰带（不计时）、装备、分解成材料；附魔（仅武器，每级攻击 +15%，最高 +10，魂晶+铁片+魂尘，+5 起要血玉）；合成（药剂、绷带、磨刀石、巨魔再生药、背篓 1–5 档，魂晶只作手工费）。
+  - 存档：`S.inv = {sack, belt, stash, pending}`，`S.eqPlus.weapon`；旧存档的药剂自动迁入腰带/储物箱。首级对象在格子里是不可枚举属性，不进 JSON。
+- **改动点**：`worlds.js`（populate `node.loot`、buildNode `Sack.placeLoot`、onDeath 尸体、hitPlayer 打断、power ×磨刀石、takeHead/capture/bossWin 走格子、leaveHome/dieNow、interNear 取最近、onKey Tab/B/E/H、openChest、HUD `🎒 格 · 💀`）；`ui.js`（finishTrip `Sack.homeArrive`、equip 页）；`game.js`（倒袋结束 `Sack.pourPending`、洞里 H）；`rpg.js`（eqSum 附魔加成）；`foe.js`（导出 `hasHead`）；`mods.js`（`sack_grid`）；`index.html` 加 `js/sack.js`。
+- 测试：`_tools/wsack.py`（野外容器/翻找/拖动/菜单/倒袋/回洞）、`_sk.html`（洞里储物·附魔·合成，gitignored）。

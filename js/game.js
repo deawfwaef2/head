@@ -406,6 +406,7 @@ window.startGame = function () {
     if (e.code === 'KeyQ' && held) throwHeld(true);
     if (e.code === 'KeyQ' && bagCarrying) { bagCarrying = false; if (bagGroup) { bagGroup.position.copy(player.pos).add(new V3(0, 0, -0.8)); bagGroup.position.y = 0; } toast('你放下了麻袋。靠近它按 E 再扛起。', '#ccc'); }
     if (e.code === 'KeyV' && held) cycleHeldFace();
+    if (e.code === 'KeyH' && window.Sack && Sack.on()) { Sack.quickUse(); return; }
     if (e.code === 'KeyH') useItem(S.items.bigpotion && st().maxHp - S.hp > st().maxHp * 0.6 ? 'bigpotion' : 'potion');
     if (e.code === 'KeyM') { const on = SFX.toggleMusic(); toast('音乐 ' + (on ? '开' : '关'), '#ccc', 1); }
     if (e.code === 'KeyX') { const t = performance.now(); if (t - lastX < 450) { doubleX(); lastX = 0; } else { lastX = t; toast('再按一次 X：碾碎首级吸魂 / 拆除建筑', '#f88', 1); } }
@@ -646,6 +647,7 @@ window.startGame = function () {
       const best = list.slice().sort((a, b) => b.c.rar - a.c.rar)[0], nNew = list.filter(r => r.isNew).length;
       toast(`倒出 ${list.length} 颗首级 · 最高【${RAR[best.c.rar].n}】${best.c.shiny ? '✨异色' : ''}${nNew ? ` · 图鉴 +${nNew}` : ''}${toVault ? ` · ${toVault} 颗洞里放不下，已存入魂库` : ''}`, RAR[best.c.rar].c, 4);
       const remain = S.heads.filter(r => r.inBag); if (remain.length) createReturnBag(remain);
+      if (window.Sack && Sack.on()) setTimeout(() => Sack.pourPending(), 1400); // 第十九轮：麻袋里其它东西一起倒出 → 储物箱
       setTimeout(() => { if (gachaBox && !cine) gachaBox.innerHTML = ''; }, 2500);
       cine = null; saveSoon(0.6);
     } });
