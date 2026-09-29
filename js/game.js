@@ -2,7 +2,8 @@
 window.startGame = function () {
   const V3 = THREE.Vector3;
   const SAVE_KEY = 'soulhead_v3';
-  const HS = 1.55, RC = 0.165, GRAV = -9.8, MAX_HEADS = 200;
+  const HS = 1.55, RC = 0.165, GRAV = -9.8, LOD_ON = !!(window.Mods && Mods.on('lod') && window.HeadLOD), MAX_HEADS = LOD_ON ? 320 : 200; // 洞内 3D 上限；超出的进魂库（上限 9999）
+  const VAULT_MAX = 9999;
   const RAR = [
     { n: '凡魂', c: '#b8b8c0', y: 1 }, { n: '灵魂', c: '#4aa8ff', y: 3 }, { n: '英魂', c: '#c05aff', y: 8 }, { n: '圣魂', c: '#ffb020', y: 20 }, { n: '神魂', c: '#ff4a8a', y: 55 }
   ];
@@ -26,11 +27,14 @@ window.startGame = function () {
   const moon = new THREE.DirectionalLight(0xaab4ff, 0.18); moon.position.set(-3, 8, 2); scene.add(moon);
   const LIGHTS = []; for (let i = 0; i < 6; i++) { const l = new THREE.PointLight(0xff8a3a, 0, 9, 1.6); scene.add(l); LIGHTS.push(l); }
   const exitLight = new THREE.PointLight(0xfff0d0, 1.4, 10, 1.5); scene.add(exitLight);
+  let lodStat = null;
+  const lod = LOD_ON ? HeadLOD.create(renderer, scene) : null; // 远处静止首级 → 图集替身，一次 draw call
 
   // ---------------- 状态 ----------------
   const fresh = () => ({ v: 3, coins: 30, hp: 150, base: { str: 5, con: 5, agi: 5, ter: 5, soul: 5 }, trained: {}, eq: { weapon: 0, helm: 0, armor: 0, charm: 0, bag: 0 }, items: { potion: 1, bigpotion: 0 }, depth: 1, builds: [], heads: [], sigs: [], names: [], logs: [], stats: { trips: 0, kills: 0, earned: 0, pokes: 0 }, nextId: 1, dead: false, intro: false });
   let S = fresh();
   try { const raw = localStorage.getItem(SAVE_KEY); if (raw) S = Object.assign(fresh(), JSON.parse(raw)); } catch (e) { console.warn(e); }
+  try { if (window.Store) Store.loadVault(S); } catch (e) { console.warn('vault', e); }
   const usedSig = new Set(S.sigs), usedNames = new Set(S.names);
 
   // ---------------- 洞穴 ----------------
@@ -146,8 +150,30 @@ window.startGame = function () {
     heads.push(h);
     return h;
   }
+  function despawnHead(h) { // 只拆 3D，不删记录（入魂库用）
+    const i = heads.indexOf(h); if (i >= 0) heads.splice(i, 1);
+    if (lod) lod.release(h);
+    if (h.mount) h.mount.heads[h.slot] = null;
+    if (held === h) held = null;
+    scene.remove(h.g); scene.remove(h.blob); if (h.aura) { scene.remove(h.aura); h.aura.geometry.dispose(); h.aura.material.dispose(); } h.hb.dispose(); if (h.hb.glow) h.hb.glow.material.dispose();
+  }
+  // 魂库：存入 / 取出
+  function vaultCount() { let n = 0; for (const r of S.heads) if (r.vault) n++; return n; }
+  function storeHead(h) { if (!h || h === held && cine) return false; const rec = h.rec; despawnHead(h); rec.vault = true; rec.inBag = false; delete rec.p; delete rec.q; rec.mt = -1; return true; }
+  function takeOut(rec, pos) {
+    if (!rec || !rec.vault) return null;
+    if (heads.length >= MAX_HEADS) { toast(`洞里已有 ${heads.length} 颗（上限 ${MAX_HEADS}），先存几颗进魂库`, '#f88'); return null; }
+    rec.vault = false; rec.vv = (rec.vv || 0) + 1;
+    const fwd = new V3(); camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
+    const p = pos || player.pos.clone().addScaledVector(fwd, 1.0).setY(1.2);
+    const h = createHead(rec, p, null); h.vel.set((Math.random() - 0.5) * 0.4, 0.6, (Math.random() - 0.5) * 0.4); return h;
+  }
+  function storeLoose() { // 一键收纳：没上架、没被拿着的散落首级全部入库
+    const list = heads.filter(h => !h.mount && h !== held); list.forEach(storeHead); save(); return list.length;
+  }
   function removeHead(h) {
     const i = heads.indexOf(h); if (i >= 0) heads.splice(i, 1);
+    if (lod) lod.release(h);
     if (h.mount) h.mount.heads[h.slot] = null;
     if (held === h) held = null;
     scene.remove(h.g); scene.remove(h.blob); if (h.aura) { scene.remove(h.aura); h.aura.geometry.dispose(); h.aura.material.dispose(); } h.hb.dispose(); if (h.hb.glow) h.hb.glow.material.dispose();
@@ -465,13 +491,13 @@ window.startGame = function () {
     const bag = makeBagMesh(); bag.scale.setScalar(0.85); pivot.add(bag);
     player.pitch = -0.5;
     S.codex = S.codex || {};
-    const ev = []; let at = 1.25; const n = list.length;
+    const ev = []; let at = 1.25; const n = list.length; let toVault = 0;
     ev.push({ at: 0.05, fn() { SFX.play('heavy', 0.45, 0.8); SFX.sack(); } });
     ev.push({ at: 0.7, fn() { SFX.sack(); } });
     list.forEach((rec, i) => {
       const r = rec.c.rar, sh = !!rec.c.shiny;
       ev.push({ at, fn() {
-        if (heads.length >= MAX_HEADS) { rec.inBag = true; return; }
+        if (heads.length >= MAX_HEADS) { rec.vault = true; toVault++; const key = rec.c.race + '|' + rec.c.id; if (!S.codex[key]) S.codex[key] = 1; return; }
         const mouth = bag.localToWorld(new V3(0, 0.5, 0)), md = bag.localToWorld(new V3(0, 1.5, 0)).sub(mouth).normalize();
         const h = createHead(rec, mouth.addScaledVector(md, 0.12), new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6)));
         h.vel.copy(md).multiplyScalar(0.9 + Math.random() * 0.9).add(new V3((Math.random() - 0.5) * 0.9, 0.2, (Math.random() - 0.5) * 0.9));
@@ -488,7 +514,7 @@ window.startGame = function () {
     ev.push({ at: at + 1.6, fn() {
       scene.remove(pivot);
       const best = list.slice().sort((a, b) => b.c.rar - a.c.rar)[0], nNew = list.filter(r => r.isNew).length;
-      toast(`倒出 ${list.length} 颗首级 · 最高【${RAR[best.c.rar].n}】${best.c.shiny ? '✨异色' : ''}${nNew ? ` · 图鉴 +${nNew}` : ''}`, RAR[best.c.rar].c, 4);
+      toast(`倒出 ${list.length} 颗首级 · 最高【${RAR[best.c.rar].n}】${best.c.shiny ? '✨异色' : ''}${nNew ? ` · 图鉴 +${nNew}` : ''}${toVault ? ` · ${toVault} 颗洞里放不下，已存入魂库` : ''}`, RAR[best.c.rar].c, 4);
       const remain = S.heads.filter(r => r.inBag); if (remain.length) createReturnBag(remain);
       setTimeout(() => { if (gachaBox && !cine) gachaBox.innerHTML = ''; }, 2500);
       cine = null; save();
@@ -737,7 +763,7 @@ window.startGame = function () {
     }
     if (ny > 0.5) h.grounded = true;
   }
-  const grid = new Map(); const CELL = RC * 2;
+  const grid = new Map(); const CELL = RC * 2; const gkey = (x, y, z) => ((x + 512) * 1024 + (y + 512)) * 1024 + (z + 512);
   function physStep(dt) {
     const R = cave.R - 0.82; // visual head radius is wider than the conservative collision sphere; keep thrown heads inside the wall
     for (const h of heads) {
@@ -763,14 +789,14 @@ window.startGame = function () {
         if (mt && b.heads && h.vel.y < 0) { let done = false; for (let i = 0; i < b.heads.length; i++) { if (b.heads[i]) continue; const mp = mountPos(b, i), dx = p.x - mp.x, dz = p.z - mp.z, sy = mp.y - RC * 0.8; if (dx * dx + dz * dz < 0.05 && p.y > sy && p.y < sy + RC * 2.4) { mountHead(h, b, i); done = true; break; } } if (done) break; }
       }
     }
-    grid.clear();
     for (let i = 0; i < heads.length; i++) heads[i].idx = i;
-    for (const h of heads) { if (h === held) continue; const k = Math.floor(h.g.position.x / CELL) + ',' + Math.floor(h.g.position.y / CELL) + ',' + Math.floor(h.g.position.z / CELL); let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(h); }
+    for (const a of grid.values()) a.length = 0;
+    for (const h of heads) { if (h === held) continue; const k = gkey(Math.floor(h.g.position.x / CELL), Math.floor(h.g.position.y / CELL), Math.floor(h.g.position.z / CELL)); let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(h); }
     for (const a of heads) {
       if (a === held || (a.sleep > 1 && !a.mount)) continue;
       const ax = Math.floor(a.g.position.x / CELL), ay = Math.floor(a.g.position.y / CELL), az = Math.floor(a.g.position.z / CELL);
       for (let ix = -1; ix <= 1; ix++) for (let iy = -1; iy <= 1; iy++) for (let iz = -1; iz <= 1; iz++) {
-        const cell = grid.get((ax + ix) + ',' + (ay + iy) + ',' + (az + iz)); if (!cell) continue;
+        const cell = grid.get(gkey(ax + ix, ay + iy, az + iz)); if (!cell || !cell.length) continue;
         for (const b of cell) {
           if (b === a) continue;
           const bAct = b.mount || b.sleep <= 1;
@@ -910,27 +936,31 @@ window.startGame = function () {
   function spawnReturnHeads(list) {
     const dir = new V3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
     list.forEach((rec, i) => setTimeout(() => {
-      if (heads.length >= MAX_HEADS) { toast('洞里的头太多了（上限 ' + MAX_HEADS + '），多余的被扔掉了', '#f88'); return; }
+      if (heads.length >= MAX_HEADS) { rec.vault = true; if (!spawnReturnHeads.warned) { spawnReturnHeads.warned = 1; toast('洞里放不下了（上限 ' + MAX_HEADS + '），多出来的已存入魂库（H 档案 → 魂库）', '#e8c070', 4); setTimeout(() => spawnReturnHeads.warned = 0, 3000); } save(); return; }
       const p = player.pos.clone().addScaledVector(dir, 1.2).add(new V3((Math.random() - 0.5) * 0.5, 1.6 + i * 0.15, (Math.random() - 0.5) * 0.5));
       const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 3, Math.random() * 6, Math.random() * 3));
       const h = createHead(rec, p, q); h.vel.set((Math.random() - 0.5) * 1.5, 0.5, (Math.random() - 0.5) * 1.5); h.av.set((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10);
       SFX.sack(); if (rec.c.rar >= 3) { SFX.fanfare(rec.c.rar); burst(p, RAR[rec.c.rar].c, 80, 3, 1.3, 0); }
     }, 300 + i * 260));
   }
-  function addHeadRecs(list) { for (const h of list) { const rec = { id: S.nextId++, c: h.c, look: h.look, mem: h.mem, story: h.story, app: h.app, date: h.date }; S.heads.push(rec); S.sigs.push(h.sig); S.names.push(h.c.name); h.rec = rec; } return list.map(h => h.rec); }
+  function addHeadRecs(list) { if (S.heads.length + list.length > VAULT_MAX) { toast(`魂库已满（${VAULT_MAX}），多余的首级化作了魂尘`, '#f88'); list = list.slice(0, Math.max(0, VAULT_MAX - S.heads.length)); } for (const h of list) { if (h.c && h.c.lookRace) { h.c = Object.assign({}, h.c); delete h.c.lookRace; } const rec = { id: S.nextId++, c: h.c, look: h.look, mem: h.mem, story: h.story, app: h.app, date: h.date }; S.heads.push(rec); S.sigs.push(h.sig); S.names.push(h.c.name); h.rec = rec; } return list.map(h => h.rec); }
 
   // ---------------- 存档 ----------------
   function save() {
     if (S.dead) return;
     for (const h of heads) { h.rec.p = h.g.position.toArray().map(v => +v.toFixed(3)); h.rec.q = h.g.quaternion.toArray().map(v => +v.toFixed(3)); h.rec.mt = h.mount ? builds.indexOf(h.mount) : -1; h.rec.ms = h.mount ? h.slot : 0; }
     persistBuilds();
+    let all = null; try { if (window.Store) { all = S.heads; S.heads = Store.saveVault(S); } } catch (e) { console.warn('vault save', e); }
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { console.warn('save failed', e); }
+    if (all) S.heads = all;
   }
   function load() {
     S.codex = S.codex || {}; for (const r of S.heads) { const k = r.c.race + '|' + r.c.id; if (!S.codex[k]) S.codex[k] = 1; }
     for (const b of S.builds) if (CAT[b.type]) addBuild(b.type, b.x, b.z, b.rot, false);
+    let nLoaded = 0;
     for (const rec of S.heads) {
-      if (rec.inBag) continue;
+      if (rec.inBag || rec.vault) continue;
+      if (nLoaded >= MAX_HEADS) { rec.vault = true; continue; } nLoaded++;
       try {
         const p = rec.p ? new V3().fromArray(rec.p) : new V3((Math.random() - 0.5) * 3, 1, (Math.random() - 0.5) * 3);
         const q = rec.q ? new THREE.Quaternion().fromArray(rec.q) : null;
@@ -946,7 +976,7 @@ window.startGame = function () {
   S.hp = Math.min(S.hp, st().maxHp);
   setInterval(save, 8000);
   addEventListener('beforeunload', save);
-  function wipe() { S.dead = true; localStorage.removeItem(SAVE_KEY); }
+  function wipe() { S.dead = true; localStorage.removeItem(SAVE_KEY); if (window.Store) Store.wipeVault(); }
 
   // ---------------- 主循环 ----------------
   addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
@@ -985,7 +1015,7 @@ window.startGame = function () {
         const dx = player.pos.x - cx, dz = player.pos.z - cz, d = Math.hypot(dx, dz);
         if (d < pr && d > 1e-5) { player.pos.x += dx / d * (pr - d); player.pos.z += dz / d * (pr - d); }
       }
-      const fd = Math.hypot(player.pos.x - cave.firePos.x, player.pos.z - cave.firePos.z); if (fd < 0.75) { player.pos.x = cave.firePos.x + (player.pos.x - cave.firePos.x) / fd * 0.75; player.pos.z = cave.firePos.z + (player.pos.z - cave.firePos.z) / fd * 0.75; }
+      let fd = Math.hypot(player.pos.x - cave.firePos.x, player.pos.z - cave.firePos.z); if (fd < 1e-4) { player.pos.z += 0.01; fd = Math.hypot(player.pos.x - cave.firePos.x, player.pos.z - cave.firePos.z); } if (fd < 0.75) { player.pos.x = cave.firePos.x + (player.pos.x - cave.firePos.x) / fd * 0.75; player.pos.z = cave.firePos.z + (player.pos.z - cave.firePos.z) / fd * 0.75; }
     }
     const moving = Math.hypot(player.vel.x, player.vel.z);
     if (playing && player.onGround && moving > 1) { stepT -= dt * moving; if (stepT <= 0) { stepT = 1.6; SFX.step(); } }
@@ -1059,12 +1089,13 @@ window.startGame = function () {
       if (h.squash > 0) { h.squash = Math.max(0, h.squash - dt * 3.2); const k = Math.sin(h.squash * Math.PI * 2.5) * 0.16 * h.squash; h.hb.group.scale.set(HS * (1 + k * 0.7), HS * (1 - k), HS * (1 + k * 0.7)); }
       if (h.wob > 0) { h.wob = Math.max(0, h.wob - dt * 1.8); const w = h.wob * h.wob, ph = (1 - h.wob) * 26; h.hb.group.rotation.set(Math.sin(ph) * 0.1 * w, Math.sin(ph * 0.7) * 0.06 * w * h.wobA, Math.cos(ph) * 0.14 * w * h.wobA); h.hb.group.position.y = -0.005 + Math.abs(Math.sin(ph * 0.5)) * 0.025 * w; if (h.wob === 0) { h.hb.group.rotation.set(0, 0, 0); h.hb.group.position.y = -0.005; } }
       const dd = camera.position.distanceToSquared(h.g.position);
-      h.g.visible = dd < 400;
+      if (!lod) h.g.visible = dd < 400;
       if (dd < 64 && (h.sleep <= 1 || h === held || h.mount || h.sway.lengthSq() > 1e-6 || h.swayV.lengthSq() > 1e-6)) updateSway(h, dt);
       if (!h.mount && h !== held && h.sleep < 1.5) { h.blob.visible = true; const gy = groundY(h.g.position); h.blob.position.set(h.g.position.x, gy + 0.004, h.g.position.z); const hgt = h.g.position.y - gy; h.blob.scale.setScalar(0.42 * Math.max(0.4, 1 - hgt * 0.3)); h.blob.material.opacity = 1; }
       else if (h.mount || h === held) h.blob.visible = false;
       if (h.hb.glow) h.hb.glow.material.opacity = 0.16 + Math.sin(now * 3 + h.idx) * 0.06;
     }
+    if (lod) { const st2 = lod.update(heads, camera, held); lodStat = st2; }
     // 光束
     for (let i = beams.length - 1; i >= 0; i--) { const bm = beams[i]; bm.t += dt; bm.l.material.opacity = 1 - bm.t / 0.5; if (bm.t > 0.5) { scene.remove(bm.l); bm.l.geometry.dispose(); bm.l.material.dispose(); beams.splice(i, 1); } }
     updateParticles(dt); updateWisps(dt); updateGhost();
@@ -1093,8 +1124,8 @@ window.startGame = function () {
     ui.power.textContent = s.power;
     ui.hpbar.style.width = (S.hp / s.maxHp * 100) + '%';
     ui.hptxt.textContent = `${Math.round(S.hp)} / ${s.maxHp}`;
-    const bagCount = S.heads.filter(r => r.inBag).length;
-    { const ex = exhibit(), cx = codexInfo(); const hc = `洞内首级 ${heads.length}/${MAX_HEADS}` + (bagCount ? ` · 麻袋 ${bagCount}` : '') + ` · 第 ${S.depth} 层<br><span class="exl">🏛️ 展厅 <b class="g${ex.tier}">${ex.grade}</b> ${fmtN(ex.score)}${ex.next ? '/' + fmtN(ex.next) : ''} · 📖 ${cx.nIds}/${cx.totalIds} · ${daily.n}</span>`; if (hc !== ui._hc) { ui._hc = hc; ui.headcount.innerHTML = hc; } }
+    let bagCount = 0, vN = 0; for (const r of S.heads) { if (r.inBag) bagCount++; else if (r.vault) vN++; }
+    { const ex = exhibit(), cx = codexInfo(); const hc = `洞内首级 ${heads.length}/${MAX_HEADS}` + (vN ? ` · 魂库 ${vN}` : '') + (bagCount ? ` · 麻袋 ${bagCount}` : '') + ` · 第 ${S.depth} 层<br><span class="exl">🏛️ 展厅 <b class="g${ex.tier}">${ex.grade}</b> ${fmtN(ex.score)}${ex.next ? '/' + fmtN(ex.next) : ''} · 📖 ${cx.nIds}/${cx.totalIds} · ${daily.n}</span>`; if (hc !== ui._hc) { ui._hc = hc; ui.headcount.innerHTML = hc; } }
     // 准星提示
     let tip = '';
     if (playing && !uiOpen) {
@@ -1124,7 +1155,7 @@ window.startGame = function () {
     _dbg: { submitBounty: h => submitBounty(h), interactE: () => interactE(), startSeance: h => startSeance(h), carry() { bagCarrying = true; }, unloadBag: () => unloadBag(), get cine() { return cine; } },
     hasAff, yieldOf, exhibit, codexInfo, daily, DAILY, bounties, rerollBounties, EX_T, fmtN, S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
     save, wipe, setUI, lockPointer, spawnReturnHeads, addHeadRecs, createReturnBag, usedSig, usedNames, headOf, removeHead, refreshWeapon, burst, get cave() { return cave; },
-    post, HOOK, rebuildHead, floatText, spawnBeam, gachaCard, lookHit, unmount, soulWisp, trigger, SAVE_KEY, get clock() { return clock; }, get held() { return held; }, set held(v) { held = v; }, get keys() { return keys; }, get cine() { return cine; }, setUIOpen: v => setUI(v),
+    post, lod, get lodStat() { return lodStat; }, storeHead, takeOut, storeLoose, vaultCount, MAX_HEADS, VAULT_MAX, HOOK, rebuildHead, floatText, spawnBeam, gachaCard, lookHit, unmount, soulWisp, trigger, SAVE_KEY, get clock() { return clock; }, get held() { return held; }, set held(v) { held = v; }, get keys() { return keys; }, get cine() { return cine; }, setUIOpen: v => setUI(v),
     get playing() { return playing; }, get uiOpen() { return uiOpen; }, renderer, camera, scene, poke, mountHead, createHead, addBuild
   };
   window.__game = G;

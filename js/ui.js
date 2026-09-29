@@ -62,6 +62,11 @@ window.UI = (() => {
       case 'buy': if (G.buyItem(v)) openMenu(menuState.tab); else deny(a); break;
       case 'use': G.useItem(v); openMenu(menuState.tab); break;
       case 'card': { const rec = G.S.heads.find(r => r.id == v); if (rec) openCard(rec, true); break; }
+      case 'hf': { const [k, x] = v.split(':'); HV[k] = (k === 'rar') ? +x : x; HV.page = 0; openMenu('heads'); break; }
+      case 'hpg': HV.page = Math.max(0, HV.page + (+v)); openMenu('heads'); break;
+      case 'storeAll': { const n = G.storeLoose(); G.toast(n ? `📥 ${n} 颗散落首级已存入魂库` : '没有散落在地上的首级', n ? '#e8c070' : '#aaa'); openMenu('heads'); break; }
+      case 'store': { const h = G.headOf(+v); if (h && G.storeHead(h)) { G.save(); SFX.sack && SFX.sack(); G.toast('📥 已存入魂库', '#e8c070'); openMenu('heads'); } else deny(a); break; }
+      case 'take': { const rec = G.S.heads.find(r => r.id == v); if (rec && G.takeOut(rec)) { G.save(); close(); G.toast('📤 从魂库取出：' + rec.c.name, '#e8c070'); } else deny(a); break; }
       case 'mem': showMemory(); break;
       case 'log': openLog(+v); break;
       case 'back': openMenu(menuState.tab); break;
@@ -118,7 +123,7 @@ window.UI = (() => {
     if (tab === 'stats') body = statsBody();
     else if (tab === 'equip') body = equipBody();
     else if (tab === 'build') body = buildBody();
-    else if (tab === 'heads') body = headsBody();
+    else if (tab === 'heads') { body = headsBody(); setTimeout(bindHeads, 0); }
     else if (tab === 'logs') body = logsBody();
     else if (tab === 'codex') body = codexBody();
     if (cur !== 'menu') SFX.open();
@@ -175,11 +180,29 @@ window.UI = (() => {
     }
     return `<div class="bp-tabs">${tabs}</div><p class="hint2">每件建筑都会<b>永久提升主角属性</b>（战力）。放置时：左键确认 · R/Shift+R 任意角度旋转 · 右键取消。新建筑会在达成<b>隐藏条件</b>后出现。对建筑连按 XX 拆除（返还 50%）。</p><div class="bp-grid">${grid}</div>`;
   }
+  // 首级收藏 + 魂库（第九轮）：9999 颗也不卡 —— 筛选 / 排序 / 搜索 / 分页，每页只渲染 60 张卡
+  const HV = { where: 'all', rar: -1, sort: 'rar', q: '', page: 0 }, PAGE = 60;
   function headsBody() {
-    const list = G.S.heads.slice().sort((a, b) => b.c.rar - a.c.rar || b.id - a.id);
-    if (!list.length) return '<p class="empty">洞里还没有首级。走到洞口（发光的出口）按 E，出去狩猎吧。</p>';
-    return `<p class="hint2">共 ${list.length} 颗 · 点击查看档案与「回忆」。在洞里对着首级按 F 也可以查看。</p><div class="hd-grid">` + list.map(r => `<div class="hd" data-a="card" data-v="${r.id}" style="--c:${RC[r.c.rar]}"><div class="hd-r">${RN[r.c.rar]}</div><div class="hd-n">${esc(r.c.name)}</div><div class="hd-i">${esc(r.c.raceN)} · ${esc(r.c.idN)}</div><div class="hd-l">${esc(r.c.locN)}</div></div>`).join('') + '</div>';
+    const all = G.S.heads;
+    if (!all.length) return '<p class="empty">洞里还没有首级。走到洞口（发光的出口）按 E，出去狩猎吧。</p>';
+    let nCave = 0, nVault = 0, nBag = 0; for (const r of all) { if (r.inBag) nBag++; else if (r.vault) nVault++; else nCave++; }
+    const q = HV.q.trim();
+    let list = all.filter(r => (HV.where === 'all' || (HV.where === 'vault' ? r.vault : HV.where === 'bag' ? r.inBag : (!r.vault && !r.inBag))) && (HV.rar < 0 || r.c.rar === HV.rar) && (!q || (r.c.name + r.c.raceN + r.c.idN + r.c.locN).includes(q)));
+    const Y = r => (G.yieldOf ? G.yieldOf(r) : 0);
+    list.sort(HV.sort === 'new' ? (a, b) => b.id - a.id : HV.sort === 'yield' ? (a, b) => Y(b) - Y(a) : (a, b) => b.c.rar - a.c.rar || (b.c.shiny ? 1 : 0) - (a.c.shiny ? 1 : 0) || b.id - a.id);
+    const pages = Math.max(1, Math.ceil(list.length / PAGE)); HV.page = Math.min(HV.page, pages - 1);
+    const shown = list.slice(HV.page * PAGE, HV.page * PAGE + PAGE);
+    const chip = (k, v, n) => `<button class="hv-chip ${String(HV[k]) === String(v) ? 'on' : ''}" data-a="hf" data-v="${k}:${v}">${n}</button>`;
+    const where = r => r.vault ? '<span class="hd-w v">魂库</span>' : r.inBag ? '<span class="hd-w b">麻袋</span>' : '<span class="hd-w c">洞内</span>';
+    const bar = `<div class="hv-bar">${chip('where', 'all', '全部 ' + all.length)}${chip('where', 'cave', '洞内 ' + nCave + '/' + G.MAX_HEADS)}${chip('where', 'vault', '🗝️ 魂库 ' + nVault)}${nBag ? chip('where', 'bag', '麻袋 ' + nBag) : ''}
+      <span class="hv-sep"></span>${chip('rar', -1, '全品阶')}${RN.map((n, i) => chip('rar', i, n)).join('')}
+      <span class="hv-sep"></span>${chip('sort', 'rar', '按品阶')}${chip('sort', 'new', '最新')}${chip('sort', 'yield', '产魂')}
+      <input id="hvQ" class="hv-q" placeholder="🔍 名字 / 种族 / 地点" value="${esc(HV.q)}"></div>
+      <div class="hv-bar"><button class="hv-chip" data-a="storeAll">📥 一键收纳：散落在地上的首级全部存入魂库</button><span class="hint2">共 ${list.length} 颗 · 魂库上限 ${G.VAULT_MAX} · 入库的首级不占洞内名额、不耗性能，随时可取出。</span></div>`;
+    const pager = pages > 1 ? `<div class="hv-pg"><button class="hv-chip" data-a="hpg" data-v="-1" ${HV.page ? '' : 'disabled'}>◀</button><b>${HV.page + 1} / ${pages}</b><button class="hv-chip" data-a="hpg" data-v="1" ${HV.page < pages - 1 ? '' : 'disabled'}>▶</button></div>` : '';
+    return bar + pager + `<div class="hd-grid">` + shown.map(r => `<div class="hd" data-a="card" data-v="${r.id}" style="--c:${RC[r.c.rar]}"><div class="hd-r">${RN[r.c.rar]}${r.c.shiny ? ' ✨' : ''} ${where(r)}</div><div class="hd-n">${esc(r.c.name)}</div><div class="hd-i">${esc(r.c.raceN)} · ${esc(r.c.idN)}</div><div class="hd-l">${esc(r.c.locN)}</div></div>`).join('') + '</div>' + pager;
   }
+  function bindHeads() { const el = document.getElementById('hvQ'); if (!el) return; el.onchange = () => { HV.q = el.value; HV.page = 0; openMenu('heads'); }; el.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') el.onchange(); }; el.onkeyup = e => e.stopPropagation(); }
   function logsBody() {
     const L = G.S.logs;
     if (!L.length) return '<p class="empty">还没有狩猎记录。</p>';
@@ -211,7 +234,7 @@ window.UI = (() => {
       <h3>外貌</h3>${para(rec.app)}${modelNote(rec)}
       <h3>生平</h3>${para(rec.story)}
       <div id="memBox"></div>
-      <div class="btns"><button class="red" data-a="mem">🩸 回忆：我是怎么得到这颗头的</button>${fromMenu ? '<button data-a="back">← 返回</button>' : ''}<button data-a="close">关闭</button></div></div>`, 'card-m');
+      <div class="btns"><button class="red" data-a="mem">🩸 回忆：我是怎么得到这颗头的</button>${rec.vault ? `<button data-a="take" data-v="${rec.id}">📤 取出到洞里</button>` : (!rec.inBag && G.headOf(rec.id) && G.held !== G.headOf(rec.id)) ? `<button data-a="store" data-v="${rec.id}">📥 存入魂库</button>` : ''}${fromMenu ? '<button data-a="back">← 返回</button>' : ''}<button data-a="close">关闭</button></div></div>`, 'card-m');
   }
   function showMemory() {
     const box = document.getElementById('memBox'); if (!box || !cardRec) return;

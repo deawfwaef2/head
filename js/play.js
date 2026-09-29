@@ -121,7 +121,7 @@ window.Play = (() => {
           for (let k = 0; k < nInh && pool.length && c.aff.length < 4; k++) c.aff.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
           if (!c.shiny && (F.godTriple || (F.shinyIn && Math.random() < 0.34 * F.shinyIn))) { c.shiny = 1; raw.look.shiny = 1 + Math.floor(Math.random() * 4); raw.look.glowEye = 1; }
           c.forged = 1;
-          rec = G.addHeadRecs([raw])[0];
+          rec = G.addHeadRecs([raw])[0]; if (!rec) throw new Error('vault full');
         } catch (e) { console.warn('forge', e); F.b.busy = false; forging.splice(i, 1); continue; }
         const key = rec.c.race + '|' + rec.c.id, isNew = !G.S.codex[key]; G.S.codex[key] = (G.S.codex[key] || 0) + 1; if (rec.c.shiny) G.S.shinySeen = (G.S.shinySeen || 0) + 1;
         const h = G.createHead(rec, F.center.clone().add(new V3(0, 0.25, 0)));

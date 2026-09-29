@@ -100,6 +100,12 @@
   .eq-next { border: 2px dashed #6a4a2e; border-radius: 12px; padding: 10px; cursor: pointer; transition: all .12s; }
   .eq-next:hover { border-color: #ffb050; background: #2a1a10; } .eq.poor .eq-next { opacity: .55; } .eq-next.max { color: #8a7458; cursor: default; text-align: center; }
   .cost { color: #d9a8ff; font-weight: 900; margin-top: 4px; }
+  .hv-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 8px; } .hv-sep { width: 10px; }
+  button.hv-chip { padding: 4px 11px !important; font-size: 13px !important; min-height: 0 !important; line-height: 1.3 !important; }
+  .hv-chip { background: #2a1a12; color: #e8d0a8; border: 1px solid #5a3a28; border-radius: 999px; padding: 5px 11px; font-size: 13px; cursor: pointer; } .hv-chip.on { background: #6a3a1a; border-color: #ffb050; color: #fff2d0; } .hv-chip:disabled { opacity: .35; }
+  .hv-q { background: #140c08; color: #f0e0c0; border: 1px solid #5a3a28; border-radius: 999px; padding: 6px 12px; font-size: 14px; min-width: 190px; }
+  .hv-pg { display: flex; gap: 10px; align-items: center; justify-content: center; margin: 8px 0; color: #e8d0a8; }
+  .hd-w { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; margin-left: 4px; } .hd-w.v { background: #3a2a5a; color: #d8c8ff; } .hd-w.c { background: #2a3a22; color: #c8f0b0; } .hd-w.b { background: #4a3218; color: #f0d0a0; }
   .hd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
   .hd { border: 2px solid var(--c); border-radius: 12px; padding: 10px 12px; cursor: pointer; background: linear-gradient(180deg, rgba(0,0,0,.2), #1c110c); box-shadow: inset 0 0 20px color-mix(in srgb, var(--c) 20%, transparent); transition: transform .1s; }
   .hd:hover { transform: translateY(-2px); } .hd-r { color: var(--c); font-weight: 900; font-size: 13px; } .hd-n { font-weight: 900; font-size: 17px; } .hd-i, .hd-l { font-size: 12px; color: #a89070; }
@@ -260,6 +266,8 @@
 <script src="lib/GLTFLoader.js"></script>
 <script src="js/mods.js"></script>
 <script src="js/render.js"></script>
+<script src="js/store.js"></script>
+<script src="js/lod.js"></script>
 <script src="models/AvatarSample_A.js"></script>
 <script src="models/AvatarSample_B.js"></script>
 <script src="models/AvatarSample_D_Darkness.js"></script>
