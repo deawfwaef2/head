@@ -85,7 +85,7 @@ window.Combat = (() => {
   function onDown(btn) {
     if (!drawn) return false;
     if (btn === 0) { S.lmb = true; S.lmbT = performance.now(); S.drag = 0; const c = invCtrl(S.hand); S.ctrl.x = c.x; S.ctrl.y = c.y; }
-    if (btn === 2) { S.rmb = true; S.guard.x = 0; S.guard.y = 1; }
+    if (btn === 2) { S.rmb = true; S.guard.x = 0; S.guard.y = 1; S.guardT = performance.now() / 1000; }
     return true;
   }
   function onUp(btn) {

@@ -331,7 +331,7 @@ window.startGame = function () {
   let swing = 0;
 
   // ---------------- 玩家与输入 ----------------
-  const player = { pos: new V3(0, 0, 2.5), vel: new V3(), yaw: 0, pitch: -0.15, h: 1.95, onGround: true, crouch: 0 };
+  const player = { pos: new V3(0, 0, 2.5), vel: new V3(), yaw: 0, pitch: -0.15, h: 1.45, onGround: true, crouch: 0 };
   const keys = {};
   let locked = false, noLock = false, playing = false, uiOpen = false;
   const ray = new THREE.Raycaster(); ray.far = 3.4;
@@ -1166,7 +1166,7 @@ window.startGame = function () {
       const f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
       const s = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
       // 下蹲（按住 C）：视线降低 0.8m，移速 ×0.45，不能跳
-      player.crouch += ((keys.KeyC ? 1 : 0) - player.crouch) * Math.min(1, dt * 12); player.h = 1.95 - 0.8 * player.crouch;
+      player.crouch += ((keys.KeyC ? 1 : 0) - player.crouch) * Math.min(1, dt * 12); player.h = 1.45 - 0.55 * player.crouch; // 眼高与女角色一致
       const sp = (keys.ShiftLeft && player.crouch < 0.5 ? 6 : 3.4) * (1 - 0.55 * player.crouch);
       fw.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw)); rt.set(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
       wantV.copy(fw).multiplyScalar(f).addScaledVector(rt, s); if (wantV.lengthSq() > 0) wantV.normalize().multiplyScalar(sp);

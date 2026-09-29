@@ -542,3 +542,18 @@
   → 身体材质在 `foe.js template()` 里改成同一条 toon 渐变的 MeshToonMaterial（画风也更统一）。
 - 原神身体的肤色从贴图脖子一圈采样（`sampleSkin`），头用这个肤色；再用 `_tools/calib.py`（gitignored）在同一光照下把脸颊渲染色对齐到脖子/上胸渲染色，得到每具身体的 `SKIN_FIX`，只校亮度 + 25% 色相，存进 `look.skinMul`。
 - **heads.js 小改（协作者请知悉）**：`makeUniforms` 的 skin 乘上 `look.skinMul`（没有这个字段时为 1，不影响旧首级）。
+
+---
+## 第十六轮（总管理师）：战斗感 / 成就感 / 身高 / 斩首卡顿
+用户要求：更好玩、更有战斗感和成就感；玩家眼高与女性角色一致；“到头”与斩首时严重卡顿。
+- **身高**：worlds.js `EYE = 1.45`（原 1.95），蹲下 -0.55；洞窟 game.js 同步 1.45。**以后不要再改回食人魔身高。**
+- **斩首卡顿根因**：旧代码斩首时 `ModelHeads.create` 新建一颗死头 → 新材质/新着色器编译，斩首后首帧 113ms（软件渲染测得）。
+  现在 `Foe.decapitate` **直接把活人脖子上的头摘下来**（g.attach(holder)，改 U.pale/blood/spat、隐藏眼睛高光、换死气表情、显示断面），零新建 → 首帧 8ms、新程序 0。
+- **预编译** `prewarm(ctx)`（populate 末尾）：断肢碎块的静态 toon 材质、血粒子、血迹、断面（含阴影深度程序）先 compile+render 一次。**不要 dispose 这些预热材质**（会释放程序）。ctx 需要 `renderer`、`camera`。
+- **断肢**：三角形筛选结果缓存在 `geo.userData.sev[zone|nBones]`，populate 后 requestIdleCallback 预热各部位 → 断肢 28ms→6–8ms。
+- 血粒子对象池（≤300）+ 地面不规则暗红血迹（循环 80 块）；布娃娃骨骼名字表缓存。
+- **战斗感**：受击闪红（emissive）+击退；击杀/斩首慢动作（只作用于敌人/尸体/头/血，玩家不减速，`Foe.slowmo(t,k)`）；断颈喷血 1.8s；敌人出刀前头顶红色“!”预警；
+  **完美格挡**（右键在挨刀前 0.3s 内按下，combat.js `S.guardT`）→ `Foe.parried(fo)`：敌人硬直 1.6s、破绽期间伤害×2、**砍脖子直接处决（不看血量）**；发现玩家时惊动 13m 内同伴；活人会眨眼。
+- **成就感**（worlds.js `foeEvent`）：连击计数（2.5s 内续上，右侧大字），双杀/三杀；魂晶奖励：击杀 6 / 斩首 10 / 活斩 16 / 处决 30 / 一刀斩首 40 / 断肢 3 / 腰斩 8 / 完美格挡 4（×稀有度、霸主×4、连击加成），飘金字；
+  永久成就 `G.S.ach {got, n}`（ACH 表 17 项，金色横幅）；HUD 实时战绩；出猎结束写入日志+toast。
+- 测试：`_tools/fperf.py`（卡顿计时）、`_tools/fparry.py`（格挡→处决）、`_tools/fcut.py`（切割回归）均通过。

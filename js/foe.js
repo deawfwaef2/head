@@ -236,6 +236,9 @@ window.Foe = (() => {
         brave: !!it.boss || !!ARMED[id] || r() < 0.2 + rar * 0.1, boss: it.boss || null, bossK: it.bossK, dead: false, decap: false, rag: null, stag: 0, atk: null, block: 0, iq: 0.4 + rar * 0.15 + (it.boss ? 0.4 : 0),
         idleClip: IDLE[id] || pickR(r, ['Idle_Loop', 'Idle_Loop', 'Idle_Talking_Loop', 'Idle_FoldArms_Loop']), wpn: null, id2: 'foe' + FOES.length + '_' + (c.name || ''), anchor: { pos: new V3(), gone: false }, home: it.pos.clone() };
       fo.maxHp = fo.hp = it.boss ? 100 : 26 + rar * 16;
+      fo.mats = []; f.root.traverse(o => { if (o.isMesh && o.material && o.material.emissive && !o.userData.cut) fo.mats.push(o.material); });
+      fo.warn = new THREE.Sprite(warnMat()); fo.warn.scale.set(0.16, 0.16, 1); fo.warn.visible = false; fo.warn.renderOrder = 5; ctx.sc.add(fo.warn);
+      fo.blinkT = 1 + r() * 4;
       const wn = it.boss ? (it.bossK === 'swamp' || it.bossK === 'village' ? null : 'antique_katana_01') : ARMED[id];
       if (wn) fo.wpn = attachWeapon(f, wn);
       fo.armed = !!fo.wpn || !!it.boss;
@@ -243,29 +246,46 @@ window.Foe = (() => {
       ctx.sc.add(f.root); f.play(fo.idleClip, { fade: 0 }); f.mixer.setTime(r() * 3);
       FOES.push(fo); out.push(fo);
     }
-    evict(used, 5);
+    evict(used, 5); prewarm(ctx); { const seenB = new Set(); for (const fo of FOES) if (!seenB.has(fo.f.bodyName)) { seenB.add(fo.f.bodyName); sevWarm(fo); } }
     return out;
+  }
+  function warnMat() { if (warnMat.m) return warnMat.m; const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+    g.fillStyle = 'rgba(255,40,30,0.95)'; g.beginPath(); g.moveTo(32, 4); g.lineTo(60, 58); g.lineTo(4, 58); g.closePath(); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 40px sans-serif'; g.textAlign = 'center'; g.fillText('!', 32, 52);
+    return warnMat.m = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }); }
+  // 预编译：把断肢碎块（静态卡通材质）、血、血迹会用到的着色器在进场时就编好，砍的那一刻不再卡
+  function prewarm(ctx) {
+    if (!ctx.renderer || !ctx.camera) return; const grp = new THREE.Group(), geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3)); geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(6), 2)); geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([0, 1, 0, 0, 1, 0, 0, 1, 0]), 3));
+    const seen = new Set();
+    for (const fo of FOES) for (const m of fo.mats) { const k = m.type + (m.map ? 1 : 0) + m.side + (m.alphaTest > 0 ? 'a' : ''); if (seen.has(k)) continue; seen.add(k); grp.add(new THREE.Mesh(geo, m.clone())); }
+    bloodMat(); grp.add(new THREE.Sprite(blood.mat), new THREE.Mesh(blood.dgeo, blood.dmat));
+    const hid = []; for (const fo of FOES) { fo.f.cut.forEach(o => { if (!o.visible) { o.visible = true; hid.push(o); } }); fo.f.hb.group.traverse(o => { if (o.isMesh && o.userData.kind === 'cut' && !o.visible) { o.visible = true; hid.push(o); } }); }
+    grp.position.set(0, -50, 0); ctx.sc.add(grp); try { ctx.renderer.compile(ctx.sc, ctx.camera); ctx.renderer.render(ctx.sc, ctx.camera); } catch (e) { console.warn('prewarm', e); } // render 一次：连阴影深度程序和贴图上传一起预热 ctx.sc.remove(grp); // 不 dispose：保留已编译的程序
+    hid.forEach(o => o.visible = false);
   }
   function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function clear() {
-    for (const fo of FOES) { fo.anchor.gone = true; if (fo.f.root.parent) fo.f.root.parent.remove(fo.f.root); try { fo.f.hb.dispose(); } catch (e) {} }
+    for (const fo of FOES) { fo.anchor.gone = true; if (fo.warn && fo.warn.parent) fo.warn.parent.remove(fo.warn); if (fo.f.root.parent) fo.f.root.parent.remove(fo.f.root); try { fo.f.hb.dispose(); } catch (e) {} }
     for (const h of HEADS) { if (h.g.parent) h.g.parent.remove(h.g); }
     for (const p of PIECES) { if (p.g.parent) p.g.parent.remove(p.g); }
-    for (const x of FX) { if (x.o.parent) x.o.parent.remove(x.o); }
+    for (const x of FX) { if (x.o.parent) x.o.parent.remove(x.o); POOL.push(x); } for (const d of DECALS) if (d && d.parent) d.parent.remove(d);
     FOES.length = HEADS.length = PIECES.length = FX.length = 0;
   }
   // ---- 每帧 ----
   const tv = new V3(), tv2 = new V3(), up = new V3(0, 1, 0);
   function update(dt, now) {
     if (!CTX) return; const ctx = CTX, P = ctx.player;
+    if (slowT > 0) { slowT -= dt; dt *= slowK; if (slowT <= 0) slowK = 1; } // 击杀慢动作：只作用于敌人/尸体/头/血，玩家照常
     for (const fo of FOES) {
       const f = fo.f;
-      if (fo.dead) { if (fo.rag) ragStep(fo, dt); continue; }
+      if (fo.dead) { if (fo.rag) ragStep(fo, dt); if (fo.warn) fo.warn.visible = false;
+        if (fo.spurt > 0 && !fo.headOnPiece) { fo.spurt -= dt; const nb = f.bones.neck; if (nb && Math.random() < 0.8) { nb.getWorldPosition(tv2); const up = tv.set(0, 1, 0).applyQuaternion(nb.getWorldQuaternion(_q)); blood(tv2.addScaledVector(up, 0.05), 1, up, 0.9 + fo.spurt * 0.3); } }
+        continue; }
       fo.t += dt; fo.cd -= dt; fo.sayT -= dt; if (fo.stag > 0) fo.stag -= dt; if (fo.block > 0) fo.block -= dt;
       const dx = P.pos.x - fo.pos.x, dz = P.pos.z - fo.pos.z, d = Math.hypot(dx, dz) || 1e-3;
       const face = Math.atan2(dx, dz);
       const see = ctx.sees(fo.pos, (fo.boss ? 16 : 9 + fo.rar * 2) * (P.crouch > 0.5 ? 0.55 : 1)) && (fo.seen || Math.abs(ang(face - fo.yaw)) < 1.4 || d < 3);
-      if (see && !fo.seen) { fo.seen = true; fo.cd = Math.max(fo.cd, 0.5 + (1 - fo.iq) * 0.8); if (fo.boss) ctx.bossMeet(fo); else talk(fo, pickR(Math.random, SAY.see)); if (!fo.boss) fo.state = fo.brave ? 'chase' : 'flee'; else fo.state = 'chase'; }
+      if (see && !fo.seen) { alertNear(fo); fo.seen = true; fo.cd = Math.max(fo.cd, 0.5 + (1 - fo.iq) * 0.8); if (fo.boss) ctx.bossMeet(fo); else talk(fo, pickR(Math.random, SAY.see)); if (!fo.boss) fo.state = fo.brave ? 'chase' : 'flee'; else fo.state = 'chase'; }
       if (fo.seen && d > 26) { fo.seen = false; fo.state = 'idle'; }
       let spd = 0, turnTo = null;
       if (fo.atk) { // 攻击动作进行中：到命中帧判定
@@ -293,14 +313,21 @@ window.Foe = (() => {
       collide(fo.pos, 0.35); fo.pos.y = ctx.H(fo.pos.x, fo.pos.z); f.root.rotation.y = fo.yaw;
       f.mixer.update(dt);
       fo.f.bones.head.getWorldPosition(fo.anchor.pos); fo.anchor.pos.y -= 0.3;
-      if (fo.flash > 0) fo.flash -= dt;
+      if (fo.flash > 0 || fo.flashOn) { fo.flash -= dt; const on = fo.flash > 0; if (on !== fo.flashOn) { fo.flashOn = on; for (const m of fo.mats) m.emissive.setRGB(on ? 0.55 : 0, on ? 0.04 : 0, on ? 0.02 : 0); } }
+      fo.blinkT -= dt; if (fo.blinkT < 0) { const b = fo.blinkT > -0.07 ? -fo.blinkT / 0.07 : fo.blinkT > -0.16 ? 1 - (-fo.blinkT - 0.07) / 0.09 : 0; try { f.hb.setExpression({ blink: Math.max(0, b) }); } catch (e) {} if (fo.blinkT < -0.16) fo.blinkT = 2 + Math.random() * 4; }
+      if (fo.warn) { fo.warn.visible = !!(fo.atk && fo.atk.t < fo.atk.hitAt); if (fo.warn.visible) { fo.warn.position.copy(fo.anchor.pos); fo.warn.position.y += 0.75; const k = 0.13 + 0.05 * Math.sin(fo.atk.t * 30); fo.warn.scale.set(k, k, 1); } }
+      if (fo.broken > 0) fo.broken -= dt;
     }
     for (const h of HEADS) bodyPhys(h, dt, 0.11);
     for (const p of PIECES) bodyPhys(p, dt, p.rad);
-    for (let i = FX.length - 1; i >= 0; i--) { const x = FX[i]; x.t -= dt; x.v.y -= 9.8 * dt; x.o.position.addScaledVector(x.v, dt); const gy = ctx.H(x.o.position.x, x.o.position.z) + 0.01; if (x.o.position.y < gy) { x.o.position.y = gy; x.v.set(0, 0, 0); } x.o.material.opacity = Math.min(1, x.t * 1.5); if (x.t <= 0) { x.o.parent && x.o.parent.remove(x.o); FX.splice(i, 1); } }
+    for (let i = FX.length - 1; i >= 0; i--) { const x = FX[i]; x.t -= dt; x.v.y -= 9.8 * dt; x.o.position.addScaledVector(x.v, dt); const gy = ctx.H(x.o.position.x, x.o.position.z) + 0.01;
+      if (x.o.position.y < gy) { x.o.position.y = gy; if (x.decal) { decal(x.o.position, 0.06 + Math.random() * 0.12); x.decal = false; } x.v.set(0, 0, 0); x.t = Math.min(x.t, 0.25); }
+      if (x.t <= 0) { x.o.parent && x.o.parent.remove(x.o); FX[i] = FX[FX.length - 1]; FX.pop(); if (POOL.length < 300) POOL.push(x); } }
   }
+  let slowT = 0, slowK = 1; function slowmo(t, k) { slowT = Math.max(slowT, t); slowK = Math.min(k, slowT > 0 ? slowK : 1); }
   const ang = a => Math.atan2(Math.sin(a), Math.cos(a)), clampA = (a, m) => Math.max(-m, Math.min(m, a));
   function collide(p, r) { const ctx = CTX; for (const c of ctx.cols) { const ex = p.x - c.x, ez = p.z - c.z, e = Math.hypot(ex, ez), m = c.r + r; if (e < m && e > 1e-5) { p.x += ex / e * (m - e); p.z += ez / e * (m - e); } } const pr = Math.hypot(p.x, p.z), pl = ctx.R - 1; if (pr > pl) { p.x *= pl / pr; p.z *= pl / pr; } }
+  function alertNear(src) { for (const o of FOES) if (o !== src && !o.dead && !o.seen && o.pos.distanceTo(src.pos) < 13) { o.seen = true; o.state = o.boss ? 'chase' : (o.brave ? 'chase' : 'flee'); o.cd = Math.max(o.cd, 0.8 + Math.random()); if (o.boss) CTX.bossMeet(o); else if (Math.random() < 0.5) setTimeout(() => talk(o, pickR(Math.random, ['有人闯进来了！', '在那边！', '小心——', '快去叫人！'])), 400 + Math.random() * 600); } }
   function talk(fo, text, col) { if (!CTX || fo.dead) return; CTX.say(fo.anchor, text, col); fo.sayT = 3 + Math.random() * 2; }
   function attack(fo, d) {
     const f = fo.f, s = CTX.st();
@@ -353,6 +380,10 @@ window.Foe = (() => {
     }
     return out;
   }
+  function parried(fo) { // worlds.js 在完美格挡时调用
+    fo.atk = null; fo.stag = fo.boss ? 1.1 : 1.6; fo.broken = fo.stag + 0.2; fo.f.play('Hit_Knockback', { once: true, fade: 0.05, restart: true }); slowmo(0.25, 0.35);
+    if (fo.sayT <= 0 || true) talk(fo, pickR(Math.random, ['什……！', '怎么可能……', '呃——！']), '#ffe0a0');
+  }
   function hit(fo, info) {
     const ctx = CTX; const c = contact(fo, info); if (!c) return false; // 刃没碰到身体：不算
     const zone = c.zone, slash = info.kind !== 'thrust', spd = c.speed, sp = Math.max(0.5, Math.min(1.8, spd / 8));
@@ -369,16 +400,19 @@ window.Foe = (() => {
     if (fo.block > 0 && Math.abs(ang(Math.atan2(ctx.player.pos.x - fo.pos.x, ctx.player.pos.z - fo.pos.z) - fo.yaw)) < 1.1) {
       if (fo.sayT <= 0) talk(fo, pickR(Math.random, SAY.block)); sfx().thud && sfx().thud(0.8); ctx.clang && ctx.clang(c.point); fo.block = Math.max(0, fo.block - 0.3); return true;
     }
-    const q = ctx.power(fo), mult = zone === 'head' ? 1.6 : zone === 'neck' ? 1.8 : /Arm|Leg/.test(zone) ? 0.7 : 1;
+    const q = ctx.power(fo), brk = fo.broken > 0, mult = (zone === 'head' ? 1.6 : zone === 'neck' ? 1.8 : /Arm|Leg/.test(zone) ? 0.7 : 1) * (brk ? 2 : 1);
     const dealt = Math.max(1, Math.round((fo.boss ? 11 : 12) * q * sp * mult * (slash ? 1 : 0.8) * (0.85 + Math.random() * 0.3)));
-    fo.hp -= dealt; fo.flash = 0.15; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2);
+    const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.12; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk);
+    { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp); fo.pos.add(kv); } } // 击退
+    ctx.event && ctx.event('hit', fo, { dealt, zone, brk });
     if (!fo.seen) { fo.seen = true; fo.state = fo.brave ? 'chase' : 'flee'; if (fo.boss) ctx.bossMeet(fo); }
     if (!fo.brave && Math.random() < 0.35) { fo.brave = true; fo.state = 'chase'; }
     if (fo.boss) ctx.bossHp(fo);
     // 斩首：够快的横砍砍中脖子，且这一刀后她剩不到一半血（霸主要剩不到 25%）
-    if (slash && zone === 'neck' && spd > 4.5 && fo.hp <= fo.maxHp * (fo.boss ? 0.25 : 0.5)) { fo.hp = 0; die(fo, info, true); decapitate(fo, info); return true; }
+    if (slash && zone === 'neck' && spd > 4.5 && (brk || fo.hp <= fo.maxHp * (fo.boss ? 0.25 : 0.5))) { // 破绽中 = 处决，不看血量
+      const one = first && !brk; fo.hp = 0; die(fo, info, true); decapitate(fo, info); ctx.event && ctx.event(brk ? 'execute' : one ? 'onecut' : 'decapAlive', fo); return true; }
     if (fo.hp <= 0) {
-      die(fo, info, false);
+      die(fo, info, false); slowmo(0.35, 0.4);
       if (slash && /Arm|Leg/.test(zone) && spd > 5) sever(fo, zone, info);                    // 致命一刀砍在四肢：顺势砍断
       else if (slash && (zone === 'spine' || zone === 'hips') && spd > 9) sever(fo, 'spine', info); // 致命的快刀砍在腰：腰斩
       return true;
@@ -394,26 +428,51 @@ window.Foe = (() => {
     fo.dead = true; fo.atk = null; fo.anchor.gone = true;
     ragStart(fo, info); // 先按当前动作姿势建粒子，再停动画（停动画会把骨骼还原成 T 姿势）
     fo.f.mixer.stopAllAction(); ragPose(fo);
-    CTX.onDeath && CTX.onDeath(fo);
+    CTX.onDeath && CTX.onDeath(fo); CTX.event && CTX.event('kill', fo);
     if (!quiet) CTX.toast('☠️ 她倒下了——砍下她的头才能带走首级', '#ffb0a0', 2.6);
   }
   function decapitate(fo, info) {
-    if (fo.decap) return; fo.decap = true; const ctx = CTX, f = fo.f;
+    if (fo.decap) return; fo.decap = true; const ctx = CTX, f = fo.f, hb = f.hb, lk = fo.h.look;
     f.holder.updateMatrixWorld(true);
-    const hb = ModelHeads.create(fo.h.look); // 首级 = 死去的样子（与带回洞里的一致）
-    const g = new THREE.Group(); const m = new M4().copy(f.holder.matrixWorld); m.decompose(g.position, g.quaternion, g.scale);
-    hb.group.scale.setScalar(f.fit.s); g.add(hb.group); g.scale.set(1, 1, 1); hb.group.traverse(o => { if (o.isMesh) o.castShadow = true; });
-    f.holder.parent.remove(f.holder); try { f.hb.dispose(); } catch (e) {}
+    // 直接把脖子上这颗活人的头摘下来，换成“首级”的样子：只改 uniform/可见性，不新建任何几何、材质、着色器
+    const g = new THREE.Group(); f.holder.matrixWorld.decompose(g.position, g.quaternion, g.scale); g.scale.set(1, 1, 1); ctx.sc.add(g); g.attach(f.holder);
+    if (hb.U) { if (hb.U.pale) hb.U.pale.value = lk.pale || 0.2; if (hb.U.blood) hb.U.blood.value = lk.blood || 0; if (hb.U.spat) hb.U.spat.value = lk.spat || 0; }
+    (hb.hl || []).forEach(m => m.visible = false); // 死眼：去掉高光
+    try { hb.setExpression(lk.ex || { blink: 0.6 }); } catch (e) {}
+    hb.group.traverse(o => { if (o.isMesh && o.userData.kind === 'cut') o.visible = true; });
     f.cut.forEach(o => o.visible = true);
-    ctx.sc.add(g);
-    const v = (info.vel || info.dir || new V3(0, 0, 1)).clone(); v.y = 0; if (v.lengthSq() < 1e-4) v.set(0, 0, 1); v.normalize().multiplyScalar(1.8 + Math.random()); v.y = 2.4;
+    fo.blinkT = 1e9;
+    const v = (info.vel || info.dir || new V3(0, 0, 1)).clone(); v.y = 0; if (v.lengthSq() < 1e-4) v.set(0, 0, 1); v.normalize().multiplyScalar(1.8 + Math.random()); v.y = 2.6;
     HEADS.push({ g, hb, fo, h: fo.h, vel: v, av: new V3((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 12), rest: 0 });
-    blood(g.position, 14, v); sfx().chop && sfx().chop(); sfx().squish && sfx().squish(1.2); ctx.shake && ctx.shake(0.35);
+    fo.spurt = 1.8; // 断颈喷血
+    blood(g.position, 18, v, 1.4); sfx().chop && sfx().chop(); sfx().squish && sfx().squish(1.3); ctx.shake && ctx.shake(0.45);
+    slowmo(0.55, 0.3);
     ctx.toast('🩸 斩首！走过去按 E 拾取首级', '#ff9080', 3);
-    if (fo.rag) { fo.rag.act.head = false; ragKick(fo, info, 0.4); }
+    ctx.event && ctx.event('decap', fo);
+    if (fo.rag) { fo.rag.act.head = false; fo.rag.act.top = false; ragKick(fo, info, 0.4); }
   }
   // 断肢：把这段骨头子树上的三角形按当前姿势“拍”成一块静态网格飞出去，身体上这段骨头缩成 0
   function subtreeBones(root) { const s = new Set(); root.traverse(o => { if (o.isBone || o.type === 'Bone' || o.isObject3D) s.add(o); }); return s; }
+  function sevData(o, zone, sub) {
+    const geo = o.geometry, si = geo.attributes.skinIndex, sw = geo.attributes.skinWeight, pa = geo.attributes.position;
+    const ck = zone + '|' + o.skeleton.bones.length; geo.userData.sev = geo.userData.sev || {}; let C = geo.userData.sev[ck];
+      if (!C) {
+        const bones = o.skeleton.bones, inSub = bones.map(b => sub.has(b));
+      const wv = new Float32Array(pa.count), SA = si.array, WA = sw.array, ss = si.itemSize, ws = sw.itemSize; for (let i = 0; i < pa.count; i++) { let w = 0, tot = 0; for (let k = 0; k < 4; k++) { const wk = WA[i * ws + k]; tot += wk; if (inSub[SA[i * ss + k]]) w += wk; } wv[i] = tot > 0 ? w / tot : 0; } // 权重可能是归一化整数：按总和归一
+        const idx = geo.index ? geo.index.array : null, tri = []; const n = idx ? idx.length : pa.count;
+        for (let t = 0; t < n; t += 3) { const a = idx ? idx[t] : t, b = idx ? idx[t + 1] : t + 1, c = idx ? idx[t + 2] : t + 2; if (wv[a] + wv[b] + wv[c] >= 1.5) tri.push(a, b, c); }
+        const remap = new Int32Array(pa.count).fill(-1), used = []; const ti = new Uint32Array(tri.length);
+        for (let q = 0; q < tri.length; q++) { const x = tri[q]; if (remap[x] < 0) { remap[x] = used.length; used.push(x); } ti[q] = remap[x]; }
+        C = geo.userData.sev[ck] = { used: Uint32Array.from(used), ti };
+      }
+    return C;
+  }
+  function sevWarm(fo) { // 空闲时预先算好各部位的断肢三角形
+    const Z = ['leftUpperArm', 'rightUpperArm', 'leftLowerArm', 'rightLowerArm', 'leftUpperLeg', 'rightUpperLeg', 'leftLowerLeg', 'rightLowerLeg', 'spine'], f = fo.f;
+    let zi = 0; const step = () => { if (!CTX || fo.dead && fo.gone) return; const z = Z[zi++]; if (!z) return; const b = f.bones[z]; if (b) { const sub = subtreeBones(b); f.root.traverse(o => { if (o.isSkinnedMesh && o.geometry.attributes.skinIndex) sevData(o, z, sub); }); }
+      (window.requestIdleCallback || setTimeout)(step, { timeout: 400 }); };
+    (window.requestIdleCallback || setTimeout)(step, { timeout: 1500 });
+  }
   function sever(fo, zone, info) {
     const f = fo.f, bone = f.bones[zone]; if (!bone || (fo.gone && fo.gone.has(zone))) return;
     if (zone === 'spine') fo.halved = true;
@@ -421,15 +480,13 @@ window.Foe = (() => {
     const sub = subtreeBones(bone), piece = new THREE.Group(), v = new V3(), center = new V3(); let nv = 0;
     f.root.traverse(o => {
       if (!o.isSkinnedMesh || !o.visible) return; const geo = o.geometry, si = geo.attributes.skinIndex, sw = geo.attributes.skinWeight, pa = geo.attributes.position; if (!si) return;
-      const bones = o.skeleton.bones, inSub = bones.map(b => sub.has(b));
-      const wv = new Float32Array(pa.count), SA = si.array, WA = sw.array, ss = si.itemSize, ws = sw.itemSize; for (let i = 0; i < pa.count; i++) { let w = 0, tot = 0; for (let k = 0; k < 4; k++) { const wk = WA[i * ws + k]; tot += wk; if (inSub[SA[i * ss + k]]) w += wk; } wv[i] = tot > 0 ? w / tot : 0; } // 权重可能是归一化整数：按总和归一
-      const idx = geo.index ? geo.index.array : null, tri = []; const n = idx ? idx.length : pa.count;
-      for (let t = 0; t < n; t += 3) { const a = idx ? idx[t] : t, b = idx ? idx[t + 1] : t + 1, c = idx ? idx[t + 2] : t + 2; if (wv[a] + wv[b] + wv[c] >= 1.5) tri.push(a, b, c); }
-      if (!tri.length) return;
-      const used = [...new Set(tri)], remap = new Map(used.map((x, i) => [x, i])), P = new Float32Array(used.length * 3), UV = geo.attributes.uv ? new Float32Array(used.length * 2) : null;
-      used.forEach((x, i) => { v.fromBufferAttribute(pa, x); o.boneTransform(x, v); v.applyMatrix4(o.matrixWorld); P.set([v.x, v.y, v.z], i * 3); center.add(v); nv++; if (UV) UV.set([geo.attributes.uv.getX(x), geo.attributes.uv.getY(x)], i * 2); });
+      // 缓存：同一几何体 + 同一部位的三角形筛选结果永远相同（几何体在克隆间共享）
+      const C = sevData(o, zone, sub);
+      if (!C.ti.length) return;
+      const used = C.used, P = new Float32Array(used.length * 3), UV = geo.attributes.uv ? new Float32Array(used.length * 2) : null, uva = geo.attributes.uv;
+      for (let q = 0; q < used.length; q++) { const x = used[q]; v.fromBufferAttribute(pa, x); o.boneTransform(x, v); v.applyMatrix4(o.matrixWorld); P[q * 3] = v.x; P[q * 3 + 1] = v.y; P[q * 3 + 2] = v.z; center.add(v); nv++; if (UV) { UV[q * 2] = uva.getX(x); UV[q * 2 + 1] = uva.getY(x); } }
       const g2 = new THREE.BufferGeometry(); g2.setAttribute('position', new THREE.BufferAttribute(P, 3)); if (UV) g2.setAttribute('uv', new THREE.BufferAttribute(UV, 2));
-      g2.setIndex(tri.map(x => remap.get(x))); g2.computeVertexNormals();
+      g2.setIndex(new THREE.BufferAttribute(C.ti, 1)); g2.computeVertexNormals();
       const mat = (Array.isArray(o.material) ? o.material[0] : o.material).clone(); mat.skinning = false;
       const mesh = new THREE.Mesh(g2, mat); mesh.castShadow = true; piece.add(mesh);
     });
@@ -444,7 +501,7 @@ window.Foe = (() => {
     if (fo.rag) { for (const k of Object.keys(fo.rag.idx)) { const b = f.bones[k]; if (b && sub.has(b)) fo.rag.act[k] = false; } }
     const vel = (info.vel || info.dir || new V3()).clone().multiplyScalar(0.25); vel.y += 2;
     PIECES.push({ g: piece, vel, av: new V3((Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9), rad: zone === 'spine' ? 0.18 : 0.06, rest: 0, fo, headPiece: zone === 'spine' && !fo.decap });
-    blood(center, 10, info.vel); sfx().chop && sfx().chop(); sfx().squish && sfx().squish(1);
+    blood(center, 12, info.vel); sfx().chop && sfx().chop(); sfx().squish && sfx().squish(1); CTX.event && CTX.event(zone === 'spine' ? 'halve' : 'sever', fo);
   }
   // 头/残肢的简单刚体：重力、落地弹跳、摩擦、滚动
   function bodyPhys(b, dt, rad) {
@@ -458,13 +515,27 @@ window.Foe = (() => {
     const w = b.av.length(); if (w > 1e-3) g.quaternion.premultiply(new Q().setFromAxisAngle(tv.copy(b.av).divideScalar(w), w * dt));
     if (b.vel.lengthSq() < 0.01 && w < 0.2 && g.position.y <= gy + 0.001) b.rest += dt; else b.rest = 0;
   }
-  function blood(p, n, dir) {
-    if (!CTX) return; if (!blood.tex) { const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d'), gr = g.createRadialGradient(16, 16, 2, 16, 16, 15); gr.addColorStop(0, 'rgba(120,8,8,1)'); gr.addColorStop(0.6, 'rgba(90,4,4,0.9)'); gr.addColorStop(1, 'rgba(60,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 32, 32); blood.tex = new THREE.CanvasTexture(c); blood.mat = new THREE.SpriteMaterial({ map: blood.tex, transparent: true, depthWrite: false }); }
+  const POOL = [], DECALS = []; let decalI = 0;
+  function bloodMat() {
+    if (!blood.mat) { const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d'), gr = g.createRadialGradient(16, 16, 2, 16, 16, 15); gr.addColorStop(0, 'rgba(130,8,8,1)'); gr.addColorStop(0.6, 'rgba(95,4,4,0.92)'); gr.addColorStop(1, 'rgba(60,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
+      blood.tex = new THREE.CanvasTexture(c); blood.mat = new THREE.SpriteMaterial({ map: blood.tex, transparent: true, depthWrite: false });
+      const c2 = document.createElement('canvas'); c2.width = c2.height = 64; const g2 = c2.getContext('2d'); // 不规则暗红血迹
+      for (let k = 0; k < 9; k++) { const x = 32 + (Math.random() - 0.5) * 30 * (k ? 1 : 0), y = 32 + (Math.random() - 0.5) * 30 * (k ? 1 : 0), rr = k ? 3 + Math.random() * 7 : 15; const gg = g2.createRadialGradient(x, y, 0, x, y, rr); gg.addColorStop(0, 'rgba(62,2,4,0.95)'); gg.addColorStop(0.75, 'rgba(48,0,2,0.85)'); gg.addColorStop(1, 'rgba(40,0,0,0)'); g2.fillStyle = gg; g2.beginPath(); g2.arc(x, y, rr, 0, 7); g2.fill(); }
+      blood.dmat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c2), transparent: true, depthWrite: false, opacity: 0.7, polygonOffset: true, polygonOffsetFactor: -2 }); blood.dgeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2); }
+    return blood.mat;
+  }
+  function blood(p, n, dir, big = 1) {
+    if (!CTX) return; const mat = bloodMat();
     for (let i = 0; i < n; i++) {
-      const m = new THREE.Sprite(blood.mat.clone()); m.scale.setScalar(0.012 + Math.random() * 0.02); m.position.copy(p);
-      const v = new V3((Math.random() - 0.5) * 2.4, 1 + Math.random() * 2, (Math.random() - 0.5) * 2.4); if (dir) v.addScaledVector(tv.copy(dir).normalize(), 1.2);
-      CTX.sc.add(m); FX.push({ o: m, v, t: 1.2 + Math.random() * 1.2 });
+      let x = POOL.pop(); if (!x) { x = { o: new THREE.Sprite(mat), v: new V3(), t: 0 }; x.o.renderOrder = 3; }
+      x.o.scale.setScalar((0.014 + Math.random() * 0.022) * big); x.o.position.copy(p); x.o.material = mat;
+      x.v.set((Math.random() - 0.5) * 2.4, 0.8 + Math.random() * 2.2, (Math.random() - 0.5) * 2.4); if (dir) x.v.addScaledVector(tv.copy(dir).normalize(), 1.3 * big);
+      x.t = 1 + Math.random() * 1.2; x.decal = Math.random() < 0.18; CTX.sc.add(x.o); FX.push(x);
     }
+  }
+  function decal(p, sz) { // 地面血迹：最多 80 块，循环复用
+    bloodMat(); let d = DECALS[decalI]; if (!d) { d = new THREE.Mesh(blood.dgeo, blood.dmat); d.renderOrder = 1; DECALS[decalI] = d; }
+    decalI = (decalI + 1) % 80; d.position.set(p.x, CTX.H(p.x, p.z) + 0.012, p.z); d.scale.setScalar(sz); d.rotation.y = Math.random() * 6.28; if (d.parent !== CTX.sc) CTX.sc.add(d);
   }
   // 拾取首级：只有砍下来的头能捡
   function nearHead(pos, yaw, maxD = 2.3) {
@@ -561,8 +632,7 @@ window.Foe = (() => {
       D[s + 'Shoulder'] = dChest.clone(); D[s + 'UpperArm'] = swing(dChest, s + 'UpperArm', s + 'LowerArm'); D[s + 'LowerArm'] = swing(D[s + 'UpperArm'], s + 'LowerArm', s + 'Hand'); D[s + 'Hand'] = swing(D[s + 'LowerArm'], s + 'Hand', t);
       D[s + 'UpperLeg'] = swing(dHips, s + 'UpperLeg', s + 'LowerLeg'); D[s + 'LowerLeg'] = swing(D[s + 'UpperLeg'], s + 'LowerLeg', s + 'Foot'); D[s + 'Foot'] = swing(D[s + 'LowerLeg'], s + 'Foot', toe); D[s + 'Toes'] = D[s + 'Foot'].clone(); }
     // 按层级写回局部旋转
-    const Wq = {}; const byName = {}; root.traverse(o => { byName[o.name] = o; });
-    const hbName = {}; Object.entries(f.bones).forEach(([k, o]) => hbName[o.name] = k);
+    const Wq = {}; if (!rg.byName) { rg.byName = {}; root.traverse(o => { rg.byName[o.name] = o; }); rg.hbName = {}; Object.entries(f.bones).forEach(([k, o]) => rg.hbName[o.name] = k); } const byName = rg.byName, hbName = rg.hbName;
     for (const nm of R.order) {
       const o = byName[nm]; if (!o) continue; const pW = o.parent === root ? new Q() : (Wq[o.parent.name] || R.restW[o.parent.name] || new Q());
       const hk = hbName[nm]; let w;
@@ -574,5 +644,5 @@ window.Foe = (() => {
     const pinv = new M4().copy(par.matrixWorld).invert().multiply(root.matrixWorld); hips.position.copy(want.applyMatrix4(pinv));
   }
   function has(name) { return !!(window.BODY_LIST && BODY_LIST.includes(name)); }
-  return { template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
+  return { template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
 })();

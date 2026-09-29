@@ -13,6 +13,7 @@ window.Worlds = (() => {
   const mulberry = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   const pick = (r, a) => a[Math.floor(r() * a.length)];
   let G = null, W = null, provReg = false;
+  const EYE = 1.45; // 第十四轮 14d：食人魔身高与女角色一致（原 1.95 太高）
   const LITE = /[?&]wlite=1/.test(location.search); // 调试：不散布植被（2GB 沙箱里测流程用）
 
   // ================= 风格 =================
@@ -372,10 +373,14 @@ window.Worlds = (() => {
     return {
       sc: B.sc, H: B.H, cols: B.cols, R: B.R, player: { pos: W.pos, get yaw() { return G.player.yaw; }, get crouch() { return G.player.crouch; } },
       st: () => G.st(), sees: (pos, maxD) => sees({ pos }, maxD), say: (anchor, text, col) => { if (text) say(anchor, text, col); },
-      floatDmg: (pos, n, big) => floatDmg(pos, n, big), toast: (t, c, d) => G.toast && G.toast(t, c, d), shake: (k) => { W.shake = Math.max(W.shake || 0, k); },
+      floatDmg: (pos, n, big) => floatDmg(pos, n, big), renderer: G.renderer, camera: G.camera, event: (t, fo, d) => foeEvent(t, fo, d), toast: (t, c, d) => G.toast && G.toast(t, c, d), shake: (k) => { W.shake = Math.max(W.shake || 0, k); },
       playerSwinging: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.thrust > 0)),
       power: (fo) => { const q = G.st().power / ((fo.boss ? node.loc.rec * (fo.boss.pow || 2) : node.loc.rec * [0.7, 0.9, 1.15, 1.5, 2.1][fo.rar])); return Math.pow(clamp(q, 0.25, 3), 0.7); },
       hitPlayer: (fo, n) => { const s = G.st(); n = Math.max(1, Math.round(n * (1 - s.dodge * 0.5) * (1 - Math.min(0.5, s.def / (s.def + 300)))));
+        const CS = window.Combat && Combat.state;
+        if (guardFacing(fo.pos) && CS && CS.guardT && performance.now() / 1000 - CS.guardT < 0.3) { // 完美格挡：挨刀前 0.3 秒内举刀
+          G.toast && G.toast('⚔️ 完美格挡！她露出了破绽——砍她的脖子！', '#ffe070', 1.8); SFX.play && SFX.play('draw', 0.7, 2.2); SFX.thud && SFX.thud(1); W.shake = Math.max(W.shake || 0, 0.3);
+          G.flash && G.flash('#fff6c0', 0.35, 160); Foe.parried(fo); foeEvent('parry', fo); return; }
         if (guardFacing(fo.pos)) { n = Math.round(n * 0.25); G.toast && G.toast('🛡️ 格挡！', '#cfe0ff', 0.6); SFX.thud && SFX.thud(0.8); fo.stag = fo.boss ? 0.8 : 0.6; }
         else { G.flash && G.flash('#a00000', 0.4, 280); W.shake = Math.max(W.shake || 0, fo.boss ? 0.5 : 0.25); }
         if (n > 0) { G.damage(n); W.trip.log.push({ t: `${fo.h.c.name}${fo.boss ? '' : '反击'}，你受了伤。`, d: `-${n} HP` }); } },
@@ -385,6 +390,39 @@ window.Worlds = (() => {
         if (fo.boss) { bossSay(fo.boss.lose, 4); W.dom.boss.style.display = 'none'; G.flash && G.flash('#ffffff', 0.8, 600); SFX.fanfare && SFX.fanfare(3); W.shake = 1; setTimeout(() => G.toast && G.toast(`👑 ${fo.boss.title}倒下了——砍下她的头，带回去！`, fo.boss.col || '#ffd060', 4), 1200); } }
     };
   }
+  // ---- 战斗感与成就感：连击、击杀奖励、成就、战绩 ----
+  const ACH = [
+    ['k1', 'kill', 1, '初猎', '第一次亲手放倒猎物'], ['k25', 'kill', 25, '林间恶名', '累计放倒 25 人'], ['k100', 'kill', 100, '魂首窟之主', '累计放倒 100 人'],
+    ['d1', 'decap', 1, '第一颗首级', '第一次斩首'], ['d10', 'decap', 10, '刽子手', '累计斩首 10 次'], ['d50', 'decap', 50, '首级收藏家', '累计斩首 50 次'],
+    ['e1', 'execute', 1, '处决', '完美格挡后一刀斩首'], ['e10', 'execute', 10, '以刃还刃', '处决 10 次'], ['o1', 'onecut', 1, '一刀', '毫发未伤时一刀斩首'], ['o10', 'onecut', 10, '居合', '一刀斩首 10 次'],
+    ['p10', 'parry', 10, '铁壁', '完美格挡 10 次'], ['s10', 'sever', 10, '拆解', '断肢 10 次'], ['h1', 'halve', 1, '腰斩', '第一次腰斩'], ['c10', 'combo', 10, '连斩', '一次连击 10 下'], ['c20', 'combo', 20, '血舞', '一次连击 20 下'],
+    ['m3', 'multi', 3, '三杀', '8 秒内放倒 3 人'], ['b1', 'boss', 1, '弑主', '砍下第一位霸主的头']
+  ];
+  const REW = { kill: [6, '击杀'], decap: [10, '斩首'], decapAlive: [16, '活斩'], execute: [30, '处决！'], onecut: [40, '一刀斩首！'], sever: [3, '断肢'], halve: [8, '腰斩'], parry: [4, '完美格挡'] };
+  function achAdd(key, v, set) {
+    const S = G.S; S.ach = S.ach || { got: {}, n: {} }; const n = S.ach.n; n[key] = set ? Math.max(n[key] || 0, v) : (n[key] || 0) + v;
+    for (const [id, k, need, name, d] of ACH) if (k === key && !S.ach.got[id] && n[key] >= need) { S.ach.got[id] = Date.now(); setTimeout(() => { achBanner(name, d); }, 500); W && W.trip.log.push({ t: `🏆 成就：${name}（${d}）`, cls: 'gethead' }); }
+  }
+  function achBanner(name, d) {
+    if (!W || !W.dom) return; const el = document.createElement('div'); el.className = 'wach'; el.innerHTML = `<div class="a1">🏆 成就解锁</div><div class="a2">${esc(name)}</div><div class="a3">${esc(d)}</div>`;
+    W.dom.root.appendChild(el); SFX.fanfare && SFX.fanfare(3); setTimeout(() => el.classList.add('out'), 2600); setTimeout(() => el.remove(), 3400);
+  }
+  function foeEvent(t, fo, d) {
+    if (!W) return; const now = performance.now() / 1000, st = W.stats = W.stats || { kill: 0, decap: 0, execute: 0, onecut: 0, sever: 0, halve: 0, parry: 0, combo: 0, maxCombo: 0, lastHit: 0, kills: [] };
+    if (t === 'hit') { st.combo = now - st.lastHit < 2.5 ? st.combo + 1 : 1; st.lastHit = now; st.maxCombo = Math.max(st.maxCombo, st.combo); showCombo(st.combo, d && d.brk); if (st.combo >= 10) achAdd('combo', st.combo, true); return; }
+    const rw = REW[t]; if (rw) { const mul = 1 + (fo.rar || 0) * 0.5 + (fo.boss ? 3 : 0), c = Math.round(rw[0] * mul * (1 + Math.min(1, st.combo / 20))); G.addCoins(c); W.trip.coins += c;
+      floatDmg(fo.anchor ? fo.anchor.pos : fo.pos, `${rw[1]} +${c}🔮`, t === 'execute' || t === 'onecut'); SFX.coins && SFX.coins(); }
+    if (t in st) st[t]++;
+    if (t === 'kill') { st.kills = st.kills.filter(x => now - x < 8); st.kills.push(now); if (st.kills.length >= 2) { const nm = ['', '', '双杀！', '三杀！', '四杀！', '屠戮！'][Math.min(5, st.kills.length)]; G.toast && G.toast(`💀 ${nm}`, '#ff7060', 1.6); achAdd('multi', st.kills.length, true); } }
+    if (t === 'decap') achAdd('decap', 1);
+    if (['kill', 'execute', 'onecut', 'sever', 'halve', 'parry'].includes(t)) achAdd(t, 1);
+  }
+  function showCombo(n, brk) {
+    if (!W || !W.dom) return; let el = W.dom.combo; if (!el) { el = W.dom.combo = document.createElement('div'); el.className = 'wcombo'; W.dom.root.appendChild(el); }
+    if (n < 2) { el.style.opacity = 0; return; } el.innerHTML = `<b>${n}</b><span>连击${brk ? ' · 破绽' : ''}</span>`; el.style.opacity = 1; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+    clearTimeout(el._t); el._t = setTimeout(() => { el.style.opacity = 0; }, 2400);
+  }
+  function tripStats() { const st = W && W.stats; if (!st || !(st.kill || st.decap)) return; W.trip.log.push({ t: `⚔️ 战绩：放倒 ${st.kill} · 斩首 ${st.decap} · 处决 ${st.execute} · 一刀斩首 ${st.onecut} · 断肢 ${st.sever} · 完美格挡 ${st.parry} · 最高连击 ${st.maxCombo}`, cls: 'gethead' }); const msg = `⚔️ 本次战绩：放倒 ${st.kill} · 斩首 ${st.decap} · 处决 ${st.execute} · 最高连击 ${st.maxCombo}`; setTimeout(() => G.toast && G.toast(msg, '#ffd070', 5), 1400); }
   function takeHead(hd) { // 拾取砍下的首级
     const fo = hd.fo, c = hd.h.c, s = G.st(), node = W.graph.nodes[W.cur];
     if (fo.boss) { bossWin(hd.h, fo.boss); return true; }
@@ -510,6 +548,7 @@ window.Worlds = (() => {
   function leaveHome() {
     const api = W.api, won = window.Explore && Explore.checkVictory ? Explore.checkVictory() : false;
     W.busy = true; fadeTo(1);
+    tripStats();
     setTimeout(() => { stop(); api.finish(); G.setUI(false); try { G.lockPointer(); } catch (e) {} if (won) setTimeout(() => Explore.victoryScreen(), 900); }, 400);
   }
   function dieNow() {
@@ -526,7 +565,7 @@ window.Worlds = (() => {
     const active = G.playing && !G.uiOpen && !W.busy && !W.mapOpen && !W.dead;
     if (active) {
       const f = (K.KeyW || K.ArrowUp ? 1 : 0) - (K.KeyS || K.ArrowDown ? 1 : 0), s = (K.KeyD || K.ArrowRight ? 1 : 0) - (K.KeyA || K.ArrowLeft ? 1 : 0);
-      P.crouch += ((K.KeyC ? 1 : 0) - P.crouch) * Math.min(1, dt * 12); P.h = 1.95 - 0.8 * P.crouch;
+      P.crouch += ((K.KeyC ? 1 : 0) - P.crouch) * Math.min(1, dt * 12); P.h = EYE - 0.55 * P.crouch;
       const sp = (K.ShiftLeft && P.crouch < 0.5 ? 6.2 : 3.6) * (1 - 0.55 * P.crouch);
       fw.set(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)); rt.set(Math.cos(P.yaw), 0, -Math.sin(P.yaw));
       want.copy(fw).multiplyScalar(f).addScaledVector(rt, s); if (want.lengthSq() > 0) want.normalize().multiplyScalar(sp);
@@ -649,6 +688,7 @@ window.Worlds = (() => {
     if (bo.hp <= 0) bossWin();
   }
   function bossWin(hIn, BoIn) {
+    achAdd('boss', 1);
     const bo = W.boss, Bo = BoIn || bo.B, loc = W.graph.nodes[W.cur].loc; if (bo) bo.dead = true;
     const h = hIn || RPG.bossHead(G.S, G.st(), loc, Bo, G.usedNames, G.usedSig);
     W.trip.res.heads.push(h); G.S.bosses = G.S.bosses || {}; G.S.bosses[loc.k] = { n: Bo.n, t: Bo.title, date: Date.now() }; G.S.rep = G.S.rep || {}; G.S.rep[loc.k] = (G.S.rep[loc.k] || 0) + 5;
@@ -668,7 +708,7 @@ window.Worlds = (() => {
   // ---- 说话气泡 ----
   function say(p, text, col) { const el = document.createElement('div'); el.className = 'wsay'; el.textContent = text; el.style.color = col || '#fff'; W.dom.root.appendChild(el); W.say.push({ el, p, t: 2.6 }); }
   function bossSay(text, t) { if (!W || !W.boss) return; const el = document.createElement('div'); el.className = 'wsay boss'; el.innerHTML = `<b style="color:${W.boss.B.col}">${esc(W.boss.B.n)}</b>「${esc(text)}」`; W.dom.root.appendChild(el); W.say.push({ el, p: W.boss, t: t || 3, off: 1.2 }); }
-  function floatDmg(pos, n, big) { const el = document.createElement('div'); el.className = 'wsay dmg'; el.textContent = n; if (big) el.style.fontSize = '30px'; W.dom.root.appendChild(el); W.say.push({ el, p: { pos: pos.clone() }, t: 0.8, rise: 1 }); }
+  function floatDmg(pos, n, big) { const rew = typeof n === 'string', el = document.createElement('div'); el.className = 'wsay dmg' + (rew ? ' rew' : ''); el.textContent = n; if (big) el.style.fontSize = rew ? '28px' : '32px'; if (big && !rew) el.style.color = '#ff6a4a'; W.dom.root.appendChild(el); W.say.push({ el, p: { pos: pos.clone().add(new V3(rew ? (Math.random() - 0.5) * 0.5 : 0, rew ? 0.3 + Math.random() * 0.3 : 0, 0)) }, t: rew ? 1.5 : 0.8, rise: 1 }); }
   const sv = new V3();
   function updateSay() {
     for (let i = W.say.length - 1; i >= 0; i--) { const s = W.say[i]; s.t -= 1 / 60; if (s.t <= 0 || s.p.gone) { s.el.remove(); W.say.splice(i, 1); continue; }
@@ -718,7 +758,7 @@ window.Worlds = (() => {
       #wBanner{position:absolute;top:30%;left:50%;transform:translate(-50%,-50%);color:#fff;text-align:center;text-shadow:0 2px 10px #000;opacity:0;transition:opacity .6s}
       #wBanner .n{font-size:44px;font-weight:900;letter-spacing:6px}#wBanner .s{font-size:16px;opacity:.85;margin-top:4px}
       .wsay{position:absolute;transform:translate(-50%,-100%);background:#000a;color:#fff;padding:4px 10px;border-radius:10px;font-size:15px;white-space:nowrap;pointer-events:none}
-      .wsay.boss{font-size:17px;border:1px solid #ffd06066}.wsay.dmg{background:none;color:#ffe0a0;font-weight:900;font-size:22px;text-shadow:0 2px 4px #000}
+      .wsay.boss{font-size:17px;border:1px solid #ffd06066}.wsay.rew{color:#ffd24a;font-size:19px;letter-spacing:1px}.wcombo{position:absolute;right:6%;top:34%;text-align:right;color:#fff;opacity:0;transition:opacity .3s;pointer-events:none;text-shadow:0 3px 8px #000,0 0 18px #ff3a2a88}.wcombo b{display:block;font-size:64px;line-height:1;font-weight:900;font-style:italic;background:linear-gradient(#fff,#ffb070 55%,#ff4a30);-webkit-background-clip:text;background-clip:text;color:transparent}.wcombo span{font-size:18px;font-weight:700;letter-spacing:4px;color:#ffd0b0}.wcombo.pop b{animation:wcpop .22s ease-out}@keyframes wcpop{0%{transform:scale(1.6)}100%{transform:scale(1)}}.wach{position:absolute;left:50%;top:16%;transform:translateX(-50%);min-width:280px;padding:12px 26px;text-align:center;border-radius:10px;background:linear-gradient(135deg,#2a1a08ee,#4a2a0aee);border:2px solid #ffc860;box-shadow:0 0 30px #ffb03088;color:#fff;pointer-events:none;animation:wachin .4s ease-out;transition:opacity .7s,transform .7s}.wach.out{opacity:0;transform:translateX(-50%) translateY(-20px)}.wach .a1{font-size:13px;letter-spacing:4px;color:#ffd890}.wach .a2{font-size:26px;font-weight:900;margin:2px 0;color:#ffe9a0}.wach .a3{font-size:13px;color:#e8d8c0}@keyframes wachin{0%{opacity:0;transform:translateX(-50%) scale(.7)}100%{opacity:1;transform:translateX(-50%) scale(1)}}.wsay.dmg{background:none;color:#ffe0a0;font-weight:900;font-size:22px;text-shadow:0 2px 4px #000}
       #wFade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:31;transition:opacity .25s}
       #wLoad{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:32;color:#fff;font-size:18px;pointer-events:none}
       #wLoad .b{width:260px;height:6px;background:#fff2;border-radius:3px;margin-top:12px;overflow:hidden}#wLoad .b i{display:block;height:100%;width:0;background:#ffd060}
@@ -746,7 +786,7 @@ window.Worlds = (() => {
     if (!W || !W.B || !DOM) return; const node = W.graph.nodes[W.cur], st = STYLES[node.style], s = G.st();
     DOM.top.querySelector('.n').textContent = node.name; DOM.top.querySelector('.s').textContent = `${node.loc.icon} ${node.loc.n} · ${st.n} · ${SIZES[node.size].n} · 已探索 ${W.graph.nodes.filter(n => n.visited).length}/${W.graph.nodes.length}`;
     const left = W.foes ? W.foes.filter(f => !f.dead).length : W.prey.filter(p => !p.gone).length;
-    DOM.stat.innerHTML = `<div class="hp"><i style="width:${clamp(G.S.hp / s.maxHp, 0, 1) * 100}%"></i></div>❤️ ${Math.round(G.S.hp)}/${s.maxHp} · 🧪${G.S.items.potion || 0}<br>🧺 ${W.trip.res.heads.length}/${s.cap} · 🔮 +${W.trip.coins}${left ? `<br><span style="color:#9fd0ff">✨ 此地还有 ${left} 缕魂光</span>` : ''}`;
+    DOM.stat.innerHTML = `<div class="hp"><i style="width:${clamp(G.S.hp / s.maxHp, 0, 1) * 100}%"></i></div>❤️ ${Math.round(G.S.hp)}/${s.maxHp} · 🧪${G.S.items.potion || 0}<br>🧺 ${W.trip.res.heads.length}/${s.cap} · 🔮 +${W.trip.coins}${W.stats && W.stats.kill ? `<br>⚔️ 放倒 ${W.stats.kill} · 🩸 斩首 ${W.stats.decap} · 连击 ${W.stats.maxCombo}` : ''}${left ? `<br><span style="color:#9fd0ff">✨ 此地还有 ${left} 缕魂光</span>` : ''}`;
     let h = 'WASD 走动 · <b>F</b> 拔刀（按住左键挥砍 / 连点刺 / 右键格挡）· <b>M</b> 地图 · <b>H</b> 喝药';
     if (W.headNear) h = `<b>E</b> 拾取首级 · 【${RN[W.headNear.h.c.rar]}】${esc(W.headNear.h.c.name)}`;
     else if (W.interNear) h = '<b>E</b> 打开宝箱';
