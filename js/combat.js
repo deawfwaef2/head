@@ -100,7 +100,8 @@ window.Combat = (() => {
   //   格挡（按住右键）灵敏度更低 ×0.3。MOD wpn_feel（默认开）；关掉恢复第二十轮的 ×0.42/×0.45。
   const FEEL = () => !window.Mods || !Mods.on || Mods.on('wpn_feel');
   const LK = { tx: 0, ty: 0, cx: 0, cy: 0, vx: 0, vy: 0 };
-  function lookLmb(dx, dy) { if (!FEEL()) return 0.42; LK.tx += dx; LK.ty += dy; return 0; }
+  // 第二十二轮（用户）：按住左键的"武器惯性"太难受 → 移除。按住左键视角 1:1 跟手（灵敏度不降低、没有延迟）；只保留按住右键格挡 ×0.3。
+  function lookLmb(dx, dy) { return 1; }
   function lookTau() { return 0.035 + 0.085 * Math.max(0, Math.min(1, (S.wt - 0.8) / 0.7)); } // 轻刀 35ms · 重锤 120ms
   function drainLook(dt, flush) {
     if (!LK.tx && !LK.ty && !LK.cx && !LK.cy) return;

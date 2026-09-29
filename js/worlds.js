@@ -633,10 +633,10 @@ window.Worlds = (() => {
   }
   function skillHud() {
     if (!W || !W.dom) return; let el = W.dom.skills; if (!el) { el = W.dom.skills = document.createElement('div'); el.className = 'wskills'; W.dom.root.appendChild(el); }
-    const on = window.Combat && Combat.drawn; el.style.display = on ? 'flex' : 'none'; if (!on) return; const now = performance.now() / 1000, cds = W.cds || {};
+    const on = window.Combat && Combat.drawn; { const dsp = on ? 'flex' : 'none'; if (el._d !== dsp) { el._d = dsp; el.style.display = dsp; } } if (!on) return; const now = performance.now() / 1000, cds = W.cds || {};
     const bf = W.foes && Foe.brokenNear(W.pos, G.player.yaw);
-    el.innerHTML = Object.entries(SKILL).map(([k, sk]) => { const lock = !skillOk(k), left = Math.max(0, (cds[k] || 0) - now); return `<div class="sk${lock ? ' lock' : ''}${left > 0 ? ' cd' : ''}"><i>${lock ? '🔒' : sk.icon}</i><b>${k.slice(3)}</b><span>${left > 0 ? left.toFixed(1) : sk.n}</span></div>`; }).join('')
-      + `<div class="sk${bf ? ' ready' : ' lock'}"><i>🗡️</i><b>E</b><span>处决</span></div>`;
+    setH(el, Object.entries(SKILL).map(([k, sk]) => { const lock = !skillOk(k), left = Math.max(0, (cds[k] || 0) - now); return `<div class="sk${lock ? ' lock' : ''}${left > 0 ? ' cd' : ''}"><i>${lock ? '🔒' : sk.icon}</i><b>${k.slice(3)}</b><span>${left > 0 ? left.toFixed(1) : sk.n}</span></div>`; }).join('')
+      + `<div class="sk${bf ? ' ready' : ' lock'}"><i>🗡️</i><b>E</b><span>处决</span></div>`);
   }
   function tripStats() { const st = W && W.stats; if (!st || !(st.kill || st.decap)) return; W.trip.log.push({ t: `⚔️ 战绩：放倒 ${st.kill} · 斩首 ${st.decap} · 处决 ${st.execute} · 一刀斩首 ${st.onecut} · 断肢 ${st.sever} · 完美格挡 ${st.parry} · 最高连击 ${st.maxCombo}`, cls: 'gethead' }); const msg = `⚔️ 本次战绩：放倒 ${st.kill} · 斩首 ${st.decap} · 处决 ${st.execute} · 最高连击 ${st.maxCombo}`; setTimeout(() => G.toast && G.toast(msg, '#ffd070', 5), 1400); }
   function takeHead(hd) { // 拾取砍下的首级
@@ -1047,16 +1047,18 @@ window.Worlds = (() => {
     const w = Math.round(W.run); if (w !== W.runW) { W.runW = w; b.firstChild.style.width = w + '%'; b.firstChild.style.background = W.runTired ? '#e07a5a' : '#8fe08a'; b.style.opacity = w >= 100 ? 0 : 1; } }
   function hud() {
     if (!W || !W.B || !DOM) return; const node = W.graph.nodes[W.cur], st = STYLES[node.style], s = G.st();
-    DOM.top.querySelector('.n').textContent = node.name; DOM.top.querySelector('.s').textContent = `${node.loc.icon} ${node.loc.n} · ${st.n}${LAYOUTS[layOf(node)] ? ' · ' + LAYOUTS[layOf(node)].n : ''} · ${SIZES[node.size].n} · 已探索 ${W.graph.nodes.filter(n => n.visited).length}/${W.graph.nodes.length}`;
+    setT(DOM.tn || (DOM.tn = DOM.top.querySelector('.n')), node.name); setT(DOM.ts || (DOM.ts = DOM.top.querySelector('.s')), `${node.loc.icon} ${node.loc.n} · ${st.n}${LAYOUTS[layOf(node)] ? ' · ' + LAYOUTS[layOf(node)].n : ''} · ${SIZES[node.size].n} · 已探索 ${W.graph.nodes.filter(n => n.visited).length}/${W.graph.nodes.length}`);
     const left = W.foes ? W.foes.filter(f => !f.dead).length : W.prey.filter(p => !p.gone).length;
     const LVI = RPG.lvOf(G.S.xp), lvOn = s.lv > 1 || G.S.xp > 0;
-    DOM.stat.innerHTML = `<div class="hp"><i style="width:${clamp(G.S.hp / s.maxHp, 0, 1) * 100}%"></i></div>${lvOn ? `<span title="食人魔等级" style="color:#ffd27a">Lv.${LVI.lv}</span> <span style="opacity:.6;font-size:.85em">${LVI.need ? LVI.cur + '/' + LVI.need : 'MAX'}</span> · ` : ''}❤️ ${Math.round(G.S.hp)}/${s.maxHp} · ${(window.Sack && Sack.on()) ? (() => { const u = Sack.usage(), b = Sack.inv().belt.filter(Boolean); return `🩹${b.reduce((a, o) => a + o.n, 0)}<br>🎒 ${u[0]}/${u[1]}格 · 💀${u[2]}`; })() : `🧪${G.S.items.potion || 0}<br>🧺 ${W.trip.res.heads.length}/${s.cap}`} · 🔮 +${W.trip.coins}${W.stats && W.stats.kill ? `<br>⚔️ 放倒 ${W.stats.kill} · 🩸 斩首 ${W.stats.decap} · 连击 ${W.stats.maxCombo}` : ''}${left ? `<br><span style="color:#9fd0ff">✨ 此地还有 ${left} 缕魂光</span>` : ''}`;
+    if (!DOM.statHp) { DOM.stat.innerHTML = '<div class="hp"><i></i></div><div class="stx"></div>'; DOM.statHp = DOM.stat.querySelector('.hp i'); DOM.statTx = DOM.stat.querySelector('.stx'); }
+    { const w = (clamp(G.S.hp / s.maxHp, 0, 1) * 100).toFixed(1) + '%'; if (DOM.statHp._w !== w) { DOM.statHp._w = w; DOM.statHp.style.width = w; } }
+    setH(DOM.statTx, `${lvOn ? `<span title="食人魔等级" style="color:#ffd27a">Lv.${LVI.lv}</span> <span style="opacity:.6;font-size:.85em">${LVI.need ? LVI.cur + '/' + LVI.need : 'MAX'}</span> · ` : ''}❤️ ${Math.round(G.S.hp)}/${s.maxHp} · ${(window.Sack && Sack.on()) ? (() => { const u = Sack.usage(), b = Sack.inv().belt.filter(Boolean); return `🩹${b.reduce((a, o) => a + o.n, 0)}<br>🎒 ${u[0]}/${u[1]}格 · 💀${u[2]}`; })() : `🧪${G.S.items.potion || 0}<br>🧺 ${W.trip.res.heads.length}/${s.cap}`} · 🔮 +${W.trip.coins}${W.stats && W.stats.kill ? `<br>⚔️ 放倒 ${W.stats.kill} · 🩸 斩首 ${W.stats.decap} · 连击 ${W.stats.maxCombo}` : ''}${left ? `<br><span style="color:#9fd0ff">✨ 此地还有 ${left} 缕魂光</span>` : ''}`);
     let h = 'WASD 走动 · <b>F</b> 拔刀（按住左键挥砍 / 连点刺 / 右键格挡）· <b>M</b> 地图 · <b>H</b> 喝药';
     if (W.headNear) h = `<b>E</b> 拾取首级 · 【${RN[W.headNear.h.c.rar]}】${esc(W.headNear.h.c.name)}`;
     else if (W.interNear) { const it = W.interNear, L = it.kind === 'loot' ? it.L : null; h = L ? `<b>E</b> ${L.kind === 'corpse' ? '搜身' : L.kind === 'pile' ? '翻' : '搜刮'} · ${esc(L.name)}${L.items && !L.items.length ? ' <span style="color:#999">（空）</span>' : ''}` : '<b>E</b> 打开宝箱'; }
     if ((window.Sack && Sack.on()) && !W.headNear && !W.doorNear) h += ' · <b>Tab</b> 麻袋';
     if (W.doorNear && !W.headNear && !W.interNear) { const d = W.doorNear, cn = W.graph.nodes[W.cur]; h = d.home ? '<b>E</b> 回到魂首窟（结束狩猎，带回首级）' : `<b>E</b> 穿过门 → ${esc(doorName(cn, d))}` + (W.graph.nodes[d.to].region !== cn.region ? ` <span style="color:#f0a060">（推荐战力 ${W.graph.nodes[d.to].loc.rec}）</span>` : ''); }
-    DOM.hint.innerHTML = h;
+    setH(DOM.hint, h);
   }
   function toggleMap(v) {
     if (!W) return; W.mapOpen = v == null ? !W.mapOpen : v; DOM.map.style.display = W.mapOpen ? 'block' : 'none'; if (!W.mapOpen) return;

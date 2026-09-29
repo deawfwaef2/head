@@ -846,3 +846,6 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - `js/itemicons.js`（新）：`ItemIcons.url(id)` 返回缓存的 3D 渲染小图（共享一个离屏 WebGL 渲染器，每个模型只渲染一次）；映射：w0–w6 武器、a1–a5 盾（当护甲）、h* 骑士盔、c* 宝石（各不同）、b* 箱子、iron/cloth/herb/dust/hide/bone/wood/gem/potion/bigpotion/bandage/whet 各有模型；没有模型的（meat/fang/horn/stew/head 等）仍用 emoji。个别 FBX 颜色丢失（全白）→ `TINT` 按网格顺序上色。
 - `js/sack.js`：`CELL` 由固定 40px 改为随屏幕自适应 44–64px（`css()` 里算）；格子里用 `<img>`（异步加载完成后自动重绘一次）；物品菜单顶部显示 120px 大图；**闪烁修复**：`hud()`（麻袋翻找进度条）原先每帧 `innerHTML` 重写，现在只在文字变化时才写，进度条只改 width。
 - 测试页 `_tools/wv/icons.html`（gitignored）为图标联系表。未做：可旋转的 3D 预览（现在是 3/4 角度静态图）。
+
+## 第二十二轮（续 2）：移除左键惯性 + 麻袋翻找提速 + HUD 防闪烁 （UI Agent）
+用户反馈：① 按住左键的“武器惯性”太难受 → **移除**（`js/combat.js` `lookLmb` 现在直接返回 1：按住左键视角 1:1 跟手、灵敏度不降；`LK/drainLook` 保留但永远为空；MOD `wpn_feel` 改成只管“按住右键格挡 ×0.3”）；② 装东西时间太久 → `js/sack.js` 的固定 `RUM=5` 改成按动作分的 `DUR`（拿/放/丢 0.6s、腰带/使用 0.9s、换装 1.8s、塞首级 2.2s），所有 “5 秒” 文案已去掉；③ UI 闪烁 → `js/mods.js` 顶部新增全局 `setH(el,html)` / `setT(el,text)`（内容没变就不写 DOM）。已套用：洞内 `updateHud`（金币/战力/血条/准星提示 `ui.tip`——之前每帧重写 innerHTML）、`worlds.js` 的 `hud()`（标题/血条+状态/提示，血条 `.hp i` 现在是常驻节点只改 width）与 `skillHud()`。以后新写的逐帧/定时 HUD 一律用 `setH/setT`。

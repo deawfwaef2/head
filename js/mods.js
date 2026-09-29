@@ -1,3 +1,7 @@
+// 第二十二轮：UI 防闪烁小工具 —— 周期性/逐帧写 HUD 时，内容没变就不碰 DOM（innerHTML 重写会重置 CSS 过渡、重建节点，肉眼可见的闪）。
+//   setH(el, html) / setT(el, text)：只在字符串变化时才写。
+window.setH = (el, h) => { if (el && el._h !== h) { el._h = h; el.innerHTML = h; } };
+window.setT = (el, t) => { t = String(t); if (el && el._t !== t) { el._t = t; el.textContent = t; } };
 // 第九轮：MOD 管理器 —— 每个改动都是可开关的 MOD；处理互斥组 / 依赖 / 冲突。
 // 状态存 localStorage 'soulhead_mods'；改动后需重新载入（先自动存档）。
 // 用法：Mods.on('forge') → true/false。新 MOD：在 LIST 里加一项，然后在对应代码里用 Mods.on(id) 做开关。
@@ -65,9 +69,9 @@ window.Mods = (() => {
     { id: 'foe_door_escape', cat: 'play', icon: '🚪', n: '猎物会从门逃走（第二十一轮）', d: '逃跑的猎物会冲向最近的门，跑到门口就真的逃掉了（这次拿不到她的首级）。', def: true },
     { id: 'sprint_stamina', cat: 'play', icon: '😮‍💨', n: '疾跑耗体力（第二十一轮）', d: 'Shift 疾跑每秒消耗体力，耗尽后要缓一缓才能再跑——敌人追得上你了。', def: true },
     { id: 'guard_slowlook', cat: 'play', icon: '🛡️', n: '格挡降灵敏度（第十九轮）', d: '按住右键格挡时视角转动变慢（×0.45），方便稳住架势；挥砍时不降。', def: true, requires: ['gesture_combat'] },
-    { id: 'wpn_feel', cat: 'play', icon: '⚔️', n: '武器手感（第二十一轮）', d: '拔刀按住左键挥砍时视角灵敏度不降低，但镜头按武器重量带惯性（轻刀跟手、重锤拖拽、停手后还会滑一点）；不按左键没有惯性；按住右键格挡时灵敏度降到 ×0.3。', def: true },
+    { id: 'wpn_feel', cat: 'play', icon: '⚔️', n: '格挡降灵敏度', d: '按住右键格挡时视角灵敏度降到 ×0.3（关掉则恢复旧的 ×0.45 或不降）。第二十二轮已移除按住左键的“武器惯性”：按住左键视角 1:1 跟手。', def: true },
     { id: 'loc_story', cat: 'play', icon: '📖', n: '地点进场剧情卡（第二十轮）', d: '每个地点首次进入时冻结并弹出遭遇介绍卡（可撤离）。用户第二十一轮要求去掉 → 默认关。', def: false },
-    { id: 'sack_grid', cat: 'play', icon: '🎒', n: '麻袋格子·搜刮经济（第十九轮）', d: '麻袋变成格子物品栏（物品按形状占格，首级 2×2，Tab/B 打开，拖动整理、R 旋转）。野外翻找放入/取出一件 5 秒，受击打断；倒袋瞬间倒出全部。武器装备只能在野外搜刮（木箱/酒桶/武器架/尸体/霸主）；魂晶只用于附魔武器与材料合成。关闭 = 旧的「麻袋装 N 颗头」+ 商店购买。', def: true },
+    { id: 'sack_grid', cat: 'play', icon: '🎒', n: '麻袋格子·搜刮经济（第十九轮）', d: '麻袋变成格子物品栏（物品按形状占格，首级 2×2，Tab/B 打开，拖动整理、R 旋转）。野外翻找放入/取出一件 0.6~2 秒（首级 2.2 秒），受击打断；倒袋瞬间倒出全部。武器装备只能在野外搜刮（木箱/酒桶/武器架/尸体/霸主）；魂晶只用于附魔武器与材料合成。关闭 = 旧的「麻袋装 N 颗头」+ 商店购买。', def: true },
     { id: 'worldlay', cat: 'play', icon: '🏕️', n: '地点布局原型（第十八轮）', d: '出猎地点不再只是随机撒树：营火营地、林间空地、湖畔码头、残垣庭院、石阵高台、峡谷小径、废弃集市，带地形起伏与敌人阵型。', def: true },
     { id: 'film', cat: 'play', icon: '🎬', n: '电影模式', d: 'P 键自由飞行镜头。', def: true },
     { id: 'unlocks', cat: 'play', icon: '🔒', n: '隐藏解锁', d: '未解锁建筑不显示，达成条件后弹窗说明。关闭则全部按层数解锁。', def: true }

@@ -1315,10 +1315,10 @@ window.startGame = function () {
   }
   function updateHud() {
     const s = st();
-    ui.coins.textContent = Math.floor(S.coins).toLocaleString();
-    ui.power.textContent = s.power;
-    ui.hpbar.style.width = (S.hp / s.maxHp * 100) + '%';
-    ui.hptxt.textContent = `${Math.round(S.hp)} / ${s.maxHp}`;
+    setT(ui.coins, Math.floor(S.coins).toLocaleString());
+    setT(ui.power, s.power);
+    { const w = (S.hp / s.maxHp * 100).toFixed(1) + '%'; if (ui.hpbar._w !== w) { ui.hpbar._w = w; ui.hpbar.style.width = w; } }
+    setT(ui.hptxt, `${Math.round(S.hp)} / ${s.maxHp}`);
     let bagCount = 0, vN = 0; for (const r of S.heads) { if (r.inBag) bagCount++; else if (r.vault) vN++; }
     { const ex = exhibit(), cx = codexInfo(); const hc = `洞内首级 ${heads.length}/${MAX_HEADS}` + (vN ? ` · 魂库 ${vN}` : '') + (bagCount ? ` · 麻袋 ${bagCount}` : '') + ` · 第 ${S.depth} 层<br><span class="exl">🏛️ 展厅 <b class="g${ex.tier}">${ex.grade}</b> ${fmtN(ex.score)}${ex.next ? '/' + fmtN(ex.next) : ''} · 📖 ${cx.nIds}/${cx.totalIds} · ${daily.n}</span>`; if (hc !== ui._hc) { ui._hc = hc; ui.headcount.innerHTML = hc; } }
     // 准星提示
@@ -1340,7 +1340,7 @@ window.startGame = function () {
       }
     }
     if (hplace) tip = `🟩 摆放「${hplace.h.rec.c.name}」 · ${hplace.mount ? '吸附到展位' : HP_POSE[hplace.pose]} · <b>左键/E</b>放下 · <b>滚轮</b>旋转(Shift微调) · <b>R</b>换姿势 · <b>右键/Esc</b>取消`;
-    ui.tip.innerHTML = tip; ui.tip.style.display = tip ? 'block' : 'none';
+    setH(ui.tip, tip); { const dsp = tip ? 'block' : 'none'; if (ui.tip._d !== dsp) { ui.tip._d = dsp; ui.tip.style.display = dsp; } }
     ui.cross.classList.toggle('active', !!tip && !buildMode);
     ui.vign.style.background = S.hp / s.maxHp < 0.3 ? 'radial-gradient(ellipse at center, transparent 55%, rgba(160,0,0,0.45) 100%)' : '';
   }

@@ -2,12 +2,14 @@
 // 规则（用户原话要点）：
 //  · 武器装备要去野外搜刮，不能用魂晶买；魂晶只能用于「附魔强化武器」和「配合材料合成道具」。
 //  · 麻袋 = 格子物品栏（类似 Unturned：物品按形状占格，可旋转），取代「麻袋装几颗头」的上限；首级 2×2。
-//  · 野外翻找：放入 / 取出一件 = 5 秒（排队进行，受击打断，挥刀时暂停）；倒袋 = 瞬间倒出全部格子里的东西。
+//  · 野外翻找：放入 / 取出一件 = 0.6~2 秒（排队进行，受击打断，挥刀时暂停）；倒袋 = 瞬间倒出全部格子里的东西。
 //  · 回洞倒袋：首级照旧滚出来，其余物品进储物箱。洞里整理不计时。
 window.Sack = (() => {
   const G = new Proxy({}, { get: (_, k) => { const g = window.G || window.__game; return g && g[k]; } });
   const on = () => !(window.Mods && !Mods.on('sack_grid'));
-  const RUM = 5; let CELL = 40; // CELL 随屏幕自适应（css() 里计算）：第二十二轮把格子从 40px 放大到 44~64px
+  // 第二十二轮（用户：装东西时间太久）：每件 5 秒 → 按动作分：拿/放/丢 0.6s、腰带/使用 0.9s、换装 1.8s、塞首级 2.2s
+  const DUR = { take: 0.6, put: 0.6, drop: 0.6, belt: 0.9, use: 0.9, equip: 1.8, head: 2.2 }, dur = (j) => DUR[j && j.k] || 0.8;
+  let CELL = 40; // CELL 随屏幕自适应（css() 里计算）：第二十二轮把格子从 40px 放大到 44~64px
   const RARC = ['#b9b4aa', '#7fd07a', '#5fa6ff', '#c27cff', '#ffb347', '#ff5a4a', '#ffe27a'];
   const RARN = ['普通', '优良', '稀有', '史诗', '传说', '神话', '神话'];
   const IT = {};
@@ -158,7 +160,7 @@ window.Sack = (() => {
     const W = W_(); if (!W) { Q.length = 0; return; }
     const j = Q[0]; if (!valid(j)) { Q.shift(); render(); return; }
     if (window.Combat && Combat.state && Combat.state.lmb) j.t = Math.max(0, j.t - dt * 2); else j.t += dt; // 挥刀时翻找不前进
-    if (j.t >= RUM) { Q.shift(); try { finish(j); } catch (e) { console.warn('sack job', e); } render(); }
+    if (j.t >= dur(j)) { Q.shift(); try { finish(j); } catch (e) { console.warn('sack job', e); } render(); }
     hud();
   }
   function valid(j) {
@@ -198,7 +200,7 @@ window.Sack = (() => {
     const I = inv(), S = G.S, s = G.st(), miss = s.maxHp - S.hp; const pref = miss > s.maxHp * 0.6 ? ['bigpotion', 'potion', 'bandage'] : miss > s.maxHp * 0.3 ? ['potion', 'bandage', 'bigpotion'] : ['bandage', 'potion', 'bigpotion'];
     for (const id of pref) { const i = I.belt.findIndex(q => q && q.id === id); if (i >= 0) { const q = I.belt[i]; if (--q.n <= 0) I.belt[i] = null; use(id); render(); return true; } }
     if (!W_()) { const q = I.stash.find(o => IT[o.id] && IT[o.id].heal); if (q) { if (--q.n <= 0) I.stash.splice(I.stash.indexOf(q), 1); use(q.id); render(); return true; } }
-    toast('腰带里没有药（从麻袋里翻要 5 秒）', '#f99', 1.6); return false;
+    toast('腰带里没有药（从麻袋里翻一下就好）', '#f99', 1.6); return false;
   }
   function equip(o, putOld) { // 穿上 o；旧装备交给 putOld
     const S = G.S, d = IT[o.id], sl = d.slot, cur = S.eq[sl] || 0;
@@ -285,7 +287,7 @@ window.Sack = (() => {
   }
   function tile(o, extra) { // 物品方块
     const [w, h] = dims(o), d = IT[o.id] || {}, rc = RARC[Math.min(6, rarOf(o))];
-    const q = Q.find(j => j.o === o || (j.hd && o.h && j.hd.h === o.h)), pg = q && Q[0] === q ? `<span class="pg" style="width:${q.t / RUM * 100}%"></span>` : '';
+    const q = Q.find(j => j.o === o || (j.hd && o.h && j.hd.h === o.h)), pg = q && Q[0] === q ? `<span class="pg" style="width:${q.t / dur(q) * 100}%"></span>` : '';
     return `<div class="sk-it${q ? ' q' : ''}${window.ItemIcons && ItemIcons.has(o.id) && ItemIcons.ready ? ' i3' : ''}" data-u="${o.u}" ${extra || ''} style="--rc:${rc};width:${w * CELL - 2}px;height:${h * CELL - 2}px;${o.x != null && extra == null ? `left:${o.x * CELL + 1}px;top:${o.y * CELL + 1}px` : ''}" title="${esc(nameOf(o))}">${(() => { const u = window.ItemIcons && ItemIcons.url(o.id); return u ? `<img src="${u}" alt="">` : `<i>${d.icon || '?'}</i>`; })()}${h > 1 || w > 1 ? `<b>${esc(nameOf(o))}</b>` : ''}${o.n > 1 ? `<em>${o.n}</em>` : ''}${pg}</div>`;
   }
   function sackHtml(I) {
@@ -300,8 +302,8 @@ window.Sack = (() => {
   function render() {
     if (mode === 'wild' && panel) {
       const I = inv(), L = cont ? itemsOf(cont) : null;
-      panel.innerHTML = `<div class="sk-cols">${cont ? `<div class="sk-col"><h4>📦 ${esc(cont.name)} <small>${L.length ? '点击 = 装进麻袋（5 秒）' : '空了'}</small></h4><div class="sk-list" id="skCont">${L.map(o => tile(o, '')).join('')}</div></div>` : ''}${sackHtml(I)}</div>
-        <div class="sk-foot">${Q.length ? `翻找中：${Q.length} 件排队（每件 ${RUM} 秒，受击会打断）· ` : ''}点击麻袋物品 = 取出/使用/装备（5 秒）· 拖动整理（拖动时 R 旋转）· Tab / B / Esc 关闭</div>`;
+      panel.innerHTML = `<div class="sk-cols">${cont ? `<div class="sk-col"><h4>📦 ${esc(cont.name)} <small>${L.length ? '点击 = 装进麻袋' : '空了'}</small></h4><div class="sk-list" id="skCont">${L.map(o => tile(o, '')).join('')}</div></div>` : ''}${sackHtml(I)}</div>
+        <div class="sk-foot">${Q.length ? `翻找中：${Q.length} 件排队（受击会打断）· ` : ''}点击麻袋物品 = 取出/使用/装备· 拖动整理（拖动时 R 旋转）· Tab / B / Esc 关闭</div>`;
       bind(panel);
     }
     if (mode === 'cave' && panel && panel.isConnected) renderCave();
@@ -355,10 +357,10 @@ window.Sack = (() => {
     const I = inv(), d = IT[o.id] || {}, wild = mode === 'wild', acts = [];
     if (wild) {
       if (where === 'cont') { queue({ k: 'take', o, L: cont }); return; }
-      if (where === 'sack') { if (d.kind === 'use') acts.push(['使用（5 秒）', () => queue({ k: 'use', o })], ['放进腰带（5 秒）', () => queue({ k: 'belt', o })]);
-        if (d.kind === 'equip') acts.push(['装备（5 秒）', () => queue({ k: 'equip', o })]);
-        if (cont && cont.kind !== 'corpse') acts.push([`放进${cont.name}（5 秒）`, () => queue({ k: 'put', o, L: cont })]);
-        if (o.id !== 'head') acts.push(['丢在地上（5 秒）', () => queue({ k: 'drop', o })]);
+      if (where === 'sack') { if (d.kind === 'use') acts.push(['使用', () => queue({ k: 'use', o })], ['放进腰带', () => queue({ k: 'belt', o })]);
+        if (d.kind === 'equip') acts.push(['装备', () => queue({ k: 'equip', o })]);
+        if (cont && cont.kind !== 'corpse') acts.push([`放进${cont.name}`, () => queue({ k: 'put', o, L: cont })]);
+        if (o.id !== 'head') acts.push(['丢在地上', () => queue({ k: 'drop', o })]);
         const jq = Q.find(j => j.o === o); if (jq) { acts.length = 0; acts.push(['取消翻找', () => { Q.splice(Q.indexOf(jq), 1); render(); }]); } }
       if (where === 'belt') acts.push(['使用', () => { if (--o.n <= 0) I.belt[bi] = null; use(o.id); render(); }]);
     } else {
@@ -377,7 +379,7 @@ window.Sack = (() => {
     setTimeout(() => addEventListener('mousedown', closeMenu, { once: true }), 0);
   }
   function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
-  function pourWild() { const I = inv(), all = I.sack.items.splice(0); if (!all.length) return; Q.length = 0; dropPile(all); SFX.sack && SFX.sack(); SFX.play && SFX.play('heavy', 0.35, 0.9); toast(`麻袋倒空了：${all.length} 样东西倒在脚下（再装要一件件翻，5 秒一件）`, '#ffd890', 3); cont = W_().B.inter.find(it => it.L && it.L.kind === 'pile' && it.L.items.includes(all[0])).L; render(); }
+  function pourWild() { const I = inv(), all = I.sack.items.splice(0); if (!all.length) return; Q.length = 0; dropPile(all); SFX.sack && SFX.sack(); SFX.play && SFX.play('heavy', 0.35, 0.9); toast(`麻袋倒空了：${all.length} 样东西倒在脚下（再装要一件件翻，但很快）`, '#ffd890', 3); cont = W_().B.inter.find(it => it.L && it.L.kind === 'pile' && it.L.items.includes(all[0])).L; render(); }
   function openWild(L) { // 野外：打开麻袋（可带一个容器）
     if (!on()) return false; css(); inv(); const W = W_(); if (!W) return false;
     cont = L || null; if (cont) { itemsOf(cont); SFX.open && SFX.open(); }
@@ -391,12 +393,12 @@ window.Sack = (() => {
     if (!Q.length) return; if (!hudEl) { hudEl = document.createElement('div'); hudEl.id = 'skHud'; document.body.appendChild(hudEl); css(); }
     const j = Q[0], nm = j.k === 'head' ? `把首级「${j.hd.h.c.name}」塞进麻袋` : j.k === 'take' ? `装进麻袋：${nameOf(j.o)}` : j.k === 'use' ? `从麻袋里翻出${nameOf(j.o)}` : j.k === 'equip' ? `翻出并换上${nameOf(j.o)}` : `翻找：${nameOf(j.o)}`;
     hudEl.style.display = 'block'; // 第二十二轮：只在文字变化时重写 DOM，进度条只改宽度（原先每帧 innerHTML 导致闪烁）
-    const txt = `🎒 ${esc(nm)} · ${(RUM - j.t).toFixed(1)}s${Q.length > 1 ? ` · 还有 ${Q.length - 1} 件` : ''}`;
+    const txt = `🎒 ${esc(nm)} · ${(dur(j) - j.t).toFixed(1)}s${Q.length > 1 ? ` · 还有 ${Q.length - 1} 件` : ''}`;
     if (!hudEl._bar) { hudEl.innerHTML = '<span class="tx"></span><div class="bar"><i></i></div>'; hudEl._bar = hudEl.querySelector('.bar i'); hudEl._tx = hudEl.querySelector('.tx'); }
-    if (hudEl._t !== txt) { hudEl._t = txt; hudEl._tx.innerHTML = txt; } hudEl._bar.style.width = j.t / RUM * 100 + '%';
-    if (panel && mode === 'wild') { const pg = panel.querySelector('.sk-it.q .pg'); if (pg) pg.style.width = j.t / RUM * 100 + '%'; }
+    if (hudEl._t !== txt) { hudEl._t = txt; hudEl._tx.innerHTML = txt; } hudEl._bar.style.width = j.t / dur(j) * 100 + '%';
+    if (panel && mode === 'wild') { const pg = panel.querySelector('.sk-it.q .pg'); if (pg) pg.style.width = j.t / dur(j) * 100 + '%'; }
   }
-  function queueHead(hd, ok, done) { if (!on()) return false; if (!canAdd(inv().sack, mk('head', 1))) { toast('麻袋里没有 2×2 的空位放首级（Tab 整理 / 倒掉点东西）', '#ffb070', 2.5); return true; } if (Q.some(j => j.hd === hd)) return true; queue({ k: 'head', hd, ok, done }); toast('把首级塞进麻袋……（5 秒，别挨打）', '#ffd890', 1.6); return true; }
+  function queueHead(hd, ok, done) { if (!on()) return false; if (!canAdd(inv().sack, mk('head', 1))) { toast('麻袋里没有 2×2 的空位放首级（Tab 整理 / 倒掉点东西）', '#ffb070', 2.5); return true; } if (Q.some(j => j.hd === hd)) return true; queue({ k: 'head', hd, ok, done }); toast('把首级塞进麻袋……（别挨打）', '#ffd890', 1.6); return true; }
   function capture(h) { const o = mkHead(h); return addTo(inv().sack, o); } // 追上猎物：直接入袋（需要空位）
   function usage() { const g = inv().sack; return [g.items.reduce((a, o) => { const [w, h] = dims(o); return a + w * h; }, 0), g.w * g.h, g.items.filter(o => o.id === 'head').length]; }
   // 按键：面板打开时拦截（捕获阶段，先于游戏）
