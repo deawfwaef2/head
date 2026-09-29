@@ -97,3 +97,6 @@ ClassicConsole_01、Rockingchair_01、Sofa_01、Television_01、bull_head、hors
 
 ### 第十八轮 地点布局原型（Poly Haven, CC0）
 modular_wooden_pier, painted_wooden_bench, wooden_picnic_table, wooden_stool_01, wooden_bucket_01, wicker_basket_01, wooden_crate_02, rock_face_01, rock_face_02, flower_empodium, flower_gazania, shrub_sorrel_01 — https://polyhaven.com （CC0）
+## 第十八轮 · 史录陈列（js/rites.js）与地图布景（js/wlayout.js）
+Poly Haven（https://polyhaven.com），CC0：wooden_cutting_board、brass_pot_01、stone_01、gothic_coffee_table、carved_wooden_plate、wicker_basket_01、wooden_ladder、wooden_bucket_02。
+地图布景复用已有 CC0 资产（刀剑/盾/锤斧/牛头狮头马头/花园侏儒/花槽/木箱/酒桶/灯笼/烛台/酒杯/火盆及 big/world 的岩石树干雕像）。
