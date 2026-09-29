@@ -31,6 +31,9 @@ window.Cave = (() => {
   // CC0 小物分批实例化：用现成资产变体装饰地表，不为每个物件单独创建 draw call。
   function scatterSmallProps(parent, R, floorAt, rand, merchantPos) {
     if (!(window.Mods && Mods.on('cave_detail'))) return 0;
+    // 第十九轮（总管理师，用户反馈“洞穴地面上莫名其妙各种非常小的物体”）：这里的实例矩阵 S(baseScale) × norm(已含 baseScale) 是双重缩放，
+    // 物件被缩成几毫米～几厘米，且本身就是 9～32cm 的迷你酒杯/木箱/酒桶随机撒地。先停用散布（地表贴图部分不受影响）；协作者如要恢复请修缩放并按真实尺寸摆在合理位置。
+    if (!window.__caveSmallProps) return 0;
     const am = A(), pack = window.PropModels && PropModels.T;
     const specs = [
       { name: 'brass_goblets', count: 18, h: 0.09, root: () => am && am.models.brass_goblets },

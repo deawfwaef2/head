@@ -702,3 +702,21 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   - **其他 Agent 请注意**：① 需要新弹窗就沿用 `.modal/.m-head/.m-title/.hint2/.bp-grid/.bp-item/.eq/.loc/.hd/.log/.btns` 等既有 class，皮肤自动生效；② 新增 HUD 元素别直接写死颜色/圆角，请用 `css/ui3a.css` 顶部 `--u-*` 变量；③ `#tip`/`#hud` 的内容仍由 game.js 每帧写入，别给它们的子元素加入场动画（会每帧重播）；④ 卡片/按钮的 hover 用 `transform`，别给同元素再加 `animation-fill-mode: forwards`，会锁住 hover。
   - 测试：`_tools/mock.py mock_combat.html out.png`（秒出 HUD 静态样机，无需加载游戏）；`_tools/multi.py _t.html steps.json [W H]`（一次加载多次截图，约 3~5 分钟）；`_tools/mk_t.py 4` 生成 4 模型轻量页。这些在 `_tools/`（gitignored）。
   - 待办（UI）：seance/chess/explore 自带全屏 UI 未换肤（各有独立风格，谨慎处理）；旧“点 60 次”旅途 UI 仅通用换肤；技能栏冷却可做环形遮罩；可加设置面板（音量/UI 缩放/受击闪屏强度）。
+
+---
+## 第十九轮（总管理师）：卡顿根因 / 格挡降灵敏度 / 洞穴小物 / 战斗手感 / 麻袋格子与搜刮（进行中，分批追加）
+
+### 用户本轮反馈（原话要点）
+- 每次砍头都要卡一下；每次洞穴里倒头都卡顿。
+- **推荐防御（格挡）时鼠标灵敏度降低**（← 推翻第十四轮 14b「格挡不降灵敏度」；挥砍仍不降）。
+- 洞穴地面上莫名其妙各种非常小的物体。
+- 战斗很怪：单位速度太快；敌人打过来时的防御 UI 很不明显；敌人靠近你还会在你附近闪烁；战斗感太弱太违和。
+- 可以大改机制：武器装备要去野外搜刮，不能靠资源买；自己的资源（魂晶）只能附魔强化武器，配合材料合成道具。
+- 加麻袋物品栏格子系统（类似 Unturned：物品按格子形状占位），取代「麻袋装几颗头」上限；倒袋 = 倒出所有格子里的东西；或者翻找：5 秒拿出/放入一件。
+- 顺手 BOSS 平衡。
+
+### 第 1 批（已完成）
+- **卡顿根因**：Master 后处理把场景渲到离屏 RT 且 `toneMapping=NoToneMapping` → 程序变体（线性输出、无 ACES）与直接 render 到屏幕不同。以前所有预热（foe.js `prewarm`、game.js `prebuildHeads`、开局 `renderer.compile`）都在屏幕状态下编译 → 编的是用不上的变体，斩首/倒袋时照样现编（Windows ANGLE 上一个程序几十~上百 ms）。新增 `Foe.warm(renderer, scene, camera)`：有后处理时模拟 Master 状态（临时 RT + 无色调映射）再 compile+render；预热组放到相机前 2.5~3m（在视锥与阴影相机内），离屏看不见。`_tools/fwarm.py` 验证：开后处理斩首，程序数 63→63 不再增长。
+- **倒袋卡顿第二个原因**：每颗头落地都 `save()` 整档（序列化全部首级+魂库分块签名+localStorage）。改为 `saveSoon()` 合并到倒袋结束后的空闲时刻存一次。光柱材质也加入预热。
+- **MOD `guard_slowlook`**（默认开）：按住右键格挡时视角 ×0.45；格挡方向输入不变；挥砍不降。
+- **协作者文件 `js/cave.js` 最小改动**：`scatterSmallProps` 停用（`window.__caveSmallProps` 才启用）。原因：实例矩阵 `S(baseScale)·norm(已含 baseScale)` 双重缩放 + 本身就是 9~32cm 的迷你酒杯/木箱/酒桶随机撒地 = 用户看到的「莫名其妙的小物体」。地表贴图部分不受影响。协作者如要恢复，请修缩放并按真实尺寸摆在合理位置。

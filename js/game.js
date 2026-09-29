@@ -157,10 +157,11 @@ window.startGame = function () {
   // 第十六轮：倒袋卡顿 —— 新脸模首次渲染要编译约 11 个着色器。回洞转场时就把袋里的首级预先造好并编译/渲染一次，倒袋时直接取用
   const PREHB = new Map();
   function prebuildHeads(recs) {
-    const grp = new THREE.Group(); grp.position.set(player.pos.x, -40, player.pos.z);
+    const grp = new THREE.Group(); { const cp = camera.getWorldPosition(new V3()), cd = camera.getWorldDirection(new V3()); grp.position.copy(cp).addScaledVector(cd, 2.5); } // 第十九轮：相机前（离屏渲染看不见）
     for (const r of recs) { if (PREHB.has(r.id)) continue; try { prepLook(r); const hb = ModelHeads.create(r.look); hb.group.scale.setScalar(HS); grp.add(hb.group); PREHB.set(r.id, hb); } catch (e) { console.warn('prebuild', e); } }
     if (!grp.children.length) return; scene.add(grp);
-    try { renderer.compile(scene, camera); renderer.render(scene, camera); } catch (e) { console.warn('prewarm heads', e); }
+    if (!prebuildHeads.beam) { prebuildHeads.beam = 1; try { const bm = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1, 8, 1, true), new THREE.MeshBasicMaterial({ map: beamTex, color: '#fff', transparent: true, opacity: 0.01, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); grp.add(bm); } catch (e) {} } // 光柱材质也预编
+    if (window.Foe && Foe.warm) Foe.warm(renderer, scene, camera); else try { renderer.compile(scene, camera); renderer.render(scene, camera); } catch (e) { console.warn('prewarm heads', e); }
     grp.children.slice().forEach(c => grp.remove(c)); scene.remove(grp);
   }
   function createHead(rec, pos, quat) {
@@ -633,7 +634,7 @@ window.startGame = function () {
         h.av.set((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
         SFX.play('sack', 0.25, 0.9 + Math.random() * 0.3); cine.jolt = 1;
         const key = rec.c.race + '|' + rec.c.id, isNew = !S.codex[key]; S.codex[key] = (S.codex[key] || 0) + 1; rec.isNew = isNew; if (sh) S.shinySeen = (S.shinySeen || 0) + 1;
-        ev.push({ at: cine.t + 0.7, fn() { gachaCard(rec, isNew); if (r >= 3 || sh) { SFX.fanfare(Math.min(4, r + (sh ? 1 : 0))); spawnBeam(h.g.position, sh ? '#fff2b0' : RAR[r].c, Math.min(2, r), sh); } else if (r >= 2) SFX.soul(2, r); save(); } });
+        ev.push({ at: cine.t + 0.7, fn() { gachaCard(rec, isNew); if (r >= 3 || sh) { SFX.fanfare(Math.min(4, r + (sh ? 1 : 0))); spawnBeam(h.g.position, sh ? '#fff2b0' : RAR[r].c, Math.min(2, r), sh); } else if (r >= 2) SFX.soul(2, r); saveSoon(); } });
       } });
       // 一团一团地出来：有时连着滚出两三颗，有时卡住要抖一下
       at += Math.random() < 0.3 ? 0.12 : 0.28 + Math.random() * 0.35;
@@ -646,7 +647,7 @@ window.startGame = function () {
       toast(`倒出 ${list.length} 颗首级 · 最高【${RAR[best.c.rar].n}】${best.c.shiny ? '✨异色' : ''}${nNew ? ` · 图鉴 +${nNew}` : ''}${toVault ? ` · ${toVault} 颗洞里放不下，已存入魂库` : ''}`, RAR[best.c.rar].c, 4);
       const remain = S.heads.filter(r => r.inBag); if (remain.length) createReturnBag(remain);
       setTimeout(() => { if (gachaBox && !cine) gachaBox.innerHTML = ''; }, 2500);
-      cine = null; save();
+      cine = null; saveSoon(0.6);
     } });
     cine = { t: 0, ev, bag, pivot, fast: false, pourAt: 1.1, drop: 0, jolt: 0, shakeT: 0 };
     toast('解开袋口，抓住袋底……', '#d8c8a8', 1.6);
@@ -1111,7 +1112,11 @@ window.startGame = function () {
   function addHeadRecs(list) { if (S.heads.length + list.length > VAULT_MAX) { toast(`魂库已满（${VAULT_MAX}），多余的首级化作了魂尘`, '#f88'); list = list.slice(0, Math.max(0, VAULT_MAX - S.heads.length)); } for (const h of list) { if (h.c && h.c.lookRace) { h.c = Object.assign({}, h.c); delete h.c.lookRace; } const rec = { id: S.nextId++, c: h.c, look: h.look, mem: h.mem, story: h.story, app: h.app, date: h.date }; S.heads.push(rec); S.sigs.push(h.sig); S.names.push(h.c.name); h.rec = rec; } return list.map(h => h.rec); }
 
   // ---------------- 存档 ----------------
+  // 第十九轮：倒袋时每颗头都整档存一次（序列化全部首级+魂库+localStorage）→ 每颗都卡。改为合并到空闲时存一次
+  let _svT = 0;
+  function saveSoon(d = 1.2) { clearTimeout(_svT); _svT = setTimeout(() => { if (cine) return saveSoon(0.8); (window.requestIdleCallback || ((f) => setTimeout(f, 0)))(() => save(), { timeout: 2000 }); }, d * 1000); }
   function save() {
+    clearTimeout(_svT);
     if (S.dead) return;
     for (const h of heads) { h.rec.p = h.g.position.toArray().map(v => +v.toFixed(3)); h.rec.q = h.g.quaternion.toArray().map(v => +v.toFixed(3)); h.rec.mt = h.mount ? builds.indexOf(h.mount) : -1; h.rec.ms = h.mount ? h.slot : 0; }
     persistBuilds();
@@ -1138,7 +1143,7 @@ window.startGame = function () {
   }
   load();
   // 着色器预热：在开始界面期间把场景里所有材质编译好（否则进入游戏后头几秒边看边编译 → 卡顿）
-  setTimeout(() => { try { const t0 = performance.now(); renderer.compile(scene, camera); if (post && post.warm) post.warm(); console.log('shader prewarm ms', Math.round(performance.now() - t0)); } catch (e) { console.warn('prewarm', e); } }, 50);
+  setTimeout(() => { try { const t0 = performance.now(); if (window.Foe && Foe.warm) Foe.warm(renderer, scene, camera); else renderer.compile(scene, camera); if (post && post.warm) post.warm(); console.log('shader prewarm ms', Math.round(performance.now() - t0)); } catch (e) { console.warn('prewarm', e); } }, 50);
   if (S.heads.some(r => r.inBag)) createReturnBag(S.heads.filter(r => r.inBag));
   S.hp = Math.min(S.hp, st().maxHp);
   if (window.Mods && Mods.on('steady_save')) {

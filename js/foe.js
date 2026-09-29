@@ -257,6 +257,16 @@ window.Foe = (() => {
     g.fillStyle = 'rgba(255,40,30,0.95)'; g.beginPath(); g.moveTo(32, 4); g.lineTo(60, 58); g.lineTo(4, 58); g.closePath(); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 40px sans-serif'; g.textAlign = 'center'; g.fillText('!', 32, 52);
     return warnMat.m = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }); }
   // 预编译：把断肢碎块（静态卡通材质）、血、血迹会用到的着色器在进场时就编好，砍的那一刻不再卡
+  // 第十九轮（卡顿根因）：Master 后处理把场景渲到离屏 RT 且关掉色调映射 → 着色器变体（线性输出/无 ACES）与直接渲到屏幕不同。
+  // 以前的预热直接 render 到屏幕，编的是用不上的变体，斩首/倒袋时照样现编。这里完全模拟 Master 的状态再 compile+render。
+  function warmRender(R, sc, cam) {
+    const GG = window.G || window.__game, post = GG && GG.post, viaRT = !!(post && post.on), tm = R.toneMapping, rt0 = R.getRenderTarget();
+    try {
+      if (viaRT) { const rt = warmRender.rt || (warmRender.rt = new THREE.WebGLRenderTarget(16, 16, { depthBuffer: true })); R.toneMapping = THREE.NoToneMapping; R.setRenderTarget(rt); }
+      R.compile(sc, cam); R.render(sc, cam);
+    } catch (e) { console.warn('warm', e); }
+    finally { R.toneMapping = tm; R.setRenderTarget(rt0); }
+  }
   function prewarm(ctx) {
     if (!ctx.renderer || !ctx.camera) return; const grp = new THREE.Group(), geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3)); geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(6), 2)); geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([0, 1, 0, 0, 1, 0, 0, 1, 0]), 3));
@@ -264,7 +274,8 @@ window.Foe = (() => {
     for (const fo of FOES) for (const m of fo.mats) { const k = m.type + (m.map ? 1 : 0) + m.side + (m.alphaTest > 0 ? 'a' : ''); if (seen.has(k)) continue; seen.add(k); grp.add(new THREE.Mesh(geo, m.clone())); }
     bloodMat(); spark(new V3(), 0); grp.add(new THREE.Sprite(blood.mat), new THREE.Mesh(blood.dgeo, blood.dmat), new THREE.Sprite(spark.mat), new THREE.Sprite(warnMat()), new THREE.Sprite(guardMat()));
     const hid = []; for (const fo of FOES) { fo.f.cut.forEach(o => { if (!o.visible) { o.visible = true; hid.push(o); } }); fo.f.hb.group.traverse(o => { if (o.isMesh && o.userData.kind === 'cut' && !o.visible) { o.visible = true; hid.push(o); } }); }
-    grp.position.set(0, -50, 0); ctx.sc.add(grp); try { ctx.renderer.compile(ctx.sc, ctx.camera); ctx.renderer.render(ctx.sc, ctx.camera); } catch (e) { console.warn('prewarm', e); }
+    { const cp = ctx.camera.getWorldPosition(new V3()), cd = ctx.camera.getWorldDirection(new V3()); grp.position.copy(cp).addScaledVector(cd, 3); } // 第十九轮：放在相机前（视锥+阴影相机内），离屏渲染不会被看见
+    ctx.sc.add(grp); warmRender(ctx.renderer, ctx.sc, ctx.camera);
     ctx.sc.remove(grp); // render 一次：连阴影深度程序和贴图上传一起预热；不 dispose：保留已编译的程序
     hid.forEach(o => o.visible = false);
   }
@@ -750,5 +761,5 @@ window.Foe = (() => {
     const pinv = new M4().copy(par.matrixWorld).invert().multiply(root.matrixWorld); hips.position.copy(want.applyMatrix4(pinv));
   }
   function has(name) { return !!(window.BODY_LIST && BODY_LIST.includes(name)); }
-  return { template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, attack, ATK, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
+  return { warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, attack, ATK, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
 })();

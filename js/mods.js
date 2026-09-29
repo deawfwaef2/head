@@ -54,6 +54,7 @@ window.Mods = (() => {
     { id: 'echo', cat: 'play', icon: '💭', n: '残响气泡', d: '相邻首级偶尔浮现记忆碎片，并获得 ×2 产出。', def: true },
     { id: 'gesture_combat', cat: 'play', icon: '⚔️', n: '手势战斗', d: 'F 拔刀/收刀。按住左键用鼠标轨迹实时控制武器挥砍（上撩/下劈/横斩，越快伤害越高），连点左键刺击，按住右键格挡（轻移鼠标切换上下左右）。首级查看改为 I 键。', def: true },
     { id: 'crosshair_slash', cat: 'play', icon: '🎯', n: '刀尖锁准星（第十八轮）', d: '按住左键时刀尖固定在屏幕中心，转动视角就是挥砍，刀光＝准星轨迹；关闭则回到旧的“鼠标控制武器轨迹”。需要「手势战斗」。', def: true, requires: ['gesture_combat'] },
+    { id: 'guard_slowlook', cat: 'play', icon: '🛡️', n: '格挡降灵敏度（第十九轮）', d: '按住右键格挡时视角转动变慢（×0.45），方便稳住架势；挥砍时不降。', def: true, requires: ['gesture_combat'] },
     { id: 'worldlay', cat: 'play', icon: '🏕️', n: '地点布局原型（第十八轮）', d: '出猎地点不再只是随机撒树：营火营地、林间空地、湖畔码头、残垣庭院、石阵高台、峡谷小径、废弃集市，带地形起伏与敌人阵型。', def: true },
     { id: 'film', cat: 'play', icon: '🎬', n: '电影模式', d: 'P 键自由飞行镜头。', def: true },
     { id: 'unlocks', cat: 'play', icon: '🔒', n: '隐藏解锁', d: '未解锁建筑不显示，达成条件后弹窗说明。关闭则全部按层数解锁。', def: true }
