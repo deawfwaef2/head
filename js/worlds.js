@@ -376,14 +376,17 @@ window.Worlds = (() => {
       floatDmg: (pos, n, big) => floatDmg(pos, n, big), renderer: G.renderer, camera: G.camera, event: (t, fo, d) => foeEvent(t, fo, d), toast: (t, c, d) => G.toast && G.toast(t, c, d), shake: (k) => { W.shake = Math.max(W.shake || 0, k); },
       playerSwinging: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.thrust > 0)),
       playerAiming: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.tipSpeed > 3)),
-      handAng: () => { const CS = window.Combat && Combat.drawn && Combat.state; if (!CS) return null; return Math.atan2(CS.hand.y + 0.1, CS.hand.x - 0.04); },
+      handAng: (fo) => { const CS = window.Combat && Combat.drawn && Combat.state; if (!CS) return null; // 第十八轮：刀尖锁准星 → 刀来自“准星相对这个敌人”的方向；挥动中用挥动来向
+        if (CS.lmb && CS.mv && CS.mv.lengthSq() > 4e4) return Math.atan2(-CS.mv.y, -CS.mv.x);
+        if (fo && fo.pos) { const p = _hv.set(fo.pos.x, fo.pos.y + 1.2, fo.pos.z).project(G.camera); if (p.z < 1 && Math.hypot(p.x, p.y) > 0.08) return Math.atan2(-p.y, -p.x); }
+        return Math.atan2(CS.hand.y + 0.1, CS.hand.x - 0.04); },
       clang: (p, type) => { Foe.spark(p, type === 'break' ? 26 : 14, type === 'break' ? 'blue' : null); SFX.play && SFX.play('bell', type === 'break' ? 0.5 : 0.3, type === 'break' ? 1.6 : 2.4); SFX.thud && SFX.thud(0.9);
         if (type === 'block' && window.Combat) { Combat.recoil(1); G.toast && G.toast('🛡️ 被她挡住了——换个方向砍，或蓄力重斩破防', '#9fd0ff', 1.1); } if (type === 'break') { W.shake = Math.max(W.shake || 0, 0.35); G.toast && G.toast('💥 破防！', '#9fd0ff', 1.1); } },
       power: (fo) => { const q = G.st().power / ((fo.boss ? node.loc.rec * (fo.boss.pow || 2) : node.loc.rec * [0.7, 0.9, 1.15, 1.5, 2.1][fo.rar])); return Math.pow(clamp(q, 0.25, 3), 0.7); },
       hitPlayer: (fo, n, h = {}) => { const s = G.st(); n = Math.max(1, Math.round(n * (1 - s.dodge * 0.5) * (1 - Math.min(0.5, s.def / (s.def + 300)))));
         const now = performance.now() / 1000, CS = window.Combat && Combat.drawn && Combat.state;
         // 闪身无敌帧
-        if (W.dodgeT > now) { const perfect = now - W.dodgeAt < 0.22; if (perfect) { Foe.slowmo(0.6, 0.25); fo.broken = Math.max(fo.broken || 0, 1.1); fo.stag = Math.max(fo.stag || 0, 0.9); G.toast && G.toast('💨 完美闪避！她露出了破绽', '#c8f0ff', 1.4); foeEvent('perfectdodge', fo); } else foeEvent('dodge', fo); return; }
+        if (W.dodgeT > now) { const perfect = now - W.dodgeAt < 0.22; if (perfect) { W.shake = Math.max(W.shake || 0, 0.25); fo.broken = Math.max(fo.broken || 0, 1.1); fo.stag = Math.max(fo.stag || 0, 0.9); G.toast && G.toast('💨 完美闪避！她露出了破绽', '#c8f0ff', 1.4); foeEvent('perfectdodge', fo); } else foeEvent('dodge', fo); return; }
         const tip = CS && CS.lastTip ? CS.lastTip.clone() : W.pos.clone().add(new V3(0, 1.3, 0));
         if (CS && CS.rmb && guardFacing(fo.pos)) {
           const gA = CS.gAng, diff = h.thrust ? 0 : Math.abs(Math.atan2(Math.sin(gA - h.ang), Math.cos(gA - h.ang)));
@@ -414,6 +417,7 @@ window.Worlds = (() => {
     ['m3', 'multi', 3, '三杀', '8 秒内放倒 3 人'], ['b1', 'boss', 1, '弑主', '砍下第一位霸主的头']
   ];
   const REW = { guardbreak: [5, '破防'], perfectdodge: [6, '完美闪避'], outflank: [2, '破绽'], kill: [6, '击杀'], decap: [10, '斩首'], decapAlive: [16, '活斩'], execute: [30, '处决！'], onecut: [40, '一刀斩首！'], sever: [3, '断肢'], halve: [8, '腰斩'], parry: [4, '完美格挡'] };
+  const _hv = new V3();
   function achAdd(key, v, set) {
     const S = G.S; S.ach = S.ach || { got: {}, n: {} }; const n = S.ach.n; n[key] = set ? Math.max(n[key] || 0, v) : (n[key] || 0) + v;
     for (const [id, k, need, name, d] of ACH) if (k === key && !S.ach.got[id] && n[key] >= need) { S.ach.got[id] = Date.now(); setTimeout(() => { achBanner(name, d); }, 500); W && W.trip.log.push({ t: `🏆 成就：${name}（${d}）`, cls: 'gethead' }); }

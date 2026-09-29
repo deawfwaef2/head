@@ -768,7 +768,9 @@ window.ModelHeads = (() => {
         if (!out) {
           const ew = /EyeWhite/i.test(src.name || '');
           if (ew && window.Mods && Mods.on('head_repair')) {
-            out = new THREE.MeshBasicMaterial({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), transparent: src.transparent, opacity: src.opacity, alphaTest: src.alphaTest ? Math.min(src.alphaTest, 0.25) : 0.15, side: THREE.DoubleSide, depthWrite: false, name: src.name + ' · readable sclera' });
+            // 第十八轮：不再用不受光的 Basic（亮处发光、比脸亮一截）；改为受光卡通 + 少量自发光打底，暗处也不会变黑
+            const c0 = src.color ? src.color.clone() : new THREE.Color(1, 1, 1);
+            out = new THREE.MeshToonMaterial({ map: src.map || null, color: c0.clone().multiplyScalar(0.9), emissive: c0.clone().multiplyScalar(0.28), emissiveMap: src.map || null, gradientMap: grad, transparent: src.transparent, opacity: src.opacity, alphaTest: src.alphaTest ? Math.min(src.alphaTest, 0.25) : 0.15, side: THREE.DoubleSide, depthWrite: false, name: src.name + ' · readable sclera' });
           } else out = new THREE.MeshToonMaterial({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: ew ? false : src.depthWrite });
           t.shared.set(key, out);
         } // 修复 MOD：眼白不再被幽暗洞窟光照压黑；关闭 MOD 时保留原 toon 路径

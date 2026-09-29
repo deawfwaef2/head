@@ -29,9 +29,10 @@ window.SFX = (() => {
     o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05);
   }
   function noise(t, dur, vol, type = 'lowpass', freq = 800) {
-    const n = ctx.createBufferSource(); const b = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate); const d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    n.buffer = b; const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    n.connect(f); f.connect(g); g.connect(master); n.start(t);
+    // 第十八轮：复用一段 3 秒噪声（原来每次现生成缓冲区，击杀时连放多个音效会卡）
+    if (!noise.b) { noise.b = ctx.createBuffer(1, ctx.sampleRate * 3, ctx.sampleRate); const d = noise.b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    const n = ctx.createBufferSource(); n.buffer = noise.b; const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    n.connect(f); f.connect(g); g.connect(master); const d = Math.min(dur, 2.9); n.start(t, Math.random() * (3 - d), d);
   }
   // 魂晶叮：音高随连击上升（多巴胺）
   const SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];

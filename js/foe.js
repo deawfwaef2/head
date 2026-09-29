@@ -31,8 +31,10 @@ window.Foe = (() => {
       }
     });
     try { sampleSkin({ E, root }); } catch (e) { console.warn('skin sample', name, e); }
+    // 第十八轮：身体比头暗时提亮整个身体（而不是把头压暗去迁就身体）→ 角色和头都不再发暗
+    const gain = bodyGain(name); root.traverse(o => { if (o.isMesh && o.material && !o.userData.cut && o.material.color) o.material.color.multiplyScalar(gain); });
     E.glb = null; // 解析完就丢掉 base64，省内存（被淘汰后会重新加载脚本）
-    const T = TMPL[name] = { name, E, gltf, root }; T.skin = root.userData.skin || null; return T;
+    const T = TMPL[name] = { name, E, gltf, root, gain }; T.skin = root.userData.skin || null; return T;
   }
   // 从身体贴图上读脖子一圈的真实肤色（原神身体皮肤和衣服同一张图，不能染色 → 让头跟身体一致）
   function sampleSkin({ E, root }) {
@@ -77,14 +79,14 @@ window.Foe = (() => {
     // 身体皮肤跟头的肤色一致
     const alive = opts.alive !== false;
     if (T.skin && !TINT[bodyName]) { look.skinHex = '#' + T.skin; look.sk = look.sk || '象牙'; } // 身体不能染色：头随身体
-    if (SKIN_FIX[bodyName]) { const f = SKIN_FIX[bodyName], L = f[0] * 0.3 + f[1] * 0.59 + f[2] * 0.11; look.skinMul = f.map(x => +(L + (x - L) * 0.25).toFixed(3)); } // 主要校亮度，色相只跟 25%（避免脸发绿/发黄） // 渲染标定（_tools/calib.py）：脸颊与脖子渲染出来同色
+    { const f = SKIN_FIX[bodyName] || [1, 1, 1], L = f[0] * 0.3 + f[1] * 0.59 + f[2] * 0.11, n = L < 1 ? L : 1; look.skinMul = f.map(x => +((L + (x - L) * 0.25) / n * LIFT).toFixed(3)); } // 第十八轮：头只随身体变亮、不再被压暗 // 主要校亮度，色相只跟 25%（避免脸发绿/发黄） // 渲染标定（_tools/calib.py）：脸颊与脖子渲染出来同色
     const hb = ModelHeads.create(alive ? Object.assign({}, look, { ex: {}, pale: 0, blood: 0, spat: 0 }) : look, { alive });
     hb.group.traverse(o => { if (o.isMesh && o.userData.kind === 'cut') o.visible = false; }); // 活人：头自己的断口盖藏起来
     const sk = hb.U && hb.U.skin && hb.U.skin.value;
     if (TINT[bodyName]) { // 可染色身体：身体皮肤 × (头肤色 / 身体贴图肤色)，两边精确一致
       const hc = new THREE.Color(look.skinHex).convertSRGBToLinear(), bc = T.skin ? new THREE.Color('#' + T.skin).convertSRGBToLinear() : null;
       const k = bc ? [hc.r / bc.r, hc.g / bc.g, hc.b / bc.b] : (sk ? [sk.x, sk.y, sk.z] : [1, 1, 1]);
-      root.traverse(o => { if (o.isMesh && o.material && o.material.userData && o.material.userData.skin) o.material.color.setRGB(Math.min(1.6, k[0]), Math.min(1.6, k[1]), Math.min(1.6, k[2])); });
+      root.traverse(o => { if (o.isMesh && o.material && o.material.userData && o.material.userData.skin) o.material.color.setRGB(Math.min(1.6, k[0]) * (T.gain || 1), Math.min(1.6, k[1]) * (T.gain || 1), Math.min(1.6, k[2]) * (T.gain || 1)); });
     }
     // 挂头：静止姿势下算好相对 H_head 的偏移
     root.updateMatrixWorld(true);
@@ -168,6 +170,8 @@ window.Foe = (() => {
   };
   // 每具身体的头肤色倍数：在同一光照下把首级脸颊渲染色对齐到身体脖子/上胸的渲染色（_tools/calib.py 迭代求得）
   const SKIN_FIX = {"Jean":[0.613,0.652,0.764],"Noelle":[0.991,1.214,1.484],"Amber":[0.749,0.898,1.13],"Rosaria":[0.777,1.044,1.039],"Lisa":[1.272,1.554,1.757],"Sucrose":[2.954,2.213,2.941],"Xiangling":[1.607,1.518,1.406],"Ningguang":[1.019,1.205,1.436],"Furina":[0.849,0.949,1.125],"Kokomi":[0.82,0.839,0.784],"YaeMiko":[1.566,2.149,2.172],"Shenhe":[1.507,1.32,1.558],"Mona":[2.583,2.373,2.564],"Eula":[0.783,0.965,1.236],"Beidou":[0.747,0.767,0.855],"HikariCape":[0.97,1.115,1.302],"HikariScholar":[0.804,0.824,0.806],"AvatarSample_A":[1.04,0.986,1.08]};
+  const LIFT = 1.04; // 第十八轮：角色整体稍提亮
+  function bodyGain(name) { const f = SKIN_FIX[name]; if (!f) return LIFT; const L = f[0] * 0.3 + f[1] * 0.59 + f[2] * 0.11; return (L < 1 ? Math.min(1.7, 1 / L) : 1) * LIFT; }
   const TINT = { HikariCape: 1, HikariScholar: 1, AvatarSample_A: 1 }; // 皮肤是独立材质、能跟头同色的身体
   const LIGHT = ['瓷白', '象牙', '蜜色', '苍白'];
   const ARMED = { knight: 'antique_katana_01', paladin: 'ornate_medieval_mace', guard: 'antique_estoc', general: 'antique_katana_01', dragonknight: 'ornate_war_hammer', dragonslayer: 'antique_katana_01', merc: 'machete',
@@ -236,7 +240,7 @@ window.Foe = (() => {
         brave: !!it.boss || !!ARMED[id] || r() < 0.2 + rar * 0.1, boss: it.boss || null, bossK: it.bossK, dead: false, decap: false, rag: null, stag: 0, atk: null, block: 0, iq: 0.4 + rar * 0.15 + (it.boss ? 0.4 : 0),
         idleClip: IDLE[id] || pickR(r, ['Idle_Loop', 'Idle_Loop', 'Idle_Talking_Loop', 'Idle_FoldArms_Loop']), wpn: null, id2: 'foe' + FOES.length + '_' + (c.name || ''), anchor: { pos: new V3(), gone: false }, home: it.pos.clone() };
       fo.maxHp = fo.hp = it.boss ? 100 : 26 + rar * 16;
-      fo.mats = []; f.root.traverse(o => { if (o.isMesh && o.material && o.material.emissive && !o.userData.cut) fo.mats.push(o.material); });
+      fo.mats = []; { const skip = new Set(); if (f.holder) f.holder.traverse(o => skip.add(o)); f.root.traverse(o => { if (o.isMesh && !skip.has(o) && o.material && o.material.emissive && !o.userData.cut && !fo.mats.includes(o.material)) fo.mats.push(o.material); }); } // 第十八轮：不碰头上共享的宝石/头饰材质
       fo.warn = new THREE.Sprite(warnMat()); fo.warn.scale.set(0.16, 0.16, 1); fo.warn.visible = false; fo.warn.renderOrder = 5; ctx.sc.add(fo.warn);
       fo.blinkT = 1 + r() * 4;
       const wn = it.boss ? (it.bossK === 'swamp' || it.bossK === 'village' ? null : 'antique_katana_01') : ARMED[id];
@@ -328,6 +332,7 @@ window.Foe = (() => {
   }
   let slowT = 0, slowK = 1; function slowmo(t, k) { slowT = Math.max(slowT, t); slowK = Math.min(k, slowT > 0 ? slowK : 1); }
   const ang = a => Math.atan2(Math.sin(a), Math.cos(a)), clampA = (a, m) => Math.max(-m, Math.min(m, a));
+  function collideList(p, r, cols) { for (const c of cols) { const ex = p.x - c.x, ez = p.z - c.z, e = Math.hypot(ex, ez), m = c.r + r; if (e < m && e > 1e-5) { p.x += ex / e * (m - e); p.z += ez / e * (m - e); } } const pr = Math.hypot(p.x, p.z), pl = CTX.R - 1; if (pr > pl) { p.x *= pl / pr; p.z *= pl / pr; } }
   function collide(p, r) { const ctx = CTX; for (const c of ctx.cols) { const ex = p.x - c.x, ez = p.z - c.z, e = Math.hypot(ex, ez), m = c.r + r; if (e < m && e > 1e-5) { p.x += ex / e * (m - e); p.z += ez / e * (m - e); } } const pr = Math.hypot(p.x, p.z), pl = ctx.R - 1; if (pr > pl) { p.x *= pl / pr; p.z *= pl / pr; } }
   function alertNear(src) { for (const o of FOES) if (o !== src && !o.dead && !o.seen && o.pos.distanceTo(src.pos) < 13) { o.seen = true; o.state = o.boss ? 'chase' : (o.brave ? 'chase' : 'flee'); o.cd = Math.max(o.cd, 0.8 + Math.random()); if (o.boss) CTX.bossMeet(o); else if (Math.random() < 0.5) setTimeout(() => talk(o, pickR(Math.random, ['有人闯进来了！', '在那边！', '小心——', '快去叫人！'])), 400 + Math.random() * 600); } }
   function talk(fo, text, col) { if (!CTX || fo.dead) return; CTX.say(fo.anchor, text, col); fo.sayT = 3 + Math.random() * 2; }
@@ -397,7 +402,7 @@ window.Foe = (() => {
   function guardAI(fo, dt, d) {
     if (!(fo.armed || fo.iq > 0.75) || fo.atk || fo.stag > 0 || d > 2.9) { if (fo.block > 0 && d > 3.5) fo.block = 0; return; }
     fo.gTick = (fo.gTick || 0) - dt; if (fo.gTick > 0) return; fo.gTick = 0.5 - Math.min(0.3, fo.iq * 0.25); // 反应周期：越聪明越快
-    const aim = CTX.handAng ? CTX.handAng() : null; if (aim == null) return;
+    const aim = CTX.handAng ? CTX.handAng(fo) : null; if (aim == null) return;
     const err = (Math.random() - 0.5) * 2 * Math.max(0.1, (1.1 - fo.iq)) * 0.7;
     if (fo.block > 0) { fo.gAng = aim + err; return; } // 跟着玩家的手移动格挡
     if (CTX.playerAiming && CTX.playerAiming() && Math.random() < fo.iq * 0.45) { fo.block = 1.2 + Math.random() * 0.9; fo.gAng = aim + err; fo.f.play('Sword_Block', { once: true, fade: 0.1, restart: true }); }
@@ -412,7 +417,7 @@ window.Foe = (() => {
   function brokenNear(pos, yaw) { let best = null, bd = 2.6; for (const fo of FOES) { if (fo.dead || !(fo.broken > 0)) continue; const dx = fo.pos.x - pos.x, dz = fo.pos.z - pos.z, d = Math.hypot(dx, dz); if (d < bd && Math.abs(ang(Math.atan2(-dx, -dz) - yaw)) < 1.1) { bd = d; best = fo; } } return best; }
   function execute(fo, dir) { // 处决：破绽中按 E
     const nb = fo.f.bones.neck, p = nb.getWorldPosition(new V3()); const v = (dir || new V3(1, 0, 0)).clone().normalize().multiplyScalar(9);
-    const info = { point: p, vel: v, speed: 9, kind: 'slash', dir: 'right' }; fo.hp = 0; die(fo, info, true); decapitate(fo, info); slowmo(0.9, 0.18);
+    const info = { point: p, vel: v, speed: 9, kind: 'slash', dir: 'right' }; fo.hp = 0; die(fo, info, true); decapitate(fo, info); slowmo(0.5, 0.3);
     CTX.shake && CTX.shake(0.7); CTX.event && CTX.event('execute', fo); sfx().roar && sfx().roar(0.4);
   }
   function aoe(center, r, mult, kind) { // 旋风斩：周围一圈
@@ -466,7 +471,7 @@ window.Foe = (() => {
     return out;
   }
   function parried(fo) { // worlds.js 在完美格挡时调用
-    fo.atk = null; fo.stag = fo.boss ? 1.1 : 1.6; fo.broken = fo.stag + 0.2; fo.f.play('Hit_Knockback', { once: true, fade: 0.05, restart: true }); slowmo(0.25, 0.35);
+    fo.atk = null; fo.stag = fo.boss ? 1.1 : 1.6; fo.broken = fo.stag + 0.2; fo.f.play('Hit_Knockback', { once: true, fade: 0.05, restart: true }); // 第十八轮：去掉慢动作（被感知为卡顿）
     if (fo.sayT <= 0 || true) talk(fo, pickR(Math.random, ['什……！', '怎么可能……', '呃——！']), '#ffe0a0');
   }
   function hit(fo, info) {
@@ -502,7 +507,7 @@ window.Foe = (() => {
     if (slash && zone === 'neck' && spd > 4.5 && (brk || fo.hp <= fo.maxHp * (fo.boss ? 0.25 : 0.5))) { // 破绽中 = 处决，不看血量
       const one = first && !brk; fo.hp = 0; die(fo, info, true); decapitate(fo, info); ctx.event && ctx.event(brk ? 'execute' : one ? 'onecut' : 'decapAlive', fo); return true; }
     if (fo.hp <= 0) {
-      die(fo, info, false); slowmo(0.35, 0.4);
+      die(fo, info, false); if (CTX && CTX.shake) CTX.shake(0.35); // 第十八轮：击杀不再慢放
       if (slash && /Arm|Leg/.test(zone) && spd > 5) sever(fo, zone, info);                    // 致命一刀砍在四肢：顺势砍断
       else if (slash && (zone === 'spine' || zone === 'hips') && spd > 9) sever(fo, 'spine', info); // 致命的快刀砍在腰：腰斩
       return true;
@@ -536,7 +541,7 @@ window.Foe = (() => {
     HEADS.push({ g, hb, fo, h: fo.h, vel: v, av: new V3((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 12), rest: 0 });
     fo.spurt = 1.8; // 断颈喷血
     blood(g.position, 18, v, 1.4); sfx().chop && sfx().chop(); sfx().squish && sfx().squish(1.3); ctx.shake && ctx.shake(0.45);
-    slowmo(0.55, 0.3);
+    if (CTX && CTX.shake) CTX.shake(0.45); // 第十八轮：斩首不再慢放
     ctx.toast('🩸 斩首！走过去按 E 拾取首级', '#ff9080', 3);
     ctx.event && ctx.event('decap', fo);
     if (fo.rag) { fo.rag.act.head = false; fo.rag.act.top = false; ragKick(fo, info, 0.4); }
@@ -699,15 +704,19 @@ window.Foe = (() => {
     const g = -9.8 * dt * dt; let moving = 0;
     for (const q of rg.pts) { const vx = (q.p.x - q.o.x) * 0.985, vy = (q.p.y - q.o.y) * 0.985, vz = (q.p.z - q.o.z) * 0.985; q.o.copy(q.p); q.p.x += vx; q.p.y += vy + g; q.p.z += vz; moving += Math.abs(vx) + Math.abs(vy) + Math.abs(vz); }
     const actIdx = rg.pts.map(() => true); for (const [k, i] of Object.entries(rg.idx)) actIdx[i] = rg.act[k] !== false;
-    for (let it = 0; it < 10; it++) {
+    // 第十八轮：地面高度每点每帧只查一次（原来 24 点 × 10 次迭代 = 240 次/具/帧）
+    const gys = rg.gys || (rg.gys = new Float32Array(rg.pts.length)); for (let i = 0; i < rg.pts.length; i++) gys[i] = ctx.H(rg.pts[i].p.x, rg.pts[i].p.z) + 0.045;
+    for (let it = 0; it < 7; it++) {
       for (const [a, b, L, soft] of rg.sticks) {
         if (!actIdx[a] || !actIdx[b]) continue; const pa = rg.pts[a], pb = rg.pts[b]; tv.subVectors(pb.p, pa.p); const d = tv.length() || 1e-6;
         if (soft === 2 && d >= L) continue; const diff = (d - L) / d * (soft === 1 ? 0.2 : 1), wa = pb.m / (pa.m + pb.m), wb = pa.m / (pa.m + pb.m);
         pa.p.addScaledVector(tv, diff * wa); pb.p.addScaledVector(tv, -diff * wb);
       }
-      for (const q of rg.pts) { const gy = ctx.H(q.p.x, q.p.z) + 0.045; if (q.p.y < gy) { q.p.y = gy; q.o.x += (q.p.x - q.o.x) * 0.45; q.o.z += (q.p.z - q.o.z) * 0.45; } }
+      for (let i = 0; i < rg.pts.length; i++) { const q = rg.pts[i], gy = gys[i]; if (q.p.y < gy) { q.p.y = gy; q.o.x += (q.p.x - q.o.x) * 0.45; q.o.z += (q.p.z - q.o.z) * 0.45; } }
     }
-    for (const q of rg.pts) collide(q.p, 0.05);
+    // 第十八轮：只和尸体附近 4m 的碰撞体比较（每秒刷新一次列表）
+    rg.colT = (rg.colT || 0) - dt; if (!rg.cols || rg.colT <= 0) { rg.colT = 1; const c0 = rg.pts[0].p; rg.cols = ctx.cols.filter(c => Math.hypot(c.x - c0.x, c.z - c0.z) < c.r + 4); }
+    for (const q of rg.pts) collideList(q.p, 0.05, rg.cols);
     if (moving < 0.002) rg.sleep += dt; else rg.sleep = 0;
     ragPose(fo);
   }
