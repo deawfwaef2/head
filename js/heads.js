@@ -783,9 +783,38 @@ window.ModelHeads = (() => {
     }
   }
 
+  // ---------- 第二十一轮 MOD hair_cover ----------
+  // 离线评分表 js/hair_cover.js；评分过高（从后面能看到脸内侧/没有后颈）时换成盖得住的头发。
+  // 优先自带头发，其次同组可混用的头发中评分最低的几个（按脸+发名确定性挑选，同一颗首级永远一样）。
+  let _hcIdx = null;
+  function coverScore(fi, hi) {
+    const HC = window.HAIR_COVER; if (!HC) return 0;
+    if (!_hcIdx) { _hcIdx = new Map(); HC.files.forEach((f, i) => _hcIdx.set(f, i)); }
+    const a = _hcIdx.get(T[fi].meta.file), b = _hcIdx.get(T[hi].meta.file);
+    if (a == null || b == null) return 0;
+    return parseInt(HC.s[a * HC.files.length + b], 36) / 200;
+  }
+  function coverHair(fi, hi, look) {
+    if (!window.HAIR_COVER || !(window.Mods && Mods.on('hair_cover'))) return hi;
+    if (coverScore(fi, hi) < 0.055) return hi;
+    const face = T[fi];
+    const hasHair = i => T[i].hairMeshes.length && !T[i].meta.noHair;
+    if (hasHair(fi) && coverScore(fi, fi) <= 0.03) return fi;
+    const grp = face.meta.grp || 'vroid';
+    const all = T.map((t, i) => i).filter(hasHair);
+    const comp = all.filter(i => (MIX[grp] || [grp]).includes(T[i].meta.grp || 'vroid'));
+    let c = (comp.length ? comp : all).filter(i => coverScore(fi, i) <= 0.02);
+    if (!c.length) c = all.filter(i => coverScore(fi, i) <= 0.02);
+    if (!c.length) return hi;
+    const key = String(look.f) + '|' + String(look.h); let hsh = 7;
+    for (let k = 0; k < key.length; k++) hsh = (hsh * 31 + key.charCodeAt(k)) | 0;
+    return c[Math.abs(hsh) % c.length];
+  }
+
   function create(look, opts = {}) {
     let fi = idxOf(look.f); if (fi < 0) fi = 0;
     let hi = idxOf(look.h); if (hi < 0) hi = fi;
+    hi = coverHair(fi, hi, look); // 第二十一轮 MOD hair_cover：避免借来的头发盖不住后脑 → 后颈/后脑露洞
     const F = T[fi], H = T[hi];
     const U = makeUniforms(look, F.meta, H.meta, H);
     const g = new THREE.Group();

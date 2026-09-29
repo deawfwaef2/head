@@ -247,7 +247,7 @@ window.Master = (() => {
       if (q.fxaa) { pass(comp, T.ldr); fxaa.u.tSrc.value = T.ldr.texture; pass(fxaa, null); } else pass(comp, null);
       renderer.autoClear = ac;
     }
-    function warm() { try { for (const p of [mkAO(q.aoSamples), aoBlur, bright, down, up, rays, comp, fxaa]) renderer.compile(p.sc, cam); } catch (e) { } }
+    function warm() { try { for (const p of [mkAO(q.aoSamples), aoBlur, bright, down, up, rays, comp, fxaa]) renderer.compile(p.sc, cam); for (const k in Q) renderer.compile(mkAO(Q[k].aoSamples).sc, cam); } catch (e) { } } // 第二十一轮：三档 AO 变体一起预编，切档不再现编
     return { on: true, style: 'master', setSize, render, setTier, get tier() { return tier; }, setRayLight, warm, P };
   }
   return { create, P, Q };

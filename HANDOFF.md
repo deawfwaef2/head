@@ -889,3 +889,20 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 改动的共享文件：`game.js`（trigger 乘 `Props.auraMul`/`Props.pokeMul`；`st()` 合并 `Props.bonus()`）、`sack.js`（道具页签、掉落、起步、物品菜单「放置到洞里」、导出 stashAdd/have/take）、`itemicons.js`（`ItemIcons.make(name,size)` 摆真模型 + pr_ 图标）、`mods.js`、`index.html`。
 - 说明：Quaternius 资源里没有「手/脚」模型，所以原计划的枯骨之手/脚改为「遗骨堆/碎骨毯」。**内容边界**：道具只用骨、筋、蜡、发、灰等暗黑奇幻材料；不做性相关人体部位，也不做对角色的性物化——用户提出的这类内容没有实现。
 - 测试台：`_tools/wv/props.html`（假 G + 假 Sack，`/tmp/cur.py` 式 playwright 脚本）。已验证摆放/拿起/收回流程、光环/戳击倍率；整机联调未在沙箱里跑（整机 OOM），请用户实机确认：页签、摆放手感、E 拿起与其他 E 交互是否冲突。
+## 第二十一轮（续）：进洞卡顿 + 后颈破洞
+
+### 进洞卡顿（js/perf2.js，MOD perf2 下的子开关 window.__p2.steady / __p2.warm）
+- ③ steadyAdaptive：包装 G.post.setTier / renderer.setPixelRatio；开局 8s、进入游玩 5s、以及任何 >600ms 的卡帧后 4s 为宽限期，期间禁止自适应降档；之后仅当 3s 中位帧时间 > 1000/38ms（画质档）/ 1000/40ms（像素比）才允许降档 → 首次进洞不会因首帧编译卡顿被误降画质再升回（二次编译）。
+- ④ warmUploads：空闲时 renderer.initTexture 预上传贴图；+600ms 用 16×16 RT + NoToneMapping 预编译隐藏首级材质（同 Foe.warm 做法）。
+- ⑤ 灯光 layer 5 仅镜像 layer 0 的灯（全部开会导致 LOD 快照灯数不一致 → 重编译）。
+- **改了他人文件 js/master.js**：warm() 现在对 16/10/8 三档都编译 mkAO（原来只编当前档，切档时现编）。
+- 结果（_t.html 场景，SwiftShader）：首进 123 个程序，与基线同；剩余晚链接为 LOD 快照 morph 数首编 + PMREM（接受）。
+
+### 后颈/后脑破洞（MOD hair_cover，默认开，cat look）
+- 原因：很多 VRoid/第三方脸模本身就没有后脑勺和后颈皮肤，只靠自带头发遮挡；look.h 借用别人的头发盖不住时，从后面能看到脸的内侧（眼睛、前颈内面）。Hinata 连自带头发都盖不住。
+- 规则不允许自制补丁网格 → 改为「选对头发」：离线把 39×39 全部脸×发组合从后方三个角度渲染，统计皮肤背面像素占比，存成 **js/hair_cover.js**（window.HAIR_COVER，每组合 1 字符 base36(score*200)）。
+- **改了 js/heads.js**：新增 coverScore/coverHair（create() 之前），create() 中 `hi = coverHair(fi, hi, look)`：评分 ≥0.055 时优先自带头发（若 ≤0.03），否则在 MIX 兼容组中挑 ≤0.02 的头发（按 look.f|look.h 哈希确定性挑选，同一颗首级永远一样）。关闭 MOD 恢复原组合。
+- index.html：在 heads.js 前加 `<script src="js/hair_cover.js">`；mods.js 加 hair_cover 条目。
+- 原 119/1521 个坏组合修复后全部 <0.055。换模型后需重跑评分：见 bak 工具 cover3.js / cv5.py（渲染法：正面绿、皮肤背面红，头发一律绿）。
+
+- 注：R23 新增的 12 颗 MMD 首级不在评分表中 → coverScore 视为 0（行为不变）；如需覆盖，重跑评分工具生成新表。

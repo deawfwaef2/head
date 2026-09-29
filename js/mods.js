@@ -29,6 +29,7 @@ window.Mods = (() => {
     { id: 'lowspec', cat: 'perf', icon: '🥔', n: '低配模式', d: '关闭所有后处理和发丝摆动，降低分辨率。与所有画风（原版除外）/泛光/发丝微风冲突。', conflicts: ['r_illust', 'r_anime', 'r_water', 'r_oil', 'r_film', 'r_ink', 'bloom', 'breeze', 'outline'] },
     // ---------- 角色外观 ----------
     { id: 'head_repair', cat: 'look', icon: '🩹', n: '首级外观修复', d: '对齐真实切颈平面、按颈部轮廓封口；使用 CC0 肉质 PBR 贴图，并减轻异常绿肤与暗黑眼白。', def: true },
+    { id: 'hair_cover', cat: 'look', icon: '🧢', n: '后脑/后颈补洞（第二十一轮）', d: '部分脸模没有后脑勺与后颈皮肤，借来的头发盖不住时会从后面看到脸的内侧。按离线评分表（js/hair_cover.js）自动换成盖得住的头发；关闭则恢复原组合。', def: true },
     { id: 'smooth_faces', cat: 'look', icon: '🫧', n: '柔化头模', d: '平滑皮肤网格接缝法线，并柔化卡通明暗阶梯；只影响显示，不改模型存档。', def: true },
     { id: 'headwear', cat: 'look', icon: '🎀', n: '头饰', d: '14 种精细头饰（蝴蝶结、兔耳、女仆头饰、花冠……），按身份掷骰。', def: true },
     // ---------- 场景资产 ----------

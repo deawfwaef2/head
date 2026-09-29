@@ -7,7 +7,11 @@
 // ② 首级静态合批：一颗首级里的头饰/饰品常常是同一材质的很多小件（珠串、花瓣、镜框……）。把「同材质、同渲染顺序、
 //    无 morph、无模板、非透明、无自定义着色器」的静态网格按相对首级根节点的矩阵烘成一个网格（原网格隐藏、保留引用），
 //    每颗 ~30 → ~22 次 draw call。只处理进入 9m 内、完整显示的首级；带骨骼（身体）的模型整颗跳过；首级销毁时释放合并几何。
-// 调试：window.__p2 = { shadow:false, merge:false } 可单独关闭；Perf2.stat() 看统计。
+// ③（第二十一轮）稳定自适应：开局/回洞宽限期内不降画质档/分辨率，之后按 3 秒帧时间中位数判断（单个长帧不触发降档→关阴影→全体着色器重编）。
+// ④（第二十一轮）菜单期间空闲分片 initTexture 上传全部贴图 + 隐藏首级临时可见 compile 一次。
+// ⑤（第二十一轮）lod 替身拍照相机只看第 5 图层：rebuild() 让「第 5 层上的灯」与主相机（第 0 层）看到的灯严格一致（后加入的灯也跟上），
+//    避免拍照时灯数不同而多编一套着色器变体。
+// 调试：window.__p2 = { shadow:false, merge:false, steady:false, warm:false } 可单独关闭；Perf2.stat() 看统计。
 window.Perf2 = (() => {
   if (window.Mods && Mods.on && !Mods.on('perf2')) return { off: true };
   const T = window.THREE; if (!T) return {};
@@ -18,7 +22,7 @@ window.Perf2 = (() => {
   let SC = null, R = null, casters = [], slights = [], listT = 0, lastN = -1, buf = null, prev = null, armed = false, lastT = 0, safeT = 0, wasEn = false;
   function rebuild() {
     casters = []; slights = [];
-    SC.traverse(o => { if (o.isLight) { if (o.castShadow && o.shadow) slights.push(o); } else if ((o.isMesh || o.isPoints || o.isLine) && o.castShadow) casters.push(o); });
+    SC.traverse(o => { if (o.isLight) { if (o.layers.isEnabled(0)) o.layers.enable(5); else o.layers.disable(5); if (o.castShadow && o.shadow) slights.push(o); } else if ((o.isMesh || o.isPoints || o.isLine) && o.castShadow) casters.push(o); });
     lastN = SC.children.length;
   }
   const effVis = (o) => { while (o) { if (!o.visible) return false; if (o === SC) return true; o = o.parent; } return false; };
@@ -142,6 +146,59 @@ window.Perf2 = (() => {
     }
   }
 
+
+  // ---------------- ③ 稳定的自适应画质（第二十一轮：进洞卡一段的根因之一）----------------
+  // game.js 每 2 秒按平均 FPS 调档：开局那几秒有贴图上传/首帧编译/LOD 拍照，平均 FPS 必然很低 → 降到 mid → 关阴影 →
+  // 所有受光材质换着色器变体（几十上百个程序重编，卡得更狠）→ 稳定后升档、开阴影 → 再全部重编一遍。
+  // 这里拦截 post.setTier / renderer.setPixelRatio 的「降级」：开局/回洞宽限期内不降；之后只看最近 3 秒帧时间的中位数
+  // （单个长帧不算），中位数确实慢才放行。升级一律放行。画面只会比原来更稳定，不会更差。
+  const FT = new Float32Array(240); let ftN = 0, ftI = 0, lastFT = 0, graceUntil = 0, wasPlaying = false;
+  const grace = (ms) => { graceUntil = Math.max(graceUntil, performance.now() + ms); };
+  function trackFrame() {
+    const n = performance.now();
+    if (lastFT && n - lastFT > 600) { grace(4000); ftN = 0; } // 洞窟主循环停过（出猎/小游戏/切后台）→ 回来重新给宽限
+    else if (lastFT) { FT[ftI] = n - lastFT; ftI = (ftI + 1) % FT.length; ftN = Math.min(FT.length, ftN + 1); }
+    lastFT = n;
+    const pl = !!G.playing; if (pl && !wasPlaying) grace(5000); wasPlaying = pl;
+  }
+  function medianMs(win) { // 最近 win 毫秒内帧时间中位数
+    const a = []; let acc = 0; for (let k = 0; k < ftN && acc < win; k++) { const v = FT[(ftI - 1 - k + FT.length) % FT.length]; a.push(v); acc += v; }
+    if (a.length < 20) return 0; a.sort((x, y) => x - y); return a[a.length >> 1];
+  }
+  const slowFor = (fps) => performance.now() > graceUntil && medianMs(3000) > 1000 / fps;
+  function steadyAdaptive() {
+    if (OPT().steady === false) return;
+    const post = G.post, TIER = { mid: 0, high: 1, ultra: 2 };
+    if (post && post.setTier && !post._p2) {
+      const st0 = post.setTier.bind(post); post._p2 = true;
+      post.setTier = function (t) { const cur = TIER[post.tier], nx = TIER[t]; if (OPT().steady !== false && cur != null && nx != null && nx < cur && !slowFor(38)) { st.tierBlocked = (st.tierBlocked || 0) + 1; return; } st.tierSet = (st.tierSet || 0) + 1; return st0(t); };
+    }
+    if (!R._p2pr) {
+      const sp0 = R.setPixelRatio.bind(R); R._p2pr = true;
+      R.setPixelRatio = function (v) { if (OPT().steady !== false && v < R.getPixelRatio() - 1e-3 && !slowFor(40)) { st.prBlocked = (st.prBlocked || 0) + 1; return; } return sp0(v); };
+    }
+  }
+
+  // ---------------- ④ 菜单期间预上传（贴图 + 隐藏首级的着色器）----------------
+  // three r147 的 compile() 只编可见物体、也不上传贴图；被 LOD 藏起来的首级、第一次转身才看到的物件，贴图/着色器都会在游戏中现传现编。
+  // 这里在空闲时段分片：renderer.initTexture 上传场景里所有贴图；把所有首级临时设为可见做一次 compile（只编译、不渲染）。
+  function warmUploads() {
+    if (OPT().warm === false) return;
+    const texs = new Set(), seen = new Set();
+    SC.traverse(o => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms) { if (!m || seen.has(m)) continue; seen.add(m); for (const k in m) { const v = m[k]; if (v && v.isTexture && !v.isRenderTargetTexture && v.image) texs.add(v); } if (m.uniforms) for (const k in m.uniforms) { const v = m.uniforms[k] && m.uniforms[k].value; if (v && v.isTexture && !v.isRenderTargetTexture && v.image) texs.add(v); } } });
+    const list = [...texs]; let i = 0; st.warmTex = list.length;
+    const idle = window.requestIdleCallback || (f => setTimeout(() => f({ timeRemaining: () => 8 }), 30));
+    const step = (dl) => { const t0 = performance.now(); while (i < list.length && performance.now() - t0 < 6) { try { R.initTexture(list[i]); } catch (e) {} i++; } if (i < list.length) idle(step, { timeout: 400 }); };
+    idle(step, { timeout: 400 });
+    // 隐藏首级的着色器：一次 compile
+    setTimeout(() => { try {
+      const hid = []; for (const h of G.heads) if (h.g && !h.g.visible) { h.g.visible = true; hid.push(h.g); }
+      if (hid.length) { const tm = R.toneMapping, rt0 = R.getRenderTarget(), viaRT = !!(G.post && G.post.on); // 与 Foe.warm 相同：模拟后处理的离屏状态，否则编出的是用不上的变体
+        try { if (viaRT) { warmUploads.rt = warmUploads.rt || new T.WebGLRenderTarget(16, 16, { depthBuffer: true }); R.toneMapping = T.NoToneMapping; R.setRenderTarget(warmUploads.rt); } R.compile(SC, G.camera); } finally { R.toneMapping = tm; R.setRenderTarget(rt0); } }
+      hid.forEach(g => g.visible = false); st.warmHidden = hid.length;
+    } catch (e) { console.warn('perf2 warm', e); } }, 600);
+  }
+
   // ---------------- 挂载 ----------------
   const wait = setInterval(() => {
     if (!window.G || !G.HOOK || !G.renderer || !G.scene) return;
@@ -157,7 +214,9 @@ window.Perf2 = (() => {
       try { return orig.call(this, s, c); } finally { s.matrixWorldAutoUpdate = true; }
     };
     G.HOOK.pre.push(() => { armed = true; });
-    G.HOOK.frame.push((dt) => { if (G.camera) mergeTick(dt, G.camera); });
+    G.HOOK.frame.push((dt) => { trackFrame(); if (G.camera) mergeTick(dt, G.camera); });
+    grace(8000); try { steadyAdaptive(); } catch (e) { console.warn('perf2 steady', e); }
+    setTimeout(() => { try { warmUploads(); } catch (e) { console.warn('perf2 warm', e); } }, 200);
   }, 150);
 
   function mergeAll() { if (!window.G) return 0; let n = 0; for (const h of G.heads) if (h.hb && h._p2m !== h.hb) { mergeHead(h); n++; } return n; }
