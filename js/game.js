@@ -150,10 +150,22 @@ window.startGame = function () {
     const hb = ModelHeads.create(rec.look); hb.group.scale.setScalar(HS); hb.group.position.y = -0.005; h.g.add(hb.group);
     if (old.glow) hb.glow = old.glow; h.hb = hb; h.yield = yieldOf(rec); return h;
   }
-  function createHead(rec, pos, quat) {
+  function prepLook(rec) {
     if (rec.look.hw === undefined && window.HeadWear) rec.look.hw = HeadWear.roll(rec.look.seed || rec.id, rec.c, rec.look);
     if (!rec.look.mk) { let s = ((rec.look.seed || rec.id) * 9301 + 49297) % 233280; const rr = () => (s = (s * 9301 + 49297) % 233280) / 233280; rec.look.mk = [rr() < 0.5 ? +(0.35 + rr() * 0.6).toFixed(2) : 0, rr() < 0.2 ? 1 + Math.floor(rr() * 3) : 0, rr() < 0.13 ? 1 : 0]; }
-    const hb = ModelHeads.create(rec.look);
+  }
+  // 第十六轮：倒袋卡顿 —— 新脸模首次渲染要编译约 11 个着色器。回洞转场时就把袋里的首级预先造好并编译/渲染一次，倒袋时直接取用
+  const PREHB = new Map();
+  function prebuildHeads(recs) {
+    const grp = new THREE.Group(); grp.position.set(player.pos.x, -40, player.pos.z);
+    for (const r of recs) { if (PREHB.has(r.id)) continue; try { prepLook(r); const hb = ModelHeads.create(r.look); hb.group.scale.setScalar(HS); grp.add(hb.group); PREHB.set(r.id, hb); } catch (e) { console.warn('prebuild', e); } }
+    if (!grp.children.length) return; scene.add(grp);
+    try { renderer.compile(scene, camera); renderer.render(scene, camera); } catch (e) { console.warn('prewarm heads', e); }
+    grp.children.slice().forEach(c => grp.remove(c)); scene.remove(grp);
+  }
+  function createHead(rec, pos, quat) {
+    prepLook(rec);
+    const hb = PREHB.get(rec.id) || ModelHeads.create(rec.look); PREHB.delete(rec.id); hb.group.position.set(0, 0, 0); hb.group.quaternion.identity();
     const g = new THREE.Group(); hb.group.scale.setScalar(HS); hb.group.position.y = -0.005; g.add(hb.group);
     const hit = new THREE.Mesh(hitGeo, hitMat); g.add(hit);
     if (rec.c.rar >= 2) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, color: RAR[rec.c.rar].c, transparent: true, opacity: 0.1, depthWrite: false, blending: THREE.AdditiveBlending })); sp.scale.setScalar(rec.c.rar >= 3 ? 0.55 : 0.42); g.add(sp); hb.glow = sp; }
@@ -563,6 +575,7 @@ window.startGame = function () {
     const d = new V3(Math.sin(player.yaw), 0, -Math.cos(player.yaw));
     bagGroup.position.copy(player.pos).addScaledVector(d, 1.05); bagGroup.position.y = 0;
     bagGroup.rotation.y = player.yaw; scene.add(bagGroup); save();
+    setTimeout(() => prebuildHeads(recs.filter(r => r.inBag)), 60);
     toast(`背篓里有 ${recs.length} 颗首级。对着麻袋按 E 扛起，再到洞内按 E 倒出。`, '#ffd890', 5);
   }
   // ---------------- 倒袋仪式：抽卡式揭晓 ----------------

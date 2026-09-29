@@ -844,6 +844,8 @@ window.ModelHeads = (() => {
     get ready() { return ready; },
     get count() { return T.length; },
     files: () => T.map(t => t.meta.file),
+    // 第十六轮（总管理师）：某个外观会用到的脸/发型贴图 —— 倒袋前逐帧 renderer.initTexture 预上传，避免首次渲染时同步解码大贴图卡顿
+    mapsFor(look) { const out = new Set(); for (const k of [look.f, look.h]) { let i = idxOf(k); if (i < 0) i = 0; const t = T[i]; if (t) t.meshes.forEach(m => { const s = SRC.get(m) || m.material; if (s && s.map) out.add(s.map); }); } return [...out]; },
     meta: (file) => { const i = idxOf(file); return i >= 0 ? T[i].meta : null; },
     credits: () => T.map(t => t.meta.name + ' — ' + t.meta.credit)
   };

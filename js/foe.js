@@ -258,14 +258,15 @@ window.Foe = (() => {
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3)); geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(6), 2)); geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([0, 1, 0, 0, 1, 0, 0, 1, 0]), 3));
     const seen = new Set();
     for (const fo of FOES) for (const m of fo.mats) { const k = m.type + (m.map ? 1 : 0) + m.side + (m.alphaTest > 0 ? 'a' : ''); if (seen.has(k)) continue; seen.add(k); grp.add(new THREE.Mesh(geo, m.clone())); }
-    bloodMat(); grp.add(new THREE.Sprite(blood.mat), new THREE.Mesh(blood.dgeo, blood.dmat));
+    bloodMat(); spark(new V3(), 0); grp.add(new THREE.Sprite(blood.mat), new THREE.Mesh(blood.dgeo, blood.dmat), new THREE.Sprite(spark.mat), new THREE.Sprite(warnMat()), new THREE.Sprite(guardMat()));
     const hid = []; for (const fo of FOES) { fo.f.cut.forEach(o => { if (!o.visible) { o.visible = true; hid.push(o); } }); fo.f.hb.group.traverse(o => { if (o.isMesh && o.userData.kind === 'cut' && !o.visible) { o.visible = true; hid.push(o); } }); }
-    grp.position.set(0, -50, 0); ctx.sc.add(grp); try { ctx.renderer.compile(ctx.sc, ctx.camera); ctx.renderer.render(ctx.sc, ctx.camera); } catch (e) { console.warn('prewarm', e); } // render 一次：连阴影深度程序和贴图上传一起预热 ctx.sc.remove(grp); // 不 dispose：保留已编译的程序
+    grp.position.set(0, -50, 0); ctx.sc.add(grp); try { ctx.renderer.compile(ctx.sc, ctx.camera); ctx.renderer.render(ctx.sc, ctx.camera); } catch (e) { console.warn('prewarm', e); }
+    ctx.sc.remove(grp); // render 一次：连阴影深度程序和贴图上传一起预热；不 dispose：保留已编译的程序
     hid.forEach(o => o.visible = false);
   }
   function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function clear() {
-    for (const fo of FOES) { fo.anchor.gone = true; if (fo.warn && fo.warn.parent) fo.warn.parent.remove(fo.warn); if (fo.f.root.parent) fo.f.root.parent.remove(fo.f.root); try { fo.f.hb.dispose(); } catch (e) {} }
+    for (const fo of FOES) { fo.anchor.gone = true; if (fo.warn && fo.warn.parent) fo.warn.parent.remove(fo.warn); if (fo.gs && fo.gs.parent) fo.gs.parent.remove(fo.gs); if (fo.f.root.parent) fo.f.root.parent.remove(fo.f.root); try { fo.f.hb.dispose(); } catch (e) {} }
     for (const h of HEADS) { if (h.g.parent) h.g.parent.remove(h.g); }
     for (const p of PIECES) { if (p.g.parent) p.g.parent.remove(p.g); }
     for (const x of FX) { if (x.o.parent) x.o.parent.remove(x.o); POOL.push(x); } for (const d of DECALS) if (d && d.parent) d.parent.remove(d);
@@ -278,7 +279,7 @@ window.Foe = (() => {
     if (slowT > 0) { slowT -= dt; dt *= slowK; if (slowT <= 0) slowK = 1; } // 击杀慢动作：只作用于敌人/尸体/头/血，玩家照常
     for (const fo of FOES) {
       const f = fo.f;
-      if (fo.dead) { if (fo.rag) ragStep(fo, dt); if (fo.warn) fo.warn.visible = false;
+      if (fo.dead) { if (fo.rag) ragStep(fo, dt); if (fo.warn) fo.warn.visible = false; if (fo.gs) fo.gs.visible = false;
         if (fo.spurt > 0 && !fo.headOnPiece) { fo.spurt -= dt; const nb = f.bones.neck; if (nb && Math.random() < 0.8) { nb.getWorldPosition(tv2); const up = tv.set(0, 1, 0).applyQuaternion(nb.getWorldQuaternion(_q)); blood(tv2.addScaledVector(up, 0.05), 1, up, 0.9 + fo.spurt * 0.3); } }
         continue; }
       fo.t += dt; fo.cd -= dt; fo.sayT -= dt; if (fo.stag > 0) fo.stag -= dt; if (fo.block > 0) fo.block -= dt;
@@ -288,20 +289,19 @@ window.Foe = (() => {
       if (see && !fo.seen) { alertNear(fo); fo.seen = true; fo.cd = Math.max(fo.cd, 0.5 + (1 - fo.iq) * 0.8); if (fo.boss) ctx.bossMeet(fo); else talk(fo, pickR(Math.random, SAY.see)); if (!fo.boss) fo.state = fo.brave ? 'chase' : 'flee'; else fo.state = 'chase'; }
       if (fo.seen && d > 26) { fo.seen = false; fo.state = 'idle'; }
       let spd = 0, turnTo = null;
-      if (fo.atk) { // 攻击动作进行中：到命中帧判定
-        const a = fo.atk; a.t += dt; turnTo = a.t < a.hitAt * 0.6 ? face : null;
-        if (!a.hit && a.t >= a.hitAt) { a.hit = true; if (d < a.reach && Math.abs(ang(face - fo.yaw)) < 0.9) ctx.hitPlayer(fo, a.dmg); else if (fo.sayT <= 0 && Math.random() < 0.3) { talk(fo, '……躲开了？'); } }
-        if (a.t >= a.dur) { fo.atk = null; fo.cd = (fo.boss ? 0.6 : 1.1) + Math.random() * (1.6 - fo.iq); f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); }
-      } else if (fo.stag > 0) { /* 受击硬直 */ }
+      let strafe = 0;
+      if (fo.atk) { const r = atkStep(fo, dt, d, face); turnTo = r.turnTo; spd = r.spd; } // 攻击：定格蓄力 → 慢起手 → 快出手（按实测命中帧判定）
+      else if (fo.stag > 0) { /* 受击硬直 */ }
       else if (fo.block > 0) { turnTo = face; }
       else if (fo.state === 'chase') {
         turnTo = face;
         const reach = fo.armed ? 1.35 : 1.05;
-        if (d > reach) { spd = d > 6 ? 4.4 : 2.9; f.play(d > 6 ? 'Sprint_Loop' : 'Jog_Fwd_Loop', { fade: 0.2 }); }
+        if (fo.armed && fo.cd <= 0 && d > 2.4 && d < 4.6 && fo.iq > 0.6 && Math.random() < 0.02) attack(fo, d, 'Sword_Dash'); // 冲刺斩
+        else if (d > reach + (fo.cd > 0.3 ? 0.9 : 0)) { spd = d > 6 ? 4.2 : 2.6; f.play(d > 6 ? 'Sprint_Loop' : 'Jog_Fwd_Loop', { fade: 0.2 }); }
         else if (fo.cd <= 0) attack(fo, d);
-        else f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.25 });
-        // 玩家挥刀靠近时聪明的敌人会格挡
-        if (fo.armed && d < 2.6 && ctx.playerSwinging() && fo.block <= 0 && Math.random() < fo.iq * 0.02) { fo.block = 0.9; f.play('Sword_Block', { once: true, fade: 0.1 }); }
+        else { // 等待出手：绕着玩家游走、保持距离（节奏更慢、更像对峙）
+          fo.strafeT = (fo.strafeT || 0) - dt; if (fo.strafeT <= 0) { fo.strafeT = 0.8 + Math.random() * 1.4; fo.strafeDir = Math.random() < 0.5 ? -1 : 1; if (Math.random() < 0.3) fo.strafeDir = 0; }
+          strafe = fo.strafeDir || 0; if (d < reach - 0.3) strafe = 2; f.play(strafe ? 'Walk_Loop' : (fo.armed ? 'Sword_Idle' : 'Idle_Loop'), { fade: 0.25 }); }
       } else if (fo.state === 'flee') {
         turnTo = Math.atan2(-dx, -dz); spd = 4.0 + fo.rar * 0.3; f.play('Sprint_Loop', { fade: 0.2 });
         const pr = Math.hypot(fo.pos.x, fo.pos.z);
@@ -310,12 +310,14 @@ window.Foe = (() => {
       } else { f.play(fo.idleClip, { fade: 0.3 }); }
       if (turnTo != null) fo.yaw += clampA(ang(turnTo - fo.yaw), 6 * dt * (0.6 + fo.iq));
       if (spd > 0) { fo.pos.x += Math.sin(fo.yaw) * spd * dt; fo.pos.z += Math.cos(fo.yaw) * spd * dt; }
+      if (strafe && !fo.atk && fo.stag <= 0) { if (strafe === 2) { fo.pos.x -= Math.sin(fo.yaw) * 1.1 * dt; fo.pos.z -= Math.cos(fo.yaw) * 1.1 * dt; } else { fo.pos.x += Math.cos(fo.yaw) * strafe * 1.0 * dt; fo.pos.z -= Math.sin(fo.yaw) * strafe * 1.0 * dt; } }
+      if (fo.state === 'chase') guardAI(fo, dt, d); guardShow(fo);
       collide(fo.pos, 0.35); fo.pos.y = ctx.H(fo.pos.x, fo.pos.z); f.root.rotation.y = fo.yaw;
       f.mixer.update(dt);
       fo.f.bones.head.getWorldPosition(fo.anchor.pos); fo.anchor.pos.y -= 0.3;
       if (fo.flash > 0 || fo.flashOn) { fo.flash -= dt; const on = fo.flash > 0; if (on !== fo.flashOn) { fo.flashOn = on; for (const m of fo.mats) m.emissive.setRGB(on ? 0.55 : 0, on ? 0.04 : 0, on ? 0.02 : 0); } }
       fo.blinkT -= dt; if (fo.blinkT < 0) { const b = fo.blinkT > -0.07 ? -fo.blinkT / 0.07 : fo.blinkT > -0.16 ? 1 - (-fo.blinkT - 0.07) / 0.09 : 0; try { f.hb.setExpression({ blink: Math.max(0, b) }); } catch (e) {} if (fo.blinkT < -0.16) fo.blinkT = 2 + Math.random() * 4; }
-      if (fo.warn) { fo.warn.visible = !!(fo.atk && fo.atk.t < fo.atk.hitAt); if (fo.warn.visible) { fo.warn.position.copy(fo.anchor.pos); fo.warn.position.y += 0.75; const k = 0.13 + 0.05 * Math.sin(fo.atk.t * 30); fo.warn.scale.set(k, k, 1); } }
+      if (fo.warn) { const A = fo.atk, hh = A && A.act && A.hits && A.hits[A.hi]; fo.warn.visible = !!(hh && hh.t - A.act.time > 0.04); if (fo.warn.visible) { fo.warn.material.color.set(hh.heavy ? '#ffa030' : '#ffffff'); fo.warn.position.copy(fo.anchor.pos); fo.warn.position.y += 0.6; const k = 0.13 + 0.05 * Math.sin(fo.t * 30); fo.warn.scale.set(k, k, 1); } }
       if (fo.broken > 0) fo.broken -= dt;
     }
     for (const h of HEADS) bodyPhys(h, dt, 0.11);
@@ -329,18 +331,101 @@ window.Foe = (() => {
   function collide(p, r) { const ctx = CTX; for (const c of ctx.cols) { const ex = p.x - c.x, ez = p.z - c.z, e = Math.hypot(ex, ez), m = c.r + r; if (e < m && e > 1e-5) { p.x += ex / e * (m - e); p.z += ez / e * (m - e); } } const pr = Math.hypot(p.x, p.z), pl = ctx.R - 1; if (pr > pl) { p.x *= pl / pr; p.z *= pl / pr; } }
   function alertNear(src) { for (const o of FOES) if (o !== src && !o.dead && !o.seen && o.pos.distanceTo(src.pos) < 13) { o.seen = true; o.state = o.boss ? 'chase' : (o.brave ? 'chase' : 'flee'); o.cd = Math.max(o.cd, 0.8 + Math.random()); if (o.boss) CTX.bossMeet(o); else if (Math.random() < 0.5) setTimeout(() => talk(o, pickR(Math.random, ['有人闯进来了！', '在那边！', '小心——', '快去叫人！'])), 400 + Math.random() * 600); } }
   function talk(fo, text, col) { if (!CTX || fo.dead) return; CTX.say(fo.anchor, text, col); fo.sayT = 3 + Math.random() * 2; }
-  function attack(fo, d) {
-    const f = fo.f, s = CTX.st();
-    let clip, hitAt, reach = fo.armed ? 1.75 : 1.35;
-    if (fo.armed) { const r = Math.random(); clip = fo.boss && r < 0.25 ? 'Sword_Heavy_Combo' : r < 0.45 ? 'Sword_Regular_A' : r < 0.75 ? 'Sword_Regular_B' : 'Sword_Regular_C'; }
-    else clip = pickR(Math.random, ['Punch_Jab', 'Punch_Cross', 'Melee_Hook']);
-    const c = f.clips[clip]; if (!c) return;
-    hitAt = { Sword_Regular_A: 0.42, Sword_Regular_B: 0.42, Sword_Regular_C: 0.5, Sword_Heavy_Combo: 0.3, Punch_Jab: 0.4, Punch_Cross: 0.45, Melee_Hook: 0.45 }[clip] * c.duration;
-    const sp = fo.boss ? 1.1 : 0.85 + fo.iq * 0.2;
+  // 第十六轮：每个攻击动作实测（_tools/fclip.py：右手蓄力位→命中位的位移）得到命中时刻（动作内秒）与来刀方向（玩家屏幕角：0=右 90=上 ±180=左 -90=下）
+  const D2R = Math.PI / 180;
+  const ATK = {
+    Sword_Regular_A: { hits: [[0.25, -132]] }, Sword_Regular_B: { hits: [[0.27, -23]] }, Sword_Regular_C: { hits: [[0.63, 55]], end: 1.2 },
+    Sword_Attack: { hits: [[0.37, 80, 'heavy']], end: 1.1 }, Sword_Dash: { hits: [[0.33, -18]], lunge: 3.4, end: 1.0 },
+    Sword_Regular_Combo: { hits: [[0.25, -132], [0.73, -23], [1.25, -173], [1.53, 60]], end: 2.1 },
+    Sword_Heavy_Combo: { hits: [[0.4, -22], [1.83, -19], [2.57, 73, 'heavy']], end: 3.2 },
+    Punch_Jab: { hits: [[0.3, 0, 'thrust']] }, Punch_Cross: { hits: [[0.22, 0, 'thrust']] }, Melee_Hook: { hits: [[0.23, 150]] }
+  };
+  function attack(fo, d, force) {
+    const f = fo.f, s = CTX.st(), r = Math.random();
+    let clip;
+    if (force) clip = force;
+    else if (fo.armed) {
+      const elite = fo.boss || fo.rar >= 3 || fo.iq > 0.95;
+      if (fo.boss) clip = r < 0.22 ? 'Sword_Heavy_Combo' : r < 0.4 ? 'Sword_Regular_Combo' : r < 0.55 ? 'Sword_Attack' : pickR(Math.random, ['Sword_Regular_A', 'Sword_Regular_B', 'Sword_Regular_C']);
+      else clip = elite && r < 0.2 ? 'Sword_Regular_Combo' : elite && r < 0.32 ? 'Sword_Attack' : pickR(Math.random, ['Sword_Regular_A', 'Sword_Regular_B', 'Sword_Regular_C', 'Sword_Regular_A']);
+    } else clip = pickR(Math.random, ['Punch_Jab', 'Punch_Cross', 'Melee_Hook', 'Melee_Hook']);
+    const c = f.clips[clip], T = ATK[clip]; if (!c || !T) return;
     const base = fo.boss ? 0.1 : 0.03 + fo.rar * 0.014 + (fo.armed ? 0.02 : 0);
-    fo.atk = { clip, t: 0, dur: c.duration / sp, hitAt: hitAt / sp, hit: false, reach, dmg: Math.max(1, Math.round(s.maxHp * base * (0.85 + Math.random() * 0.3))) };
-    f.play(clip, { once: true, fade: 0.12, speed: sp, restart: true });
+    const ws = fo.boss ? 0.55 : 0.34 + Math.min(0.2, fo.iq * 0.12);
+    const hits = T.hits.map(([t, a, k]) => ({ t, a: a * D2R, ang: a * D2R, heavy: k === 'heavy', thrust: k === 'thrust' }));
+    const act = f.play(clip, { once: true, fade: 0.12, speed: 1, restart: true }); if (!act) return;
+    fo.atk = { clip, act, hits, hi: 0, ws, ws2: Math.min(1, ws * 1.7), end: Math.min(c.duration, T.end || c.duration), lunge: T.lunge || 0,
+      holdAt: Math.min(0.1, hits[0].t * 0.4), hold: fo.boss ? 0.22 : 0.34 - Math.min(0.14, fo.iq * 0.1), feint: !fo.boss && fo.iq > 0.8 && Math.random() < 0.14,
+      reach: fo.armed ? 1.8 : 1.35, tot: 0, dmg: Math.max(1, Math.round(s.maxHp * base * (0.85 + Math.random() * 0.3))) };
     if (fo.sayT <= 0 && Math.random() < 0.25) talk(fo, fo.boss ? '' : pickR(Math.random, SAY.fight), '#ffb0a0');
+  }
+  // 当前这一刀还要多久（真实秒）
+  function atkLeft(A) { const h = A.hits[A.hi]; if (!h) return 0; const ct = A.act.time, w = A.hi ? A.ws2 : A.ws, hold = A.hold > 0;
+    return (hold ? A.hold + Math.max(0, A.holdAt - ct) / w : 0) + Math.max(0, h.t - 0.06 - Math.max(ct, hold ? A.holdAt : 0)) / w + Math.min(0.06, Math.max(0, h.t - ct)); }
+  function atkStep(fo, dt, d, face) {
+    const A = fo.atk, act = A.act, ct = act.time, h = A.hits[A.hi]; let sc = 0.9, turnTo = null, spd = 0;
+    if (h) {
+      if (A.hold > 0 && ct >= A.holdAt) { sc = 0; A.hold -= dt; if (A.hold <= 0 && A.feint) { fo.atk = null; fo.cd = 0.35; fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.15 }); if (Math.random() < 0.5) talk(fo, pickR(Math.random, ['骗你的～', '嘿……', '别紧张嘛'])); return { turnTo: face, spd: 0 }; } }
+      else sc = ct < h.t - 0.06 ? (A.hi ? A.ws2 : A.ws) : 1;
+      if (ct < h.t - 0.14) turnTo = face; // 出手前最后一瞬不再转身：侧闪有效
+      if (A.lunge && ct < h.t && d > 1.1 && sc > 0) spd = A.lunge;
+      const left = atkLeft(A); if (left > A.tot) A.tot = left;
+      if (ct >= h.t) { A.hi++; A.tot = 0;
+        if (d < A.reach && Math.abs(ang(face - fo.yaw)) < 0.9) CTX.hitPlayer(fo, Math.round(A.dmg * (h.heavy ? 1.6 : 1)), h);
+        else if (fo.sayT <= 0 && Math.random() < 0.3) talk(fo, '……躲开了？'); }
+    }
+    act.timeScale = sc;
+    if (!A.hits[A.hi] && (ct >= A.end - 1e-3 || ct >= act.getClip().duration - 1e-3)) { fo.atk = null; fo.cd = (fo.boss ? 1.0 : 1.7) + Math.random() * Math.max(0.4, 2.0 - fo.iq); fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); }
+    return { turnTo, spd };
+  }
+  // 给 HUD：正在蓄力/出手的敌人 → 来刀方向 + 进度（1 = 命中那一刻）
+  function threats() {
+    const out = []; if (!CTX) return out; const P = CTX.player;
+    for (const fo of FOES) { const A = fo.atk; if (fo.dead || !A) continue; const h = A.hits[A.hi]; if (!h) continue;
+      const dx = fo.pos.x - P.pos.x, dz = fo.pos.z - P.pos.z, d = Math.hypot(dx, dz); if (d > 5.5) continue;
+      const left = atkLeft(A), k = A.tot > 0 ? Math.max(0, Math.min(1, 1 - left / A.tot)) : 0;
+      const rel = ang(Math.atan2(-dx, -dz) - P.yaw); const side = Math.abs(rel) > 0.95 ? (rel > 0 ? -1 : 1) : 0;
+      out.push({ ang: h.a, heavy: h.heavy, thrust: h.thrust, k, left, side, fo }); }
+    return out;
+  }
+  // ---- 敌人的方向格挡（蓝色弧 = 她挡住的那一侧；从别的方向砍 / 蓄力重斩破防）----
+  function guardMat() { if (guardMat.tex) return new THREE.SpriteMaterial({ map: guardMat.tex, depthTest: false, transparent: true });
+    const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.lineCap = 'round';
+    g.strokeStyle = 'rgba(120,190,255,0.9)'; g.lineWidth = 12; g.beginPath(); g.arc(64, 64, 50, -Math.PI / 2 - 0.75, -Math.PI / 2 + 0.75); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,0.95)'; g.lineWidth = 3; g.beginPath(); g.arc(64, 64, 50, -Math.PI / 2 - 0.75, -Math.PI / 2 + 0.75); g.stroke();
+    guardMat.tex = new THREE.CanvasTexture(c); return guardMat(); }
+  function guardAI(fo, dt, d) {
+    if (!(fo.armed || fo.iq > 0.75) || fo.atk || fo.stag > 0 || d > 2.9) { if (fo.block > 0 && d > 3.5) fo.block = 0; return; }
+    fo.gTick = (fo.gTick || 0) - dt; if (fo.gTick > 0) return; fo.gTick = 0.5 - Math.min(0.3, fo.iq * 0.25); // 反应周期：越聪明越快
+    const aim = CTX.handAng ? CTX.handAng() : null; if (aim == null) return;
+    const err = (Math.random() - 0.5) * 2 * Math.max(0.1, (1.1 - fo.iq)) * 0.7;
+    if (fo.block > 0) { fo.gAng = aim + err; return; } // 跟着玩家的手移动格挡
+    if (CTX.playerAiming && CTX.playerAiming() && Math.random() < fo.iq * 0.45) { fo.block = 1.2 + Math.random() * 0.9; fo.gAng = aim + err; fo.f.play('Sword_Block', { once: true, fade: 0.1, restart: true }); }
+  }
+  function guardShow(fo) {
+    if (!fo.gs) { fo.gs = new THREE.Sprite(guardMat()); fo.gs.scale.set(0.6, 0.6, 1); fo.gs.renderOrder = 6; CTX.sc.add(fo.gs); }
+    const on = fo.block > 0 && !fo.dead; fo.gs.visible = on; if (!on) return;
+    const P = CTX.player; tv.set(P.pos.x - fo.pos.x, 0, P.pos.z - fo.pos.z).normalize();
+    fo.gs.position.copy(fo.anchor.pos).addScaledVector(tv, 0.35); fo.gs.position.y += 0.12; fo.gs.material.rotation = fo.gAng - Math.PI / 2;
+  }
+  // ---- 技能接口（worlds.js 调用）----
+  function brokenNear(pos, yaw) { let best = null, bd = 2.6; for (const fo of FOES) { if (fo.dead || !(fo.broken > 0)) continue; const dx = fo.pos.x - pos.x, dz = fo.pos.z - pos.z, d = Math.hypot(dx, dz); if (d < bd && Math.abs(ang(Math.atan2(-dx, -dz) - yaw)) < 1.1) { bd = d; best = fo; } } return best; }
+  function execute(fo, dir) { // 处决：破绽中按 E
+    const nb = fo.f.bones.neck, p = nb.getWorldPosition(new V3()); const v = (dir || new V3(1, 0, 0)).clone().normalize().multiplyScalar(9);
+    const info = { point: p, vel: v, speed: 9, kind: 'slash', dir: 'right' }; fo.hp = 0; die(fo, info, true); decapitate(fo, info); slowmo(0.9, 0.18);
+    CTX.shake && CTX.shake(0.7); CTX.event && CTX.event('execute', fo); sfx().roar && sfx().roar(0.4);
+  }
+  function aoe(center, r, mult, kind) { // 旋风斩：周围一圈
+    let n = 0; for (const fo of FOES) { if (fo.dead) continue; const dx = fo.pos.x - center.x, dz = fo.pos.z - center.z, d = Math.hypot(dx, dz); if (d > r) continue;
+      const cb = fo.f.bones.chest || fo.f.bones.spine, p = cb.getWorldPosition(new V3()); const tg = new V3(-dz, 0, dx).normalize();
+      const was = fo.block; fo.block = 0; hit(fo, { point: p, vel: tg.multiplyScalar(9), speed: 9, tipSpeed: 9, kind: 'slash', from: 0, mult, aoe: true }); if (!fo.dead && was > 0) fo.stag = Math.max(fo.stag, 0.6); n++; }
+    return n;
+  }
+  function roar(center, r) { // 战吼：震慑
+    let n = 0; for (const fo of FOES) { if (fo.dead) continue; const d = Math.hypot(fo.pos.x - center.x, fo.pos.z - center.z); if (d > r) continue; n++;
+      fo.atk = null; fo.block = 0; fo.stag = fo.boss ? 0.8 : 1.6; fo.broken = fo.boss ? 0 : 0.9; fo.f.play('Hit_Knockback', { once: true, fade: 0.05, restart: true });
+      if (!fo.boss && Math.random() < 0.5) { fo.state = 'flee'; fo.brave = false; } setTimeout(() => talk(fo, pickR(Math.random, ['呀啊——！', '怪、怪物……', '别过来！']), '#ffd0a0'), 200 + Math.random() * 400); }
+    return n;
   }
   // ---- 被砍：部位判定 ----
   const ZN = [['head', 0.13], ['neck', 0.075], ['upperChest', 0.2], ['chest', 0.2], ['spine', 0.19], ['hips', 0.2], ['leftUpperArm', 0.07], ['leftLowerArm', 0.06], ['rightUpperArm', 0.07], ['rightLowerArm', 0.06], ['leftUpperLeg', 0.1], ['leftLowerLeg', 0.08], ['rightUpperLeg', 0.1], ['rightLowerLeg', 0.08]];
@@ -397,10 +482,15 @@ window.Foe = (() => {
       sfx().chop && sfx().chop(); return true;
     }
     // 活人：格挡 / 伤害
-    if (fo.block > 0 && Math.abs(ang(Math.atan2(ctx.player.pos.x - fo.pos.x, ctx.player.pos.z - fo.pos.z) - fo.yaw)) < 1.1) {
-      if (fo.sayT <= 0) talk(fo, pickR(Math.random, SAY.block)); sfx().thud && sfx().thud(0.8); ctx.clang && ctx.clang(c.point); fo.block = Math.max(0, fo.block - 0.3); return true;
+    let side = 1;
+    if (fo.block > 0 && Math.abs(ang(Math.atan2(ctx.player.pos.x - fo.pos.x, ctx.player.pos.z - fo.pos.z) - fo.yaw)) < 1.2) {
+      const diff = Math.abs(ang((info.from || 0) - (fo.gAng || 0)));
+      if (info.charged) { fo.block = 0; fo.atk = null; fo.stag = fo.boss ? 0.9 : 1.4; fo.broken = fo.stag + 0.2; fo.f.play('Hit_Knockback', { once: true, fade: 0.05, restart: true }); ctx.clang && ctx.clang(c.point, 'break'); ctx.event && ctx.event('guardbreak', fo); talk(fo, pickR(Math.random, ['挡、挡不住……！', '什么力气……', '呜——！']), '#ffe0a0'); }
+      else if (!slash || diff < 0.95) { // 正好砍在她格挡的那一侧：弹刀
+        if (fo.sayT <= 0) talk(fo, pickR(Math.random, SAY.block)); sfx().thud && sfx().thud(0.8); ctx.clang && ctx.clang(c.point, 'block'); fo.block = Math.max(fo.block, 0.5); fo.cd = Math.min(fo.cd, 0.25); ctx.event && ctx.event('blocked', fo); return true;
+      } else { fo.block = 0; side = 1.35; ctx.event && ctx.event('outflank', fo); } // 绕开格挡：破绽伤害
     }
-    const q = ctx.power(fo), brk = fo.broken > 0, mult = (zone === 'head' ? 1.6 : zone === 'neck' ? 1.8 : /Arm|Leg/.test(zone) ? 0.7 : 1) * (brk ? 2 : 1);
+    const q = ctx.power(fo), brk = fo.broken > 0, mult = (zone === 'head' ? 1.6 : zone === 'neck' ? 1.8 : /Arm|Leg/.test(zone) ? 0.7 : 1) * (brk ? 2 : 1) * side * (info.charged ? 2.2 : 1) * (info.mult || 1);
     const dealt = Math.max(1, Math.round((fo.boss ? 11 : 12) * q * sp * mult * (slash ? 1 : 0.8) * (0.85 + Math.random() * 0.3)));
     const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.12; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk);
     { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp); fo.pos.add(kv); } } // 击退
@@ -533,6 +623,13 @@ window.Foe = (() => {
       x.t = 1 + Math.random() * 1.2; x.decal = Math.random() < 0.18; CTX.sc.add(x.o); FX.push(x);
     }
   }
+  function spark(p, n, col) { // 刀刃相击的火花（与血共用粒子池）
+    if (!CTX) return; if (!spark.mat) { const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d'), gr = g.createRadialGradient(8, 8, 0, 8, 8, 8); gr.addColorStop(0, 'rgba(255,255,230,1)'); gr.addColorStop(0.4, 'rgba(255,200,90,0.9)'); gr.addColorStop(1, 'rgba(255,120,20,0)'); g.fillStyle = gr; g.fillRect(0, 0, 16, 16);
+      spark.mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }); spark.blue = spark.mat.clone(); spark.blue.color.set('#9fd0ff'); }
+    const mat = col === 'blue' ? spark.blue : spark.mat;
+    for (let i = 0; i < n; i++) { let x = POOL.pop(); if (!x) { x = { o: new THREE.Sprite(mat), v: new V3(), t: 0 }; x.o.renderOrder = 3; }
+      x.o.material = mat; x.o.scale.setScalar(0.02 + Math.random() * 0.03); x.o.position.copy(p); x.v.set((Math.random() - 0.5) * 7, Math.random() * 5, (Math.random() - 0.5) * 7); x.t = 0.25 + Math.random() * 0.35; x.decal = false; CTX.sc.add(x.o); FX.push(x); }
+  }
   function decal(p, sz) { // 地面血迹：最多 80 块，循环复用
     bloodMat(); let d = DECALS[decalI]; if (!d) { d = new THREE.Mesh(blood.dgeo, blood.dmat); d.renderOrder = 1; DECALS[decalI] = d; }
     decalI = (decalI + 1) % 80; d.position.set(p.x, CTX.H(p.x, p.z) + 0.012, p.z); d.scale.setScalar(sz); d.rotation.y = Math.random() * 6.28; if (d.parent !== CTX.sc) CTX.sc.add(d);
@@ -644,5 +741,5 @@ window.Foe = (() => {
     const pinv = new M4().copy(par.matrixWorld).invert().multiply(root.matrixWorld); hips.position.copy(want.applyMatrix4(pinv));
   }
   function has(name) { return !!(window.BODY_LIST && BODY_LIST.includes(name)); }
-  return { template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
+  return { template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, attack, ATK, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
 })();

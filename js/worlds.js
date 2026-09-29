@@ -375,14 +375,29 @@ window.Worlds = (() => {
       st: () => G.st(), sees: (pos, maxD) => sees({ pos }, maxD), say: (anchor, text, col) => { if (text) say(anchor, text, col); },
       floatDmg: (pos, n, big) => floatDmg(pos, n, big), renderer: G.renderer, camera: G.camera, event: (t, fo, d) => foeEvent(t, fo, d), toast: (t, c, d) => G.toast && G.toast(t, c, d), shake: (k) => { W.shake = Math.max(W.shake || 0, k); },
       playerSwinging: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.thrust > 0)),
+      playerAiming: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.tipSpeed > 3)),
+      handAng: () => { const CS = window.Combat && Combat.drawn && Combat.state; if (!CS) return null; return Math.atan2(CS.hand.y + 0.1, CS.hand.x - 0.04); },
+      clang: (p, type) => { Foe.spark(p, type === 'break' ? 26 : 14, type === 'break' ? 'blue' : null); SFX.play && SFX.play('bell', type === 'break' ? 0.5 : 0.3, type === 'break' ? 1.6 : 2.4); SFX.thud && SFX.thud(0.9);
+        if (type === 'block' && window.Combat) { Combat.recoil(1); G.toast && G.toast('🛡️ 被她挡住了——换个方向砍，或蓄力重斩破防', '#9fd0ff', 1.1); } if (type === 'break') { W.shake = Math.max(W.shake || 0, 0.35); G.toast && G.toast('💥 破防！', '#9fd0ff', 1.1); } },
       power: (fo) => { const q = G.st().power / ((fo.boss ? node.loc.rec * (fo.boss.pow || 2) : node.loc.rec * [0.7, 0.9, 1.15, 1.5, 2.1][fo.rar])); return Math.pow(clamp(q, 0.25, 3), 0.7); },
-      hitPlayer: (fo, n) => { const s = G.st(); n = Math.max(1, Math.round(n * (1 - s.dodge * 0.5) * (1 - Math.min(0.5, s.def / (s.def + 300)))));
-        const CS = window.Combat && Combat.state;
-        if (guardFacing(fo.pos) && CS && CS.guardT && performance.now() / 1000 - CS.guardT < 0.3) { // 完美格挡：挨刀前 0.3 秒内举刀
-          G.toast && G.toast('⚔️ 完美格挡！她露出了破绽——砍她的脖子！', '#ffe070', 1.8); SFX.play && SFX.play('draw', 0.7, 2.2); SFX.thud && SFX.thud(1); W.shake = Math.max(W.shake || 0, 0.3);
-          G.flash && G.flash('#fff6c0', 0.35, 160); Foe.parried(fo); foeEvent('parry', fo); return; }
-        if (guardFacing(fo.pos)) { n = Math.round(n * 0.25); G.toast && G.toast('🛡️ 格挡！', '#cfe0ff', 0.6); SFX.thud && SFX.thud(0.8); fo.stag = fo.boss ? 0.8 : 0.6; }
-        else { G.flash && G.flash('#a00000', 0.4, 280); W.shake = Math.max(W.shake || 0, fo.boss ? 0.5 : 0.25); }
+      hitPlayer: (fo, n, h = {}) => { const s = G.st(); n = Math.max(1, Math.round(n * (1 - s.dodge * 0.5) * (1 - Math.min(0.5, s.def / (s.def + 300)))));
+        const now = performance.now() / 1000, CS = window.Combat && Combat.drawn && Combat.state;
+        // 闪身无敌帧
+        if (W.dodgeT > now) { const perfect = now - W.dodgeAt < 0.22; if (perfect) { Foe.slowmo(0.6, 0.25); fo.broken = Math.max(fo.broken || 0, 1.1); fo.stag = Math.max(fo.stag || 0, 0.9); G.toast && G.toast('💨 完美闪避！她露出了破绽', '#c8f0ff', 1.4); foeEvent('perfectdodge', fo); } else foeEvent('dodge', fo); return; }
+        const tip = CS && CS.lastTip ? CS.lastTip.clone() : W.pos.clone().add(new V3(0, 1.3, 0));
+        if (CS && CS.rmb && guardFacing(fo.pos)) {
+          const gA = CS.gAng, diff = h.thrust ? 0 : Math.abs(Math.atan2(Math.sin(gA - h.ang), Math.cos(gA - h.ang)));
+          const aligned = diff < 0.7, partial = diff < 1.25;
+          const pressed = CS.guardT && now - CS.guardT < 0.3, swung = aligned && !h.thrust && Combat.guardWas(0.25, h.ang) > 1.0; // 刚按下 / 最后一刻转对方向
+          if (aligned && (pressed || swung)) { // 完美格挡（重击也能弹）
+            G.toast && G.toast('⚔️ 完美格挡！她露出了破绽——砍脖子或按 E 处决', '#ffe070', 1.8); SFX.play && SFX.play('bell', 0.6, 1.8); SFX.thud && SFX.thud(1); W.shake = Math.max(W.shake || 0, 0.3);
+            Foe.spark(tip, 30); G.flash && G.flash('#fff6c0', 0.35, 160); Foe.parried(fo); foeEvent('parry', fo); return; }
+          if (h.heavy) { n = Math.round(n * 0.75); CS.stam = 0; G.toast && G.toast('🟧 重击挡不住！要么完美格挡，要么按 Q 闪开', '#ffb060', 1.6); SFX.thud && SFX.thud(1); W.shake = Math.max(W.shake || 0, 0.45); }
+          else if (aligned && CS.stam > 0) { n = Math.round(n * (h.thrust ? 0.35 : 0.1)); CS.stam = Math.max(0, CS.stam - 14); Foe.spark(tip, 14); SFX.play && SFX.play('bell', 0.3, 2.3); SFX.thud && SFX.thud(0.8); fo.stag = fo.boss ? 0.3 : 0.45; foeEvent('guard', fo); }
+          else if (partial) { n = Math.round(n * 0.5); Foe.spark(tip, 5); G.toast && G.toast('🛡️ 格挡偏了', '#cfe0ff', 0.7); }
+          else { G.toast && G.toast('❌ 格挡方向错了！', '#ff9080', 0.8); G.flash && G.flash('#a00000', 0.4, 280); W.shake = Math.max(W.shake || 0, 0.25); }
+        } else { G.flash && G.flash('#a00000', 0.4, 280); W.shake = Math.max(W.shake || 0, fo.boss ? 0.5 : 0.25); }
+        if (W.stats) W.stats.combo = 0;
         if (n > 0) { G.damage(n); W.trip.log.push({ t: `${fo.h.c.name}${fo.boss ? '' : '反击'}，你受了伤。`, d: `-${n} HP` }); } },
       bossMeet: (fo) => { W.dom.boss.style.display = 'block'; W.boss = { B: fo.boss, pos: fo.pos, foe: fo, hp: 100, dead: false, sayT: 0 }; bossSay(fo.boss.say || pick(Math.random, fo.boss.taunt), 3); },
       bossHp: (fo) => { W.dom.bossHp.style.width = Math.max(0, fo.hp / fo.maxHp * 100) + '%'; if (W.boss && W.boss.sayT <= 0 && Math.random() < 0.3) { bossSay(pick(Math.random, fo.boss.hurt), 2); W.boss.sayT = 4; } },
@@ -395,10 +410,10 @@ window.Worlds = (() => {
     ['k1', 'kill', 1, '初猎', '第一次亲手放倒猎物'], ['k25', 'kill', 25, '林间恶名', '累计放倒 25 人'], ['k100', 'kill', 100, '魂首窟之主', '累计放倒 100 人'],
     ['d1', 'decap', 1, '第一颗首级', '第一次斩首'], ['d10', 'decap', 10, '刽子手', '累计斩首 10 次'], ['d50', 'decap', 50, '首级收藏家', '累计斩首 50 次'],
     ['e1', 'execute', 1, '处决', '完美格挡后一刀斩首'], ['e10', 'execute', 10, '以刃还刃', '处决 10 次'], ['o1', 'onecut', 1, '一刀', '毫发未伤时一刀斩首'], ['o10', 'onecut', 10, '居合', '一刀斩首 10 次'],
-    ['p10', 'parry', 10, '铁壁', '完美格挡 10 次'], ['s10', 'sever', 10, '拆解', '断肢 10 次'], ['h1', 'halve', 1, '腰斩', '第一次腰斩'], ['c10', 'combo', 10, '连斩', '一次连击 10 下'], ['c20', 'combo', 20, '血舞', '一次连击 20 下'],
+    ['p10', 'parry', 10, '铁壁', '完美格挡 10 次'], ['p1', 'parry', 1, '弹刀', '第一次完美格挡'], ['g5', 'guardbreak', 5, '碎盾', '蓄力重斩破防 5 次'], ['v5', 'perfectdodge', 5, '残影', '完美闪避 5 次'], ['s10', 'sever', 10, '拆解', '断肢 10 次'], ['h1', 'halve', 1, '腰斩', '第一次腰斩'], ['c10', 'combo', 10, '连斩', '一次连击 10 下'], ['c20', 'combo', 20, '血舞', '一次连击 20 下'],
     ['m3', 'multi', 3, '三杀', '8 秒内放倒 3 人'], ['b1', 'boss', 1, '弑主', '砍下第一位霸主的头']
   ];
-  const REW = { kill: [6, '击杀'], decap: [10, '斩首'], decapAlive: [16, '活斩'], execute: [30, '处决！'], onecut: [40, '一刀斩首！'], sever: [3, '断肢'], halve: [8, '腰斩'], parry: [4, '完美格挡'] };
+  const REW = { guardbreak: [5, '破防'], perfectdodge: [6, '完美闪避'], outflank: [2, '破绽'], kill: [6, '击杀'], decap: [10, '斩首'], decapAlive: [16, '活斩'], execute: [30, '处决！'], onecut: [40, '一刀斩首！'], sever: [3, '断肢'], halve: [8, '腰斩'], parry: [4, '完美格挡'] };
   function achAdd(key, v, set) {
     const S = G.S; S.ach = S.ach || { got: {}, n: {} }; const n = S.ach.n; n[key] = set ? Math.max(n[key] || 0, v) : (n[key] || 0) + v;
     for (const [id, k, need, name, d] of ACH) if (k === key && !S.ach.got[id] && n[key] >= need) { S.ach.got[id] = Date.now(); setTimeout(() => { achBanner(name, d); }, 500); W && W.trip.log.push({ t: `🏆 成就：${name}（${d}）`, cls: 'gethead' }); }
@@ -415,12 +430,40 @@ window.Worlds = (() => {
     if (t in st) st[t]++;
     if (t === 'kill') { st.kills = st.kills.filter(x => now - x < 8); st.kills.push(now); if (st.kills.length >= 2) { const nm = ['', '', '双杀！', '三杀！', '四杀！', '屠戮！'][Math.min(5, st.kills.length)]; G.toast && G.toast(`💀 ${nm}`, '#ff7060', 1.6); achAdd('multi', st.kills.length, true); } }
     if (t === 'decap') achAdd('decap', 1);
-    if (['kill', 'execute', 'onecut', 'sever', 'halve', 'parry'].includes(t)) achAdd(t, 1);
+    if (['kill', 'execute', 'onecut', 'sever', 'halve', 'parry', 'guardbreak', 'perfectdodge'].includes(t)) achAdd(t, 1);
+    if (t === 'kill' && [10, 25].includes((G.S.ach && G.S.ach.n.kill) || 0)) setTimeout(() => achBanner('新技能解锁', (G.S.ach.n.kill === 10 ? '📣 R 战吼：震慑周围敌人' : '🌀 G 旋风斩：斩击周围一圈')), 1200);
   }
   function showCombo(n, brk) {
     if (!W || !W.dom) return; let el = W.dom.combo; if (!el) { el = W.dom.combo = document.createElement('div'); el.className = 'wcombo'; W.dom.root.appendChild(el); }
     if (n < 2) { el.style.opacity = 0; return; } el.innerHTML = `<b>${n}</b><span>连击${brk ? ' · 破绽' : ''}</span>`; el.style.opacity = 1; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
     clearTimeout(el._t); el._t = setTimeout(() => { el.style.opacity = 0; }, 2400);
+  }
+  // ---- 技能：Q 闪身（无敌帧）· E 处决（破绽中）· R 战吼（放倒 10 人解锁）· G 旋风斩（放倒 25 人或斩一位霸主解锁）----
+  const SKILL = { KeyQ: { n: '闪身', icon: '💨', cd: 0.9, st: 22 }, KeyR: { n: '战吼', icon: '📣', cd: 16, st: 0, need: ['kill', 10] }, KeyG: { n: '旋风斩', icon: '🌀', cd: 7, st: 45, need: ['kill', 25] } };
+  function skillOk(k) { const sk = SKILL[k]; if (!sk.need) return true; const A = G.S.ach || { n: {} }; return (A.n[sk.need[0]] || 0) >= sk.need[1] || (k === 'KeyG' && (A.n.boss || 0) > 0); }
+  function skill(k) {
+    const sk = SKILL[k], now = performance.now() / 1000; W.cds = W.cds || {};
+    if (!skillOk(k)) { G.toast && G.toast(`🔒 ${sk.n}：累计放倒 ${sk.need[1]} 人后解锁`, '#aaa', 1.4); return; }
+    if ((W.cds[k] || 0) > now) return;
+    if (sk.st && window.Combat && Combat.state && !Combat.useStam(sk.st)) { G.toast && G.toast('体力不足', '#ff9a7a', 0.8); return; }
+    W.cds[k] = now + sk.cd; const P = G.player;
+    if (k === 'KeyQ') { const K = G.keys || {}, f = (K.KeyW ? 1 : 0) - (K.KeyS ? 1 : 0), sd = (K.KeyD ? 1 : 0) - (K.KeyA ? 1 : 0);
+      fw.set(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)); rt.set(Math.cos(P.yaw), 0, -Math.sin(P.yaw)); const v = new V3().addScaledVector(fw, f || (sd ? 0 : -1)).addScaledVector(rt, sd).normalize().multiplyScalar(11);
+      W.vel.x = v.x; W.vel.z = v.z; W.dashT = 0.2; W.dashV = v; W.dodgeAt = now; W.dodgeT = now + 0.38; SFX.play && SFX.play('draw', 0.5, 0.6); }
+    if (k === 'KeyR') { const n = Foe.roar(W.pos, 7); SFX.roar && SFX.roar(1); W.shake = 0.6; G.flash && G.flash('#ffd0a0', 0.25, 300); G.toast && G.toast(`📣 战吼！震慑了 ${n} 人`, '#ffd0a0', 1.4); }
+    if (k === 'KeyG') { const n = Foe.aoe(W.pos, 2.7, 1.3); SFX.play && SFX.play('draw', 0.8, 0.9); W.shake = 0.35; W.spinT = 0.35; ring(); G.toast && G.toast(n ? `🌀 旋风斩 ×${n}` : '🌀 旋风斩', '#ffd27a', 1); }
+  }
+  function ring() { // 旋风斩的刃光环（特效）
+    const m = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.9, 48), new THREE.MeshBasicMaterial({ color: '#ffe0a0', transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    m.rotation.x = -Math.PI / 2; m.position.set(W.pos.x, W.pos.y + 1.0, W.pos.z); W.B.sc.add(m); let t = 0;
+    const tick = () => { t += 0.016; m.scale.setScalar(1 + t * 9); m.material.opacity = Math.max(0, 0.8 - t * 2.6); if (t < 0.32 && W && W.B) requestAnimationFrame(tick); else { m.parent && m.parent.remove(m); m.geometry.dispose(); m.material.dispose(); } }; tick();
+  }
+  function skillHud() {
+    if (!W || !W.dom) return; let el = W.dom.skills; if (!el) { el = W.dom.skills = document.createElement('div'); el.className = 'wskills'; W.dom.root.appendChild(el); }
+    const on = window.Combat && Combat.drawn; el.style.display = on ? 'flex' : 'none'; if (!on) return; const now = performance.now() / 1000, cds = W.cds || {};
+    const bf = W.foes && Foe.brokenNear(W.pos, G.player.yaw);
+    el.innerHTML = Object.entries(SKILL).map(([k, sk]) => { const lock = !skillOk(k), left = Math.max(0, (cds[k] || 0) - now); return `<div class="sk${lock ? ' lock' : ''}${left > 0 ? ' cd' : ''}"><i>${lock ? '🔒' : sk.icon}</i><b>${k.slice(3)}</b><span>${left > 0 ? left.toFixed(1) : sk.n}</span></div>`; }).join('')
+      + `<div class="sk${bf ? ' ready' : ' lock'}"><i>🗡️</i><b>E</b><span>处决</span></div>`;
   }
   function tripStats() { const st = W && W.stats; if (!st || !(st.kill || st.decap)) return; W.trip.log.push({ t: `⚔️ 战绩：放倒 ${st.kill} · 斩首 ${st.decap} · 处决 ${st.execute} · 一刀斩首 ${st.onecut} · 断肢 ${st.sever} · 完美格挡 ${st.parry} · 最高连击 ${st.maxCombo}`, cls: 'gethead' }); const msg = `⚔️ 本次战绩：放倒 ${st.kill} · 斩首 ${st.decap} · 处决 ${st.execute} · 最高连击 ${st.maxCombo}`; setTimeout(() => G.toast && G.toast(msg, '#ffd070', 5), 1400); }
   function takeHead(hd) { // 拾取砍下的首级
@@ -470,6 +513,7 @@ window.Worlds = (() => {
     G.setUI(false); try { G.lockPointer(); } catch (e) {}
     ensureDom(); W.dom.root.style.display = 'block';
     if (!provReg && window.Combat) { Combat.addProvider(targets); provReg = true; }
+    if (window.Combat && Combat.setThreats) Combat.setThreats(() => (W && W.foes && window.Foe) ? Foe.threats() : []);
     SFX.music && SFX.music('expedition'); SFX.roar && SFX.roar(0.6);
     const st0 = !graph.trip && graph.nodes[S.world.stone] && graph.nodes[S.world.stone].stone ? S.world.stone : graph.home;
     goto(st0, -1).catch(e => { console.warn('Worlds', e); stop(); api.fallback && api.fallback(); });
@@ -536,7 +580,7 @@ window.Worlds = (() => {
     W.say.forEach(s => s.el.remove()); W.say = []; W.B = null;
   }
   function stop() {
-    if (!W) return; const w = W;
+    if (!W) return; const w = W; if (window.Combat && Combat.setThreats) Combat.setThreats(null); if (W.dom && W.dom.skills) W.dom.skills.style.display = 'none';
     if (w.B) disposeNode();
     G.scene.add(G.camera); G.camera.far = w.camFar; G.camera.updateProjectionMatrix();
     if (window.Combat && Combat.attach) Combat.attach(G.scene);
@@ -569,7 +613,7 @@ window.Worlds = (() => {
       const sp = (K.ShiftLeft && P.crouch < 0.5 ? 6.2 : 3.6) * (1 - 0.55 * P.crouch);
       fw.set(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)); rt.set(Math.cos(P.yaw), 0, -Math.sin(P.yaw));
       want.copy(fw).multiplyScalar(f).addScaledVector(rt, s); if (want.lengthSq() > 0) want.normalize().multiplyScalar(sp);
-      W.vel.x += (want.x - W.vel.x) * Math.min(1, dt * 10); W.vel.z += (want.z - W.vel.z) * Math.min(1, dt * 10);
+      if (W.dashT > 0) { W.dashT -= dt; W.vel.x = W.dashV.x; W.vel.z = W.dashV.z; } else { W.vel.x += (want.x - W.vel.x) * Math.min(1, dt * 10); W.vel.z += (want.z - W.vel.z) * Math.min(1, dt * 10); }
       if (K.Space && W.onGround && P.crouch < 0.3) { W.vel.y = 4.4; W.onGround = false; }
     } else { W.vel.x *= 0.8; W.vel.z *= 0.8; }
     W.vel.y -= 14 * dt; W.pos.addScaledVector(W.vel, dt);
@@ -595,7 +639,7 @@ window.Worlds = (() => {
     W.headNear = W.foes ? Foe.nearHead(W.pos, G.player.yaw) : null;
     updateSay();
     if (window.Combat) { try { Combat.update(dt, now); Combat.prerender(); } catch (e) { console.warn(e); } }
-    W.hintT -= dt; if (W.hintT <= 0) { W.hintT = 0.12; hud(); }
+    W.hintT -= dt; if (W.hintT <= 0) { W.hintT = 0.12; hud(); skillHud(); }
     if (G.S.hp <= 0) dieNow();
     const post = G.post; if (post && post.setRayLight) post.setRayLight(tmp.set(0, -100, 0), 0);
     if (post && post.on) post.render(B.sc, cam); else G.renderer.render(B.sc, cam);
@@ -723,7 +767,9 @@ window.Worlds = (() => {
     if (W.busy || W.dead) return true;
     if (e.code === 'KeyM') { toggleMap(); return true; }
     if (W.mapOpen) return true;
+    if (!e.repeat && (e.code === 'KeyQ' || e.code === 'KeyR' || e.code === 'KeyG')) { skill(e.code); return true; }
     if (e.code === 'KeyE' && !e.repeat) {
+      if (W.foes) { const bf = Foe.brokenNear(W.pos, G.player.yaw); if (bf) { Foe.execute(bf, new V3(Math.cos(G.player.yaw), 0, -Math.sin(G.player.yaw))); return true; } }
       if (W.headNear) { const hd = W.headNear; if (takeHead(hd)) Foe.pickup(hd); return true; }
       if (W.interNear) { openChest(W.interNear); return true; }
       if (W.doorNear) { const d = W.doorNear; if (d.home) leaveHome(); else { SFX.open && SFX.open(); goto(d.to, W.cur); } return true; }
@@ -758,7 +804,7 @@ window.Worlds = (() => {
       #wBanner{position:absolute;top:30%;left:50%;transform:translate(-50%,-50%);color:#fff;text-align:center;text-shadow:0 2px 10px #000;opacity:0;transition:opacity .6s}
       #wBanner .n{font-size:44px;font-weight:900;letter-spacing:6px}#wBanner .s{font-size:16px;opacity:.85;margin-top:4px}
       .wsay{position:absolute;transform:translate(-50%,-100%);background:#000a;color:#fff;padding:4px 10px;border-radius:10px;font-size:15px;white-space:nowrap;pointer-events:none}
-      .wsay.boss{font-size:17px;border:1px solid #ffd06066}.wsay.rew{color:#ffd24a;font-size:19px;letter-spacing:1px}.wcombo{position:absolute;right:6%;top:34%;text-align:right;color:#fff;opacity:0;transition:opacity .3s;pointer-events:none;text-shadow:0 3px 8px #000,0 0 18px #ff3a2a88}.wcombo b{display:block;font-size:64px;line-height:1;font-weight:900;font-style:italic;background:linear-gradient(#fff,#ffb070 55%,#ff4a30);-webkit-background-clip:text;background-clip:text;color:transparent}.wcombo span{font-size:18px;font-weight:700;letter-spacing:4px;color:#ffd0b0}.wcombo.pop b{animation:wcpop .22s ease-out}@keyframes wcpop{0%{transform:scale(1.6)}100%{transform:scale(1)}}.wach{position:absolute;left:50%;top:16%;transform:translateX(-50%);min-width:280px;padding:12px 26px;text-align:center;border-radius:10px;background:linear-gradient(135deg,#2a1a08ee,#4a2a0aee);border:2px solid #ffc860;box-shadow:0 0 30px #ffb03088;color:#fff;pointer-events:none;animation:wachin .4s ease-out;transition:opacity .7s,transform .7s}.wach.out{opacity:0;transform:translateX(-50%) translateY(-20px)}.wach .a1{font-size:13px;letter-spacing:4px;color:#ffd890}.wach .a2{font-size:26px;font-weight:900;margin:2px 0;color:#ffe9a0}.wach .a3{font-size:13px;color:#e8d8c0}@keyframes wachin{0%{opacity:0;transform:translateX(-50%) scale(.7)}100%{opacity:1;transform:translateX(-50%) scale(1)}}.wsay.dmg{background:none;color:#ffe0a0;font-weight:900;font-size:22px;text-shadow:0 2px 4px #000}
+      .wsay.boss{font-size:17px;border:1px solid #ffd06066}.wsay.rew{color:#ffd24a;font-size:19px;letter-spacing:1px}.wskills{position:absolute;left:50%;bottom:78px;transform:translateX(-50%);display:flex;gap:8px;pointer-events:none}.wskills .sk{width:58px;padding:5px 0 4px;border-radius:9px;background:#140c08cc;border:1px solid #ffd27a66;text-align:center;color:#fff;font-size:11px;line-height:1.25;box-shadow:0 2px 8px #0008}.wskills .sk i{display:block;font-style:normal;font-size:20px}.wskills .sk b{position:absolute;margin:-40px 0 0 -26px;font-size:10px;color:#ffd27a}.wskills .sk.cd{opacity:.5}.wskills .sk.lock{opacity:.35;filter:grayscale(1)}.wskills .sk.ready{border-color:#ffe070;box-shadow:0 0 14px #ffd040;animation:skr .5s infinite alternate}@keyframes skr{to{transform:scale(1.08)}}.wcombo{position:absolute;right:6%;top:34%;text-align:right;color:#fff;opacity:0;transition:opacity .3s;pointer-events:none;text-shadow:0 3px 8px #000,0 0 18px #ff3a2a88}.wcombo b{display:block;font-size:64px;line-height:1;font-weight:900;font-style:italic;background:linear-gradient(#fff,#ffb070 55%,#ff4a30);-webkit-background-clip:text;background-clip:text;color:transparent}.wcombo span{font-size:18px;font-weight:700;letter-spacing:4px;color:#ffd0b0}.wcombo.pop b{animation:wcpop .22s ease-out}@keyframes wcpop{0%{transform:scale(1.6)}100%{transform:scale(1)}}.wach{position:absolute;left:50%;top:16%;transform:translateX(-50%);min-width:280px;padding:12px 26px;text-align:center;border-radius:10px;background:linear-gradient(135deg,#2a1a08ee,#4a2a0aee);border:2px solid #ffc860;box-shadow:0 0 30px #ffb03088;color:#fff;pointer-events:none;animation:wachin .4s ease-out;transition:opacity .7s,transform .7s}.wach.out{opacity:0;transform:translateX(-50%) translateY(-20px)}.wach .a1{font-size:13px;letter-spacing:4px;color:#ffd890}.wach .a2{font-size:26px;font-weight:900;margin:2px 0;color:#ffe9a0}.wach .a3{font-size:13px;color:#e8d8c0}@keyframes wachin{0%{opacity:0;transform:translateX(-50%) scale(.7)}100%{opacity:1;transform:translateX(-50%) scale(1)}}.wsay.dmg{background:none;color:#ffe0a0;font-weight:900;font-size:22px;text-shadow:0 2px 4px #000}
       #wFade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:31;transition:opacity .25s}
       #wLoad{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:32;color:#fff;font-size:18px;pointer-events:none}
       #wLoad .b{width:260px;height:6px;background:#fff2;border-radius:3px;margin-top:12px;overflow:hidden}#wLoad .b i{display:block;height:100%;width:0;background:#ffd060}
