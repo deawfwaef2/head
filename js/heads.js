@@ -512,7 +512,7 @@ window.ModelHeads = (() => {
   const pick = (r, a) => a[Math.floor(r() * a.length)];
 
   // 可换发型的组
-  const MIX = { vroid: ['vroid', 'twist', 'seed'], twist: ['vroid', 'twist'], seed: ['seed', 'vroid'], godette: ['godette'] };
+  const MIX = { mmd: ['mmd'], vroid: ['vroid', 'twist', 'seed'], twist: ['vroid', 'twist'], seed: ['seed', 'vroid'], godette: ['godette'] };
   function idxOf(file) { return T.findIndex(t => t.meta.file === file); }
 
   // ---------- 随机外观（种族约束由 lore 传入） ----------
@@ -590,6 +590,7 @@ window.ModelHeads = (() => {
       LOOK.hn3 = { pony: '马尾', twin: '双马尾', drill: '钻头卷', bun: '丸子头', odango: '双丸子', braid: '麻花辫', braid2: '双麻花辫' }[LOOK.hx.s];
     } else if (grp !== 'godette' && !acc.includes('witchhat') && r() < 0.12) LOOK.hx = { s: null, ahoge: 1, seed: 1 + Math.floor(r() * 9999) };
     // face_morph 已按用户要求删除（恐怖谷）
+    if (grp === 'mmd') { LOOK.h = LOOK.f; delete LOOK.hx; delete LOOK.hn3; LOOK.skinHex = '#fbe6da'; LOOK.pale = 0.04; LOOK.acc = []; } // MMD 成品头：原发型原配色
     return LOOK;
   }
 
@@ -795,7 +796,9 @@ window.ModelHeads = (() => {
       const key = src.uuid;
       if (matMap.has(key)) return matMap.get(key);
       let out;
+      const keep = t.meta && t.meta.grp === 'mmd' && (k === 'hair' || k === 'brow' || k === 'iris'); // MMD 头模：保留原贴图配色，不重新染色
       if (k === 'cut') out = getCut();
+      else if (keep) { out = new THREE.MeshToonMaterial({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest || (k === 'hair' ? 0.4 : 0), side: THREE.DoubleSide, depthWrite: src.depthWrite }); own.push(out); }
       else if (k === 'hair') { out = hairMat(src, U, t.lum.get(src) || 0.6); own.push(out); }
       else if (k === 'brow') { out = browMat(src, U, t.lum.get(src) || 0.4); own.push(out); }
       else if (k === 'iris') { out = irisMat(src, U, t.lum.get(src) || 0.5); own.push(out); }

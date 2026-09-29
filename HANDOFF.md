@@ -872,3 +872,9 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   `cuckoo` 布谷钟（1 槽，45 秒弹出报时 ×4；E 拨针；现实整点连敲）· `vending` 魂饮自动贩卖机（材料库存，E 取货/投币买药，会出 Props 原料）· `roulette` 魂盘赌局（6 槽，盘带首级旋转，E 押 10% 魂晶）· `head_piano` 亡者琴键（7 槽，魂阶不递减=上行音阶+共鸣 buff）· `sworn` 结义坛（3 槽，缘分=同族/同信仰/同乡/同性情）· `auction` 落槌拍卖台（出价随时间涨，E 落槌）。
 - `sack.js` 导出增加 `stashAdd/have/take`。测试台：`_tools/wv/curios.html`（配合 /tmp/cur.py 那种 playwright 脚本；假 G + 假首级）。
 - 与已有建筑不重复（对照 builds/oddities/rites/sanctum 清单）。首级不说话，只有数字与音效（第八轮规则）。
+## 第二十三轮(2)：MMD 高评分头模（原神 12 个）
+- 用户要求：网上下载评分高的 MMD 头模，多样化；已告知 MMD 规约（禁止再分发/猎奇），用户回复“仓库之后改私人，先下载”。CREDITS.md 已注明仅私人使用。
+- 管线（全部在 tools/）：`pmx_fetch_gi.py <英文名>`（从 phoshco.github.io/gi/genshin.json 取 PMX+贴图）→ `pmx2vrm.py`（PMX→伪 VRM0 GLB：材质按中/日文名改为 VRoid 命名 FACE_SKIN/_EYE_Iris/_HAIR…，表情 あいうえお/まばたき/笑い/怒り/困る/なごみ/びっくり → VRM 预设，比例 0.08m/单位，z 翻转）→ `vrm2head.py --noflip --hair-drop 0.04 --sc 0.75`（新增 --sc 固定缩放、--noflip）。一键：`HD=0.04 SC=0.75 tools/pmx_batch.sh "Hu Tao" 胡桃`（需在 /tmp/pmx 放脚本与 gi.json，见脚本内路径）。
+- 已入库：Furina 胡桃 雷电 绫华 八重 甘雨 纳西妲 可莉 妮露 优菈 荧 莫娜（index.html 追加 script）。弃用（切头有身体残片/偏移）：Keqing、Yoimiya、Kokomi、Navia。
+- heads.js：`grp==='mmd'` 的头 → 发型固定原模型（不混搭、不加程序化发饰）、头发/眉/瞳保留原贴图颜色（不走 hairMat 重染色）、肤色不改。MIX 增加 mmd:['mmd']。
+- 待办：战斗体验“大师级”改造（用户：违和、低级、不爽）。

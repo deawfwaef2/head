@@ -22,7 +22,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument('src'); ap.add_argument('file'); ap.add_argument('name'); ap.add_argument('credit')
 ap.add_argument('--grp', default='vroid'); ap.add_argument('--hair-drop', type=float, default=0.12)
 ap.add_argument('--norm', type=float, default=0.194)  # 统一 切面→头顶 高度（与现有模型一致）
-ap.add_argument('--out', default=None); ap.add_argument('--force', action='store_true')
+ap.add_argument('--sc', type=float, default=0); ap.add_argument('--noflip', action='store_true'); ap.add_argument('--out', default=None); ap.add_argument('--force', action='store_true')
 A = ap.parse_args()
 
 raw = open(A.src, 'rb').read()
@@ -151,7 +151,7 @@ cxm = (FP[:, 0].min() + FP[:, 0].max()) / 2
 eyeC = EP.mean(0)
 headPos = world(HEAD)[:3, 3]
 # 朝向：眼睛应在头骨中心前方(+Z)
-flip = eyeC[2] < headPos[2]
+flip = (eyeC[2] < headPos[2]) and not A.noflip
 def orient(v):
     v = v.copy()
     if flip: v[..., 0] *= -1; v[..., 2] *= -1
@@ -221,7 +221,7 @@ skullTopAbs = skinTop
 yMid = (skullTopAbs + yCut0) / 2
 czm = (FP[:, 2].min() + FP[:, 2].max()) / 2 - 0.01  # 头骨中心略靠后（脸前突）
 origin = np.array([cxm, yMid, czm])
-SC = A.norm / (skullTopAbs - yCut0) if A.norm > 0 else 1.0
+SC = A.sc if A.sc > 0 else (A.norm / (skullTopAbs - yCut0) if A.norm > 0 else 1.0)
 
 # ---------- 表情预设 ----------
 PRESET_MAP = {'aa': 'aa', 'ih': 'ih', 'ou': 'ou', 'ee': 'ee', 'oh': 'oh', 'blink': 'blink', 'blinkLeft': 'blinkleft', 'blinkRight': 'blinkright',

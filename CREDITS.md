@@ -100,3 +100,7 @@ modular_wooden_pier, painted_wooden_bench, wooden_picnic_table, wooden_stool_01,
 ## 第十八轮 · 史录陈列（js/rites.js）与地图布景（js/wlayout.js）
 Poly Haven（https://polyhaven.com），CC0：wooden_cutting_board、brass_pot_01、stone_01、gothic_coffee_table、carved_wooden_plate、wicker_basket_01、wooden_ladder、wooden_bucket_02。
 地图布景复用已有 CC0 资产（刀剑/盾/锤斧/牛头狮头马头/花园侏儒/花槽/木箱/酒桶/灯笼/烛台/酒杯/火盆及 big/world 的岩石树干雕像）。
+
+## MMD 头模（第二十三轮，grp: mmd）— ⚠ 仅限私人使用
+models/GI_*.js：原神角色 MMD 模型（模型提供 miHoYo，各改造者见原模型 readme），取自 phoshco.github.io 镜像。
+原规约禁止二次配布、禁止血腥猎奇及商用；用户已知悉并表示仓库将设为私人。**不得公开发布/商用。**
