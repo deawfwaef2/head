@@ -11,7 +11,7 @@ window.Post = (() => {
     r_illust: { kuwa: 1, R: 3.5, q: 10.0, alpha: 1.0, paint: 0.95, line: 0.7, lineW: 1.0, ink: [0.14, 0.06, 0.09], paper: 0.08, sat: 1.18, warm: 0.03, contrast: 1.1, vig: 0.3, bloom: 0.45, glow: 0.06, post: 0, sharp: 0.6 },
     r_anime: { kuwa: 1, R: 2.5, q: 12.0, alpha: 1.0, paint: 0.55, line: 0.95, lineW: 1.4, ink: [0.08, 0.04, 0.07], paper: 0.0, sat: 1.32, warm: 0.02, contrast: 1.12, vig: 0.12, bloom: 0.85, glow: 0.1, post: 4.0 },
     r_water: { kuwa: 1, R: 3.0, q: 6.0, alpha: 1.0, paint: 0.85, line: 0.28, lineW: 1.0, ink: [0.25, 0.14, 0.14], paper: 0.32, sat: 0.92, warm: 0.03, contrast: 0.95, vig: 0.18, bloom: 0.4, glow: 0.12, post: 0, wet: 1.0, wob: 0.0035, lift: 0.1 },
-    r_oil: { kuwa: 1, R: 6.0, q: 10.0, alpha: 1.0, paint: 1.0, line: 0.18, lineW: 1.0, ink: [0.12, 0.06, 0.04], paper: 0.0, canvas: 0.22, relief: 0.35, sat: 1.15, warm: 0.07, contrast: 1.08, vig: 0.32, bloom: 0.45, glow: 0.12, post: 0 },
+    r_oil: { kuwa: 1, R: 4.2, q: 12.0, alpha: 1.6, paint: 0.95, line: 0.3, sharp: 0.7, lineW: 1.0, ink: [0.12, 0.06, 0.04], paper: 0.0, canvas: 0.22, relief: 0.35, sat: 1.15, warm: 0.07, contrast: 1.08, vig: 0.32, bloom: 0.45, glow: 0.05, post: 0 },
     r_film: { kuwa: 0, line: 0.0, paper: 0.0, sat: 0.95, warm: 0.0, teal: 0.12, contrast: 1.12, vig: 0.55, bloom: 1.0, glow: 0.0, grain: 0.055, ca: 0.0022, post: 0 },
     r_ink: { kuwa: 1, R: 3.0, q: 8.0, alpha: 1.0, paint: 0.8, line: 1.0, lineW: 1.2, ink: [0.03, 0.02, 0.02], paper: 0.3, sat: 1.0, ink2: 1.0, contrast: 1.15, vig: 0.3, bloom: 0.35, glow: 0.0, post: 5.0 }
   };
@@ -102,7 +102,7 @@ window.Post = (() => {
       vec3 col = base;
       if (uKuwa > 0.5) { vec3 pt = texture2D(tPaint, uv).rgb; vec3 pn = (texture2D(tPaint, uv + vec2(uTex.x * 1.5, 0.0)).rgb + texture2D(tPaint, uv - vec2(uTex.x * 1.5, 0.0)).rgb + texture2D(tPaint, uv + vec2(0.0, uTex.y * 1.5)).rgb + texture2D(tPaint, uv - vec2(0.0, uTex.y * 1.5)).rgb) * 0.25; pt += (pt - pn) * uSharp * 2.0; col = mix(base, pt, uPaint); }
       // 色阶化（赛璐璐/水墨）
-      if (uPost > 0.5) { float l = luma(col); float q = floor(l * uPost + 0.5) / uPost; col *= mix(1.0, q / max(l, 0.02), 0.65); }
+      if (uPost > 0.5) { float l = luma(col); float fl = l * uPost; float q = (floor(fl) + smoothstep(0.4, 0.6, fract(fl))) / uPost; q = max(q, l * 0.7); col *= mix(1.0, clamp(q / max(l, 0.03), 0.7, 1.4), 0.6 * smoothstep(0.04, 0.15, l)); }
       // 水彩：边缘积色 + 颜料晕开
       if (uWet > 0.0) { vec3 bl = texture2D(tB2, uv).rgb; float e = clamp(length(col - texture2D(tPaint, uv + uTex * 3.0).rgb) * 3.0, 0.0, 1.0); col *= 1.0 - e * 0.22 * uWet; col = mix(col, col * col * 1.15, 0.25 * uWet); }
       // 描边：深度 + 颜色边缘
