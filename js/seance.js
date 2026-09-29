@@ -157,7 +157,7 @@ window.Seance = (() => {
   }
   function showChoice() {
     st.phase = 'choice'; const rec = st.rec, c = rec.c, ch = el.querySelector('.sc-choice');
-    const y = G.yieldOf(rec), muse = (c.aff && c.aff.includes('muse') ? 2 : 1) * (G.daily && G.daily.k === 'seance' ? 3 : 1);
+    const y = G.yieldOf(rec), muse = (c.aff && c.aff.includes('oracle') ? 3 : c.aff && c.aff.includes('muse') ? 2 : 1) * (G.daily && G.daily.k === 'seance' ? 3 : 1);
     const first = Math.round(60 * y * muse), sq = Math.round(240 * y * muse);
     el.querySelector('.sc-skip').style.display = 'none';
     if (rec.seance) {

@@ -118,7 +118,19 @@ window.startGame = function () {
     for (const b of builds) { const d = CAT[b.type]; if (d.stat) for (const k in d.stat) o[k] += d.stat[k]; if (d.regen) o.regen += d.regen; }
     return (bonusCache = o);
   }
-  function st() { return RPG.stats(S, buildBonus()); }
+  // 第二十二轮：展示在洞里的首级魂印给玩家属性（guardian/warlord/windrunner/keeper/regen/porter/mentor），每种最多计 5 颗；1 秒缓存
+  let hbC = { t: -9, o: null };
+  function headBonus() {
+    const now = performance.now(); if (hbC.o && now - hbC.t < 1000) return hbC.o; hbC.t = now;
+    const n = {}; for (const h of heads) if (h.mount && h.rec.c.aff) for (const k of h.rec.c.aff) n[k] = (n[k] || 0) + 1;
+    const m = k => Math.min(5, n[k] || 0), o = { hp: m('guardian') * 12, str: m('warlord'), ter: m('warlord'), agi: m('windrunner') * 2, soul: m('keeper'), regen: m('regen') * 0.4, cap: Math.min(3, n.porter || 0), xp: m('mentor') * 0.06 };
+    o.any = !!(o.hp || o.str || o.agi || o.soul || o.regen || o.cap || o.xp); return (hbC.o = o);
+  }
+  function xpMul() { return 1 + headBonus().xp; }
+  function st() {
+    const b = buildBonus(), hb = headBonus(); if (!hb.any) return RPG.stats(S, b);
+    const m = Object.assign({}, b); for (const k of ['hp', 'str', 'ter', 'agi', 'soul', 'regen', 'cap']) m[k] = (m[k] || 0) + hb[k]; return RPG.stats(S, m);
+  }
 
   // ---------------- 首级 ----------------
   const heads = [];
@@ -130,6 +142,7 @@ window.startGame = function () {
   function yieldOf(rec) {
     const c = rec.c; let y = RAR[c.rar].y;
     if (c.aff && c.aff.includes('greed')) y *= 1.5;
+    if (c.aff && c.aff.length) { if (c.aff.includes('scholar')) y *= 1.25; if (c.aff.includes('noble')) y *= 1.2; if (c.aff.includes('sage')) y *= 1.4; }
     if (c.shiny) y *= 3;
     if (c.aff && c.aff.includes('eternal')) y *= 1 + Math.min(1.2, (Date.now() - (rec.date || Date.now())) / 86400000 * 0.08);
     if (rec.calm) y *= 1.5; // 通灵后安抚
@@ -602,7 +615,7 @@ window.startGame = function () {
     const el = document.createElement('div'); el.className = 'gcard r' + c.rar + (c.shiny ? ' shiny' : ''); el.style.setProperty('--c', R.c);
     el.innerHTML = `<div class="gstars">${'★'.repeat(c.rar + 1)}</div>${isNew ? '<div class="gnew">NEW</div>' : ''}
       <div class="grar">【${R.n}】${c.shiny ? ' ✨异色' : ''}</div>${c.title ? `<div class="gtitle">『${c.title}』</div>` : ''}<div class="gname">${c.name}</div>
-      <div class="gsub">${c.raceN} · ${c.idN} · ${c.age}岁</div>${(c.aff || []).length ? `<div class="gaff">${c.aff.map(k => RPG.AFF[k] ? `<span>${RPG.AFF[k].icon}${RPG.AFF[k].n}</span>` : '').join('')}</div>` : ''}`;
+      <div class="gsub">${c.raceN} · ${c.idN} · ${c.age}岁</div>${(c.aff || []).length ? `<div class="gaff">${c.aff.map(k => RPG.AFF[k] ? `${RPG.affHTML(k, 'pill')}` : '').join('')}</div>` : ''}`;
     gachaBox.appendChild(el); requestAnimationFrame(() => el.classList.add('in'));
     while (gachaBox.children.length > 3) gachaBox.firstChild.remove();
     return el;
@@ -700,7 +713,7 @@ window.startGame = function () {
   function doubleX() {
     const hit = held ? { head: held } : lookHit(); if (!hit) return;
     if (hit.head) {
-      const h = hit.head; const v = Math.round(h.yield * 15 * st().yieldMul * (hasAff(h, 'burst') ? 4 : 1));
+      const h = hit.head; const v = Math.round(h.yield * 15 * st().yieldMul * (hasAff(h, 'relic') ? 8 : hasAff(h, 'burst') ? 4 : 1));
       addCoins(v); floatText('碾碎吸魂 +' + v, h.g.position, '#ff4a6a', 30);
       burst(h.g.position, '#8a0010', 60, 2.5, 1.0, -8); burst(h.g.position, RAR[h.rec.c.rar].c, 40, 2, 1.2, 1);
       bloodSplat(h.g.position.x, 0, h.g.position.z, 0.8); SFX.squish(1.4); SFX.play('heavy', 0.8, 0.7); shake = 0.3;
@@ -724,7 +737,7 @@ window.startGame = function () {
   function exhibit(force) {
     const now = clock.elapsedTime; if (!force && now - exCache.t < 1.5) return exCache;
     let sc = 0, shown = 0; const races = new Set(), ids = new Set();
-    for (const h of heads) if (h.mount) { const c = h.rec.c; sc += EX_P[c.rar] * (c.shiny ? 3 : 1) * (h.rec.calm ? 1.2 : 1) * (CAT[h.mount.type].showcase ? 1.6 : 1) * (1 + (c.aff ? c.aff.length : 0) * 0.1); races.add(c.race); ids.add(c.id); shown++; }
+    for (const h of heads) if (h.mount) { const c = h.rec.c; sc += EX_P[c.rar] * (c.shiny ? 3 : 1) * (h.rec.calm ? 1.2 : 1) * (CAT[h.mount.type].showcase ? 1.6 : 1) * (1 + (c.aff ? c.aff.length : 0) * 0.1) * (hasAff(h, 'noble') ? 1.5 : 1) * (hasAff(h, 'sage') ? 1.2 : 1); races.add(c.race); ids.add(c.id); shown++; }
     const deco = builds.filter(b => CAT[b.type] && CAT[b.type].cat === 'decor').length;
     sc = Math.round(sc + races.size * 25 + ids.size * 12 + deco * 6);
     let tier = 0; for (let i = 0; i < EX_T.length; i++) if (sc >= EX_T[i][0]) tier = i;
@@ -758,7 +771,7 @@ window.startGame = function () {
     else if (R < 0.22) { const races = Object.keys(Lore.RACES); const k = c0 && Math.random() < 0.5 ? c0.c.race : pickA(races); b = { k: 'race', v: k, n: `献上一颗【${Lore.RACES[k].n}】的首级`, rw: 220 }; }
     else if (R < 0.38) { const ids = Object.keys(Lore.ID); const k = c0 && Math.random() < 0.6 ? c0.c.id : pickA(ids); b = { k: 'id', v: k, n: `献上「${Lore.ID[k].n}」的首级`, rw: 360 }; }
     else if (R < 0.54) { const n = Math.min(4, 1 + Math.floor(Math.random() * (1.5 + S.depth * 0.5))); b = { k: 'rar', v: n, n: `献上一颗【${RAR[n].n}】或更高的首级`, rw: Math.round(150 * Math.pow(n + 1, 1.7)) }; }
-    else if (R < 0.66) { const ks = Object.keys(RPG.AFF); const k = pickA(ks); b = { k: 'aff', v: k, n: `献上带魂印【${RPG.AFF[k].icon}${RPG.AFF[k].n}】的首级`, rw: 520 }; }
+    else if (R < 0.66) { const ks = RPG.AFF_WILD; const k = pickA(ks); b = { k: 'aff', v: k, n: `献上带魂印【${RPG.AFF[k].icon}${RPG.AFF[k].n}】的首级`, rw: 520 }; }
     else if (R < 0.78) { const hn = c0 && Math.random() < 0.6 ? c0.look.hn : pickA(ModelHeads.HAIR.map(x => x[0])); b = { k: 'hair', v: hn, n: `献上一颗${hn}色头发的首级`, rw: 260 }; }
     else if (R < 0.88) b = { k: 'hetero', n: '献上一颗异色瞳的首级', rw: 420 };
     else { const k = c0 && Math.random() < 0.5 ? c0.c.traits[0] : pickA(Lore.TRAITS); b = { k: 'trait', v: k, n: `献上一颗「${k}」性格的首级`, rw: 240 }; }
@@ -777,7 +790,7 @@ window.startGame = function () {
   function submitBounty(h) {
     const list = bounties(), i = list.findIndex(b => bountyOk(b, h.rec));
     if (i < 0) { toast('这颗头不符合任何悬赏条件。对着悬赏榜按 E（空手）查看委托。', '#f99', 3); SFX.deny(); return false; }
-    const b = list[i], rw = b.rw * (daily.k === 'bounty' ? 2 : 1);
+    const b = list[i], rw = Math.round(b.rw * (daily.k === 'bounty' ? 2 : 1) * (hasAff(h, 'bounty') ? 1.5 : 1));
     if (held === h) held = null;
     burst(h.g.position, '#ffd86a', 40, 2, 1); removeHead(h);
     addCoins(rw); S.fame = (S.fame || 0) + 1; S.stats.bounties = (S.stats.bounties || 0) + 1;
@@ -803,7 +816,10 @@ window.startGame = function () {
     let v = h.yield * mult * s.yieldMul * globalMul() * auraMul(h.g.position) * beaconMul(h) * (h.buff && h.buff > clock.elapsedTime ? 2 : 1) * (src === 'manual' || src === 'hold' ? (1 + Math.min(combo, cap) * 0.1) : 1);
     let tag = '';
     if (src === 'auto' && hasAff(h, 'wrath') && Math.random() < 0.2) { v *= 5; tag = '怨念爆发！'; SFX.play('heavy', 0.4, 1.4); burst(h.g.position, '#b04aff', 30, 1.6, 0.8, 1); }
-    if ((src === 'manual' || src === 'hold') && hasAff(h, 'lucky') && Math.random() < 0.06) { v *= 10; tag = '🍀幸运 ×10！'; SFX.fanfare(2); }
+    if ((src === 'manual' || src === 'hold') && hasAff(h, 'destiny') && Math.random() < 0.12) { v *= 15; tag = '🌠天命 ×15！'; SFX.fanfare(3); }
+    else if ((src === 'manual' || src === 'hold') && hasAff(h, 'lucky') && Math.random() < 0.06) { v *= 10; tag = '🍀幸运 ×10！'; SFX.fanfare(2); }
+    if ((src === 'manual' || src === 'hold') && hasAff(h, 'echo') && Math.random() < 0.25) { v *= 1.6; tag = tag || '🔔回响'; }
+    if ((src === 'manual' || src === 'hold') && hasAff(h, 'scholar') && Math.random() < 0.25 && window.RPG && RPG.addXp) { const up = RPG.addXp(S, 1); floatText('📚+1 经验', h.g.position.clone().add(new V3(0, 0.65, 0)), '#9fd0ff', 16); if (up) toast('🆙 食人魔升到了 Lv.' + RPG.lvOf(S.xp).lv, '#ffd27a', 3); }
     const val = Math.max(1, Math.round(v));
     if (tag) floatText(tag, h.g.position.clone().add(new V3(0, 0.45, 0)), '#ffe27a', 24);
     addCoins(val);
@@ -1299,7 +1315,7 @@ window.startGame = function () {
     // 连击
     if (comboT > 0) { comboT -= dt; if (comboT <= 0) combo = 0; }
     // 生命恢复
-    regenT += dt; if (regenT >= 10) { regenT = 0; const s = st(); if (S.hp < s.maxHp) { S.hp = Math.min(s.maxHp, S.hp + Math.max(1, Math.round(s.maxHp * (1 + buildBonus().regen) / 100))); } }
+    regenT += dt; if (regenT >= 10) { regenT = 0; const s = st(); if (S.hp < s.maxHp) { S.hp = Math.min(s.maxHp, S.hp + Math.max(1, Math.round(s.maxHp * (1 + buildBonus().regen + headBonus().regen) / 100))); } }
     // HUD
     hudT -= dt; if (hudT <= 0) { hudT = 0.15; updateHud(); }
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) ui.toast.classList.remove('show'); }
@@ -1333,7 +1349,7 @@ window.startGame = function () {
         let htip = null; for (const f of HOOK.tip) { try { htip = f(hit, held); } catch (e) {} if (htip) break; }
         if (htip) tip = htip;
         else if (held) tip = `手持「${held.rec.c.name}」 · <b>左键</b>把玩 · <b>滚轮</b>转向 · <b>V</b>换表情 · <b>E</b>放下/插桩 · <b>长按E</b>精确摆放 · <b>右键</b>扔 · <b>F</b>查看`;
-        else if (hit && hit.head) { const c = hit.head.rec.c; tip = `<span style="color:${RAR[c.rar].c}">【${RAR[c.rar].n}】</span>${c.shiny ? ' <span style="color:#ffe27a">✨异色</span>' : ''} <b>${c.name}</b>${c.title ? ` <small style="color:#e6c7a0">『${c.title}』</small>` : ''} · ${c.raceN}${c.idN}${(c.aff || []).length ? '<br><small>' + c.aff.map(k => RPG.AFF[k] ? RPG.AFF[k].icon + RPG.AFF[k].n : '').join(' ') + '</small>' : ''}<br><small>左键把玩 · E 拿起 · 长按E 摆放 · F 查看/回忆 · XX 碾碎</small>`; }
+        else if (hit && hit.head) { const c = hit.head.rec.c; tip = `<span style="color:${RAR[c.rar].c}">【${RAR[c.rar].n}】</span>${c.shiny ? ' <span style="color:#ffe27a">✨异色</span>' : ''} <b>${c.name}</b>${c.title ? ` <small style="color:#e6c7a0">『${c.title}』</small>` : ''} · ${c.raceN}${c.idN}${(c.aff || []).length ? '<br><small>' + c.aff.map(k => RPG.AFF[k] ? RPG.affHTML(k, 'pill') : '').join('') + '</small>' : ''}<br><small>左键把玩 · E 拿起 · 长按E 摆放 · F 查看/回忆 · XX 碾碎</small>`; }
         else if (player.pos.distanceTo(cave.exitPos) < 2.6) tip = '<b>[E]</b> 离开洞窟，出去狩猎';
         else if (player.pos.distanceTo(cave.merchantPos) < 2.4) tip = '<b>[E]</b> 和地精行商斯尼克交易';
         else if (hit && hit.build) { const d = CAT[hit.build.type]; tip = `<b>${d.n}</b>` + (d.train ? ' · <b>[E]</b> 开始训练' : '') + (d.mount ? (() => { const n = hit.build.heads.length, k = hit.build.heads.filter(Boolean).length; return (k ? ' · 左键把玩 · E 取下' : '') + (k < n ? ' · 手持首级按 E 插上' : '') + (n > 1 ? ` · ${k}/${n} 位` : ''); })() : '') + ' <small>· XX 拆除</small>'; }
@@ -1349,7 +1365,7 @@ window.startGame = function () {
   // ---------------- 对外 ----------------
   window.G = {
     _dbg: { supportH: h => supportH(h), hullOf: h => hullOf(h), submitBounty: h => submitBounty(h), interactE: () => interactE(), startSeance: h => startSeance(h), carry() { bagCarrying = true; }, unloadBag: () => unloadBag(), get cine() { return cine; } },
-    hasAff, yieldOf, exhibit, codexInfo, daily, DAILY, bounties, rerollBounties, EX_T, fmtN, S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
+    hasAff, yieldOf, xpMul, headBonus, exhibit, codexInfo, daily, DAILY, bounties, rerollBounties, EX_T, fmtN, S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
     save, wipe, setUI, lockPointer, spawnReturnHeads, addHeadRecs, createReturnBag, usedSig, usedNames, headOf, removeHead, refreshWeapon, burst, get cave() { return cave; },
     post, lod, get lodStat() { return lodStat; }, startHP, confirmHP, cancelHP, updateHP, get hplace() { return hplace; }, storeHead, takeOut, storeLoose, vaultCount, MAX_HEADS, VAULT_MAX, HOOK, rebuildHead, floatText, spawnBeam, gachaCard, lookHit, unmount, soulWisp, trigger, SAVE_KEY, get clock() { return clock; }, get held() { return held; }, set held(v) { held = v; }, get keys() { return keys; }, get cine() { return cine; }, setUIOpen: v => setUI(v),
     get playing() { return playing; }, get uiOpen() { return uiOpen; }, vm, get weapon() { return weaponMesh; }, fist, get held() { return held; }, renderer, camera, scene, poke, mountHead, createHead, addBuild

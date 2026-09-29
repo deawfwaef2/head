@@ -393,3 +393,7 @@ body.ui3a #u-tip b { color: var(--u-gold); font-weight: 700; }
 #u-hm.heavy { --hc: #ff3a4a; } #u-hm.heavy i { background: #ffd0c0; width: 15px; height: 3.5px; }
 
 @media (prefers-reduced-motion: reduce) { body.ui3a *, body.ui3a *::before, body.ui3a *::after { animation-duration: .01ms !important; } }
+
+/* 第二十二轮：魂印卡片分类色条（覆盖上面通用 .aff 的边框） */
+body.ui3a .affs .aff { display: flex; gap: 9px; align-items: center; border-left: 4px solid var(--ac, #e7c27a); }
+body.ui3a .affs .aff .at small { color: #cbbfa8; }

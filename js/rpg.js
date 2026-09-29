@@ -147,18 +147,47 @@ window.RPG = (() => {
   }
 
   // ---------- 魂印（词缀）：每颗首级按稀有度抽取，给首级真实的玩法差异 ----------
-  const AFF = {
-    greed:   { n: '贪婪', icon: '💰', d: '所有魂晶产出 ×1.5' },
-    wrath:   { n: '怨灵', icon: '👻', d: '自动产出时 20% 几率怨念爆发 ×5' },
-    choir:   { n: '共鸣体', icon: '🎼', d: '在多位展示架上时共鸣倍率 +0.3' },
-    beacon:  { n: '招魂', icon: '🕯️', d: '1.8 米内其他首级产出 +25%' },
-    burst:   { n: '爆魂', icon: '💥', d: '被碾碎时魂晶 ×4' },
-    muse:    { n: '歌姬', icon: '🎤', d: '通灵回放奖励 ×2' },
-    charm:   { n: '魅惑', icon: '💋', d: '把玩连击上限 10 → 20' },
-    lucky:   { n: '幸运', icon: '🍀', d: '被把玩时 6% 几率掉落 ×10 魂晶' },
-    eternal: { n: '不朽', icon: '⏳', d: '收藏越久越值钱：每天 +8%（上限 +120%）' }
+  // 第二十二轮：魂印 9 → 24 种，按“作用场景”分类（cat）：yield 产出 / play 把玩 / show 展示中生效 / fight 战力（展示在洞里时给玩家属性）/ lore 典籍（只能靠读书对证获得）
+  //   src:'wild' 会在首级生成时随机抽到；src:'lore' 只能通过书籍/笔记“名字对证”获得（js/books.js）。
+  const AFF_CAT = {
+    yield: { n: '产出', c: '#ffd27a' }, play: { n: '把玩', c: '#7ad0ff' }, show: { n: '展示', c: '#b8ff9a' },
+    fight: { n: '战力', c: '#ff8a7a' }, lore: { n: '典籍', c: '#d8a8ff' }
   };
-  const AFF_K = Object.keys(AFF);
+  const AFF = {
+    greed:   { n: '贪婪', icon: '💰', cat: 'yield', d: '所有魂晶产出 ×1.5' },
+    wrath:   { n: '怨灵', icon: '👻', cat: 'yield', d: '自动产出时 20% 几率怨念爆发 ×5' },
+    eternal: { n: '不朽', icon: '⏳', cat: 'yield', d: '收藏越久越值钱：每天 +8%（上限 +120%）' },
+    scholar: { n: '博识', icon: '📚', cat: 'yield', d: '产出 ×1.25；把玩时 25% 几率 +1 点食人魔经验' },
+    noble:   { n: '贵胄', icon: '👑', cat: 'show',  d: '产出 ×1.2；展厅评分中这颗头 ×1.5' },
+    choir:   { n: '共鸣体', icon: '🎼', cat: 'show', d: '在多位展示架上时共鸣倍率 +0.3' },
+    beacon:  { n: '招魂', icon: '🕯️', cat: 'show', d: '1.8 米内其他首级产出 +25%' },
+    burst:   { n: '爆魂', icon: '💥', cat: 'play', d: '被碾碎时魂晶 ×4' },
+    muse:    { n: '歌姬', icon: '🎤', cat: 'play', d: '通灵回放奖励 ×2' },
+    charm:   { n: '魅惑', icon: '💋', cat: 'play', d: '把玩连击上限 10 → 20' },
+    lucky:   { n: '幸运', icon: '🍀', cat: 'play', d: '被把玩时 6% 几率掉落 ×10 魂晶' },
+    echo:    { n: '回响', icon: '🔔', cat: 'play', d: '把玩时 25% 几率再响一声（额外 +60% 魂晶）' },
+    bounty:  { n: '悬赏犬', icon: '📜', cat: 'play', d: '拿它交悬赏，奖励 ×1.5' },
+    guardian:{ n: '守魂', icon: '🛡️', cat: 'fight', d: '展示在洞中时：最大生命 +12（最多计 5 颗）' },
+    warlord: { n: '战魂', icon: '⚔️', cat: 'fight', d: '展示在洞中时：力量 +1、凶威 +1（最多计 5 颗）' },
+    windrunner: { n: '疾风', icon: '🌬️', cat: 'fight', d: '展示在洞中时：敏捷 +2（最多计 5 颗）' },
+    keeper:  { n: '魂匠', icon: '🔮', cat: 'fight', d: '展示在洞中时：魂力 +1（最多计 5 颗）' },
+    regen:   { n: '回春', icon: '🌿', cat: 'fight', d: '展示在洞中时：洞里自然回血速度 +40%（最多计 5 颗）' },
+    porter:  { n: '扛首', icon: '🧺', cat: 'fight', d: '展示在洞中时：一次出猎多带 1 颗首级（最多 +3）' },
+    mentor:  { n: '师承', icon: '🎓', cat: 'fight', d: '展示在洞中时：狩猎经验 +6%（最多计 5 颗）' },
+    sage:    { n: '通晓', icon: '📖', cat: 'lore', src: 'lore', d: '产出 ×1.4；展厅评分中这颗头 ×1.2' },
+    oracle:  { n: '先知', icon: '🔭', cat: 'lore', src: 'lore', d: '通灵回放奖励 ×3（与歌姬取较大者）' },
+    relic:   { n: '遗骨', icon: '🏺', cat: 'lore', src: 'lore', d: '被碾碎时魂晶 ×8（与爆魂取较大者）' },
+    destiny: { n: '天命', icon: '🌠', cat: 'lore', src: 'lore', d: '被把玩时 12% 几率掉落 ×15 魂晶（与幸运取较大者）' }
+  };
+  const AFF_WILD = Object.keys(AFF).filter(k => AFF[k].src !== 'lore'), AFF_LORE = Object.keys(AFF).filter(k => AFF[k].src === 'lore');
+  // 魂印的统一 HTML：mode 'card' = 大卡片（分类色条 + 图标 + 名称 + 类别 + 说明）；'pill' = 紧凑小标签（带说明 title）
+  const esc_ = t => String(t).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+  function affHTML(k, mode) {
+    const a = AFF[k]; if (!a) return ''; const ct = AFF_CAT[a.cat] || AFF_CAT.yield;
+    if (mode === 'pill') return `<span class="a-pill a-${a.cat}" title="${esc_(ct.n + '｜' + a.d)}"><i>${a.icon}</i>${a.n}</span>`;
+    return `<div class="aff a-${a.cat}" style="--ac:${ct.c}"><i class="ai">${a.icon}</i><div class="at"><b>${a.n}<em>${ct.n}${a.src === 'lore' ? ' · 典籍' : ''}</em></b><small>${a.d}</small></div></div>`;
+  }
+  const AFF_K = AFF_WILD;
   const EPI_A = ['银月', '绯红', '黄昏', '霜雪', '星坠', '蔷薇', '黑棘', '琉璃', '白夜', '灰烬', '苍穹', '深海', '晨曦', '夜樱', '雷鸣', '翡翠', '暮色', '圣焰', '鸦羽', '金穗', '雾中', '血月'];
   function luckOf(S) { return (S.luckLv || 0) + Math.floor((S.fame || 0) / 3) + (window.G && G.daily && G.daily.k === 'moon' ? 3 : 0) + (window.Play ? Play.luck() : 0); }
   function rollExtras(r, c, look, luck) {
@@ -216,5 +245,5 @@ window.RPG = (() => {
     const mem = Lore.memory(r, c, { weapon: wpn, q: 1, hurt: 0.1 });
     return { c, look, sig, mem, story: Lore.backstory(r, c), app: Lore.appearance(c, look), date: Date.now() };
   }
-  return { lvOf, lvBonus, addXp, lvNeed, STATS, EQUIP, SLOTS, CONSUM, TRAIN, AFF, stats, eqSum, trainCost, expedition, sigOf, rollExtras, luckOf, forgeHead, bossHead, foe };
+  return { lvOf, lvBonus, addXp, lvNeed, STATS, EQUIP, SLOTS, CONSUM, TRAIN, AFF, AFF_CAT, AFF_WILD, AFF_LORE, affHTML, stats, eqSum, trainCost, expedition, sigOf, rollExtras, luckOf, forgeHead, bossHead, foe };
 })();

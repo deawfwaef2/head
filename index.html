@@ -208,6 +208,14 @@
   .card-t { color: #e6c7a0; letter-spacing: 2px; margin: 2px 0 -4px; font-size: 15px; }
   .affs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 10px 0; } .affs.none { display: block; color: #777; font-size: 13px; }
   .aff { background: rgba(255,200,120,.06); border: 1px solid rgba(255,200,120,.25); border-radius: 10px; padding: 6px 10px; } .aff b { display: block; color: #ffd890; } .aff small { color: #bba; }
+  /* 第二十二轮：魂印卡片按类别上色（产出金 / 把玩蓝 / 展示绿 / 战力红 / 典籍紫） */
+  .affh { margin: 10px 0 -4px; color: #e6c7a0; font-size: 14px; letter-spacing: 1px; } .affh b { color: #ffd890; } .affh small { margin-left: 10px; color: #998; letter-spacing: 0; }
+  .affs .aff { display: flex; gap: 9px; align-items: center; border-left: 4px solid var(--ac, #ffd27a); background: linear-gradient(90deg, color-mix(in srgb, var(--ac, #ffd27a) 14%, transparent), rgba(255,255,255,.03)); }
+  .aff .ai { font-style: normal; font-size: 26px; line-height: 1; filter: drop-shadow(0 0 6px var(--ac, #ffd27a)); }
+  .aff .at b { color: var(--ac, #ffd890); display: flex; align-items: baseline; gap: 6px; } .aff .at b em { font-style: normal; font-size: 11px; opacity: .75; border: 1px solid currentColor; border-radius: 6px; padding: 0 5px; }
+  .aff .at small { display: block; color: #cbbfa8; line-height: 1.45; margin-top: 2px; }
+  .a-pill { display: inline-block; font-size: 12px; border-radius: 8px; padding: 1px 7px; margin: 1px 2px; border: 1px solid rgba(255,210,140,.35); background: rgba(255,210,140,.1); white-space: nowrap; } .a-pill i { font-style: normal; margin-right: 2px; }
+  .a-pill.a-yield { color: #ffd27a; border-color: #ffd27a77; } .a-pill.a-play { color: #7ad0ff; border-color: #7ad0ff77; background: rgba(122,208,255,.1); } .a-pill.a-show { color: #b8ff9a; border-color: #b8ff9a77; background: rgba(184,255,154,.1); } .a-pill.a-fight { color: #ff8a7a; border-color: #ff8a7a77; background: rgba(255,138,122,.1); } .a-pill.a-lore { color: #d8a8ff; border-color: #d8a8ff88; background: rgba(216,168,255,.14); }
   #musicCorner { position: fixed; right: 14px; top: 14px; z-index: 30; font-size: 14px; padding: 6px 12px; border-radius: 10px; background: rgba(20,12,8,.7); color: #e6c7a0; border: 1px solid #5a3e28; cursor: pointer; }
   .beat.choice { border-color: #b8862a; box-shadow: 0 0 18px rgba(255,190,80,.18); }
   .beat .chs { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }

@@ -230,7 +230,7 @@ window.UI = (() => {
       <div class="card-r">【${RN[c.rar]}】${c.shiny ? ' <span class="shiny">✨异色</span>' : ''}${rec.calm ? ' <span class="calm">🕊️已安息</span>' : ''}${rec.seance ? ' <span class="calm">🔮已通灵</span>' : ''}</div>${c.title ? `<div class="card-t">『${esc(c.title)}』</div>` : ''}<h2>${esc(c.name)}</h2>
       <div class="card-id">${esc(c.raceN)} · ${esc(c.idN)} · ${c.age} 岁 · 得自 ${esc(c.locN)}</div>
       <div class="kv"><span>性格</span><b>${esc((c.traits || []).join('、'))}</b><span>信仰</span><b>${esc(c.belief)}</b><span>生前目的</span><b>${esc(c.goal)}</b><span>魂晶产出</span><b>×${+G.yieldOf(rec).toFixed(1)}</b></div>
-      ${(c.aff || []).length ? `<div class="affs">${c.aff.map(k => RPG.AFF[k] ? `<div class="aff"><b>${RPG.AFF[k].icon} ${RPG.AFF[k].n}</b><small>${RPG.AFF[k].d}</small></div>` : '').join('')}</div>` : '<div class="affs none">无魂印</div>'}
+      ${(c.aff || []).length ? `<div class="affh">🔰 魂印 <b>${c.aff.length}</b><small>${[...new Set(c.aff.map(k => RPG.AFF[k] && RPG.AFF_CAT[RPG.AFF[k].cat].n))].filter(Boolean).join(' · ')}</small></div><div class="affs">${c.aff.map(k => RPG.affHTML(k, 'card')).join('')}</div>` : '<div class="affs none">无魂印 · 读到写着她名字的书或笔记，带到洞里对证，可以为她添上魂印</div>'}
       ${window.HeadWear && HeadWear.names(rec.look.hw).length ? `<div class="hwl">🎀 ${HeadWear.names(rec.look.hw).join(' · ')}</div>` : ''}
       <h3>外貌</h3>${para(rec.app)}${modelNote(rec)}
       <h3>生平</h3>${para(rec.story)}
