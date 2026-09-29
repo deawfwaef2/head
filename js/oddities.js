@@ -443,7 +443,7 @@ window.Oddities = (() => {
       const soil = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.36), soilM); soil.rotation.x = -Math.PI / 2; soil.position.y = h - 0.05; soil.receiveShadow = true; soil.raycast = () => {};
       g.add(soil); g.userData.soil = soil;
       if (!d._cal) { d._cal = 1; d._soilY = h - 0.05; for (const s of d.mount.slots) s[1] = h - 0.05 - 0.07; }
-      g.userData.flowers = GAR_X.map(x => { const f = F('flower_ursinia', { w: 0.28, x: x + 0.04, y: h - 0.05, z: 0.1 }); if (f) { f.scale.setScalar(0.001); g.add(f); } return f; });
+      g.userData.flowers = GAR_X.map(x => { const f = F('flower_ursinia', { w: 0.42, x: x + 0.05, y: h - 0.02, z: 0.1 }); if (f) { f.scale.setScalar(0.001); g.add(f); } return f; });
       add(g, F('garden_gnome', { h: 0.42, x: 0.72, z: 0.1, ry: -0.5 }));
       const can = add(g, F('watering_can_metal_01', { h: 0.2, x: -0.72, z: 0.12, ry: 0.8 }));
       g.userData.can = can; g.userData.canBase = can ? can.position.clone() : null;
@@ -565,7 +565,7 @@ window.Oddities = (() => {
         s.wet = Math.max(0, s.wet - dt / 18);
         if (any && s.wet <= 0) { s.dry += dt; if (s.dry > 60) { s.dry = 30; for (let i = 0; i < 3; i++) if (s.st[i] > 0) s.st[i]--; if (s.st.some(Boolean) || true) G.toast('🥀 首级菜园太久没浇水，菜苗蔫了一阶', '#c8a070', 2); } }
         if (U.soil) U.soil.material.color.setRGB(0.23 - s.wet * 0.12, 0.165 - s.wet * 0.09, 0.118 - s.wet * 0.06);
-        (U.flowers || []).forEach((f, i) => { if (!f) return; const want = b.heads[i] ? [0.001, 0.45, 0.75, 1.05][s.st[i]] : 0.001; const cur = f.scale.x; f.scale.setScalar(cur + (want - cur) * Math.min(1, dt * 3)); if (s.st[i] >= 3 && b.heads[i]) f.rotation.y += dt * 0.3; });
+        (U.flowers || []).forEach((f, i) => { if (!f) return; const want = b.heads[i] ? [0.001, 0.45, 0.75, 1.05][s.st[i]] : 0.001; const cur = f.scale.x; f.scale.setScalar(cur + (want - cur) * Math.min(1, dt * 3)); if (s.st[i] >= 3 && b.heads[i]) { f.rotation.y += dt * 0.3; if (Math.random() < dt * 1.5) G.burst(b.heads[i].g.position.clone().add(new V3(0, 0.12, 0)), '#ffb0e0', 3, 0.5, 0.9, 0.5); } });
         if (U.can && U.canBase) { const k = b._canT ? now - b._canT : 9; if (k < 1.2) { const i = Math.min(2, Math.floor(k / 0.4)); U.can.position.set(GAR_X[i] + 0.15, U.canBase.y + 0.45, 0.05); U.can.rotation.z = 0.7; if (Math.random() < 0.6) G.burst(b.g.localToWorld(new V3(GAR_X[i], 0.6, 0.05)), '#8ad0ff', 2, 0.4, 0.5, -6); } else { U.can.position.copy(U.canBase); U.can.rotation.z = 0; } }
       }
     }

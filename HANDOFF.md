@@ -574,3 +574,36 @@
 - **技能**：按住左键不动 0.7s 蓄力（金色刃光、×2.2、破防）；Q 闪身（体力 22，0.38s 无敌，<0.22s 内躲开 = 完美闪避→敌人破绽）；E 处决（破绽中的敌人，优先于拾取）；R 战吼（放倒 10 人解锁，7m 震慑）；G 旋风斩（放倒 25 人或斩霸主解锁，2.7m 一圈）。技能栏在拔刀时显示。
 - 节奏：玩家挥刀弹簧 ω 26→22、刺 0.24→0.28s。新成就：弹刀/碎盾/残影；奖励：破防 5、完美闪避 6、绕开格挡 2。
 - 测试：`_tools/fatk.py`（攻击节奏/方向）、`_tools/fskill.py`（格挡 AI/弹刀/破防/处决/旋风/战吼）、`_o.html`+`_tools/fov.py`（指示层截图）、fcut/fparry/fperf 回归通过。
+
+---
+## 第十五轮（协作 Agent · 恶趣味陈列馆）：更多「放置首级」的恶趣味建筑（追加）
+**用户原话要点**：更多有创意、不重复的恶趣味放置头颅建筑；分析观众喜欢什么，让人爽。（用户再次要求 18G——维持第三轮决定：黑暗奇幻、不做过度猎奇/血腥升级、无色情；文本无虐待/求饶。）
+
+**观众爽点分析 → 设计原则**
+1. 反差幽默：首级出现在最日常的生活场景（茶会、摇椅、沙发看电视、菜园），而不是再做一个刑架/尖桩。
+2. 策展/收集：摆放组合有最优解（肖像廊打分、猎首台地区谱系）。
+3. 等待→爆发：越攒越爽（摇椅安睡值、电视追剧值、菜园成熟）。
+4. 抽卡悬念：鉴定台品相只升不降 + 10 次保底。
+5. 可见的成长：画框随魂阶自动升格、猎人称号晋升、花一圈圈长出来。
+6. 节奏反馈：逐个啜茶 / 逐个开花 / 逐个颤抖的连锁时序 + 音效 + 浮字。
+
+**与已有建筑查重**：避开 builds.js 全部 + sanctum.js 第一批（橱/吊灯/博古架/魔镜/胸像/石像/花瓶/腌桶/冰窖），也避开 sanctum.js 头部注释里预告但尚未推送的第二批（虎钳/理发椅/落地钟/加农炮/飞镖靶/蒸馏台/八音盒）——那些名字留给原协作者。
+
+**新文件 `js/oddities.js`（MOD `oddities`，玩法类，默认开；index.html 在 sanctum.js 之后加载）**，只通过 BuildCat.C / Unlocks.R / G.HOOK(frame/e/tip/click) 挂载：
+| key | 名称 | 模型 | 插槽 | [E] 机制 |
+|---|---|---|---|---|
+| tea_party | 亡者茶会 | round_wooden_table_02 + 4×dining_chair_02 + tea_set_01 | 4（椅面，朝桌心） | 斟茶：逐个低头啜饮；种族越杂 ×(1+0.3·(种族数-1))；最高魂阶=主宾 ×1.5；冷却结束 8 秒内再斟=续杯连击（最多 5 连 ×2）；茶壶倾倒动画 |
+| portrait_gallery | 名媛肖像廊 | chinese_console_table + 5 种画框 | 3 | 画框按魂阶自动换：凡=hanging_02 … 神=fancy_02（异色+1 档），画布染暗红；鉴赏会：魂阶/多样/左右对称/C 位压轴/满廊/异色/珍品品相打分 0–100（S–D），斯尼克点评，刷新最高分 ×2（S.odd.galBest） |
+| rocker | 奶奶的摇椅 | Rockingchair_01 + throw_pillows_01 + vintage_oil_lamp | 1（靠垫，随椅子摇） | 安睡值 150 秒满，自动产出额外补发到 ×5；推一把 ×(2+安睡×10) 并清零；左键戳 = 吵醒 -30% |
+| trophy_lodge | 猎首纪念台 | ClassicConsole_01 + bull/lion/horse_head 铜像 | 4 | 炫耀战绩：不同地区每区 +35%、同地区 ≥3 ×2.5、霸主首级 ×3；累计猎名（S.odd.fame）晋升 5 级称号，每级本台自动产出 +15% |
+| appraisal | 首级鉴定台（max 2） | round_wooden_table_02 + vintage_microscope + magnifying_glass_01 | 1 | 花魂晶鉴定品相（rec.appr = {n,m,why}，永久乘到 h.yield，每秒复查，rebuildHead 后也补回）：寻常 1.0/良 1.15/上 1.35/珍 1.7/绝 2.2/传说 3.0；只升不降；S.odd.pity 10 次保底珍品+；费用随 yield 与 rec.apprN 上涨 |
+| tv_couch | 亡者沙发影院 | Sofa_01 + wooden_crate_01 + Television_01 + CanvasTexture 屏幕 | 3 | 换台：恐怖片（抖）×2.5 / 喜剧（弹跳连锁）×1.8 / 本台新闻（滚动字幕播你的战绩，按洞中首级数加成）/ 雪花 / 午夜频道 ×8（约 9% 或每 12 次）；追剧值（最多 120 秒）使自动产出额外 +binge/60，换台减半 |
+| head_garden | 首级菜园 | planter_box_01 + flower_ursinia + garden_gnome + watering_can_metal_01 | 3（埋到下巴） | 浇水：土半干时浇 +1 阶（共 3 阶，花长大），土湿时浇=涝了（断完美连击）；满阶收获 ×(4+完美连击×1.5)；60 秒干透会掉阶；水壶飞过去倾倒动画 |
+
+- 解锁（Unlocks.R）：rocker 2 首+出猎 1 次；head_garden 出猎 2；tea_party 4 首；portrait_gallery 有灵魂+且 5 首；tv_couch 第 2 层+6 首；trophy_lodge 第 2 层+出猎 4+首级来自 ≥2 地区；appraisal 第 2 层+8 首+累计 2500 魂晶。
+- 插槽高度在第一次 make() 时用射线打到真实座面/台面自动校准（`topAt`），换模型不用手调。
+- 新存档字段：`S.odd = {galBest, fame, appr, pity, garden, tv}`；`rec.appr`、`rec.apprN`。建筑的临时状态（安睡/追剧/菜园阶段）挂在 build 对象上，不存档。
+- 调试：`Oddities._dbg.{teaPour, galCritic, boast, appraise, tvSwitch, garden, gState}(b)`。
+- 资产：24 个 `assets/*.js`（约 6.5MB，列在 index.html「第十五轮」注释下），来源写入 CREDITS.md。
+- 测试（headless，_t.html?q=mid）：7 座全部建成、挂首、每个 [E] 机制执行无报错；截图检查了茶会/肖像廊/摇椅/鉴定台/电视朝向/菜园。坑：hanging_picture_frame_01/02 原模型正面朝 -z，需 ry=π；Television_01 正面朝 -z（朝向沙发不用转）。
+- **环境坑**：/tmp 是内存 tmpfs（2GB 机器），把 300MB 仓库放 /tmp 会让 Chromium OOM 崩溃。仓库放 `/var/work/head`（根盘，不在工作区快照内）。

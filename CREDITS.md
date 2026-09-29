@@ -90,3 +90,7 @@
 
 ## 断面 PBR 贴图（head_repair MOD）
 - `assets/tex_cut_wagyu.js`：TextureCan「A5 Wagyu Beef Steak with Marbling Texture (Others 0003)」PBR 底色、OpenGL 法线与粗糙度贴图；下载后缩至 512 px，许可为 CC0 1.0 Universal，允许修改、商业使用与随项目再分发，无署名义务（仍记录来源）。[资产页](https://www.texturecan.com/details/154/) · [许可条款](https://www.texturecan.com/terms/)
+
+## 恶趣味陈列馆（第十五轮 · js/oddities.js）
+来自 [Poly Haven](https://polyhaven.com/models)，全部 **CC0（公有领域）**，经 `tools/phpack.py` 减面 + 512px 贴图打包：
+ClassicConsole_01、Rockingchair_01、Sofa_01、Television_01、bull_head、horse_head、lion_head、chinese_console_table、dining_chair_02、round_wooden_table_02、tea_set_01、fancy_picture_frame_01/02、hanging_picture_frame_01/02/03、flower_ursinia、garden_gnome、planter_box_01、watering_can_metal_01、magnifying_glass_01、vintage_microscope、vintage_oil_lamp、throw_pillows_01。
