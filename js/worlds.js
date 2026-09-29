@@ -70,6 +70,122 @@ window.Worlds = (() => {
     peak: [['龙骨', '霜牙', '白魇', '冰泪', '鹰巢', '寒鸦', '雪崩', '朝圣', '风哭'], ['雪原', '山脊', '冰川', '山口', '峭壁', '圣坛']]
   };
   const SIZES = { s: { n: '小', R: [13, 18] }, m: { n: '中', R: [22, 28] }, l: { n: '广阔', R: [34, 42] } };
+  // ================= 第十八轮：地点布局原型（用户：地点生成太无聊）=================
+  // 每个节点按风格挑一个原型：地形改造（湖/高台/峡谷）+ 中心布置 + 敌人阵型落点。只用现成的 Poly Haven CC0 模型（程序化的是布局，不是模型）。
+  const LAYOUTS = {
+    camp: { n: '营火营地', st: ['meadow', 'forest', 'wilds', 'swamp', 'fortress', 'peak'], need: ['wooden_stool_01', 'painted_wooden_bench', 'wooden_bucket_01', 'wicker_basket_01', 'wooden_crate_02', 'dead_tree_trunk', 'wooden_barrels_01', 'wooden_military_crate'] },
+    clearing: { n: '林间空地', st: ['forest', 'meadow', 'swamp'], need: ['flower_gazania', 'flower_empodium', 'shrub_sorrel_01', 'tree_stump_01', 'island_tree_01', 'island_tree_02', 'tree_small_02'] },
+    lake: { n: '湖畔', st: ['meadow', 'forest', 'swamp', 'peak', 'wilds'], need: ['modular_wooden_pier', 'grass_medium_02', 'wooden_bucket_01', 'rock_moss_set_01', 'namaqualand_boulder_03'] },
+    court: { n: '残垣庭院', st: ['ruins', 'fortress', 'capital', 'abyss'], need: ['modular_fort_01', 'gothic_statue', 'rock_07', 'rock_09'] },
+    henge: { n: '石阵高台', st: ['wilds', 'peak', 'meadow', 'abyss', 'ruins'], need: ['namaqualand_boulder_03', 'namaqualand_boulder_04', 'dead_quiver_trunk', 'rock_face_02'] },
+    ravine: { n: '峡谷小径', st: ['wilds', 'peak', 'abyss', 'fortress', 'forest'], need: ['rock_face_01', 'rock_face_02', 'namaqualand_boulder_04'] },
+    market: { n: '废弃集市', st: ['capital', 'meadow', 'fortress'], need: ['wooden_picnic_table', 'painted_wooden_bench', 'wooden_barrels_01', 'wooden_crate_02', 'wicker_basket_01', 'wooden_bucket_01', 'street_lamp_01'] }
+  };
+  function layOf(node) {
+    if (window.__forceLay && !node.home) return (node.lay = window.__forceLay);
+    if (node.lay) return node.lay; if (node.home || (window.Mods && Mods.on('worldlay') === false)) return (node.lay = 'plain');
+    const r = mulberry((node.seed ^ 0x2c1b3c6d) >>> 0), ok = Object.keys(LAYOUTS).filter(k => LAYOUTS[k].st.includes(node.style));
+    return (node.lay = !ok.length || r() < 0.12 ? 'plain' : ok[Math.floor(r() * ok.length)]);
+  }
+  const segD = (x, z, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, t = clamp(((x - ax) * dx + (z - az) * dz) / Math.max(1e-6, dx * dx + dz * dz), 0, 1); return Math.hypot(x - ax - dx * t, z - az - dz * t); };
+  // 阶段一：地形计划（在算高度之前）
+  function layPlan(node, R, doorList) {
+    const k = layOf(node), r = mulberry((node.seed ^ 0x51ed27) >>> 0), P = { k, r, R };
+    // 离门最远的方向（大空地放湖/高台）
+    const far = () => { let best = 0, bd = -1; for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; const d = Math.min(...doorList.map(dd => Math.abs(Math.atan2(Math.sin(a - dd.a), Math.cos(a - dd.a))))); if (d > bd) { bd = d; best = a; } } return best + (r() - 0.5) * 0.3; };
+    if (k === 'lake') { const a = far(); P.Lr = clamp(R * 0.34, 6, 12); const d = Math.min(R * 0.48, R - P.Lr * 0.6); P.cx = Math.cos(a) * d; P.cz = Math.sin(a) * d;
+      P.dh = (x, z) => -2.2 * (1 - sstep(P.Lr * 0.5, P.Lr * 1.12, Math.hypot(x - P.cx, z - P.cz))); }
+    else if (k === 'henge') { const a = far(); const d = R * 0.22; P.cx = Math.cos(a) * d; P.cz = Math.sin(a) * d; P.top = clamp(R * 0.16, 5, 8); P.hh = clamp(R * 0.09, 2.4, 4);
+      P.dh = (x, z) => P.hh * (1 - sstep(P.top, P.top + 6, Math.hypot(x - P.cx, z - P.cz))); }
+    else if (k === 'ravine') { P.hx = (r() - 0.5) * R * 0.2; P.hz = (r() - 0.5) * R * 0.2; P.segs = [];
+      for (const d of doorList) { const mx = (d.x * 0.93 + P.hx) / 2, mz = (d.z * 0.93 + P.hz) / 2, px = -(d.z - P.hz), pz = d.x - P.hx, pl = Math.hypot(px, pz) || 1, w = (r() - 0.5) * R * 0.35;
+        const m2x = mx + px / pl * w, m2z = mz + pz / pl * w; P.segs.push([d.x * 0.93, d.z * 0.93, m2x, m2z], [m2x, m2z, P.hx, P.hz]); }
+      P.dist = (x, z) => { let m = Math.hypot(x - P.hx, z - P.hz) - 3.5; for (const s of P.segs) m = Math.min(m, segD(x, z, s[0], s[1], s[2], s[3])); return m; };
+      P.dh = (x, z) => 5.5 * sstep(3.2, 8, P.dist(x, z)) * (1 - sstep(R - 1, R + 4, Math.hypot(x, z)) * 0.5);
+      P.skip = (kind, x, z) => (kind === 'tree' || kind === 'rock' || kind === 'wall' || kind === 'prop') && P.dist(x, z) < 3.4; }
+    else if (k === 'court') { const a = r() * 6.28, d = R * 0.12; P.cx = Math.cos(a) * d; P.cz = Math.sin(a) * d; P.hs = clamp(R * 0.3, 5.5, 9.5); P.ry = (r() - 0.5) * 0.6;
+      P.skip = (kind, x, z) => kind !== 'grass' && kind !== 'plant' && Math.abs(Math.hypot(x - P.cx, z - P.cz) - P.hs) < 2.2; }
+    else if (k === 'clearing') { P.rc = R * (0.52 + r() * 0.12);
+      P.skip = (kind, x, z) => (kind === 'tree' || kind === 'rock') && Math.hypot(x, z) < P.rc * 0.92; }
+    else if (k === 'camp' || k === 'market') { const a = r() * 6.28, d = R * 0.15; P.cx = Math.cos(a) * d; P.cz = Math.sin(a) * d;
+      P.skip = (kind, x, z) => kind !== 'grass' && Math.hypot(x - P.cx, z - P.cz) < (k === 'camp' ? 6.5 : 8); }
+    return P;
+  }
+  // 阶段二：摆放（在算好高度、建好网格之后）
+  function layPlace(P, C) {
+    const { sc, H, put, variants, mark, cols, doorList, spots, st } = C, r = P.r, R = P.R, k = P.k;
+    const one = (names) => { const vs = variants(names); return vs.length ? vs[Math.floor(r() * vs.length)] : null; };
+    const face = (x, z, tx, tz) => Math.atan2(tx - x, tz - z); // 让模型 +Z 朝向目标
+    const fire = (x, z, w, light) => { const y = H(x, z); if (window.Assets && Assets.has('stone_fire_pit')) { const f = Assets.fit('stone_fire_pit', { w, x, y, z }); if (f) sc.add(f); } const fl = window.Assets && Assets.flame(x, y + 0.15, z, 5); if (fl) sc.add(fl); if (light) { const pl = new THREE.PointLight('#ff9a50', 2.2, 12, 2); pl.position.set(x, y + 0.9, z); sc.add(pl); sc.userData.fire = pl; } cols.push({ x, z, r: w * 0.6 }); };
+    if (k === 'camp') {
+      fire(P.cx, P.cz, 1.3, true); mark(P.cx, P.cz, 6.5);
+      const n = 5 + Math.floor(r() * 3), a0 = r() * 6.28;
+      for (let i = 0; i < n; i++) { const a = a0 + i / n * Math.PI * 2 + (r() - 0.5) * 0.3, d = 2.8, x = P.cx + Math.cos(a) * d, z = P.cz + Math.sin(a) * d;
+        const v = one(i % 3 === 0 ? ['dead_tree_trunk'] : i % 3 === 1 ? ['painted_wooden_bench'] : ['wooden_stool_01']);
+        if (v) { const log = v.n === 'dead_tree_trunk', s = log ? 1.6 / Math.max(v.t.size.x, v.t.size.z) : 1; put(v.t, x, z, s, face(x, z, P.cx, P.cz) + (log ? Math.PI / 2 : 0)); cols.push({ x, z, r: log ? 0.45 : 0.35 }); }
+        spots.push({ x: P.cx + Math.cos(a + Math.PI / n) * 2.2, z: P.cz + Math.sin(a + Math.PI / n) * 2.2 }); }
+      const sa = a0 + Math.PI / n; // 物资堆
+      let last = null; for (let i = 0; i < 9; i++) { const a = sa + (r() - 0.5) * 0.9, d = 4.6 + r() * 1.2; let x = P.cx + Math.cos(a) * d, z = P.cz + Math.sin(a) * d, y0 = null; const v = one(['wooden_crate_02', 'wooden_barrels_01', 'wooden_military_crate', 'wooden_bucket_01', 'wicker_basket_01']); if (!v) break;
+        if (last && r() < 0.35 && v.t.size.y < 0.6) { x = last.x; z = last.z; y0 = H(x, z) + last.h; } put(v.t, x, z, 1, r() * 6.28, y0); if (y0 == null && Math.max(v.t.size.x, v.t.size.z) > 0.45) { cols.push({ x, z, r: 0.45 }); last = { x, z, h: v.t.size.y }; } }
+      // 外围：卧倒的原木围成半圈（营地的边界感）
+      const lg = variants(['dead_tree_trunk', 'dead_tree_trunk_02']); if (lg.length) for (let i = 0; i < 7; i++) { const a = sa + Math.PI + (i - 3) * 0.42, d = 6.2, x = P.cx + Math.cos(a) * d, z = P.cz + Math.sin(a) * d, v = lg[i % lg.length], s = 2.6 / Math.max(v.t.size.x, v.t.size.z); put(v.t, x, z, s, face(x, z, P.cx, P.cz) + Math.PI / 2); cols.push({ x, z, r: 0.6 }); }
+      P.boss = { x: P.cx + 3.4, z: P.cz };
+    } else if (k === 'clearing') {
+      const n = Math.round(Math.PI * 2 * P.rc / 2.3);
+      for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2 + (r() - 0.5) * 0.12; if (doorList.some(d => Math.abs(Math.atan2(Math.sin(a - d.a), Math.cos(a - d.a))) < 0.32)) continue;
+        const rr = P.rc + (r() - 0.3) * 3, x = Math.cos(a) * rr, z = Math.sin(a) * rr, v = one(['island_tree_01', 'island_tree_02', 'tree_small_02']); if (!v) break; const s = 0.9 + r() * 0.5; put(v.t, x, z, s, r() * 6.28); cols.push({ x, z, r: 0.35 * s }); mark(x, z, 1); }
+      for (let p = 0; p < 7; p++) { const a = r() * 6.28, d = P.rc * (0.2 + r() * 0.6), px = Math.cos(a) * d, pz = Math.sin(a) * d; const vs = variants(['flower_gazania#*', 'flower_empodium#*', 'shrub_sorrel_01']); if (!vs.length) break;
+        for (let i = 0; i < 10; i++) { const v = vs[Math.floor(r() * vs.length)]; put(v.t, px + (r() - 0.5) * 3, pz + (r() - 0.5) * 3, 1.1 + r() * 0.6, r() * 6.28); } }
+      const v = one(['tree_stump_01']); if (v) { const s = 1.8; put(v.t, 0, 0, s, r() * 6.28); cols.push({ x: 0, z: 0, r: 0.6 }); mark(0, 0, 1.5); }
+      for (let i = 0; i < 4; i++) { const a = r() * 6.28, d = P.rc * (0.3 + r() * 0.4); spots.push({ x: Math.cos(a) * d, z: Math.sin(a) * d }); }
+    } else if (k === 'lake') {
+      let wy = Infinity; for (let i = 0; i < 20; i++) { const a = i / 20 * Math.PI * 2; wy = Math.min(wy, H(P.cx + Math.cos(a) * P.Lr * 0.98, P.cz + Math.sin(a) * P.Lr * 0.98)); } wy -= 0.12;
+      const wm = new THREE.MeshStandardMaterial({ color: st.night ? '#081418' : '#123038', roughness: 0.1, metalness: 0.0, transparent: true, opacity: 0.93, envMap: C.sky ? C.sky.env : null, envMapIntensity: 0.55 });
+      const water = new THREE.Mesh(new THREE.CircleGeometry(P.Lr * 1.2, 48).rotateX(-Math.PI / 2), wm); water.position.set(P.cx, wy, P.cz); water.receiveShadow = true; sc.add(water); sc.userData.water = water;
+      cols.push({ x: P.cx, z: P.cz, r: P.Lr * 0.78 }); mark(P.cx, P.cz, P.Lr * 1.05);
+      // 码头：从岸边伸向湖心
+      const pa = Math.atan2(-P.cz, -P.cx) + (r() - 0.5) * 0.8, sx = P.cx + Math.cos(pa) * P.Lr * 0.95, sz = P.cz + Math.sin(pa) * P.Lr * 0.95, v = one(['modular_wooden_pier']);
+      if (v) { const s = Math.min(0.75, P.Lr * 1.05 / v.t.size.z), mx = sx - Math.cos(pa) * v.t.size.z * s * 0.5, mz = sz - Math.sin(pa) * v.t.size.z * s * 0.5; put(v.t, mx, mz, s, face(sx, sz, P.cx, P.cz), wy - 1.0 * s); }
+      spots.push({ x: sx + Math.cos(pa) * 1.6, z: sz + Math.sin(pa) * 1.6 });
+      const reeds = variants(['grass_medium_02#*']); for (let i = 0; i < 160 && reeds.length; i++) { const a = r() * 6.28, d = P.Lr * (0.82 + r() * 0.3), v2 = reeds[Math.floor(r() * reeds.length)]; put(v2.t, P.cx + Math.cos(a) * d, P.cz + Math.sin(a) * d, 2.2 + r() * 1.4, r() * 6.28); }
+      for (let i = 0; i < 7; i++) { const a = r() * 6.28, d = P.Lr * (0.95 + r() * 0.2), x = P.cx + Math.cos(a) * d, z = P.cz + Math.sin(a) * d, v2 = one(['rock_moss_set_01#*', 'namaqualand_boulder_03']); if (v2) { put(v2.t, x, z, 0.7 + r() * 0.6, r() * 6.28); cols.push({ x, z, r: 0.6 }); } }
+      for (let i = 0; i < 3; i++) { const a = pa + (i - 1) * 0.9 + 0.45, d = P.Lr + 2.2; spots.push({ x: P.cx + Math.cos(a) * d, z: P.cz + Math.sin(a) * d }); }
+    } else if (k === 'court') {
+      const walls = variants(['modular_fort_01#*']).filter(v => /thin_straight_0[34]|thin_gate/.test(v.t.name || '')), tower = variants(['modular_fort_01#*']).find(v => /tower_round/.test(v.t.name || ''));
+      const s = 0.42, cs = Math.cos(P.ry), sn = Math.sin(P.ry), W2 = (lx, lz) => ({ x: P.cx + lx * cs - lz * sn, z: P.cz + lx * sn + lz * cs });
+      if (walls.length) for (let side = 0; side < 4; side++) {
+        const n = Math.max(3, Math.round(P.hs * 2 / (7.4 * s))), gate = side % 2 === 0 ? Math.floor(n / 2) : -1;
+        for (let i = 0; i < n; i++) { const t = ((i + 0.5) / n - 0.5) * P.hs * 2; if (i === gate) { const g = W2(side === 0 ? t : side === 2 ? -t : 0, side === 0 ? -P.hs : side === 2 ? P.hs : 0); spots.push({ x: P.cx + (g.x - P.cx) * 0.8, z: P.cz + (g.z - P.cz) * 0.8 }); continue; }
+          if (r() < 0.28) continue; // 坍塌的缺口
+          const lx = side === 0 ? t : side === 1 ? P.hs : side === 2 ? -t : -P.hs, lz = side === 0 ? -P.hs : side === 1 ? t : side === 2 ? P.hs : -t, p = W2(lx, lz), v = walls[Math.floor(r() * walls.length)];
+          const ry = -P.ry + (side % 2 === 0 ? Math.PI / 2 : 0), ss = s * (0.75 + r() * 0.3); put(v.t, p.x, p.z, ss, ry, H(p.x, p.z) - (r() < 0.4 ? 1.2 : 0.1));
+          const ax = side % 2 === 0 ? { x: cs, z: sn } : { x: -sn, z: cs }, L = v.t.size.z * ss; for (let j = 0; j < 4; j++) { const tt = (j + 0.5) / 4 - 0.5; cols.push({ x: p.x + ax.x * tt * L, z: p.z + ax.z * tt * L, r: 0.75 }); } mark(p.x, p.z, 1.6); }
+      }
+      if (tower) { const c = W2(P.hs, P.hs), ts = 0.33; put(tower.t, c.x, c.z, ts, r() * 6.28, H(c.x, c.z) - 0.3); cols.push({ x: c.x, z: c.z, r: tower.t.size.x * ts * 0.48 }); mark(c.x, c.z, 3); }
+      const sv = one(['gothic_statue']); if (sv) { const ss = 2.6 / sv.t.size.y; put(sv.t, P.cx, P.cz, ss, r() * 6.28); cols.push({ x: P.cx, z: P.cz, r: Math.max(sv.t.size.x, sv.t.size.z) * ss * 0.45 }); mark(P.cx, P.cz, 2); }
+      for (let i = 0; i < 10; i++) { const p = W2((r() - 0.5) * P.hs * 1.7, (r() - 0.5) * P.hs * 1.7), v = one(['rock_07', 'rock_09']); if (v) put(v.t, p.x, p.z, 0.25 + r() * 0.3, r() * 6.28); }
+      spots.push(W2(2.5, 0), W2(-2.5, 1)); P.boss = W2(0, 2.8);
+    } else if (k === 'henge') {
+      const n = 10, a0 = r() * 6.28, rr = P.top * 0.8; for (let i = 0; i < n; i++) { if (i === 3 && r() < 0.6) continue; const a = a0 + i / n * Math.PI * 2, x = P.cx + Math.cos(a) * rr, z = P.cz + Math.sin(a) * rr, v = one(i % 2 ? ['rock_face_02'] : ['namaqualand_boulder_04', 'namaqualand_boulder_03']); if (v) { put(v.t, x, z, (2.1 + r() * 0.7) / Math.max(1, Math.max(v.t.size.x, v.t.size.z) / 1.2), face(x, z, P.cx, P.cz)); cols.push({ x, z, r: 0.7 }); } }
+      mark(P.cx, P.cz, P.top + 2.5); const tv = one(['dead_quiver_trunk']); if (tv) { put(tv.t, P.cx + 0.9, P.cz, 1.3, r() * 6.28); cols.push({ x: P.cx + 0.9, z: P.cz, r: 0.4 }); }
+      const fl = window.Assets && Assets.flame(P.cx - 0.6, H(P.cx - 0.6, P.cz) + 0.05, P.cz, 4.5); if (fl) sc.add(fl);
+      for (let i = 0; i < 3; i++) { const a = a0 + (i + 0.5) / 3 * Math.PI * 2; spots.push({ x: P.cx + Math.cos(a) * rr * 0.55, z: P.cz + Math.sin(a) * rr * 0.55 }); } P.boss = { x: P.cx, z: P.cz - 1.8 };
+    } else if (k === 'ravine') {
+      for (const sg of P.segs) { const L = Math.hypot(sg[2] - sg[0], sg[3] - sg[1]), nx = -(sg[3] - sg[1]) / (L || 1), nz = (sg[2] - sg[0]) / (L || 1);
+        for (let t = 2; t < L; t += 3.6) { const bx = sg[0] + (sg[2] - sg[0]) * t / L, bz = sg[1] + (sg[3] - sg[1]) * t / L; if (Math.hypot(bx - P.hx, bz - P.hz) < 6 || doorList.some(d => Math.hypot(d.x - bx, d.z - bz) < 6)) continue;
+          for (const sd of [-1, 1]) { const x = bx + nx * sd * (4.6 + r() * 1.2), z = bz + nz * sd * (4.6 + r() * 1.2); if (P.dist(x, z) < 3.8) continue; const v = one(['rock_face_01', 'rock_face_02', 'namaqualand_boulder_04']); if (!v) continue; const s = 1 + r() * 0.6; put(v.t, x, z, s, face(x, z, bx, bz) + Math.PI, H(x, z) - 0.6); cols.push({ x, z, r: 1.5 }); mark(x, z, 2); } }
+        spots.push({ x: (sg[0] + sg[2]) / 2, z: (sg[1] + sg[3]) / 2 }); }
+      spots.sort(() => r() - 0.5);
+    } else if (k === 'market') {
+      const a = r() * Math.PI, ax = Math.cos(a), az = Math.sin(a), nx = -az, nz = ax;
+      for (let i = -2; i <= 2; i++) for (const sd of [-1, 1]) { const x = P.cx + ax * i * 3.6 + nx * sd * 3, z = P.cz + az * i * 3.6 + nz * sd * 3; const v = one(i % 2 ? ['painted_wooden_bench', 'wooden_barrels_01', 'wooden_crate_02'] : ['wooden_picnic_table']); if (!v) continue;
+        put(v.t, x, z, 1, face(x, z, x - nx * sd, z - nz * sd) + (v.n === 'wooden_picnic_table' ? Math.PI / 2 : 0)); cols.push({ x, z, r: v.n === 'wooden_picnic_table' ? 1.1 : 0.5 }); mark(x, z, 1.5);
+        if (r() < 0.5) { const v2 = one(['wicker_basket_01', 'wooden_bucket_01']); if (v2) put(v2.t, x + (r() - 0.5) * 0.6, z + (r() - 0.5) * 0.6, 1, r() * 6.28, v.n === 'wooden_picnic_table' ? H(x, z) + 0.75 : null); }
+        if (r() < 0.35) spots.push({ x: x - nx * sd * 1.4, z: z - nz * sd * 1.4 }); }
+      const lamp = one(['street_lamp_01']); if (lamp) for (const i of [-3, 3]) { const x = P.cx + ax * i * 3.6, z = P.cz + az * i * 3.6; put(lamp.t, x, z, 1, 0); cols.push({ x, z, r: 0.3 }); if (st.night) { const pl = new THREE.PointLight('#ffc070', 1.5, 10, 2); pl.position.set(x, H(x, z) + lamp.t.size.y * 0.9, z); sc.add(pl); } }
+      spots.push({ x: P.cx, z: P.cz });
+    }
+  }
   const PREY_SAY = { see: ['……有人来了。', '那是什么？！', '别过来……', '食、食人魔！', '快跑！'], flee: ['救命！', '别追了！', '我不想死……', '放过我吧！'], fight: ['我跟你拼了！', '滚开！', '你休想！'], hit: ['啊！', '呜……', '好痛……'] };
 
   // ================= 懒加载资产（big/world/*.js）=================
@@ -137,7 +253,7 @@ window.Worlds = (() => {
       const bb = new THREE.Box3().setFromObject(c); if (bb.isEmpty()) continue; const sz = bb.getSize(new V3()), ce = bb.getCenter(new V3());
       const off = new THREE.Matrix4().makeTranslation(-ce.x, -bb.min.y, -ce.z); const parts = [];
       c.traverse(o => { if (o.isMesh) parts.push({ geo: o.geometry, mat: o.material, m: off.clone().multiply(o.matrixWorld) }); });
-      out.push({ parts, size: sz });
+      out.push({ parts, size: sz, name: r.name || base });
     }
     return (TMPL[name] = out);
   }
@@ -241,11 +357,13 @@ window.Worlds = (() => {
     const doorList = node.adj.map(b => ({ to: b })); if (node.home || node.stone) doorList.push({ to: -1 });
     const a0 = r() * Math.PI * 2; doorList.forEach((d, k) => { d.a = a0 + k / doorList.length * Math.PI * 2 + (r() - 0.5) * 0.5 / doorList.length; d.x = Math.cos(d.a) * (Rf(d.a) - 0.6); d.z = Math.sin(d.a) * (Rf(d.a) - 0.6); });
     if (LP) WLayout.paths(LP, doorList);
+    let Rmin = R; if (LP) for (let i = 0; i < 24; i++) Rmin = Math.min(Rmin, Rf(i / 24 * Math.PI * 2));
+    const LY = layPlan(node, Rmin, doorList); // 第十八轮（总管理师）：布局原型，与 wlayout 叠加；用不规则边界的最小半径
     const flat = (x, z) => { let f = 1; for (const d of doorList) f = Math.min(f, sstep(2.5, 6, Math.hypot(x - d.x, z - d.z))); return f; };
     const H = (x, z) => { const rr = Math.hypot(x, z), ang = Math.atan2(z, x);
       const fl = flat(x, z), inner = (nz(x * 0.06 + 50, z * 0.06 + 50) - 0.5) * 1.6 * (LP ? LP.relief : 1) * fl * sstep(0, 5, rr) + (LP ? WLayout.dH(LP, x, z, fl) : 0), Ra = LP ? Rf(ang) : R;
       const rim = st.hill * sstep(Ra + 0.5, Ra + 16, rr) * (0.55 + 0.9 * nz(Math.cos(ang) * 3 + 9, Math.sin(ang) * 3 + 9)) + st.hill * 1.2 * sstep(Ra + 20, Ra + 60, rr);
-      return inner + rim; };
+      return inner + rim + (LY.dh ? LY.dh(x, z) : 0); };
     // 地形
     const ext = RM + 70, seg = Math.min(220, Math.round(ext * 2 / 1.1));
     const tg = new THREE.PlaneGeometry(ext * 2, ext * 2, seg, seg); tg.rotateX(-Math.PI / 2);
@@ -279,7 +397,8 @@ window.Worlds = (() => {
     const put = (tm, x, z, s, ry, y0, ns) => { const m = new THREE.Matrix4().compose(new V3(x, (y0 != null ? y0 : H(x, z)) - 0.04 * s, z), new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), ry), new V3(s, s, s)); const M = ns ? instNS : inst; if (!M.has(tm)) M.set(tm, []); M.get(tm).push(m); };
     const variants = (list) => list.flatMap(n => templates(n).map(t => ({ t, n })));
     // 地标（先放，保证有空间）
-    const mk = pick(r, st.marks); const mx = (r() - 0.5) * R * 0.5, mz = (r() - 0.5) * R * 0.5; sc.userData.mark = mk; placeMark(mk, mx, mz);
+    const spots = []; try { layPlace(LY, { sc, H, put, variants, mark, cols, doorList, spots, st, sky, node }); } catch (e) { console.warn('layout', LY.k, e); }
+    const mk = pick(r, st.marks.filter(m => !(LY.k === 'camp' && m === 'campfire') && !(LY.k === 'henge' && m === 'stones'))); let mx = (r() - 0.5) * R * 0.5, mz = (r() - 0.5) * R * 0.5; for (let t = 0; t < 25 && !free(mx, mz, 4.5); t++) { const a = r() * 6.28, d = R * (0.25 + r() * 0.55); mx = Math.cos(a) * d; mz = Math.sin(a) * d; } sc.userData.mark = mk; placeMark(mk, mx, mz);
     const LPX = LP ? WLayout.dress(LP, { sc, H, R, cols, free, mark, put, variants }) : null;
     function placeMark(k, x, z) {
       const y = H(x, z);
@@ -310,6 +429,7 @@ window.Worlds = (() => {
         const fr = Math.max(v.t.size.x, v.t.size.z) * s * 0.5;
         const rad = kind === 'grass' ? 0 : kind === 'plant' ? 0.4 : kind === 'tree' ? 1.0 : kind === 'wall' ? fr : Math.min(fr, 2.5);
         if (rad && !free(x, z, rad)) continue;
+        if (LY.skip && LY.skip(kind, x, z)) continue;
         if (kind !== 'grass' && Math.hypot(x, z) < 2.5 && node.home) continue;
         const ry = r() * 6.28; put(v.t, x, z, s, ry); if (rad) mark(x, z, rad * (kind === 'plant' ? 0.5 : 1));
         if (kind === 'tree') cols.push({ x, z, r: 0.35 * s });
@@ -358,7 +478,7 @@ window.Worlds = (() => {
       cols.push({ x: d.x + Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z + Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 }, { x: d.x - Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z - Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 });
       return Object.assign(d, { g, label, home });
     });
-    return { sc, H, R, Rf: LP ? Rf : null, wx: LPX && LPX.wx, tag: LP ? LP.tag : '', lp: LP, cols, doors, inter, sun, sunDir, terr, style: st };
+    return { sc, H, R, Rf: LP ? Rf : null, wx: LPX && LPX.wx, tag: LP ? LP.tag : '', lp: LP, cols, doors, inter, sun, sunDir, terr, style: st, spots, lay: LY.k, bossAt: LY.boss ? new V3(LY.boss.x, 0, LY.boss.z) : null };
   }
   // 画布文字 → 精灵（门牌/气泡）
   function makeLabel(text, col) {
@@ -371,7 +491,7 @@ window.Worlds = (() => {
   function glow() { if (glowTex) return glowTex; const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,255,255,.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); glowTex = new THREE.CanvasTexture(c); return glowTex; }
 
   // ================= 猎物（魂光，第 4 步换真实身体）=================
-  function spot(B, r) { let x = 0, z = 0; for (let t = 0; t < 30; t++) { const a = r() * 6.28, d = B.R * (0.3 + r() * 0.55); x = Math.cos(a) * d; z = Math.sin(a) * d; if (B.cols.every(c => Math.hypot(c.x - x, c.z - z) > c.r + 0.8) && B.doors.every(dd => Math.hypot(dd.x - x, dd.z - z) > 5)) break; } return new V3(x, 0, z); }
+  function spot(B, r) { if (B.spots && B.spots.length) { const s = B.spots.shift(); return new V3(s.x, 0, s.z); } let x = 0, z = 0; for (let t = 0; t < 30; t++) { const a = r() * 6.28, d = B.R * (0.3 + r() * 0.55); x = Math.cos(a) * d; z = Math.sin(a) * d; if (B.cols.every(c => Math.hypot(c.x - x, c.z - z) > c.r + 0.8) && B.doors.every(dd => Math.hypot(dd.x - x, dd.z - z) > 5)) break; } return new V3(x, 0, z); }
   // 给 js/foe.js 的接口
   function foeCtx(B, node) {
     return {
@@ -540,7 +660,8 @@ window.Worlds = (() => {
     if (node.stone && w.stone !== node.i) { const first = w.stone !== node.i; w.stone = node.i; if (first && !node.home) setTimeout(() => G.toast && G.toast(`🌀 点亮了魂门「${node.name}」——下次出猎从这里出发，也可从这里回洞`, '#9fd0ff', 5), 900); }
     try { G.save && G.save(); } catch (e) {}
   }
-  function stylesOf(i) { if (LITE) { const st0 = STYLES[W.graph.nodes[i].style]; return ['sky_' + st0.sky, 'tex_' + st0.ground]; } const st = STYLES[W.graph.nodes[i].style]; const names = ['sky_' + st.sky, 'tex_' + st.ground]; st.props.forEach(p => p[0].forEach(n => names.push(n.replace('#*', '')))); if (st.edge) st.edge[0].forEach(n => { names.push(n.replace('#*', '')); if (LO[n]) names.push(n + '_lo'); }); ['namaqualand_boulder_03', 'namaqualand_boulder_04', 'rock_09', 'horse_statue_01', 'gothic_statue', 'wooden_barrels_01', 'Barrel_02', 'wooden_military_crate', 'dead_tree_trunk', 'dead_tree_trunk_02', 'dead_quiver_trunk'].forEach(n => names.push(n)); return names.filter(n => n !== 'brazier'); }
+  function stylesOf(i) { const lk = layOf(W.graph.nodes[i]), ln = LAYOUTS[lk] ? LAYOUTS[lk].need : []; return stylesOf0(i).concat(ln).filter((n, k, a) => a.indexOf(n) === k); }
+  function stylesOf0(i) { if (LITE) { const st0 = STYLES[W.graph.nodes[i].style]; return ['sky_' + st0.sky, 'tex_' + st0.ground]; } const st = STYLES[W.graph.nodes[i].style]; const names = ['sky_' + st.sky, 'tex_' + st.ground]; st.props.forEach(p => p[0].forEach(n => names.push(n.replace('#*', '')))); if (st.edge) st.edge[0].forEach(n => { names.push(n.replace('#*', '')); if (LO[n]) names.push(n + '_lo'); }); ['namaqualand_boulder_03', 'namaqualand_boulder_04', 'rock_09', 'horse_statue_01', 'gothic_statue', 'wooden_barrels_01', 'Barrel_02', 'wooden_military_crate', 'dead_tree_trunk', 'dead_tree_trunk_02', 'dead_quiver_trunk'].forEach(n => names.push(n)); return names.filter(n => n !== 'brazier'); }
   async function goto(i, from) {
     W.busy = true; const node = W.graph.nodes[i];
     fadeTo(1); await wait(260);
@@ -559,7 +680,7 @@ window.Worlds = (() => {
       try {
         const r = mulberry(node.seed ^ 0x5bd1e995), list = [];
         node.prey.forEach(h => { list.push({ h, pos: spot(B, r) }); });
-        if (wantBoss) { const Bo = Explore.BOSSES[node.region]; node.bossH = node.bossH || RPG.bossHead(G.S, G.st(), node.loc, Bo, G.usedNames, G.usedSig); list.push({ h: node.bossH, pos: new V3(0, 0, 0), boss: Bo, bossK: node.region }); }
+        if (wantBoss) { const Bo = Explore.BOSSES[node.region]; node.bossH = node.bossH || RPG.bossHead(G.S, G.st(), node.loc, Bo, G.usedNames, G.usedSig); list.push({ h: node.bossH, pos: B.bossAt || new V3(0, 0, 0), boss: Bo, bossK: node.region }); }
         W.dom.loadT.textContent = `「${node.name}」里有人……`;
         W.foes = await Foe.populate(foeCtx(B, node), list);
         if (W.foes && !W.foes.length && list.length) W.foes = null;
@@ -833,13 +954,13 @@ window.Worlds = (() => {
   }
   function fadeTo(v) { if (DOM) DOM.fade.style.opacity = v; }
   function banner(node) {
-    const st = STYLES[node.style], b = DOM.banner; b.querySelector('.n').textContent = node.name; b.querySelector('.s').textContent = `${node.loc.icon} ${node.loc.n} · ${st.n} · ${SIZES[node.size].n}${node.home ? ' · 回洞的门在这里' : ''}${W.B && W.B.tag ? ' · ' + W.B.tag : ''}`;
+    const st = STYLES[node.style], b = DOM.banner; b.querySelector('.n').textContent = node.name; b.querySelector('.s').textContent = `${node.loc.icon} ${node.loc.n} · ${st.n}${LAYOUTS[layOf(node)] ? ' · ' + LAYOUTS[layOf(node)].n : ''} · ${SIZES[node.size].n}${node.home ? ' · 回洞的门在这里' : ''}${W.B && W.B.tag ? ' · ' + W.B.tag : ''}`;
     b.style.opacity = 1; clearTimeout(banner._t); banner._t = setTimeout(() => { b.style.opacity = 0; }, 2600);
     const bo = W.boss; if (bo) DOM.boss.querySelector('.bn').innerHTML = `👑 ${esc(bo.B.title)} · ${esc(bo.B.n)}`; DOM.boss.style.display = 'none';
   }
   function hud() {
     if (!W || !W.B || !DOM) return; const node = W.graph.nodes[W.cur], st = STYLES[node.style], s = G.st();
-    DOM.top.querySelector('.n').textContent = node.name; DOM.top.querySelector('.s').textContent = `${node.loc.icon} ${node.loc.n} · ${st.n} · ${SIZES[node.size].n} · 已探索 ${W.graph.nodes.filter(n => n.visited).length}/${W.graph.nodes.length}`;
+    DOM.top.querySelector('.n').textContent = node.name; DOM.top.querySelector('.s').textContent = `${node.loc.icon} ${node.loc.n} · ${st.n}${LAYOUTS[layOf(node)] ? ' · ' + LAYOUTS[layOf(node)].n : ''} · ${SIZES[node.size].n} · 已探索 ${W.graph.nodes.filter(n => n.visited).length}/${W.graph.nodes.length}`;
     const left = W.foes ? W.foes.filter(f => !f.dead).length : W.prey.filter(p => !p.gone).length;
     DOM.stat.innerHTML = `<div class="hp"><i style="width:${clamp(G.S.hp / s.maxHp, 0, 1) * 100}%"></i></div>❤️ ${Math.round(G.S.hp)}/${s.maxHp} · 🧪${G.S.items.potion || 0}<br>🧺 ${W.trip.res.heads.length}/${s.cap} · 🔮 +${W.trip.coins}${W.stats && W.stats.kill ? `<br>⚔️ 放倒 ${W.stats.kill} · 🩸 斩首 ${W.stats.decap} · 连击 ${W.stats.maxCombo}` : ''}${left ? `<br><span style="color:#9fd0ff">✨ 此地还有 ${left} 缕魂光</span>` : ''}`;
     let h = 'WASD 走动 · <b>F</b> 拔刀（按住左键挥砍 / 连点刺 / 右键格挡）· <b>M</b> 地图 · <b>H</b> 喝药';

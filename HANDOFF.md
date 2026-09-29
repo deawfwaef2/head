@@ -630,3 +630,30 @@
 - 因运行环境没有 emoji 字体，截图里 emoji 会显示为方块——真实浏览器正常。UI Agent 在关键位置（HUD/菜单/技能栏）改用**内联 SVG 图标**（非 emoji），这些 SVG 是手写线稿图标，属于 UI 元素而非“模型/贴图”，不违反第十一轮“禁止程序化模型”的约束。
 
 ### 进度记录（UI Agent）
+
+## 第十八轮（总管理师）— 眼白 / 色调 / 击杀卡顿 / 刀尖锁准星 / 地点布局原型
+
+用户反馈：①眼白有问题 ②探索地图地点生成很无聊 ③每次击杀都很卡 ④刀光要跟随屏幕中心（武器乱飞、刀光偏移很怪）⑤角色和头的色调偏暗。
+
+**① 眼白（改了协作者的 `js/heads.js` 材质代码，请知悉）**：`head_repair` 把 EyeWhite 换成了 `MeshBasicMaterial`（不受光）→ 亮处比脸亮一大截、像在发光。现改为受光 `MeshToonMaterial` + 28% 自发光打底（emissiveMap=贴图）：亮处跟脸一起受光，暗洞里也不会变黑。原意（防止洞窟里眼白被压黑）保留。
+
+**⑤ 色调偏暗**：根因在 `foe.js` 的 `SKIN_FIX` 标定——身体在卡通光照下比头暗时（Jean 0.61、Beidou 0.76、Kokomi 0.82…），旧代码把**头压暗**去迁就身体。现在反过来：`bodyGain(name)` 把整个身体按 1/L 提亮（上限 1.7），头只保留 25% 色相校正、不再压暗；整体再 ×1.04（LIFT）。另：闪白 `fo.mats` 以前遍历了整个 `f.root`（含头上共享缓存的宝石/头饰材质 → 被闪白后 emissive 归零，其他首级的宝石也失去光泽），现在排除 `f.holder` 子树。
+
+**③ 击杀卡顿**：击杀/斩首/弹反/完美闪避时的“敌人慢动作”（全体敌人+布娃娃+血以 0.3~0.4 倍速放 0.35~0.55 s）在玩家看来就是卡顿 → 全部去掉，只保留 E 处决的 0.5 s；改用屏震。布娃娃：地面高度每点每帧只查一次（原 24 点×10 次迭代=240 次/具/帧），迭代 10→7，碰撞体按尸体 4 m 内预筛（每秒刷新）。`sfx.js` 的 `noise()` 改为复用一段 3 s 噪声（原来每次现生成缓冲区）。命中顿帧 0.03~0.09 s → 0.015~0.05 s。实测（`_tools/fkill.py`）：击杀前后着色器程序数 30→30，无新编译；击杀帧 JS < 20 ms。
+
+**④ 刀尖锁准星（MOD `crosshair_slash`，默认开，需要 gesture_combat；关掉=旧的鼠标控制武器轨迹）**：按住左键时手固定在右下，刀尖 = 相机前方 (0,0,-d)，d 满足 |刀尖-手| = 0.95×刃长（`aimBlade`）；鼠标只转镜头 → 世界里的刀光就是准星的轨迹。重量感：刀尖/手沿鼠标速度方向略滞后。挥砍来向 `info.from`/`dirName` 用平滑后的鼠标速度 `S.mv`（像素/秒，y 向上）。突刺也刺向准星。敌人格挡 AI 的 `ctx.handAng(fo)`：挥动中=挥动来向，否则=准星相对该敌人胸口的屏幕方向。测试 `_tools/fslash.py`（`_o.html`）：静止/横挥/下挥时刀尖 NDC 偏差 ≤ 0.04。
+
+**② 地点布局原型（MOD `worldlay`，默认开）**：`worlds.js` 新增 `LAYOUTS` / `layOf` / `layPlan`（地形：`dh(x,z)` 叠加到高度、`skip()` 让散布让路）/ `layPlace`（摆放 + 敌人阵型落点 `B.spots` + 霸主站位 `B.bossAt`）。原型按风格挑选，12% 保持旧的纯散布：
+- 营火营地：中心火堆，长椅/木凳/原木围坐，物资堆（木箱会叠放），外围半圈原木；敌人围火而坐。
+- 林间空地：一圈密树（对着门留缺口）+ 花丛 + 中心大树桩。
+- 湖畔：挖湖（水面=无贴图的反射材质）、码头伸向湖心、芦苇、岸石；湖是一个大碰撞圆。
+- 残垣庭院：modular_fort 墙段（0.42 倍）围方院，随机坍塌缺口、两侧门洞有守卫、角楼、中心雕像。
+- 石阵高台：地形堆出高台，顶上一圈立石 + 火。
+- 峡谷小径：每扇门→中心的弯曲通道，两侧地形抬高 5.5 m + 岩壁；敌人在通道中埋伏。
+- 废弃集市：两排野餐桌/长椅/木桶，街灯（夜间才点灯）。
+横幅/顶部信息显示布局名。调试：`window.__forceLay='court'`。
+新增 Poly Haven CC0 模型（`tools/worldpack.py model`，在 big/world/）：modular_wooden_pier、painted_wooden_bench、wooden_picnic_table、wooden_stool_01、wooden_bucket_01、wicker_basket_01、wooden_crate_02、rock_face_01/02、flower_empodium、flower_gazania、shrub_sorrel_01。（barrel_03 是蓝色工业桶，风格不符，未用。）
+截图工具：`_w2.html`（轻量世界 + 真实敌人，`?old=1` 加载旧版 foe/heads 对比）、`_tools/wlay.py lay:region`（`N=2` 选节点、`FOE=1` 带敌人）、`_tools/wshot.py`、`_tools/wkill.py`。**多个布局要分进程跑**（同一浏览器里连开会爆内存/截图超时）。
+
+测试：fcut / fparry / fskill / fslash / fkill 通过。fskill 修了测试本身的随机性（敌人朝向、开场状态、蓄力伤害打死骑士）。
+**与「陈列/地图 Agent」的 wlayout（80a4a28，js/wlayout.js）合并说明**：两套并存、叠加。wlayout 负责不规则边界 `Rf`/小径/林丛/天气/6 种布景（`WLayout.dress`，在地标之后放，用 `free()` 自动避让）；worldlay 负责「地点原型」中心布置 + 湖/高台/峡谷地形 + 敌人阵型。`buildNode` 里：门位置用 wlayout 的 `Rf`；`layPlan` 用不规则边界的最小半径 `Rmin`；高度 = wlayout 的 H + `LY.dh`；散布同时过 `WLayout.keep` 与 `LY.skip`；返回值同时带 `Rf/wx/tag/lp` 与 `spots/lay/bossAt`；横幅同时显示原型名与 wlayout 标签。两者各自是 MOD（`wlayout` / `worldlay`），可单独关闭。
