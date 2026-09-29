@@ -866,3 +866,9 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **奖励**：`claim()` 按 `hash(bookId|name)` 确定性地给一枚魂印（tome 75%/book 45%/note 20% 概率是典籍类，其余 wild），一颗头最多 6 枚，另赠魂晶。
 - **掉落**：`sack.js` `roll()` 末尾调用 `Books.rollLoot`（宝箱 26%、木箱 13%、尸体 15%…）；`inv()` 里首次调用 `Books.starter` 送一本教程书 + 一张笔记；`corpse()` 的 `extra.B` 带霸主信息。
 - 测试：`_tools/wv/books.html` 是无游戏依赖的阅读器/对证测试页（需要把 `bosses.js` 放在同目录，见提交说明）；整包游戏 headless 仍会 OOM，未整体跑过——**用户请重点试：洞里典籍页签、拿书对证、野外搜箱出书**。
+
+## 第二十二轮（续 4）· Arena Agent：首级日用品（Stage D）
+- 新增 `js/curios.js`（MOD `curios`，默认开，index.html 在 oddities.js 之后加载）：6 座新放首级建筑，只经 BuildCat.C / Unlocks.R / G.HOOK 挂载：
+  `cuckoo` 布谷钟（1 槽，45 秒弹出报时 ×4；E 拨针；现实整点连敲）· `vending` 魂饮自动贩卖机（材料库存，E 取货/投币买药，会出 Props 原料）· `roulette` 魂盘赌局（6 槽，盘带首级旋转，E 押 10% 魂晶）· `head_piano` 亡者琴键（7 槽，魂阶不递减=上行音阶+共鸣 buff）· `sworn` 结义坛（3 槽，缘分=同族/同信仰/同乡/同性情）· `auction` 落槌拍卖台（出价随时间涨，E 落槌）。
+- `sack.js` 导出增加 `stashAdd/have/take`。测试台：`_tools/wv/curios.html`（配合 /tmp/cur.py 那种 playwright 脚本；假 G + 假首级）。
+- 与已有建筑不重复（对照 builds/oddities/rites/sanctum 清单）。首级不说话，只有数字与音效（第八轮规则）。
