@@ -27,8 +27,11 @@ window.Cave = (() => {
     const g = new THREE.Group(); g.name = 'cave';
     const H = 3.6 + R * 0.28;
     // 地面
-    const fg = new THREE.CircleGeometry(R + 0.8, 96, 0, Math.PI * 2); fg.rotateX(-Math.PI / 2);
-    { const p = fg.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); const d = Math.hypot(x, z) / R; p.setY(i, d > 0.85 ? (d - 0.85) * 2.5 * fbm(x * 0.5, 0, z * 0.5) : 0); } fg.computeVertexNormals();
+    // 第十二轮修复：原 CircleGeometry 只有圆心+外圈顶点，外圈抬高后整个地面变成缓坡锥面（离中心越远越高，头"陷进地里"）。
+    // 改为带径向分环的 RingGeometry：中间严格平坦，只有墙根处起伏；并导出 floorAt 供物理使用。
+    const floorAt = (x, z) => { const d = Math.hypot(x, z) / R; return d > 0.85 ? (d - 0.85) * 2.5 * fbm(x * 0.5, 0, z * 0.5) : 0; };
+    const fg = new THREE.RingGeometry(0.001, R + 0.8, 96, Math.max(24, Math.round((R + 0.8) * 5))); fg.rotateX(-Math.PI / 2);
+    { const p = fg.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); p.setY(i, floorAt(x, z)); } fg.computeVertexNormals();
       const uv = fg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, p.getX(i) / 3, p.getZ(i) / 3); }
     const floor = new THREE.Mesh(fg, new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.95, color: '#b8a898' })); floor.receiveShadow = true; g.add(floor);
     // 穹顶岩壁
@@ -52,7 +55,7 @@ window.Cave = (() => {
     // 钟乳石 / 石笋
     const M = B().M;
     const stal = new THREE.Group(); g.add(stal);
-    const nStal = Math.round(R * R * 0.35);
+    const nStal = Math.round(R * R * 0.35); const pillars = []; // 地面石笋/岩石：简单圆柱碰撞
     const cg = new THREE.ConeGeometry(1, 1, 7, 3);
     for (let i = 0; i < nStal; i++) {
       const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * R * 0.85; const x = Math.cos(a) * r, z = Math.sin(a) * r;
@@ -66,7 +69,8 @@ window.Cave = (() => {
       const a = Math.random() * Math.PI * 2; const r = R * (0.8 + Math.random() * 0.12); const x = Math.cos(a) * r, z = Math.sin(a) * r;
       if (Math.abs(Math.atan2(x, -z)) < 0.35) continue;
       const h = 0.3 + Math.random() * 1.2; const m = new THREE.Mesh(cg, M.stone); m.scale.set(0.12 + h * 0.15, h, 0.12 + h * 0.15); m.position.set(x, h / 2 - 0.05, z); stal.add(m);
-      if (Math.random() < 0.5) { const rr = B().rock(0.2 + Math.random() * 0.35, M.stone, x + (Math.random() - 0.5) * 0.8, 0.05, z + (Math.random() - 0.5) * 0.8); stal.add(rr); }
+      pillars.push({ x, z, r: 0.12 + h * 0.15, h });
+      if (Math.random() < 0.5) { const rs = 0.2 + Math.random() * 0.35, rx = x + (Math.random() - 0.5) * 0.8, rz = z + (Math.random() - 0.5) * 0.8; const rr = B().rock(rs, M.stone, rx, 0.05, rz); stal.add(rr); pillars.push({ x: rx, z: rz, r: rs * 0.9, h: rs }); }
     }
     // 出口隧道与天光
     const exitZ = -R * 1.05;
@@ -100,7 +104,7 @@ window.Cave = (() => {
       const sg = makeSign('地精行商·斯尼克 [E]'); sg.position.set(0, 2.35, 0.5); merchant.add(sg);
     }
     scene.add(g);
-    return { group: g, R, H, exitPos: new THREE.Vector3(0, 0, exitZ + 0.3), merchantPos: merchant.position.clone(), flames, firePos: new THREE.Vector3(0, 0.4, 0), sky };
+    return { group: g, R, H, exitPos: new THREE.Vector3(0, 0, exitZ + 0.3), merchantPos: merchant.position.clone(), flames, firePos: new THREE.Vector3(0, 0.4, 0), sky, floorAt, pillars };
   }
 
   function makeSign(text) {

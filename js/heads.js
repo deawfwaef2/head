@@ -371,7 +371,7 @@ window.ModelHeads = (() => {
         const hm = mat('hat' + hc, () => new THREE.MeshToonMaterial({ color: hc, gradientMap: grad, side: THREE.DoubleSide }));
         const hat = new THREE.Group();
         const brim = new THREE.Mesh(geo('brim', () => new THREE.CylinderGeometry(0.125, 0.125, 0.004, 32)), hm); hat.add(brim);
-        const cone = new THREE.Mesh(geo('hcone', () => { const c = new THREE.ConeGeometry(0.085, 0.2, 24, 6, true); c.translate(0, 0.1, 0); const p = c.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); p.setZ(i, p.getZ(i) - Math.pow(y / 0.2, 2.2) * 0.07); } c.computeVertexNormals(); return c; }), hm); hat.add(cone);
+        const cone = new THREE.Mesh(geo('hcone', () => { const c = new THREE.ConeGeometry(0.085, 0.2, 24, 6, true); c.translate(0, 0.1, 0); const p = c.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); p.setZ(i, p.getZ(i) - Math.pow(Math.max(0, y) / 0.2, 2.2) * 0.07); } c.computeVertexNormals(); return c; }), hm); hat.add(cone);
         const band = new THREE.Mesh(geo('band', () => new THREE.CylinderGeometry(0.082, 0.085, 0.018, 24, 1, true)), mat('bandM', () => new THREE.MeshToonMaterial({ color: '#8a1a2a', gradientMap: grad }))); band.position.y = 0.012; hat.add(band);
         hat.position.set(0, top - 0.03, -0.01); hat.rotation.set(-0.12, 0, 0.1); g.add(hat);
       }

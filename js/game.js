@@ -805,11 +805,42 @@ window.startGame = function () {
   const RESTS = [new V3(0, -1, 0), new V3(1, 0, 0), new V3(-1, 0, 0), new V3(0, 0, -1), new V3(0, 0, 1)];
   // 按当前朝下的方向估算首级的支撑高度（椭球近似：断面/侧脸/后脑/脸），侧躺时不会悬空
   const _ld = new V3(), _iq = new THREE.Quaternion();
+  // 第十二轮：按真实形状求支撑高度——预计算约 160 个极值点（脸/耳/角/饰品 + 贴近头骨的头发，不含长发尾），
+  // 支撑高度 = 当前朝向下最低点的深度；旧的椭球近似会让侧躺/带角的头陷进地面。
+  const HULL_DIRS = (() => { const a = [], n = 96, ga = Math.PI * (3 - Math.sqrt(5)); for (let i = 0; i < n; i++) { const y = 1 - (i + 0.5) / n * 2, r = Math.sqrt(1 - y * y), t = ga * i; a.push(new V3(Math.cos(t) * r, y, Math.sin(t) * r)); } return a; })();
+  const _hv = new V3(), _hm = new THREE.Matrix4(), _hi = new THREE.Matrix4();
+  const HULLC = new Map(); // 同外观签名共享
+  function hullKey(h) { const l = h.rec && h.rec.look; return l ? [l.f, l.h, (l.acc || []).join('+'), l.feat || '', l.hx ? l.hx.s + (l.hx.ahoge || '') + (l.hx.len || '') : '', (l.hw || []).map(w => w.k || w).join('+')].join('|') : null; }
+  function hullOf(h) {
+    if (h._hullHb === h.hb && h._hull) return h._hull;
+    const hk = hullKey(h); if (hk && HULLC.has(hk)) { h._hull = HULLC.get(hk); h._hullHb = h.hb; return h._hull; }
+    const g = h.g, q0 = g.quaternion.clone(), p0 = g.position.clone(), sc = h.hb.group.scale.clone();
+    g.quaternion.identity(); g.position.set(0, 0, 0); h.hb.group.scale.setScalar(HS); g.updateMatrixWorld(true); _hi.copy(g.matrixWorld).invert();
+    const best = new Float32Array(HULL_DIRS.length).fill(-1e9), pts = new Array(HULL_DIRS.length);
+    const lim = 0.16 * HS; // 头发只取贴近头部中心的部分
+    h.hb.group.traverse(o => {
+      if (!o.isMesh || !o.geometry || !o.geometry.attributes.position || o.isSprite) return;
+      const P = o.geometry.attributes.position, step = Math.max(1, Math.floor(P.count / 350));
+      _hm.multiplyMatrices(_hi, o.matrixWorld);
+      for (let i = 0; i < P.count; i += step) {
+        _hv.fromBufferAttribute(P, i).applyMatrix4(_hm);
+        if (_hv.length() > lim) continue;
+        for (let k = 0; k < HULL_DIRS.length; k++) { const d = _hv.dot(HULL_DIRS[k]); if (d > best[k]) { best[k] = d; pts[k] = _hv.clone(); } }
+      }
+    });
+    g.quaternion.copy(q0); g.position.copy(p0); h.hb.group.scale.copy(sc); g.updateMatrixWorld(true);
+    const out = []; const seen = new Set();
+    pts.forEach(p => { if (!p) return; const key = p.x.toFixed(4) + p.y.toFixed(4) + p.z.toFixed(4); if (!seen.has(key)) { seen.add(key); out.push(p.x, p.y, p.z); } });
+    if (out.length < 12) { const r = 0.1 * HS; for (const d of HULL_DIRS) out.push(d.x * r, d.y * r, d.z * r); }
+    h._hull = new Float32Array(out); h._hullHb = h.hb; if (hk) HULLC.set(hk, h._hull); return h._hull;
+  }
   function supportH(h) {
-    const e = h.ext || (h.ext = (() => { const m = h.hb.meta || {}, b = m.box || [[-0.1, -0.1, -0.11], [0.1, 0.13, 0.09]]; return { xp: Math.max(b[1][0], -b[0][0]) * 0.82 * HS, yn: -(m.bottom != null ? m.bottom : -0.097) * HS + 0.012, yp: (m.hairTop || 0.12) * 0.9 * HS, zp: (m.front || 0.08) * HS, zn: -b[0][2] * 0.8 * HS }; })());
-    _iq.copy(h.g.quaternion).invert(); _ld.set(0, -1, 0).applyQuaternion(_iq);
-    const x = _ld.x * e.xp, y = _ld.y * (_ld.y < 0 ? e.yn : e.yp), z = _ld.z * (_ld.z > 0 ? e.zp : e.zn);
-    return Math.max(0.1, Math.sqrt(x * x + y * y + z * z));
+    const H = hullOf(h), q = h.g.quaternion;
+    // 局部点旋转后的 y 分量：y' = 2(xy+wz)x·... 用矩阵第二行更快
+    const x = q.x, y = q.y, z = q.z, w = q.w;
+    const r0 = 2 * (x * y - w * z), r1 = 1 - 2 * (x * x + z * z), r2 = 2 * (y * z + w * x);
+    let mn = 0; for (let i = 0; i < H.length; i += 3) { const yy = r0 * H[i] + r1 * H[i + 1] + r2 * H[i + 2]; if (yy < mn) mn = yy; }
+    return Math.max(0.06, -mn + 0.004);
   }
   function impact(h, v) {
     if (h.lastHit > 0) return; h.lastHit = 0.08;
@@ -841,7 +872,9 @@ window.startGame = function () {
       h.g.position.addScaledVector(h.vel, dt);
       const p = h.g.position;
       const floorHead = supportH(h); // 由朝向决定的支撑高度（断面朝下≈旧值，侧躺更低）
-      if (p.y < floorHead) contact(h, 0, 1, 0, floorHead - p.y);
+      const fl = floorOf(p) + floorHead; // 地面真实高度（墙根起伏）
+      if (p.y < fl) contact(h, 0, 1, 0, fl - p.y);
+      if (cave.pillars) for (const c of cave.pillars) { const dx = p.x - c.x, dz = p.z - c.z, rr0 = c.r + RC * 0.8; if (p.y < c.h + RC && dx * dx + dz * dz < rr0 * rr0) { const d = Math.hypot(dx, dz) || 1e-4; contact(h, dx / d, 0, dz / d, rr0 - d); } }
       if (p.y > cave.H - 0.5) contact(h, 0, -1, 0, p.y - (cave.H - 0.5));
       const rr = Math.hypot(p.x, p.z); if (rr > R) contact(h, -p.x / rr, 0, -p.z / rr, rr - R);
       for (const c of colliders) {
@@ -885,7 +918,7 @@ window.startGame = function () {
       }
     }
     // 被推挤的休眠首级也要做地面约束（修复“头陷进地里”）
-    for (const h of heads) { if (h === held || h.mount) continue; const fy = supportH(h); if (h.g.position.y < fy - 0.002) { h.g.position.y = fy; if (h.vel.y < 0) h.vel.y = 0; h.sleep = Math.min(h.sleep, 0.5); } const rr2 = Math.hypot(h.g.position.x, h.g.position.z), R2 = cave.R - 0.82; if (rr2 > R2) { h.g.position.x *= R2 / rr2; h.g.position.z *= R2 / rr2; } }
+    for (const h of heads) { if (h === held || h.mount || (h.sleep > 1 && h._hullHb !== h.hb && floorOf(h.g.position) < 0.002)) continue; const fy = supportH(h) + floorOf(h.g.position); if (h.g.position.y < fy - 0.002) { h.g.position.y = fy; if (h.vel.y < 0) h.vel.y = 0; h.sleep = Math.min(h.sleep, 0.5); } const rr2 = Math.hypot(h.g.position.x, h.g.position.z), R2 = cave.R - 0.82; if (rr2 > R2) { h.g.position.x *= R2 / rr2; h.g.position.z *= R2 / rr2; } }
     for (const h of heads) {
       if (h === held || h.mount || h.sleep > 1.0) continue;
       if (h.grounded) {
@@ -1121,7 +1154,7 @@ window.startGame = function () {
       camera.getWorldDirection(dirV);
       const target = camera.position.clone().addScaledVector(dirV, 0.6).add(new V3(0, -0.12, 0));
       lastHeldPos.copy(held.g.position);
-      held.g.position.lerp(target, Math.min(1, dt * 16)); { const fy = supportH(held); if (held.g.position.y < fy) held.g.position.y = fy; }
+      held.g.position.lerp(target, Math.min(1, dt * 16)); { const fy = supportH(held) + floorOf(held.g.position); if (held.g.position.y < fy) held.g.position.y = fy; }
       heldVel.subVectors(held.g.position, lastHeldPos).divideScalar(Math.max(dt, 1e-4)); held.vel.copy(heldVel);
       const faceQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(-player.pitch * 0.4, player.yaw, 0, 'YXZ'));
       faceQ.multiply(new THREE.Quaternion().setFromAxisAngle(UP, heldYaw)); held.g.quaternion.slerp(faceQ, Math.min(1, dt * 12));
@@ -1188,9 +1221,10 @@ window.startGame = function () {
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) ui.toast.classList.remove('show'); }
     if (post && post.on) post.render(scene, camera); else renderer.render(scene, camera);
   }
+  function floorOf(p) { return cave && cave.floorAt ? cave.floorAt(p.x, p.z) : 0; }
   function groundY(p) {
     for (const b of builds) { const d = CAT[b.type]; if (!d.surface) continue; const [hx, hz] = fpOf(b.type, b.rot); if (Math.abs(p.x - b.x) < hx && Math.abs(p.z - b.z) < hz && p.y >= d.surface) return d.surface; }
-    return 0;
+    return floorOf(p);
   }
   function updateHud() {
     const s = st();
@@ -1227,7 +1261,7 @@ window.startGame = function () {
 
   // ---------------- 对外 ----------------
   window.G = {
-    _dbg: { submitBounty: h => submitBounty(h), interactE: () => interactE(), startSeance: h => startSeance(h), carry() { bagCarrying = true; }, unloadBag: () => unloadBag(), get cine() { return cine; } },
+    _dbg: { supportH: h => supportH(h), hullOf: h => hullOf(h), submitBounty: h => submitBounty(h), interactE: () => interactE(), startSeance: h => startSeance(h), carry() { bagCarrying = true; }, unloadBag: () => unloadBag(), get cine() { return cine; } },
     hasAff, yieldOf, exhibit, codexInfo, daily, DAILY, bounties, rerollBounties, EX_T, fmtN, S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
     save, wipe, setUI, lockPointer, spawnReturnHeads, addHeadRecs, createReturnBag, usedSig, usedNames, headOf, removeHead, refreshWeapon, burst, get cave() { return cave; },
     post, lod, get lodStat() { return lodStat; }, startHP, confirmHP, cancelHP, updateHP, get hplace() { return hplace; }, storeHead, takeOut, storeLoose, vaultCount, MAX_HEADS, VAULT_MAX, HOOK, rebuildHead, floatText, spawnBeam, gachaCard, lookHit, unmount, soulWisp, trigger, SAVE_KEY, get clock() { return clock; }, get held() { return held; }, set held(v) { held = v; }, get keys() { return keys; }, get cine() { return cine; }, setUIOpen: v => setUI(v),
