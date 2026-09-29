@@ -237,6 +237,7 @@
   kbd { font: inherit; font-weight: 700; color: #ffcf70; margin-right: 3px; } #hint span { margin-right: 10px; white-space: nowrap; } #menu .keys span { margin: 0 8px; } #hintTag { display: none; }
 </style>
 <link rel="stylesheet" href="css/ui3a.css">
+<style>.langtabs{display:flex;gap:6px;margin:0 0 9px}.langtabs button{padding:4px 10px;border:1px solid #8c7148;background:#17120e;color:#cdbb9d;cursor:pointer}.langtabs button.on{color:#fff0bc;border-color:#e0b75d;background:#3a2915}#introCopy{max-height:210px;overflow:auto}</style>
 </head>
 <body>
 <script>try{var __m=JSON.parse(localStorage.getItem('soulhead_mods')||'{}');if(__m.ui3a!==false)document.body.classList.add('ui3a');}catch(e){document.body.classList.add('ui3a');}</script>
@@ -259,10 +260,12 @@
 <div id="hint"><span><kbd>WASD</kbd>移动</span><span><kbd>Shift</kbd>跑</span><span><kbd>C</kbd>下蹲</span><span><kbd>左键</kbd>把玩</span><span><kbd>F</kbd>拔刀 <small style="opacity:.6">左键挥砍 · 连点刺 · 右键格挡</small></span><span><kbd>E</kbd>拿起/互动</span><span><kbd>I</kbd>查看</span><span><kbd>滚轮</kbd>转向 <kbd>V</kbd>换表情 <kbd>右键</kbd>投掷</span><span><kbd>Q</kbd>放下麻袋</span><span><kbd>B</kbd>建造</span><span><kbd>Tab</kbd>菜单</span><span><kbd>H</kbd>喝药</span><span><kbd>J</kbd>成就</span><span><kbd>K</kbd>收藏</span><span><kbd>O</kbd>MOD</span><span><kbd>M</kbd>BGM</span></div>
 <div id="menu" class="hidden">
   <div class="title">魂首窟<small>SOULHEAD CAVE · 食人魔的收藏</small></div>
-  <div class="rules">你是被月之魔女诅咒的食人魔<b>格罗克</b>，只能以亡魂为食。<br>
-    走出洞窟去<b>狩猎</b>——精灵、修女、女骑士、魔女、龙裔公主……每一个都是<b>独一无二</b>的随机角色。<br>
-    <b>点击 60 次</b>把首级背回洞里，<b>把玩</b>它们榨出<b>🔮魂晶</b>；买装备、练属性、建造和<b>挖深</b>你的洞窟。<br>
-    在外面死掉，<b>一切归零</b>。</div>
+  <div class="rules" id="introCopy">
+    <div class="langtabs"><button data-lang="zh" class="on">中文</button><button data-lang="ja">日本語</button><button data-lang="en">English</button></div>
+    <div data-copy="zh"><b>《魂首窟》</b>是一款第一人称暗黑奇幻搜刮战斗游戏。你是受诅咒的食人魔格罗克：探索每次重构的地点，阅读遭遇，判断战斗或撤离。<br><b>教程：</b>WASD 移动，F 拔刀；挥动鼠标完成有力度的挥砍，连点突刺，右键定向格挡，Q 闪身。搜刮材料、装备与药剂，回洞训练升级并扩建收藏。</div>
+    <div data-copy="ja" hidden><b>『魂首窟』</b>は一人称視点のダークファンタジー探索アクション。呪われたオーガ、グロクとして、毎回姿を変える土地を探索し、物語を読み、戦うか撤退するかを選びます。<br><b>操作：</b>WASDで移動、Fで抜刀。マウスを大きく振って斬撃、クリックで刺突、右クリックで方向ガード、Qで回避。素材と装備を持ち帰り、訓練・強化・建築を行います。</div>
+    <div data-copy="en" hidden><b>SOULHEAD CAVE</b> is a first-person dark-fantasy looter brawler. As Grok, a cursed ogre, explore remixed locations, meet their inhabitants, and choose whether to fight or retreat.<br><b>How to play:</b> Move with WASD and draw your weapon with F. Swing the mouse for committed slashes, click to thrust, hold right mouse to guard by direction, and press Q to dodge. Loot materials and gear, then return home to train, upgrade, and build.</div>
+  </div>
   <button class="bigbtn" id="startBtn">开始游戏</button>
   <button class="bigbtn" id="modBtn" style="margin-left:10px;background:linear-gradient(135deg,#3a2a50,#2a1a3a)">🧩 MOD</button>
   <button class="smallbtn" id="resetBtn">删除存档重新开始</button> <button class="smallbtn musicBtn" onclick="SFX.toggleMusic()">🎵 BGM 开</button>
@@ -270,6 +273,7 @@
   <div id="credits">头部基础模型：pixiv Inc. VRoid 样例 (CC0 / 使用条款)、VirtualCast VRM 样例 (VRM Public License)、Godette by SirRichard94 (CC-BY)、以及 24 位 VRoid 社区作者公开的 VRM 模型 —— 经裁切、混搭与改造。<br>音乐：Kevin MacLeod (incompetech.com) CC-BY 4.0 · 音效：Kenney (CC0)。详见 CREDITS.md</div>
 </div>
 <div id="loading"><div class="title" style="font-size:52px">魂首窟</div><div id="loadtxt">加载中…（如一直停在这里，请用 Chrome / Edge 打开）</div><div id="loadbar"><i></i></div></div>
+<script>document.getElementById('introCopy').addEventListener('click',function(e){var b=e.target.closest('[data-lang]');if(!b)return;this.querySelectorAll('[data-lang]').forEach(function(x){x.classList.toggle('on',x===b)});this.querySelectorAll('[data-copy]').forEach(function(x){x.hidden=x.dataset.copy!==b.dataset.lang})});</script>
 <script src="lib/three.min.js"></script>
 <script src="lib/GLTFLoader.js"></script>
 <script src="js/mods.js"></script>

@@ -98,8 +98,8 @@ window.Combat = (() => {
   // 返回镜头转动系数：挥砍/格挡时鼠标主要用于控制武器
   function onMove(dx, dy) {
     if (!drawn) return 1;
-    if (S.lmb && XH()) { S.mAcc.x += dx; S.mAcc.y -= dy; S.drag += Math.hypot(dx, dy) * 0.0062; return 1; }
-    if (S.lmb) { const k = 0.0062; S.ctrl.x += dx * k; S.ctrl.y -= dy * k; S.drag += Math.hypot(dx, dy) * k; const r = Math.hypot(S.ctrl.x, S.ctrl.y); if (r > 1.25) { S.ctrl.x *= 1.25 / r; S.ctrl.y *= 1.25 / r; } return 1; } // 旧：鼠标控制武器轨迹 // 第十八轮：挥砍 = 刀尖锁在准星上，鼠标只转镜头
+    if (S.lmb && XH()) { S.mAcc.x += dx; S.mAcc.y -= dy; S.drag += Math.hypot(dx, dy) * 0.0062; return 0.42; }
+    if (S.lmb) { const k = 0.0062; S.ctrl.x += dx * k; S.ctrl.y -= dy * k; S.drag += Math.hypot(dx, dy) * k; const r = Math.hypot(S.ctrl.x, S.ctrl.y); if (r > 1.25) { S.ctrl.x *= 1.25 / r; S.ctrl.y *= 1.25 / r; } return 0.42; } // 旧：鼠标控制武器轨迹 // 第十八轮：挥砍 = 刀尖锁在准星上，鼠标只转镜头
     if (S.rmb) { S.guard.x += dx * 0.022; S.guard.y -= dy * 0.022; const r = Math.hypot(S.guard.x, S.guard.y); if (r > 1) { S.guard.x /= r; S.guard.y /= r; } return window.Mods && Mods.on('guard_slowlook') ? 0.45 : 1; } // 第十九轮：用户要求格挡时降灵敏度
     return 1;
   }

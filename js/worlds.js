@@ -672,7 +672,7 @@ window.Worlds = (() => {
       for (const k of Object.keys(S.bosses || {})) { const R = graph.regions.find(x => x.k === k); if (R) graph.nodes[R.boss].boss = false; }
     } else graph = genTrip(trip.loc, (Math.random() * 4294967296) >>> 0);
     const pool = (trip.res.heads || []).slice(); trip.res.heads = []; // 猎物要亲手砍
-    W = { trip, api, graph, pool, cur: -1, B: null, pos: new V3(), vel: new V3(), onGround: true, prey: [], boss: null, dead: false, fade: 0, busy: true, t: 0, stepT: 0, hintT: 0, say: [], camFar: G.camera.far, doorNear: null, mapOpen: false };
+    W = { trip, api, graph, pool, cur: -1, B: null, pos: new V3(), vel: new V3(), onGround: true, prey: [], boss: null, dead: false, fade: 0, busy: true, t: 0, stepT: 0, hintT: 0, say: [], camFar: G.camera.far, doorNear: null, mapOpen: false, storySeen: new Set() };
     G.setUI(false); try { G.lockPointer(); } catch (e) {}
     ensureDom(); W.dom.root.style.display = 'block';
     if (!provReg && window.Combat) { Combat.addProvider(targets); provReg = true; }
@@ -697,6 +697,18 @@ window.Worlds = (() => {
   }
   function stylesOf(i) { const lk = layOf(W.graph.nodes[i]), ln = LAYOUTS[lk] ? LAYOUTS[lk].need : []; return stylesOf0(i).concat(ln).filter((n, k, a) => a.indexOf(n) === k); }
   function stylesOf0(i) { if (LITE) { const st0 = styleOf(W.graph.nodes[i]); return ['sky_' + st0.sky, 'tex_' + st0.ground]; } const st = styleOf(W.graph.nodes[i]); if (st.g) return WGen.assets(st, W.graph.nodes[i]); const names = ['sky_' + st.sky, 'tex_' + st.ground]; st.props.forEach(p => p[0].forEach(n => names.push(n.replace('#*', '')))); if (st.edge) st.edge[0].forEach(n => { names.push(n.replace('#*', '')); if (LO[n]) names.push(n + '_lo'); }); ['namaqualand_boulder_03', 'namaqualand_boulder_04', 'rock_09', 'horse_statue_01', 'gothic_statue', 'wooden_barrels_01', 'Barrel_02', 'wooden_military_crate', 'dead_tree_trunk', 'dead_tree_trunk_02', 'dead_quiver_trunk'].forEach(n => names.push(n)); return names.filter(n => n !== 'brazier'); }
+  function nodeStory(node, canRetreat) {
+    if (!W || W.storySeen.has(node.i)) return Promise.resolve(true);
+    W.storySeen.add(node.i); document.exitPointerLock && document.exitPointerLock();
+    const count = (node.prey || []).length + (node.boss ? 1 : 0), boss = node.boss && window.Explore && Explore.BOSSES[node.region];
+    const mood = node.home ? '洞口的魂火在身后渐渐熄灭。前方的风带来陌生的气味，也带来盔甲与脚步的回声。' : node.stone ? '古老魂门在雾中低鸣。这里曾是旅人的避难所，如今只剩被打断的路标和新鲜足迹。' : count ? `这里并不空旷。你听见 ${count} 道不同的呼吸；有人已经发现了门边的影子，却还没有决定迎战还是逃跑。` : '风穿过无人照看的遗迹。没有人回应，但翻倒的容器和未熄的余烬说明这里刚刚有人离开。';
+    const goal = boss ? `霸主「${boss.n || boss.name || '未知之主'}」就在此地。她不会像普通守卫那样轻易露出破绽。` : count ? '观察站位、利用障碍；搜刮后仍可回到门边安全撤离。' : '这是搜寻材料、药剂和装备的好机会，但别在角落里放松警惕。';
+    return new Promise(resolve => {
+      const d = document.createElement('div'); d.id = 'wStory'; d.style.cssText = 'position:fixed;inset:0;z-index:80;display:grid;place-items:center;background:#030202aa;pointer-events:auto';
+      d.innerHTML = `<div style="width:min(560px,88vw);max-height:72vh;overflow:auto;padding:24px 26px;background:linear-gradient(145deg,#18110df5,#080706f8);border:1px solid #c99a4f;box-shadow:0 20px 70px #000;border-radius:4px;color:#eadcc7"><div style="font-size:11px;letter-spacing:4px;color:#b98d54">地点遭遇 · ${esc(node.loc.n)}</div><h2 style="margin:8px 0 12px;color:#ffe2a0">${esc(node.name)}</h2><p style="line-height:1.8;color:#d6c9b8">${mood}</p><p style="line-height:1.7;color:#e5bd79">${esc(goal)}</p><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">${canRetreat?'<button data-a="retreat" style="padding:9px 15px;background:#171514;color:#c9bba8;border:1px solid #766">从门边撤回洞窟</button>':''}<button data-a="enter" style="padding:9px 20px;background:#5a3517;color:#ffe9bb;border:1px solid #d5a85c">踏入此地</button></div></div>`;
+      const done = ok => { d.remove(); resolve(ok); }; d.onclick = e => { const b=e.target.closest('button'); if(b) done(b.dataset.a==='enter'); }; document.body.appendChild(d);
+    });
+  }
   async function goto(i, from) {
     W.busy = true; const node = W.graph.nodes[i];
     fadeTo(1); await wait(260);
@@ -734,6 +746,8 @@ window.Worlds = (() => {
     if (window.Combat && Combat.attach) Combat.attach(B.sc);
     try { const tc0 = performance.now(); const cm = G.camera; cm.position.set(W.pos.x, W.pos.y + EYE, W.pos.z); cm.rotation.set(G.player.pitch, G.player.yaw, 0, 'YXZ'); cm.updateMatrixWorld(true); if (G.post && G.post.on) G.post.render(B.sc, cm); else G.renderer.render(B.sc, cm); tp('firstframe', tc0); } catch (e) { console.warn('precompile', e); } // 进场前先渲一帧：着色器编译/贴图上传都藏在加载画面后面
     tp('total', tg0); W.dom.load.style.display = 'none'; hud(); banner(node);
+    const enter = await nodeStory(node, true); if (!W) return; if (!enter) { leaveHome(); return; }
+    try { G.lockPointer(); } catch (e) {}
     await wait(60); fadeTo(0); W.busy = false;
     if (W.boss) setTimeout(() => { if (W && W.boss) bossSay(W.boss.B.say, 5); }, 1500);
   }
