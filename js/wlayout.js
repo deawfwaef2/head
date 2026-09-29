@@ -28,7 +28,7 @@ window.WLayout = (() => {
   // ---------- 1) 规划：形状 / 地形 / 布局 / 天气 ----------
   function plan(node, nz) {
     if (!on() || node.home) return null;
-    const r = mulberry((node.seed ^ 0x51ED270B) >>> 0), R = node.R, P = { R, nz };
+    const r = mulberry((node.seed ^ 0x51ED270B) >>> 0), R = node.R, P = { R, nz, node };
     P.elong = r() < 0.5 ? 0.18 + r() * 0.34 : 0; P.th = r() * 6.283; P.lob = 0.05 + r() * 0.15; P.lobF = 2 + Math.floor(r() * 3); P.ph = r() * 6.283;
     P.Rf = a => R * (1 + P.elong * Math.cos(a - P.th) ** 2 + P.lob * (0.5 + 0.5 * Math.sin(a * P.lobF + P.ph)));
     P.Rmax = R * (1 + P.elong + P.lob);
@@ -63,9 +63,10 @@ window.WLayout = (() => {
     P.pathD = (x, z) => { if (x < x0 - 3 || x > x1 + 3 || z < z0 - 3 || z > z1 + 3) return 9; let m = 1e9; for (const s of segs) { const dx = s[2] - s[0], dz = s[3] - s[1], l2 = dx * dx + dz * dz || 1, t = clamp(((x - s[0]) * dx + (z - s[1]) * dz) / l2, 0, 1), ex = x - s[0] - dx * t, ez = z - s[1] - dz * t, d = ex * ex + ez * ez; if (d < m) m = d; } return Math.sqrt(m); };
   }
   // 地形附加：土丘/洼地 + 凹路
+  const BIG = { lake: 1, henge: 1, ravine: 1 }; // 总管理师的 worldlay 原型：这些自带大地形，就不再叠土丘/凹路
   function dH(P, x, z, flat) {
-    let h = 0;
-    if (P.hump) { const d = Math.hypot(x - P.hump.x, z - P.hump.z); h += P.hump.h * Math.exp(-(d * d) / (P.hump.s * P.hump.s)) * flat; }
+    let h = 0; const lay = P.node.lay; if (BIG[lay]) { if (lay === 'ravine') return 0; }
+    if (P.hump && !BIG[lay]) { const d = Math.hypot(x - P.hump.x, z - P.hump.z); h += P.hump.h * Math.exp(-(d * d) / (P.hump.s * P.hump.s)) * flat; }
     if (P.pathD) { const d = P.pathD(x, z); if (d < 2) h -= 0.13 * (1 - sstep(0.5, 1.6, d)); }
     return h;
   }
@@ -95,9 +96,11 @@ window.WLayout = (() => {
     const { sc, H, R, cols, free, mark, put, variants } = X, r = P.r;
     const place = (g, x, z, ry, dy) => { if (!g) return null; g.position.set(x, H(x, z) + (dy || 0), z); g.rotation.y = ry || 0; sc.add(g); return g; };
     const loc = (ox, oz, x, z, ry) => [x + ox * Math.cos(ry) + oz * Math.sin(ry), z - ox * Math.sin(ry) + oz * Math.cos(ry)]; // 局部 → 世界（与 three 的 rotation.y 一致）
-    const lights = [];
+    const lights = [], lay = P.node.lay;
+    if (lay === 'camp') P.sp = P.sp.filter(k => k !== 'camp'); // worldlay 已经有营地
+    if (BIG[lay] && P.sp.length > 1) P.sp.length = 1;
     // 路边垒石
-    if (P.segs) { const vs = variants(['rock_09', 'rock_07', 'namaqualand_rocks_01#*']); let acc = 0;
+    if (P.segs && lay !== 'ravine') { const vs = variants(['rock_09', 'rock_07', 'namaqualand_rocks_01#*']); let acc = 0;
       if (vs.length) for (const s of P.segs) { const L = Math.hypot(s[2] - s[0], s[3] - s[1]); acc += L; if (acc < 2.4) continue; acc = 0; if (r() < 0.35) continue;
         const sd = r() < 0.5 ? -1 : 1, nx = -(s[3] - s[1]) / (L || 1), nz = (s[2] - s[0]) / (L || 1), x = s[2] + nx * sd * (1.35 + r() * 0.3), z = s[3] + nz * sd * (1.35 + r() * 0.3);
         if (Math.hypot(x, z) > R * 0.95) continue; const v = pick(r, vs), k = (0.28 + r() * 0.22) / Math.max(0.2, Math.max(v.t.size.x, v.t.size.z)); put(v.t, x, z, k, r() * 6.28); } }
