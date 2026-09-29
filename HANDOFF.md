@@ -318,3 +318,14 @@
 - 新增"眼睛透过刘海"：眼部先写本头专属模板值（只在脸前方可见处），本头头发跳过这些像素；LOD 渲染目标也开了模板缓冲。
 - 陷地修复（第二轮）：supportH 误用旋转矩阵第二列（=逆旋转），长耳/角/侧躺时插进地里；改为第二行。外壳：脸层网格（兔耳/猫耳/蝴蝶结）不受半径限制；采样 350→1500；方向 96→200；缓存键加网格数+顶点数。陷地测试 32 头 0 穿透。
 - 仓库 .git 已移到 /home/user/.cache/headgit（head/.git 是 gitdir 指针文件），工作区快照不再计入 .git；若 .cache 丢失：`git clone --no-checkout <url> /tmp/x && mv /tmp/x/.git /home/user/.cache/headgit` 再写回指针。
+
+## 第十三轮：画质重做（用户：“你优先解决画质问题！”——大师级、惊艳、替换垃圾场景和建筑模型）
+- **渲染**：`js/master.js` 新管线（HDR RT → 半分辨率 SAO+双边模糊 → Karis Bloom 6 级 → 径向体积光(篝火) → ACES+调色+颗粒 → FXAA）。档位 ultra/high/mid，`?q=ultra|high|mid` 强制；帧率自适应降档。风格 MOD 开启时仍走旧 `Post`。篝火点光投影（PCFShadowMap 1024），建筑投影，最近 24 个首级投影。
+- **资产管线（全部 CC0 Poly Haven，禁止程序化模型/贴图）**：
+  - `tools/phpack.py <id> --tris N --tex 512|1024` → `assets/<id>.js`（单缓冲 GLB，meshopt 简化，JPEG 贴图，base64）。
+  - `tools/phtex.py tex <id>` → `assets/tex_<id>.js`（diff/nor/arm）；`tools/phtex.py hdri <id> --w 256` → RGBE PNG。
+  - `js/assets.js`：`Assets.init()`（启动时先于首级加载）、`clone(名)`、`part(名,节点)`、`names(名)`、`tex(名)`、`img(名)`、`env(renderer)`（PMREM，只挂到外部资产材质，首级不受影响）、`triplanar(set,opt)`（世界空间三平面 PBR，whiteout 法线）。
+  - 新增资产要在 index.html 加 `<script src="assets/xxx.js">`（按字母序放在“第十三轮”注释下）。
+- **洞窟**（cave.js）：dark_rock 岩壁 / rock_ground 地面（三平面）、rock_face_01 崖面沿墙（`wallR(a)` 与穹顶同噪声求墙半径）、namaqualand 巨石 + rock_moss_set_02 苔石（带碰撞）、stone_fire_pit + 5×5 序列帧火焰精灵（`cave.update(now)`）、出口 large_iron_gate + 两盏 Lantern_01、商摊 WoodenTable_01/treasure_chest/wine_barrel_01/wooden_crate_01/Lantern_01。缺资产时退回旧程序化（仅兜底）。
+- **武器**：7 档全换真实模型（baseball_bat / ornate_medieval_mace / machete / ornate_war_hammer / wooden_axe_02 / antique_katana_01+紫辉 / antique_estoc+血辉），自动找长轴与握柄端。绿色球形拳头在真实武器时隐藏（待找手臂模型）。
+- **待办**：建筑 builds.js 全部类型换 Poly Haven 模型（分批）；地精商人换真实模型；手臂模型；更多灯光（壁挂提灯/烛台）。
