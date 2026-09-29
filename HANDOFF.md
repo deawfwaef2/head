@@ -607,3 +607,26 @@
 - 资产：24 个 `assets/*.js`（约 6.5MB，列在 index.html「第十五轮」注释下），来源写入 CREDITS.md。
 - 测试（headless，_t.html?q=mid）：7 座全部建成、挂首、每个 [E] 机制执行无报错；截图检查了茶会/肖像廊/摇椅/鉴定台/电视朝向/菜园。坑：hanging_picture_frame_01/02 原模型正面朝 -z，需 ry=π；Television_01 正面朝 -z（朝向沙发不用转）。
 - **环境坑**：/tmp 是内存 tmpfs（2GB 机器），把 300MB 仓库放 /tmp 会让 Chromium OOM 崩溃。仓库放 `/var/work/head`（根盘，不在工作区快照内）。
+
+---
+## 第十九轮 · 协同 Agent「UI 大师化」（UI Agent 追加；只追加，未改动任何旧段落）
+
+### 用户本轮反馈（原话要点，长期有效）
+- 头部模型只是**游戏里的虚构 3D 模型**，不是真人；用户本意是积极向上；剧情文本被别的模型污染成现在这样——**文本/剧情先不动**，用户自己之后会改成安全健康版本。新写内容沿用文件里原有的暗黑奇幻风格（方便用户一眼分辨哪些是新加的）。
+- 用户是「多 Agent 并行」跑这个项目：**必须在 HANDOFF 里写清楚自己改了哪些文件/哪些地方，避免互相乱改**。
+- 本 Agent 的任务：**把所有 UI 重置为大师级 / 3A 大作观感**（现有 UI = 小作坊游戏感），反馈感（音效、动效、粒子、震动、数字滚动、受击/低血量反馈）都要更爽。
+- 仍然有效：每次编程前先读本文件；只追加；频繁 commit+push；根目录 `index.html` 任何时刻双击可玩；工作区 < 128MB；把 UI 做成可开关 MOD。
+- 环境提醒：用户把 GitHub PAT 以聊天文本给出。**不要写入仓库文件**；建议用户用完后撤销/轮换。工作区本地不物化 `big/`（sparse-checkout 排除，远端保留；游戏运行时 `big/body`、`big/world`、`big/anim` 是懒加载）。恢复流程见第十三轮协作总则 A.6，另需 `git sparse-checkout` 排除 `/big/`。
+
+### UI Agent 的文件归属（其他 Agent 请勿大改这些文件里的**样式**；玩法/逻辑照旧归原 owner）
+| 文件 | 归属 | 说明 |
+|---|---|---|
+| `css/ui3a.css` | **UI Agent 独占** | 全部 3A 皮肤（覆盖层）。以 `body.ui3a` 为前缀 → 关闭 MOD `ui3a` 即回到旧样式。 |
+| `js/ui3a.js` | **UI Agent 独占** | 纯增强层：点击/悬停反馈音、粒子画布、HUD 血条残影/魂晶增量、受击&低血量反馈、菜单余烬、聚光灯卡片、提示键帽化。**只读** DOM/`G`/`SFX`，不修改玩法状态。 |
+| `js/mods.js` | 仅追加 1 条 `ui3a` MOD + `CATN.ui` | 默认开启。 |
+| `index.html` | UI Agent 仅改：`<head>` 中增加 `<link css/ui3a.css>`、`<script js/ui3a.js>`、`body` 类；HUD/菜单/加载页的**静态 DOM 结构**（保留原有 id：coins/hpbar/hptxt/power/headcount/tip/toast/cross/vign/labels/hint/startBtn/modBtn/resetBtn/musicCorner）。 | 其他 Agent 往 index.html 加 `<script>` 不受影响。 |
+- **约定**：旧的内联 `<style>`（index.html）与 worlds.js/combat.js 里运行时注入的 `<style>` **不删除**，UI 皮肤通过更高优先级选择器（`body.ui3a …`）覆盖。别的 Agent 新增 DOM 时请沿用现有 class 名（`.modal .bp-item .eq .loc .hd .log .gcard .float …`），皮肤自动生效；新增全新组件请在 `css/ui3a.css` 末尾的「第三方组件」段追加，或联系 UI Agent。
+- **设计语言**：「黑曜石 + 血金」。色板变量在 `css/ui3a.css` 顶部 `:root{--u-*}`。面板 = 黑曜石底 + 细金边 + 四角括饰 + 顶部高光线；按钮 = 斜切角 + 扫光 + 按压回弹；卡片 = 鼠标聚光灯边缘光；标题字体用衬线栈（Songti/Noto Serif CJK）。
+- 因运行环境没有 emoji 字体，截图里 emoji 会显示为方块——真实浏览器正常。UI Agent 在关键位置（HUD/菜单/技能栏）改用**内联 SVG 图标**（非 emoji），这些 SVG 是手写线稿图标，属于 UI 元素而非“模型/贴图”，不违反第十一轮“禁止程序化模型”的约束。
+
+### 进度记录（UI Agent）
