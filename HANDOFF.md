@@ -906,3 +906,11 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 原 119/1521 个坏组合修复后全部 <0.055。换模型后需重跑评分：见 bak 工具 cover3.js / cv5.py（渲染法：正面绿、皮肤背面红，头发一律绿）。
 
 - 注：R23 新增的 12 颗 MMD 首级不在评分表中 → coverScore 视为 0（行为不变）；如需覆盖，重跑评分工具生成新表。
+
+### 手感 / 沉浸（js/feel.js，新文件；三个独立 MOD，默认开，cat play）
+- 只挂 G.HOOK.frame / G.HOOK.pre + window mousedown（捕获阶段只计数），**未改 game.js**。index.html 在 perf2.js 后加 `<script src="js/feel.js">`；mods.js 加 3 条。
+- feel_bubble：低频旁白小字卡（#feelBubble，复用 .log 类 + 内联定位，底部居中，打字机动画）。全局 ≥11s 一条、同类 ≥40s。事件：拿起（带分量描述）、久握、手中转圈、连戳、长传（>7m 报米数）、连弹、空中翻滚、滚远、叠罗汉、轻放、重摔、脚边人多、反复拿同一颗。第三人称旁白，首级从不说话，萌/暗基调，无血腥。
+- feel_impact：落地（竖直速度由下变上/停）按速度扬尘土圈；按落点发声：另一颗首级=sack+squish 软声，台面=wood，石地=mine 低频；近处重摔镜头阻尼弹簧轻踢（相机每帧由 game.js 重设，只加偏移）。
+- feel_heft：Feel.heftOf(h) = 0.75~1.7（名字哈希+稀有度，稳定）。拿起下沉弹簧、转身滞后摆动、走路颠、戳一下微沉。偏移在 pre 加上、下一帧 frame 开头撤掉，不与 game.js 的 held lerp 累积。
+- 调试：Feel._st、Feel.say(kind, vars, prio)。
+- 测试注意：无头测试要 add_init_script 把 requestPointerLock 设为 undefined（否则目标页崩溃）；master 档位只有 ultra/high/mid，?q=low 会报 msaa undefined（仅测试 URL 问题）。
