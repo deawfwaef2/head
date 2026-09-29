@@ -129,10 +129,11 @@ window.ModelHeads = (() => {
     return mix(mix(mix(hh3(i),hh3(i+vec3(1,0,0)),f.x),mix(hh3(i+vec3(0,1,0)),hh3(i+vec3(1,1,0)),f.x),f.y),
                mix(mix(hh3(i+vec3(0,0,1)),hh3(i+vec3(1,0,1)),f.x),mix(hh3(i+vec3(0,1,1)),hh3(i+vec3(1,1,1)),f.x),f.y),f.z); }`;
 
+  const BRZ = (!window.Mods || Mods.on('breeze')) ? '1.0' : '0.0';
   function injectVertex(sh, sway) {
     sh.vertexShader = sh.vertexShader
       .replace('void main() {', `varying vec3 vHP;\n${sway ? 'uniform vec3 uSway; uniform float uHTop; uniform float uHLen; uniform float uT; uniform float uPh;' : ''}\nvoid main() {`)
-      .replace('#include <morphtarget_vertex>', `#include <morphtarget_vertex>\n${sway ? 'float sw = clamp((uHTop - transformed.y) / uHLen, 0.0, 1.0); sw = sw * sw * (0.4 + 0.6 * clamp(length(transformed.xz) * 12.0, 0.0, 1.0)); vec3 hs = uSway; hs.x *= 0.72; hs.z *= 0.28; hs += vec3(sin(uT * 1.15 + uPh + transformed.y * 28.0) * 0.0042 + sin(uT * 2.6 + uPh * 1.7 + transformed.x * 35.0) * 0.0016, sin(uT * 1.7 + uPh) * 0.0008, cos(uT * 0.93 + uPh * 0.6 + transformed.y * 22.0) * 0.0032); transformed += hs * sw;' : ''}\nvHP = transformed;`);
+      .replace('#include <morphtarget_vertex>', `#include <morphtarget_vertex>\n${sway ? 'float sw = clamp((uHTop - transformed.y) / uHLen, 0.0, 1.0); sw = sw * sw * (0.4 + 0.6 * clamp(length(transformed.xz) * 12.0, 0.0, 1.0)); vec3 hs = uSway; hs.x *= 0.72; hs.z *= 0.28; hs += ' + BRZ + ' * vec3(sin(uT * 1.15 + uPh + transformed.y * 28.0) * 0.0042 + sin(uT * 2.6 + uPh * 1.7 + transformed.x * 35.0) * 0.0016, sin(uT * 1.7 + uPh) * 0.0008, cos(uT * 0.93 + uPh * 0.6 + transformed.y * 22.0) * 0.0032); transformed += hs * sw;' : ''}\nvHP = transformed;`);
   }
 
   function hairMat(src, U, lum) {
@@ -423,7 +424,7 @@ window.ModelHeads = (() => {
       sway: { value: new V3() }, hTop: { value: top * 0.55 }, hLen: { value: Math.max(0.08, top * 0.55 - hairT.hairMinY) },
       ec1: { value: new THREE.Color(look.ec1) }, ec2: { value: new THREE.Color(look.ec2) }, dull: { value: look.glowEye ? 0.08 : 0.45 }, glow: { value: look.glowEye ? 0.9 : 0 }, shiny: { value: look.shiny || 0 },
       skin: { value: new V3(sk.r / baseSkin.r, sk.g / baseSkin.g, sk.b / baseSkin.b) }, pale: { value: look.pale },
-      blood: { value: look.blood }, spat: { value: look.spat }, seed: { value: look.seed }, ph: { value: ((look.seed || 0) * 7.13) % 6.283 }, hover: { value: 0 }, mk: { value: new THREE.Vector3(...(look.mk || [0, 0, 0])) },
+      blood: { value: look.blood }, spat: { value: look.spat }, seed: { value: look.seed }, ph: { value: ((look.seed || 0) * 7.13) % 6.283 }, hover: { value: 0 }, mk: { value: new THREE.Vector3(...((look.mk && (!window.Mods || Mods.on('makeup'))) ? look.mk : [0, 0, 0])) },
       cutY: { value: faceMeta.bottom }, hH: { value: (faceMeta.skullTop || 0.1) - faceMeta.bottom },
       scar: { value: look.scar ? new THREE.Vector4(...look.scar) : new THREE.Vector4(-10, 0, 0, 0) },
       paint: { value: look.paint }, paintC: { value: new THREE.Color(look.paintC) },
@@ -660,7 +661,7 @@ window.ModelHeads = (() => {
     const S = hairShell(F, H, F.meta.file + '|' + H.meta.file + (hi === fi ? '|own' : ''), hairGeos);
     if (look.hx && F.meta.grp !== 'godette') try { addHairX(hg, look, S, U, disposables); } catch (e) { console.warn('hairX', e); }
     addAccessories(g, look, F.meta, U, disposables, S.top);
-    if (window.HeadWear && look.hw && look.hw.length) try { HeadWear.build({ g, look, S, onShell, grad, disp: disposables }); } catch (e) { console.warn('headwear', e); }
+    if (window.HeadWear && look.hw && look.hw.length && (!window.Mods || Mods.on('headwear'))) try { HeadWear.build({ g, look, S, onShell, grad, disp: disposables }); } catch (e) { console.warn('headwear', e); }
     const radius = 0.1;
     return {
       group: g, U, radius, meta: F.meta, hl: hlMeshes, presets,

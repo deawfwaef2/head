@@ -7,6 +7,7 @@ window.Play = (() => {
   const saveM = () => { try { localStorage.setItem(META_KEY, JSON.stringify(M)); } catch (e) {} };
   const V3 = THREE.Vector3;
   const fmt = n => (window.G && G.fmtN) ? G.fmtN(n) : String(Math.round(n));
+  const RB = () => !window.Mods || Mods.on('rebirth');
   const lv = k => M.perk[k] || 0;
   const startCoins = l => l ? Math.round(500 * Math.pow(2.2, l - 1)) : 0;
   const autoI = l => Math.max(0.8, 6 / (1 + l * 0.6));
@@ -21,9 +22,9 @@ window.Play = (() => {
     { k: 'hunt', icon: '🗡️', n: '猎魂', d: l => `击散盗魂灵的奖励 ×${(1 + l * 0.5).toFixed(1)}`, max: 6, cost: l => 2 + l }
   ];
   const api = {
-    mul: () => (1 + 0.25 * lv('fire')) * (1 + 0.1 * (M.rb || 0)),
-    luck: () => lv('fate'),
-    cap: () => lv('bag'),
+    mul: () => RB() ? (1 + 0.25 * lv('fire')) * (1 + 0.1 * (M.rb || 0)) : 1,
+    luck: () => RB() ? lv('fate') : 0,
+    cap: () => RB() ? lv('bag') : 0,
     get meta() { return M; }, PERKS
   };
 
@@ -566,7 +567,7 @@ window.Play = (() => {
       ${ACH.map(([k, n, d, , rw, kind]) => `<div class="perk" style="${M.ach[k] ? 'border-color:#8a6a2a;background:#2a2016' : 'opacity:.62'}"><div class="pi">${M.ach[k] ? '🏅' : '🔒'}</div><div class="pt"><b>${n}</b><small>${d}</small></div><div style="font-size:13px;color:${kind === 'core' ? '#9adfff' : '#e0c8ff'}">${kind === 'core' ? `💠 ${rw}` : `🔮 ${fmt(rw)}+`}</div></div>`).join('')}`,
       a => { if (a === 'close') closeModal(); });
   }
-  addEventListener('keydown', e => { if (e.code === 'KeyJ' && !e.repeat && !modal && window.G && G.playing && !G.uiOpen && !(window.Seance && Seance.active)) openAch(); });
+  addEventListener('keydown', e => { if (e.code === 'KeyJ' && (!window.Mods || Mods.on('ach')) && !e.repeat && !modal && window.G && G.playing && !G.uiOpen && !(window.Seance && Seance.active)) openAch(); });
 
   // =====================================================================
   // 挂钩
@@ -574,7 +575,8 @@ window.Play = (() => {
   function init() {
     const HK = G.HOOK;
     applyPending();
-    HK.frame.push((dt) => { tickForge(dt); tickBowling(dt); tickChat(dt); tickThief(dt); tickHand(dt); tickSurge(dt); tickAch(dt);
+    const ON = id => !window.Mods || Mods.on(id);
+    HK.frame.push((dt) => { if (ON('forge')) tickForge(dt); if (ON('bowling')) tickBowling(dt); if (ON('echo')) tickChat(dt); if (ON('thief')) tickThief(dt); if (ON('rebirth')) tickHand(dt); if (ON('surge')) tickSurge(dt); if (ON('ach')) tickAch(dt);
       for (const b of G.builds) if (b.g.userData.rorb) { const o = b.g.userData.rorb, t = now(); o.position.y = 1.35 + Math.sin(t * 1.3) * 0.04; o.rotation.y = t * 0.5; o.children.forEach((c, i) => { if (i) c.rotation.x += dt * (0.4 + i * 0.3); }); } });
     HK.click.push(() => hitThief());
     HK.e.push((hit, held, pickup) => {

@@ -242,7 +242,7 @@
   <div id="headcount"></div>
 </div>
 <button class="musicBtn" id="musicCorner" onclick="SFX.toggleMusic()" title="M 键也可以">🎵 BGM 开</button>
-<div id="hint">M 开关BGM · WASD 移动 · Shift 跑 · 左键把玩 · E 拿起/互动 · 手持首级：滚轮转向 / V 换表情 · 右键投掷 · 麻袋：E 扛起/倒出，Q 放下 · B 建造 · Tab 菜单 · H 喝药 · J 成就</div>
+<div id="hint">M 开关BGM · WASD 移动 · Shift 跑 · 左键把玩 · E 拿起/互动 · 手持首级：滚轮转向 / V 换表情 · 右键投掷 · 麻袋：E 扛起/倒出，Q 放下 · B 建造 · Tab 菜单 · H 喝药 · J 成就 · O MOD</div>
 <div id="menu" class="hidden">
   <div class="title">魂首窟<small>SOULHEAD CAVE · 食人魔的收藏</small></div>
   <div class="rules">你是被月之魔女诅咒的食人魔<b>格罗克</b>，只能以亡魂为食。<br>
@@ -250,6 +250,7 @@
     <b>点击 60 次</b>把首级背回洞里，<b>把玩</b>它们榨出<b>🔮魂晶</b>；买装备、练属性、建造和<b>挖深</b>你的洞窟。<br>
     在外面死掉，<b>一切归零</b>。</div>
   <button class="bigbtn" id="startBtn">开始游戏</button>
+  <button class="bigbtn" id="modBtn" style="margin-left:10px;background:linear-gradient(135deg,#3a2a50,#2a1a3a)">🧩 MOD</button>
   <button class="smallbtn" id="resetBtn">删除存档重新开始</button> <button class="smallbtn musicBtn" onclick="SFX.toggleMusic()">🎵 BGM 开</button>
   <div class="keys">WASD 移动 · 鼠标 视角 · 左键 把玩首级 · E 互动 · F 查看首级故事 · B 建造 · Tab 属性/装备 · Esc 暂停</div>
   <div id="credits">头部基础模型：pixiv Inc. VRoid 样例 (CC0 / 使用条款)、VirtualCast VRM 样例 (VRM Public License)、Godette by SirRichard94 (CC-BY) —— 经裁切、混搭与改造。<br>音乐：Kevin MacLeod (incompetech.com) CC-BY 4.0 · 音效：Kenney (CC0)。详见 CREDITS.md</div>
@@ -257,6 +258,7 @@
 <div id="loading"><div class="title" style="font-size:52px">魂首窟</div><div id="loadtxt">加载中…（如一直停在这里，请用 Chrome / Edge 打开）</div><div id="loadbar"><i></i></div></div>
 <script src="lib/three.min.js"></script>
 <script src="lib/GLTFLoader.js"></script>
+<script src="js/mods.js"></script>
 <script src="models/AvatarSample_A.js"></script>
 <script src="models/AvatarSample_B.js"></script>
 <script src="models/AvatarSample_D_Darkness.js"></script>
@@ -301,6 +303,7 @@
   } catch (e) { fail(e); return; }
   document.getElementById('loading').remove();
   document.getElementById('menu').classList.remove('hidden');
+  document.getElementById('modBtn').addEventListener('click', e => { e.stopPropagation(); Mods.open(); });
   document.getElementById('startBtn').addEventListener('click', e => { e.stopPropagation(); SFX.init(); if (UI.needIntro()) { SFX.music('cave'); UI.showIntro(); } else G.lockPointer(); });
   document.getElementById('resetBtn').addEventListener('click', e => { e.stopPropagation(); if (confirm('确定删除存档？所有首级、装备、建筑都会消失。')) { G.wipe(); location.reload(); } });
 })();

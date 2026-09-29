@@ -6,6 +6,7 @@ window.startGame = function () {
   const RAR = [
     { n: '凡魂', c: '#b8b8c0', y: 1 }, { n: '灵魂', c: '#4aa8ff', y: 3 }, { n: '英魂', c: '#c05aff', y: 8 }, { n: '圣魂', c: '#ffb020', y: 20 }, { n: '神魂', c: '#ff4a8a', y: 55 }
   ];
+  if (window.Mods) try { Mods.apply(); } catch (e) { console.warn('Mods.apply', e); }
   const CAT = BuildCat.C;
 
   // ---------------- 渲染器 ----------------
@@ -305,7 +306,7 @@ window.startGame = function () {
     keys[e.code] = true;
     if (window.UI && UI.onKey(e)) return;
     if (!playing || uiOpen) return;
-    if (e.code === 'KeyP') { toggleFilm(); return; }
+    if (e.code === 'KeyP' && (!window.Mods || Mods.on('film'))) { toggleFilm(); return; }
     if (e.code === 'KeyG' && held) { placeHeld(); return; }
     if (film && (e.code === 'BracketLeft' || e.code === 'BracketRight')) { film.sp = Math.max(0.3, Math.min(12, film.sp * (e.code === 'BracketRight' ? 1.4 : 0.7))); toast('镜头速度 ' + film.sp.toFixed(1), '#ccc', 0.8); return; }
     if (e.code === 'KeyE') interactE();
