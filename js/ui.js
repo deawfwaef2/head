@@ -44,7 +44,7 @@ window.UI = (() => {
     if (!G.playing) return false;
     if (e.code === 'KeyB') { openMenu('build'); return true; }
     if (e.code === 'Tab' || e.code === 'KeyI') { e.preventDefault(); openMenu('stats'); return true; }
-    if (e.code === 'KeyC') { openMenu('heads'); return true; }
+    if (e.code === 'KeyK') { openMenu('heads'); return true; }
     if (e.code === 'KeyL') { openMenu('logs'); return true; }
     return false;
   }

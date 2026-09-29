@@ -293,7 +293,7 @@ window.startGame = function () {
   let swing = 0;
 
   // ---------------- 玩家与输入 ----------------
-  const player = { pos: new V3(0, 0, 2.5), vel: new V3(), yaw: 0, pitch: -0.15, h: 1.95, onGround: true };
+  const player = { pos: new V3(0, 0, 2.5), vel: new V3(), yaw: 0, pitch: -0.15, h: 1.95, onGround: true, crouch: 0 };
   const keys = {};
   let locked = false, noLock = false, playing = false, uiOpen = false;
   const ray = new THREE.Raycaster(); ray.far = 3.4;
@@ -972,6 +972,8 @@ window.startGame = function () {
     }
   }
   load();
+  // 着色器预热：在开始界面期间把场景里所有材质编译好（否则进入游戏后头几秒边看边编译 → 卡顿）
+  setTimeout(() => { try { const t0 = performance.now(); renderer.compile(scene, camera); if (post && post.warm) post.warm(); console.log('shader prewarm ms', Math.round(performance.now() - t0)); } catch (e) { console.warn('prewarm', e); } }, 50);
   if (S.heads.some(r => r.inBag)) createReturnBag(S.heads.filter(r => r.inBag));
   S.hp = Math.min(S.hp, st().maxHp);
   setInterval(save, 8000);
@@ -996,11 +998,13 @@ window.startGame = function () {
     if (playing && !uiOpen && !cine && !film) {
       const f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
       const s = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
-      const sp = keys.ShiftLeft ? 6 : 3.4;
+      // 下蹲（按住 C）：视线降低 0.8m，移速 ×0.45，不能跳
+      player.crouch += ((keys.KeyC ? 1 : 0) - player.crouch) * Math.min(1, dt * 12); player.h = 1.95 - 0.8 * player.crouch;
+      const sp = (keys.ShiftLeft && player.crouch < 0.5 ? 6 : 3.4) * (1 - 0.55 * player.crouch);
       fw.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw)); rt.set(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
       wantV.copy(fw).multiplyScalar(f).addScaledVector(rt, s); if (wantV.lengthSq() > 0) wantV.normalize().multiplyScalar(sp);
       player.vel.x += (wantV.x - player.vel.x) * Math.min(1, dt * 10); player.vel.z += (wantV.z - player.vel.z) * Math.min(1, dt * 10);
-      if (keys.Space && player.onGround) { player.vel.y = 4.2; player.onGround = false; }
+      if (keys.Space && player.onGround && player.crouch < 0.3) { player.vel.y = 4.2; player.onGround = false; }
     } else { player.vel.x *= 0.8; player.vel.z *= 0.8; }
     player.vel.y += GRAV * dt; player.pos.addScaledVector(player.vel, dt);
     if (player.pos.y <= 0) { player.pos.y = 0; player.vel.y = 0; player.onGround = true; }

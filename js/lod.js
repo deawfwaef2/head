@@ -35,7 +35,7 @@
     const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; mesh.renderOrder = 0; scene.add(mesh);
     const tmpV = new THREE.Vector3(), tmpD = new THREE.Vector3(), box = new THREE.Box3(), sph = new THREE.Sphere();
     const cc = new THREE.Color();
-    let queue = 0;
+    let frames = 0;
     function bound(h) {
       // 首级局部包围球（按模型真实几何测一次；首级整体可旋转，所以用球）
       if (h._lodR) return;
@@ -57,14 +57,17 @@
       h.g.traverse(o => o.layers.enable(L5));
       const bg = scene.background, fog = scene.fog, prevRT = renderer.getRenderTarget(), ac = renderer.autoClear;
       renderer.getClearColor(cc); const ca = renderer.getClearAlpha();
-      scene.background = null; scene.fog = null; mesh.visible = false;
+      // 不能把 scene.fog 设为 null —— 那会让每个首级材质再编译一份“无雾”着色器（开局卡顿元凶之一）；改为临时把雾推远
+      const fn = fog && fog.isFog ? fog.near : 0, ff = fog && fog.isFog ? fog.far : 0, fd = fog && fog.isFogExp2 ? fog.density : 0;
+      if (fog && fog.isFog) { fog.near = 1e5; fog.far = 1e5 + 1; } if (fog && fog.isFogExp2) fog.density = 0;
+      scene.background = null; mesh.visible = false;
       const x = (h._cell % PER) * CELL, y = Math.floor(h._cell / PER) * CELL;
       rt.viewport.set(x, y, CELL, CELL); rt.scissor.set(x, y, CELL, CELL); rt.scissorTest = true; renderer.setRenderTarget(rt); // 必须先设视口/裁剪再绑定（setRenderTarget 时才拷贝）
       renderer.setClearColor(0x000000, 0); renderer.autoClear = false; renderer.clear(true, true, false);
       renderer.render(scene, cam);
       rt.scissorTest = false; rt.viewport.set(0, 0, ATL, ATL); rt.scissor.set(0, 0, ATL, ATL);
       renderer.setRenderTarget(prevRT); renderer.setClearColor(cc, ca); renderer.autoClear = ac;
-      scene.background = bg; scene.fog = fog; mesh.visible = true;
+      scene.background = bg; if (fog && fog.isFog) { fog.near = fn; fog.far = ff; } if (fog && fog.isFogExp2) fog.density = fd; mesh.visible = true;
       h.g.traverse(o => o.layers.disable(L5));
       h.g.visible = was;
       h._snapDir = tmpD.clone(); h._snapQ = h.g.quaternion.clone(); h._snapP = h.g.position.clone(); h._snapS = h.hb.group.scale.x;
@@ -73,7 +76,7 @@
     function release(h) { if (h._cell !== undefined) { free.push(h._cell); h._cell = undefined; } h._imp = false; h._snapDir = null; }
     // 每帧：决定谁用替身；返回 {full, imp}
     function update(heads, camera, held) {
-      let n = 0, budget = BUDGET, full = 0;
+      frames++; let n = 0, budget = frames < 90 ? 1 : BUDGET, full = 0; // 开局前 90 帧每帧只拍 1 张，避免卡顿
       const fog = scene.fog;
       if (fog && fog.isFog) { mat.uniforms.uFog.value = 1; mat.uniforms.fogColor.value.copy(fog.color); mat.uniforms.fogNear.value = fog.near; mat.uniforms.fogFar.value = fog.far; } else mat.uniforms.uFog.value = 0;
       for (const h of heads) {
