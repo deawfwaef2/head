@@ -139,7 +139,7 @@ window.Combat = (() => {
   const _t = new V3(), _b = new V3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4(), _x = new V3(), _y = new V3(), _z = new V3(), UP = new V3(0, 1, 0);
   const _tipW = new V3(), _baseW = new V3(), _vel = new V3(), _seg = new V3(), _cp = new V3();
   function update(dt, now) {
-    if (!drawn || !wpn) { if (hud && hud.d.style.display !== 'none' && !drawn) hud.d.style.display = 'none'; if (ov && ovDirty) { ov.g.clearRect(0, 0, 360, 360); ovDirty = false; } return; }
+    if (!drawn || !wpn) { if (hud && hud.d.style.display !== 'none' && !drawn) hud.d.style.display = 'none'; if (threatSrc && !G.uiOpen) drawOverlay(now); else if (ov) { if (ovDirty) { ov.g.clearRect(0, 0, 560, 560); ovDirty = false; } ov.eKey = ''; ov.edge.style.opacity = 0; } return; } // 第十九轮：没拔刀也提示来刀
     if (G.uiOpen) { S.lmb = S.rmb = false; }
     // 顿帧：武器冻结一小会，屏震衰减
     { const idt = 1 / Math.max(1e-3, dt); _t.set(S.mAcc.x * idt, S.mAcc.y * idt, 0); S.mv.lerp(_t, Math.min(1, dt * 16)); S.mAcc.set(0, 0, 0); }
@@ -246,24 +246,46 @@ window.Combat = (() => {
 
   // ---------- 准星指示层：自己的格挡角（蓝）、敌人来刀方向（红/橙=重击）+ 收缩的时机圈、蓄力环 ----------
   let ov = null, ovDirty = false, threatSrc = null;
+  // 第十九轮：来刀提示大改（用户：防御 UI 很不明显）—— 大号方向楔形 + 收缩时机圈 + 文字（方向/格挡/完美格挡/闪身）+ 屏幕边缘泛红 + 格挡弧对准变绿 + “叮”=完美格挡时刻
+  const DIRN = (a) => { const d = ((a * 180 / Math.PI) % 360 + 540) % 360 - 180; return Math.abs(d) < 22.5 ? '右' : Math.abs(d) > 157.5 ? '左' : d > 0 ? (d < 67.5 ? '右上' : d < 112.5 ? '上' : '左上') : (d > -67.5 ? '右下' : d > -112.5 ? '下' : '左下'); };
+  const adiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+  const tickHi = new WeakMap();
   function drawOverlay(now) {
-    if (!ov) { const c = document.createElement('canvas'); c.width = c.height = 360; c.style.cssText = 'position:fixed;left:50%;top:50%;width:360px;height:360px;margin:-180px 0 0 -180px;pointer-events:none;z-index:19'; document.body.appendChild(c); ov = { c, g: c.getContext('2d') }; }
-    const th = threatSrc ? threatSrc() : [], g = ov.g, C = 180;
-    if (!th.length && !S.rmb && !(S.charge > 0 && S.lmb) && !(S.charged > 0)) { if (ovDirty) { g.clearRect(0, 0, 360, 360); ovDirty = false; } return; }
-    g.clearRect(0, 0, 360, 360); ovDirty = true; g.lineCap = 'round';
-    const arc = (a, r, w, col, span) => { g.strokeStyle = col; g.lineWidth = w; g.beginPath(); g.arc(C, C, r, -a - span, -a + span); g.stroke(); };
-    for (const t of th) {
-      const col = t.heavy ? '255,150,30' : '255,50,40';
-      if (t.side) { // 敌人在视野外：边缘箭头
-        const a = t.side > 0 ? 0 : Math.PI; g.fillStyle = `rgba(${col},${0.5 + 0.5 * t.k})`; g.beginPath(); const x = C + Math.cos(a) * 160, y = C; g.moveTo(x + Math.cos(a) * 14, y); g.lineTo(x - Math.cos(a) * 6, y - 14); g.lineTo(x - Math.cos(a) * 6, y + 14); g.fill(); continue; }
-      if (t.thrust) { g.strokeStyle = `rgba(${col},${0.35 + 0.6 * t.k})`; g.lineWidth = 5; g.beginPath(); g.arc(C, C, 26, 0, 7); g.stroke(); g.lineWidth = 2; g.beginPath(); g.arc(C, C, 26 + 90 * (1 - t.k), 0, 7); g.stroke(); continue; }
-      arc(t.ang, 92, 9, `rgba(${col},${0.35 + 0.65 * t.k})`, 0.45);
-      arc(t.ang, 92 + 80 * (1 - t.k), 3, `rgba(${col},${0.25 + 0.5 * t.k})`, 0.3); // 收缩圈：到内圈时命中 —— 这一刻举盾 = 完美格挡
-      const x = C + Math.cos(t.ang) * 118, y = C - Math.sin(t.ang) * 118; g.fillStyle = `rgba(${col},${0.5 + 0.5 * t.k})`; g.beginPath(); g.moveTo(x - Math.cos(t.ang) * 14, y + Math.sin(t.ang) * 14); g.lineTo(x + Math.sin(t.ang) * 8, y + Math.cos(t.ang) * 8); g.lineTo(x - Math.sin(t.ang) * 8, y - Math.cos(t.ang) * 8); g.fill();
-    }
-    if (S.rmb) { arc(S.gAng, 78, 7, 'rgba(150,210,255,0.95)', 0.62); arc(S.gAng, 78, 2, 'rgba(255,255,255,0.9)', 0.62); }
-    if (S.lmb && S.charge > 0 && S.charged <= 0) { g.strokeStyle = 'rgba(255,210,80,0.8)'; g.lineWidth = 3; g.beginPath(); g.arc(C, C, 20, -Math.PI / 2, -Math.PI / 2 + S.charge * 6.283); g.stroke(); }
-    if (S.charged > 0) { g.strokeStyle = `rgba(255,200,60,${0.6 + 0.3 * Math.sin(now * 12)})`; g.lineWidth = 3; g.beginPath(); g.arc(C, C, 20, 0, 7); g.stroke(); }
+    const W0 = 560, C = W0 / 2;
+    if (!ov) { const c = document.createElement('canvas'); c.width = c.height = W0; c.style.cssText = `position:fixed;left:50%;top:50%;width:${W0}px;height:${W0}px;margin:-${C}px 0 0 -${C}px;pointer-events:none;z-index:19`; document.body.appendChild(c);
+      const e = document.createElement('div'); e.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:18;opacity:0;transition:opacity .08s'; document.body.appendChild(e);
+      ov = { c, g: c.getContext('2d'), edge: e, eKey: '' }; }
+    const th = (threatSrc ? threatSrc() : []).slice().sort((a, b) => a.left - b.left), g = ov.g;
+    const edge = (side, k, heavy) => { const key = side + '|' + (k * 10 | 0) + heavy; if (key === ov.eKey) return; ov.eKey = key;
+      if (!k) { ov.edge.style.opacity = 0; return; } const col = heavy ? '255,140,20' : '255,30,20';
+      ov.edge.style.background = side ? `linear-gradient(${side > 0 ? 'to left' : 'to right'}, rgba(${col},0.55), rgba(${col},0) 28%)` : `radial-gradient(ellipse at center, rgba(${col},0) 55%, rgba(${col},0.45) 100%)`; ov.edge.style.opacity = Math.min(1, 0.25 + k * 0.85); };
+    if (!th.length && !S.rmb && !(S.charge > 0 && S.lmb) && !(S.charged > 0)) { if (ovDirty) { g.clearRect(0, 0, W0, W0); ovDirty = false; } edge(0, 0, 0); return; }
+    g.clearRect(0, 0, W0, W0); ovDirty = true; g.lineCap = 'round'; g.textAlign = 'center';
+    const arc = (a, r, w, col, span, blur) => { g.save(); if (blur) { g.shadowColor = col; g.shadowBlur = blur; } g.strokeStyle = col; g.lineWidth = w; g.beginPath(); g.arc(C, C, r, -a - span, -a + span); g.stroke(); g.restore(); };
+    const text = (t, y, col, size) => { g.save(); g.font = `900 ${size}px "Noto Serif CJK SC","Songti SC",serif`; g.lineWidth = 5; g.strokeStyle = 'rgba(0,0,0,0.85)'; g.strokeText(t, C, y); g.fillStyle = col; g.fillText(t, C, y); g.restore(); };
+    const top = th[0];
+    edge(top ? (top.side || 0) : 0, top ? top.k : 0, top && top.heavy);
+    th.forEach((t, n) => {
+      const col = t.heavy ? '255,150,30' : '255,55,40', a1 = n === 0 ? 1 : 0.45;
+      // 完美格挡时刻的提示音：收缩圈碰到内圈前一瞬
+      if (n === 0 && t.k > 0.86 && t.fo) { const hi = t.fo.atk ? t.fo.atk.hi : -1, last = tickHi.get(t.fo); if (last !== hi + ':' + (t.fo.atk && t.fo.atk.clip)) { tickHi.set(t.fo, hi + ':' + (t.fo.atk && t.fo.atk.clip)); try { SFX.play('bell', 0.22, 2.2, 0.02); } catch (e) {} } }
+      if (t.side) { // 视野外：屏幕边缘大箭头 + 文字
+        const x = t.side > 0 ? W0 - 30 : 30; g.fillStyle = `rgba(${col},${(0.55 + 0.45 * t.k) * a1})`; g.beginPath(); const dx = t.side > 0 ? 1 : -1; g.moveTo(x + dx * 24, C); g.lineTo(x - dx * 10, C - 30); g.lineTo(x - dx * 10, C + 30); g.fill();
+        if (n === 0) text(t.side > 0 ? '右后方来袭 →' : '← 左后方来袭', C + 150, `rgb(${col})`, 22); return; }
+      if (t.thrust) { arc(0, 38, 9, `rgba(${col},${(0.4 + 0.6 * t.k) * a1})`, Math.PI, 14); arc(0, 38 + 150 * (1 - t.k), 3, `rgba(${col},${(0.3 + 0.6 * t.k) * a1})`, Math.PI);
+        if (n === 0) text(t.k > 0.8 ? '刺击！Q 闪身 / 正面格挡' : '刺击', C + 120, `rgb(${col})`, 22); return; }
+      const R0 = 150;
+      arc(t.ang, R0, 22, `rgba(${col},${(0.45 + 0.55 * t.k) * a1})`, 0.52, 18 * t.k); // 大号方向楔形
+      arc(t.ang, R0 + 120 * (1 - t.k), 5, `rgba(${t.k > 0.86 ? '255,255,255' : col},${(0.35 + 0.65 * t.k) * a1})`, 0.4); // 收缩时机圈：碰到楔形 = 命中那一刻
+      const x = C + Math.cos(t.ang) * (R0 + 34), y = C - Math.sin(t.ang) * (R0 + 34); g.fillStyle = `rgba(${col},${(0.6 + 0.4 * t.k) * a1})`; g.beginPath();
+      g.moveTo(x - Math.cos(t.ang) * 26, y + Math.sin(t.ang) * 26); g.lineTo(x + Math.sin(t.ang) * 16, y + Math.cos(t.ang) * 16); g.lineTo(x - Math.sin(t.ang) * 16, y - Math.cos(t.ang) * 16); g.fill();
+      if (n === 0) { const ok = S.rmb ? adiff(S.gAng, t.ang) : 9; const hint = t.heavy ? (t.k > 0.86 ? '重击 · 就是现在！' : `重击！${DIRN(t.ang)}侧 · 需完美格挡`) : (ok < 0.7 ? `${DIRN(t.ang)}侧 · 挡住了` : `${DIRN(t.ang)}侧来刀 · 右键格挡`);
+        text(hint, C + 128, t.k > 0.86 ? '#fff' : (!t.heavy && ok < 0.7) ? '#7dff9a' : `rgb(${col})`, t.heavy ? 26 : 22); }
+    });
+    if (S.rmb) { const d = top && !top.side && !top.thrust ? adiff(S.gAng, top.ang) : 9, gc = d < 0.7 ? '110,255,140' : d < 1.26 ? '255,230,90' : '150,210,255';
+      arc(S.gAng, 122, 12, `rgba(${gc},0.95)`, 0.62, 12); arc(S.gAng, 122, 3, 'rgba(255,255,255,0.95)', 0.62); }
+    if (S.lmb && S.charge > 0 && S.charged <= 0) { g.strokeStyle = 'rgba(255,210,80,0.85)'; g.lineWidth = 4; g.beginPath(); g.arc(C, C, 24, -Math.PI / 2, -Math.PI / 2 + S.charge * 6.283); g.stroke(); }
+    if (S.charged > 0) { g.strokeStyle = `rgba(255,200,60,${0.6 + 0.3 * Math.sin(now * 12)})`; g.lineWidth = 4; g.beginPath(); g.arc(C, C, 24, 0, 7); g.stroke(); }
   }
   // 格挡角度 t 秒前与 a 的夹角（用于“最后一刻转对方向”的完美格挡）
   function guardWas(tAgo, a) { const now = performance.now() / 1000; let best = null; for (const [t, g] of S.gHist) if (now - t >= tAgo) best = g; if (best == null) return Math.PI; return Math.abs(Math.atan2(Math.sin(best - a), Math.cos(best - a))); }

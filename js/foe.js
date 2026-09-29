@@ -147,7 +147,7 @@ window.Foe = (() => {
     f.mixer = mixer; f.clips = clips;
     f.play = (name, o = {}) => {
       const c = clips[name]; if (!c) return null; const a = mixer.clipAction(c);
-      if (cur === a && !o.restart) return a;
+      if (cur === a && !o.restart) { if (o.speed != null && a.timeScale !== o.speed && !o.once) a.timeScale = o.speed; return a; } // 第十九轮：同一循环动作也更新速度（正走/倒走）
       a.reset(); a.setLoop(o.once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity); a.clampWhenFinished = !!o.once; a.timeScale = o.speed || 1; a.enabled = true; a.setEffectiveWeight(1);
       if (cur && o.fade !== 0) { a.play(); cur.crossFadeTo(a, o.fade == null ? 0.2 : o.fade, false); } else a.play();
       cur = a; f.cur = name; return a;
@@ -239,7 +239,7 @@ window.Foe = (() => {
       const fo = { h: it.h, f, pos: f.root.position, yaw: r() * 6.28, rar, id, hp: 0, maxHp: 0, state: 'idle', t: 0, cd: 1 + r() * 2, sayT: 0, seen: false,
         brave: !!it.boss || !!ARMED[id] || r() < 0.2 + rar * 0.1, boss: it.boss || null, bossK: it.bossK, dead: false, decap: false, rag: null, stag: 0, atk: null, block: 0, iq: 0.4 + rar * 0.15 + (it.boss ? 0.4 : 0),
         idleClip: IDLE[id] || pickR(r, ['Idle_Loop', 'Idle_Loop', 'Idle_Talking_Loop', 'Idle_FoldArms_Loop']), wpn: null, id2: 'foe' + FOES.length + '_' + (c.name || ''), anchor: { pos: new V3(), gone: false }, home: it.pos.clone() };
-      fo.maxHp = fo.hp = it.boss ? 100 : 26 + rar * 16;
+      fo.maxHp = fo.hp = it.boss ? 150 : 26 + rar * 16; // 第十九轮 BOSS 平衡：100→150（配合韧性槽/二阶段）
       fo.mats = []; { const skip = new Set(); if (f.holder) f.holder.traverse(o => skip.add(o)); f.root.traverse(o => { if (o.isMesh && !skip.has(o) && o.material && o.material.emissive && !o.userData.cut && !fo.mats.includes(o.material)) fo.mats.push(o.material); }); } // 第十八轮：不碰头上共享的宝石/头饰材质
       fo.warn = new THREE.Sprite(warnMat()); fo.warn.scale.set(0.16, 0.16, 1); fo.warn.visible = false; fo.warn.renderOrder = 5; ctx.sc.add(fo.warn);
       fo.blinkT = 1 + r() * 4;
@@ -291,6 +291,7 @@ window.Foe = (() => {
   const tv = new V3(), tv2 = new V3(), up = new V3(0, 1, 0);
   function update(dt, now) {
     if (!CTX) return; const ctx = CTX, P = ctx.player;
+    CLK += dt;
     if (slowT > 0) { slowT -= dt; dt *= slowK; if (slowT <= 0) slowK = 1; } // 击杀慢动作：只作用于敌人/尸体/头/血，玩家照常
     for (const fo of FOES) {
       const f = fo.f;
@@ -309,30 +310,52 @@ window.Foe = (() => {
       else if (fo.stag > 0) { /* 受击硬直 */ }
       else if (fo.block > 0) { turnTo = face; }
       else if (fo.state === 'chase') {
+        // 第十九轮：对峙距离 + 攻击令牌 + 平滑移动（旧版贴在 1.3m 绕圈游走、随时换向 = 用户说的“在你附近闪烁”、太快）
         turnTo = face;
-        const reach = fo.armed ? 1.35 : 1.05;
-        if (fo.armed && fo.cd <= 0 && d > 2.4 && d < 4.6 && fo.iq > 0.6 && Math.random() < 0.02) attack(fo, d, 'Sword_Dash'); // 冲刺斩
-        else if (d > reach + (fo.cd > 0.3 ? 0.9 : 0)) { spd = d > 6 ? 4.2 : 2.6; f.play(d > 6 ? 'Sprint_Loop' : 'Jog_Fwd_Loop', { fade: 0.2 }); }
-        else if (fo.cd <= 0) attack(fo, d);
-        else { // 等待出手：绕着玩家游走、保持距离（节奏更慢、更像对峙）
-          fo.strafeT = (fo.strafeT || 0) - dt; if (fo.strafeT <= 0) { fo.strafeT = 0.8 + Math.random() * 1.4; fo.strafeDir = Math.random() < 0.5 ? -1 : 1; if (Math.random() < 0.3) fo.strafeDir = 0; }
-          strafe = fo.strafeDir || 0; if (d < reach - 0.3) strafe = 2; f.play(strafe ? 'Walk_Loop' : (fo.armed ? 'Sword_Idle' : 'Idle_Loop'), { fade: 0.25 }); }
+        const hold = fo.armed ? 2.7 : 2.2, atkR = fo.armed ? 1.55 : 1.15, mine = tokenOK(fo);
+        if (fo.armed && fo.cd <= 0 && mine && d > 2.4 && d < 4.6 && fo.iq > 0.6 && Math.random() < 0.008) attack(fo, d, 'Sword_Dash'); // 冲刺斩
+        else if (fo.cd <= 0 && mine) { // 轮到我：先上步到出手距离，再起手
+          if (d > atkR) { spd = d > 6 ? 3.0 : 1.6; f.play(d > 6 ? 'Sprint_Loop' : 'Walk_Loop', { fade: 0.3, speed: d > 6 ? 0.9 : 1.1 }); }
+          else attack(fo, d);
+        }
+        else if (d > hold + 1.4) { spd = d > 8 ? 3.0 : 1.8; f.play(d > 8 ? 'Sprint_Loop' : 'Jog_Fwd_Loop', { fade: 0.3, speed: 0.85 }); }
+        else { // 对峙：在对峙距离上慢慢游走，经常站定观察
+          fo.strafeT = (fo.strafeT || 0) - dt;
+          if (fo.strafeT <= 0) { fo.strafeT = 1.8 + Math.random() * 2.2; const r0 = Math.random(); fo.strafeDir = r0 < 0.45 ? 0 : r0 < 0.72 ? -1 : 1; }
+          strafe = fo.strafeDir || 0; if (d < hold - 0.6) strafe = 2;
+          if (strafe === 2) f.play('Walk_Loop', { fade: 0.35, speed: -0.75 }); // 倒着走 = 后退
+          else if (strafe) { f.play('Walk_Loop', { fade: 0.35, speed: 0.7 }); turnTo = face + strafe * 0.75; } // 侧移：身体偏向移动方向
+          else f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.35 });
+        }
       } else if (fo.state === 'flee') {
-        turnTo = Math.atan2(-dx, -dz); spd = 4.0 + fo.rar * 0.3; f.play('Sprint_Loop', { fade: 0.2 });
+        turnTo = Math.atan2(-dx, -dz); spd = 3.2 + fo.rar * 0.2; f.play('Sprint_Loop', { fade: 0.2 });
         const pr = Math.hypot(fo.pos.x, fo.pos.z);
         if (pr > ctx.R - 3) { const tx = -fo.pos.z / pr, tz = fo.pos.x / pr, sg = (tx * -dx + tz * -dz) > 0 ? 1 : -1; turnTo = Math.atan2(tx * sg * 0.9 - fo.pos.x / pr * 0.3, tz * sg * 0.9 - fo.pos.z / pr * 0.3); if (d < 2.2 && fo.cd <= 0) { fo.state = 'chase'; talk(fo, pickR(Math.random, SAY.fight)); } }
         else if (fo.sayT <= 0 && Math.random() < 0.006) talk(fo, pickR(Math.random, SAY.flee));
       } else { f.play(fo.idleClip, { fade: 0.3 }); }
       if (turnTo != null) fo.yaw += clampA(ang(turnTo - fo.yaw), 6 * dt * (0.6 + fo.iq));
-      if (spd > 0) { fo.pos.x += Math.sin(fo.yaw) * spd * dt; fo.pos.z += Math.cos(fo.yaw) * spd * dt; }
-      if (strafe && !fo.atk && fo.stag <= 0) { if (strafe === 2) { fo.pos.x -= Math.sin(fo.yaw) * 1.1 * dt; fo.pos.z -= Math.cos(fo.yaw) * 1.1 * dt; } else { fo.pos.x += Math.cos(fo.yaw) * strafe * 1.0 * dt; fo.pos.z -= Math.sin(fo.yaw) * strafe * 1.0 * dt; } }
+      { // 第十九轮：速度带加速度（不再瞬间换向）；侧移/后退都以“面向玩家”的方向为基准
+        let vx = 0, vz = 0; if (spd > 0) { vx = Math.sin(fo.yaw) * spd; vz = Math.cos(fo.yaw) * spd; }
+        if (strafe && !fo.atk && fo.stag <= 0) { if (strafe === 2) { vx -= Math.sin(face) * 0.8; vz -= Math.cos(face) * 0.8; } else { vx += Math.cos(face) * strafe * 0.65; vz -= Math.sin(face) * strafe * 0.65; } }
+        const fv = fo.fv || (fo.fv = new V3()), kk = 1 - Math.exp(-(fo.atk ? 14 : 6) * dt); fv.x += (vx - fv.x) * kk; fv.z += (vz - fv.z) * kk;
+        fo.pos.x += fv.x * dt; fo.pos.z += fv.z * dt;
+        const pd = Math.hypot(fo.pos.x - P.pos.x, fo.pos.z - P.pos.z), mn = 1.05; // 永远不贴进玩家 1.05m 内（第一人称近裁剪穿模闪烁）
+        if (pd < mn && pd > 1e-4) { fo.pos.x = P.pos.x + (fo.pos.x - P.pos.x) / pd * mn; fo.pos.z = P.pos.z + (fo.pos.z - P.pos.z) / pd * mn; }
+      }
       if (fo.state === 'chase') guardAI(fo, dt, d); guardShow(fo);
       collide(fo.pos, 0.35); fo.pos.y = ctx.H(fo.pos.x, fo.pos.z); f.root.rotation.y = fo.yaw;
       f.mixer.update(dt);
       fo.f.bones.head.getWorldPosition(fo.anchor.pos); fo.anchor.pos.y -= 0.3;
-      if (fo.flash > 0 || fo.flashOn) { fo.flash -= dt; const on = fo.flash > 0; if (on !== fo.flashOn) { fo.flashOn = on; for (const m of fo.mats) m.emissive.setRGB(on ? 0.55 : 0, on ? 0.04 : 0, on ? 0.02 : 0); } }
+      { // 受击闪红 + 第十九轮：蓄力时身体渐亮（红=普通，橙=重击），出手瞬间最亮 —— 只改 uniform，不新建材质
+        if (fo.flash > 0) fo.flash -= dt; let er = 0, eg = 0, eb = 0;
+        const A = fo.atk, hh = A && A.hits && A.hits[A.hi];
+        if (hh && A.tot > 0) { const k = Math.max(0, 1 - atkLeft(A) / A.tot); const e = 0.08 + 0.42 * k * k; if (hh.heavy) { er = e; eg = e * 0.45; } else { er = e; eg = e * 0.08; eb = e * 0.04; } }
+        if (fo.flash > 0) { er = Math.max(er, 0.55); eg = Math.max(eg, 0.04); eb = Math.max(eb, 0.02); }
+        const key = Math.round(er * 50) * 10000 + Math.round(eg * 50) * 100 + Math.round(eb * 50);
+        if (key !== fo.eKey) { fo.eKey = key; fo.flashOn = fo.flash > 0; for (const m of fo.mats) if (m.emissive) m.emissive.setRGB(er, eg, eb); }
+      }
       fo.blinkT -= dt; if (fo.blinkT < 0) { const b = fo.blinkT > -0.07 ? -fo.blinkT / 0.07 : fo.blinkT > -0.16 ? 1 - (-fo.blinkT - 0.07) / 0.09 : 0; try { f.hb.setExpression({ blink: Math.max(0, b) }); } catch (e) {} if (fo.blinkT < -0.16) fo.blinkT = 2 + Math.random() * 4; }
-      if (fo.warn) { const A = fo.atk, hh = A && A.act && A.hits && A.hits[A.hi]; fo.warn.visible = !!(hh && hh.t - A.act.time > 0.04); if (fo.warn.visible) { fo.warn.material.color.set(hh.heavy ? '#ffa030' : '#ffffff'); fo.warn.position.copy(fo.anchor.pos); fo.warn.position.y += 0.6; const k = 0.13 + 0.05 * Math.sin(fo.t * 30); fo.warn.scale.set(k, k, 1); } }
+      if (fo.warn) { const A = fo.atk, hh = A && A.act && A.hits && A.hits[A.hi]; fo.warn.visible = !!(hh && hh.t - A.act.time > 0.04); if (fo.warn.visible) { fo.warn.material.color.set(hh.heavy ? '#ffa030' : '#ffffff'); fo.warn.position.copy(fo.anchor.pos); fo.warn.position.y += 0.6; const k = 0.16 + 0.1 * (A.tot > 0 ? Math.max(0, 1 - atkLeft(A) / A.tot) : 0); fo.warn.scale.set(k, k, 1); } } // 第十九轮：不再 30rad/s 脉动闪烁，随蓄力平稳变大
       if (fo.broken > 0) fo.broken -= dt;
     }
     for (const h of HEADS) bodyPhys(h, dt, 0.11);
@@ -356,6 +379,10 @@ window.Foe = (() => {
     Sword_Heavy_Combo: { hits: [[0.4, -22], [1.83, -19], [2.57, 73, 'heavy']], end: 3.2 },
     Punch_Jab: { hits: [[0.3, 0, 'thrust']] }, Punch_Cross: { hits: [[0.22, 0, 'thrust']] }, Melee_Hook: { hits: [[0.23, 150]] }
   };
+  // 第十九轮：攻击令牌 —— 同一时间最多 1 人出手（有霸主时 2 人），两次出手之间至少隔 0.6s；霸主总能出手
+  let lastAtkAt = -9, CLK = 0;
+  function tokenOK(fo) { if (fo.boss) return true; if (CLK - lastAtkAt < 0.6) return false;
+    let n = 0, boss = false; for (const o of FOES) { if (o.dead) continue; if (o.boss) boss = true; if (o !== fo && o.atk) n++; } return n < (boss ? 2 : 1); }
   function attack(fo, d, force) {
     const f = fo.f, s = CTX.st(), r = Math.random();
     let clip;
@@ -366,12 +393,12 @@ window.Foe = (() => {
       else clip = elite && r < 0.2 ? 'Sword_Regular_Combo' : elite && r < 0.32 ? 'Sword_Attack' : pickR(Math.random, ['Sword_Regular_A', 'Sword_Regular_B', 'Sword_Regular_C', 'Sword_Regular_A']);
     } else clip = pickR(Math.random, ['Punch_Jab', 'Punch_Cross', 'Melee_Hook', 'Melee_Hook']);
     const c = f.clips[clip], T = ATK[clip]; if (!c || !T) return;
-    const base = fo.boss ? 0.1 : 0.03 + fo.rar * 0.014 + (fo.armed ? 0.02 : 0);
-    const ws = fo.boss ? 0.55 : 0.34 + Math.min(0.2, fo.iq * 0.12);
+    const base = fo.boss ? (fo.rage ? 0.08 : 0.07) : 0.03 + fo.rar * 0.014 + (fo.armed ? 0.02 : 0); // 第十九轮：BOSS 每刀 10%→7%（狂暴 8%）
+    const ws = fo.boss ? 0.45 : 0.34 + Math.min(0.2, fo.iq * 0.12);
     const hits = T.hits.map(([t, a, k]) => ({ t, a: a * D2R, ang: a * D2R, heavy: k === 'heavy', thrust: k === 'thrust' }));
-    const act = f.play(clip, { once: true, fade: 0.12, speed: 1, restart: true }); if (!act) return;
+    const act = f.play(clip, { once: true, fade: 0.12, speed: 1, restart: true }); if (!act) return; lastAtkAt = CLK; if (CTX.windup) try { CTX.windup(fo, clip); } catch (e) {}
     fo.atk = { clip, act, hits, hi: 0, ws, ws2: Math.min(1, ws * 1.7), end: Math.min(c.duration, T.end || c.duration), lunge: T.lunge || 0,
-      holdAt: Math.min(0.1, hits[0].t * 0.4), hold: fo.boss ? 0.22 : 0.34 - Math.min(0.14, fo.iq * 0.1), feint: !fo.boss && fo.iq > 0.8 && Math.random() < 0.14,
+      holdAt: Math.min(0.1, hits[0].t * 0.4), hold: fo.boss ? 0.3 : 0.34 - Math.min(0.14, fo.iq * 0.1), feint: !fo.boss && fo.iq > 0.8 && Math.random() < 0.14,
       reach: fo.armed ? 1.8 : 1.35, tot: 0, dmg: Math.max(1, Math.round(s.maxHp * base * (0.85 + Math.random() * 0.3))) };
     if (fo.sayT <= 0 && Math.random() < 0.25) talk(fo, fo.boss ? '' : pickR(Math.random, SAY.fight), '#ffb0a0');
   }
@@ -391,7 +418,7 @@ window.Foe = (() => {
         else if (fo.sayT <= 0 && Math.random() < 0.3) talk(fo, '……躲开了？'); }
     }
     act.timeScale = sc;
-    if (!A.hits[A.hi] && (ct >= A.end - 1e-3 || ct >= act.getClip().duration - 1e-3)) { fo.atk = null; fo.cd = (fo.boss ? 1.0 : 1.7) + Math.random() * Math.max(0.4, 2.0 - fo.iq); fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); }
+    if (!A.hits[A.hi] && (ct >= A.end - 1e-3 || ct >= act.getClip().duration - 1e-3)) { fo.atk = null; fo.cd = (fo.boss ? (fo.rage ? 1.0 : 1.5) : 2.2) + Math.random() * Math.max(0.6, 2.4 - fo.iq); fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); }
     return { turnTo, spd };
   }
   // 给 HUD：正在蓄力/出手的敌人 → 来刀方向 + 进度（1 = 命中那一刻）
@@ -525,7 +552,11 @@ window.Foe = (() => {
     }
     if (zone === 'neck' && slash && !fo.boss) ctx.toast && fo.hp > fo.maxHp * 0.5 && Math.random() < 0.5 && ctx.toast('脖子砍中了——再削弱她一些就能一刀斩首', '#ffc0a0', 1.6);
     // 受击硬直（霸主不容易被打断）
-    if (!fo.boss || Math.random() < 0.25 || sp > 1.3) { fo.atk = null; fo.stag = fo.boss ? 0.35 : 0.55; fo.f.play(zone === 'head' || zone === 'neck' ? 'Hit_Head' : sp > 1.3 ? 'Hit_Knockback' : 'Hit_Chest', { once: true, fade: 0.06, restart: true }); }
+    if (fo.boss) { fo.poise = (fo.poise || 0) + dealt; // 第十九轮：BOSS 韧性槽取代 25% 随机打断
+      if (!fo.rage && fo.hp <= fo.maxHp * 0.5) { fo.rage = true; fo.poise = 0; fo.atk = null; fo.stag = 0.9; fo.f.play('Hit_Knockback', { once: true, fade: 0.05, restart: true }); ctx.shake && ctx.shake(0.5); ctx.toast && ctx.toast('👑 霸主被激怒了——出手更快更狠！', '#ff9a60', 2.4); sfx().roar && sfx().roar(1); if (fo.sayT <= 0) talk(fo, pickR(Math.random, ['……有意思。', '你惹怒我了。', '玩够了。']), '#ffb0a0'); } }
+    const poiseBrk = fo.boss && (fo.poise >= (fo.rage ? 34 : 28) || info.charged);
+    if (poiseBrk) fo.poise = 0;
+    if (!fo.boss || poiseBrk) { fo.atk = null; fo.stag = fo.boss ? 0.35 : 0.55; fo.f.play(zone === 'head' || zone === 'neck' ? 'Hit_Head' : sp > 1.3 ? 'Hit_Knockback' : 'Hit_Chest', { once: true, fade: 0.06, restart: true }); }
     if (fo.sayT <= 0 && Math.random() < 0.5) talk(fo, fo.boss ? '' : pickR(Math.random, SAY.hit), '#ffb0a0');
     sfx().chop && sfx().chop(); sfx().squish && sfx().squish(0.5);
     return true;

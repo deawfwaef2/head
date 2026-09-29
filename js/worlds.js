@@ -497,7 +497,7 @@ window.Worlds = (() => {
     return {
       sc: B.sc, H: B.H, cols: B.cols, R: B.R, player: { pos: W.pos, get yaw() { return G.player.yaw; }, get crouch() { return G.player.crouch; } },
       st: () => G.st(), sees: (pos, maxD) => sees({ pos }, maxD), say: (anchor, text, col) => { if (text) say(anchor, text, col); },
-      floatDmg: (pos, n, big) => floatDmg(pos, n, big), renderer: G.renderer, camera: G.camera, event: (t, fo, d) => foeEvent(t, fo, d), toast: (t, c, d) => G.toast && G.toast(t, c, d), shake: (k) => { W.shake = Math.max(W.shake || 0, k); },
+      floatDmg: (pos, n, big) => floatDmg(pos, n, big), renderer: G.renderer, camera: G.camera, event: (t, fo, d) => foeEvent(t, fo, d), windup: (fo, clip) => { const dd = W ? Math.hypot(fo.pos.x - W.pos.x, fo.pos.z - W.pos.z) : 5, v = Math.max(0, 1 - dd / 14); if (!v) return; SFX.play && SFX.play('draw', 0.5 * v, 0.62, 0.05); if (/Heavy|Sword_Attack/.test(clip)) SFX.play && SFX.play('heavy', 0.45 * v, 0.7, 0.05); }, // 第十九轮：起手音 toast: (t, c, d) => G.toast && G.toast(t, c, d), shake: (k) => { W.shake = Math.max(W.shake || 0, k); },
       playerSwinging: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.thrust > 0)),
       playerAiming: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.tipSpeed > 3)),
       handAng: (fo) => { const CS = window.Combat && Combat.drawn && Combat.state; if (!CS) return null; // 第十八轮：刀尖锁准星 → 刀来自“准星相对这个敌人”的方向；挥动中用挥动来向
