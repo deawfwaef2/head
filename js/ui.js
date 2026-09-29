@@ -287,6 +287,11 @@ window.UI = (() => {
     if (q < 2.2) return ['轻松', '#8fe080'];
     return ['屠宰场', '#60d0ff'];
   }
+  function bossLine(l) {
+    const B = window.Explore && Explore.BOSSES[l.k]; if (!B) return '';
+    const done = G.S.bosses && G.S.bosses[l.k];
+    return `<div class="loc-boss" style="margin-top:4px;font-size:12.5px;color:${done ? '#ffd060' : '#c8b8d8'}">${done ? `👑 已征服：${esc(B.title)}·${esc(B.n)}` : `👑 霸主：${(G.S.visits && G.S.visits[l.k]) ? esc(B.title) : '？？？'}（随机现身）`}</div>`;
+  }
   function openExpedition() {
     const S = G.S, s = G.st();
     const hpF = S.hp / s.maxHp;
@@ -294,12 +299,13 @@ window.UI = (() => {
       const q = s.power / l.rec, [dn, dc] = danger(q);
       const races = Object.keys(l.races).map(k => (Lore.RACES[k] || { n: k }).n).join(' / ');
       return `<div class="loc" data-a="loc" data-v="${l.k}" style="--lc:${l.color}"><div class="loc-ic">${l.icon}</div><div class="loc-n">${l.n}</div>
-        <div class="loc-d" style="color:${dc}">${dn}</div><div class="loc-rec">推荐战力 ${l.rec}</div><div class="loc-desc">${esc(l.desc)}</div><div class="loc-r">猎物：${esc(races)}</div><div class="loc-loot">魂晶 ${l.loot[0]}~${l.loot[1]}</div></div>`;
+        <div class="loc-d" style="color:${dc}">${dn}</div><div class="loc-rec">推荐战力 ${l.rec}</div><div class="loc-desc">${esc(l.desc)}</div><div class="loc-r">猎物：${esc(races)}</div><div class="loc-loot">魂晶 ${l.loot[0]}~${l.loot[1]}</div>${bossLine(l)}</div>`;
     }).join('');
     SFX.open();
     open('exp', `<div class="m-head"><div class="m-title">🌄 出洞狩猎</div><div class="m-coins">⚔️ 战力 ${fmt(s.power)} · ❤️ ${Math.round(S.hp)}/${s.maxHp} · 🧺 ${s.cap} 颗</div><button class="m-close" data-a="close">✕ 留在洞里</button></div>
       ${hpF < 0.5 ? `<div class="warn">⚠️ 你的生命只剩 ${Math.round(hpF * 100)}%。死在外面就一切归零——先喝药或在洞里休息吧。 ${RPG.CONSUM.map(c => `<button data-a="use" data-v="${c.k}" ${S.items[c.k] ? '' : 'disabled'}>${c.icon}${c.n}×${S.items[c.k] || 0}</button>`).join('')}</div>` : ''}
-      <p class="hint2">选择狩猎地点。结束后要<b>点击屏幕 60 次</b>才能背着首级走回洞里。战力越高、背篓越大，带回的首级越多；地点太难可能空手而归，甚至死在路上（<b>死亡 = 重新开始</b>）。</p>
+      ${window.Explore ? `<p class="hint2" style="color:#ffd060">👑 征服目标：击败每个地区的霸主，带回她们的首级（${Object.keys(G.S.bosses || {}).length}/${Lore.LOCS.filter(l => Explore.BOSSES[l.k]).length}）${G.S.won ? ' · 你已是魂首窟之主' : ''}</p>` : ''}
+      <p class="hint2">选择狩猎地点。${window.Explore && (!window.Mods || Mods.on('explore3d')) ? '你会沿着道路一路走过去：路上的每个人都可以<b>交谈、放过或砍下首级</b>，按住鼠标/空格赶路。' : '结束后要<b>点击屏幕 60 次</b>才能背着首级走回洞里。'}战力越高、背篓越大，带回的首级越多；地点太难可能空手而归，甚至死在路上（<b>死亡 = 重新开始</b>）。</p>
       <div class="locs">${cards}</div>`, 'big');
     menuState.tab = 'exp';
   }
