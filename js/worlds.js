@@ -529,7 +529,7 @@ window.Worlds = (() => {
   // 给 js/foe.js 的接口
   function foeCtx(B, node) {
     return {
-      sc: B.sc, H: B.H, cols: B.cols, R: B.R, player: { pos: W.pos, get yaw() { return G.player.yaw; }, get crouch() { return G.player.crouch; } },
+      sc: B.sc, H: B.H, cols: B.cols, R: B.R, doors: B.doors, pvel: W.vel, escaped: (fo) => { const nd = W.graph.nodes[W.cur], i = nd.prey.indexOf(fo.h); if (i >= 0) nd.prey.splice(i, 1); G.toast && G.toast(`🚪 ${fo.h.c.name} 从门逃走了……（首级没了）`, '#ffb080', 2.4); W.trip.log.push({ t: `${fo.h.c.name}从「${nd.name}」的门逃走了。` }); if (W.stats) W.stats.combo = 0; }, player: { pos: W.pos, get yaw() { return G.player.yaw; }, get crouch() { return G.player.crouch; } },
       st: () => G.st(), sees: (pos, maxD) => sees({ pos }, maxD), say: (anchor, text, col) => { if (text) say(anchor, text, col); },
       floatDmg: (pos, n, big) => floatDmg(pos, n, big), renderer: G.renderer, camera: G.camera, event: (t, fo, d) => foeEvent(t, fo, d), windup: (fo, clip) => { const dd = W ? Math.hypot(fo.pos.x - W.pos.x, fo.pos.z - W.pos.z) : 5, v = Math.max(0, 1 - dd / 14); if (!v) return; SFX.play && SFX.play('draw', 0.5 * v, 0.62, 0.05); if (/Heavy|Sword_Attack/.test(clip)) SFX.play && SFX.play('heavy', 0.45 * v, 0.7, 0.05); }, // 第十九轮：起手音 toast: (t, c, d) => G.toast && G.toast(t, c, d), shake: (k) => { W.shake = Math.max(W.shake || 0, k); },
       playerSwinging: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.thrust > 0)),
@@ -791,7 +791,11 @@ window.Worlds = (() => {
     if (active) {
       const f = (K.KeyW || K.ArrowUp ? 1 : 0) - (K.KeyS || K.ArrowDown ? 1 : 0), s = (K.KeyD || K.ArrowRight ? 1 : 0) - (K.KeyA || K.ArrowLeft ? 1 : 0);
       P.crouch += ((K.KeyC ? 1 : 0) - P.crouch) * Math.min(1, dt * 12); P.h = EYE - 0.55 * P.crouch;
-      const sp = (K.ShiftLeft && P.crouch < 0.5 ? 6.2 : 3.6) * (1 - 0.55 * P.crouch);
+      // 第二十一轮：疾跑消耗体力（14/秒），耗尽后要恢复到 35 才能再跑 —— 敌人因此追得上
+      if (W.run == null) W.run = 100; const wantRun = (K.ShiftLeft || K.ShiftRight) && P.crouch < 0.5 && (f || s); if (!(!window.Mods || Mods.on('sprint_stamina'))) { W.run = 100; W.runTired = false; }
+      if (wantRun && !W.runTired) { W.run -= dt * ((!window.Mods || Mods.on('sprint_stamina')) ? 14 : 0); if (W.run <= 0) { W.run = 0; W.runTired = true; G.toast && G.toast('😮‍💨 跑不动了……', '#ffcf9a', 1.2); } } else { W.run = Math.min(100, W.run + dt * (wantRun ? 6 : 18)); if (W.runTired && W.run > 35) W.runTired = false; }
+      const sp = (wantRun && !W.runTired ? 6.2 : W.runTired ? 3.1 : 3.6) * (1 - 0.55 * P.crouch);
+      runBar();
       fw.set(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)); rt.set(Math.cos(P.yaw), 0, -Math.sin(P.yaw));
       want.copy(fw).multiplyScalar(f).addScaledVector(rt, s); if (want.lengthSq() > 0) want.normalize().multiplyScalar(sp);
       if (W.dashT > 0) { W.dashT -= dt; W.vel.x = W.dashV.x; W.vel.z = W.dashV.z; } else { W.vel.x += (want.x - W.vel.x) * Math.min(1, dt * 10); W.vel.z += (want.z - W.vel.z) * Math.min(1, dt * 10); }
@@ -800,7 +804,7 @@ window.Worlds = (() => {
     W.vel.y -= 14 * dt; W.pos.addScaledVector(W.vel, dt);
     // 碰撞：边界圆 + 物体圆
     const rr = Math.hypot(W.pos.x, W.pos.z), lim = (B.Rf ? B.Rf(Math.atan2(W.pos.z, W.pos.x)) : B.R) - 0.4; if (rr > lim) { W.pos.x *= lim / rr; W.pos.z *= lim / rr; }
-    for (const c of B.cols) { const dx = W.pos.x - c.x, dz = W.pos.z - c.z, d = Math.hypot(dx, dz), m = c.r + 0.35; if (d < m && d > 1e-5) { W.pos.x += dx / d * (m - d); W.pos.z += dz / d * (m - d); } }
+    for (const c of B.cols) { const dx = W.pos.x - c.x, dz = W.pos.z - c.z, m = c.r + 0.35, d2 = dx * dx + dz * dz; if (d2 >= m * m) continue; const d = Math.sqrt(d2); if (d > 1e-5) { W.pos.x += dx / d * (m - d); W.pos.z += dz / d * (m - d); } }
     const gy = B.H(W.pos.x, W.pos.z); if (W.pos.y <= gy) { W.pos.y = gy; W.vel.y = 0; W.onGround = true; } else if (W.pos.y > gy + 0.05) W.onGround = false;
     const moving = Math.hypot(W.vel.x, W.vel.z);
     if (W.onGround && moving > 1) { W.stepT -= dt * moving; if (W.stepT <= 0) { W.stepT = 1.7; SFX.step && SFX.step(); } }
@@ -849,7 +853,7 @@ window.Worlds = (() => {
         const pr = Math.hypot(p.pos.x, p.pos.z); if (pr > B.R - 2.5) { const tx = -p.pos.z / pr, tz = p.pos.x / pr, sg = (tx * dx + tz * dz) > 0 ? 1 : -1; vx = vx * 0.3 + tx * sg * 2.6; vz = vz * 0.3 + tz * sg * 2.6; if (d < 2.2 && p.cd <= 0) { if (p.sayT <= 0) { say(p, pick(Math.random, PREY_SAY.fight), '#ffb0a0'); p.sayT = 3; } preyStrike(p, s); } }
       } else { p.state = 'idle'; vx = Math.sin(now * 0.7 + p.rar) * 0.4; vz = Math.cos(now * 0.53 + p.rar * 2) * 0.4; if (d > 20) p.seen = false; }
       p.pos.x += vx * dt; p.pos.z += vz * dt;
-      for (const c of B.cols) { const ex = p.pos.x - c.x, ez = p.pos.z - c.z, e = Math.hypot(ex, ez), m = c.r + 0.3; if (e < m && e > 1e-5) { p.pos.x += ex / e * (m - e); p.pos.z += ez / e * (m - e); } }
+      for (const c of B.cols) { const ex = p.pos.x - c.x, ez = p.pos.z - c.z, m = c.r + 0.3, e2 = ex * ex + ez * ez; if (e2 >= m * m) continue; const e = Math.sqrt(e2); if (e > 1e-5) { p.pos.x += ex / e * (m - e); p.pos.z += ez / e * (m - e); } }
       const pr = Math.hypot(p.pos.x, p.pos.z), pl = B.R - 1; if (pr > pl) { p.pos.x *= pl / pr; p.pos.z *= pl / pr; }
       p.pos.y = B.H(p.pos.x, p.pos.z) + 1.35 + Math.sin(now * 2.3 + p.rar) * 0.12;
       const pulse = 1 + Math.sin(now * 5 + p.rar) * 0.12; p.core.scale.setScalar(0.5 * pulse * (p.flash > 0 ? 1.8 : 1)); p.halo.scale.setScalar(1.6 * pulse);
@@ -954,6 +958,8 @@ window.Worlds = (() => {
     if (W.mapOpen) return true;
     if (!e.repeat && (e.code === 'KeyQ' || e.code === 'KeyR' || e.code === 'KeyG')) { skill(e.code); return true; }
     if (e.code === 'KeyE' && !e.repeat) {
+      // 第二十一轮：被追杀时站在门口按 E 优先逃走（不会被旁边的尸体/战利品抢走 E）
+      if (W.doorNear && W.foes && W.foes.some(f => !f.dead && f.seen && (f.state === 'chase' || f.atk))) { const d = W.doorNear; G.toast && G.toast('🏃 你甩开了追兵，逃出了门！', '#b0ffb0', 2); if (d.home) leaveHome(); else { SFX.open && SFX.open(); goto(d.to, W.cur); } return true; }
       if (W.foes) { const bf = Foe.brokenNear(W.pos, G.player.yaw); if (bf) { Foe.execute(bf, new V3(Math.cos(G.player.yaw), 0, -Math.sin(G.player.yaw))); return true; } }
       if (W.headNear) { const hd = W.headNear;
         if ((window.Sack && Sack.on()) && !hd.fo.boss) { Sack.queueHead(hd, () => Foe.hasHead(hd), () => { if (takeHead(hd)) Foe.pickup(hd); }); return true; }
@@ -1022,6 +1028,8 @@ window.Worlds = (() => {
     b.style.opacity = 1; clearTimeout(banner._t); banner._t = setTimeout(() => { b.style.opacity = 0; }, 2600);
     const bo = W.boss; if (bo) DOM.boss.querySelector('.bn').innerHTML = `👑 ${esc(bo.B.title)} · ${esc(bo.B.n)}`; DOM.boss.style.display = 'none';
   }
+  function runBar() { let b = document.getElementById('wRun'); if (!b) { b = document.createElement('div'); b.id = 'wRun'; b.style.cssText = 'position:fixed;left:50%;bottom:74px;transform:translateX(-50%);width:180px;height:4px;border-radius:2px;background:rgba(0,0,0,.5);z-index:20;pointer-events:none;transition:opacity .3s'; b.innerHTML = '<i style="display:block;height:100%;border-radius:2px;background:#8fe08a"></i>'; document.body.appendChild(b); }
+    const w = Math.round(W.run); if (w !== W.runW) { W.runW = w; b.firstChild.style.width = w + '%'; b.firstChild.style.background = W.runTired ? '#e07a5a' : '#8fe08a'; b.style.opacity = w >= 100 ? 0 : 1; } }
   function hud() {
     if (!W || !W.B || !DOM) return; const node = W.graph.nodes[W.cur], st = STYLES[node.style], s = G.st();
     DOM.top.querySelector('.n').textContent = node.name; DOM.top.querySelector('.s').textContent = `${node.loc.icon} ${node.loc.n} · ${st.n}${LAYOUTS[layOf(node)] ? ' · ' + LAYOUTS[layOf(node)].n : ''} · ${SIZES[node.size].n} · 已探索 ${W.graph.nodes.filter(n => n.visited).length}/${W.graph.nodes.length}`;
@@ -1030,8 +1038,8 @@ window.Worlds = (() => {
     let h = 'WASD 走动 · <b>F</b> 拔刀（按住左键挥砍 / 连点刺 / 右键格挡）· <b>M</b> 地图 · <b>H</b> 喝药';
     if (W.headNear) h = `<b>E</b> 拾取首级 · 【${RN[W.headNear.h.c.rar]}】${esc(W.headNear.h.c.name)}`;
     else if (W.interNear) { const it = W.interNear, L = it.kind === 'loot' ? it.L : null; h = L ? `<b>E</b> ${L.kind === 'corpse' ? '搜身' : L.kind === 'pile' ? '翻' : '搜刮'} · ${esc(L.name)}${L.items && !L.items.length ? ' <span style="color:#999">（空）</span>' : ''}` : '<b>E</b> 打开宝箱'; }
-    if ((window.Sack && Sack.on()) && !W.headNear) h += ' · <b>Tab</b> 麻袋';
-    else if (W.doorNear) { const d = W.doorNear, cn = W.graph.nodes[W.cur]; h = d.home ? '<b>E</b> 回到魂首窟（结束狩猎，带回首级）' : `<b>E</b> 穿过门 → ${esc(doorName(cn, d))}` + (W.graph.nodes[d.to].region !== cn.region ? ` <span style="color:#f0a060">（推荐战力 ${W.graph.nodes[d.to].loc.rec}）</span>` : ''); }
+    if ((window.Sack && Sack.on()) && !W.headNear && !W.doorNear) h += ' · <b>Tab</b> 麻袋';
+    if (W.doorNear && !W.headNear && !W.interNear) { const d = W.doorNear, cn = W.graph.nodes[W.cur]; h = d.home ? '<b>E</b> 回到魂首窟（结束狩猎，带回首级）' : `<b>E</b> 穿过门 → ${esc(doorName(cn, d))}` + (W.graph.nodes[d.to].region !== cn.region ? ` <span style="color:#f0a060">（推荐战力 ${W.graph.nodes[d.to].loc.rec}）</span>` : ''); }
     DOM.hint.innerHTML = h;
   }
   function toggleMap(v) {

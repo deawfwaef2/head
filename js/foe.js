@@ -281,6 +281,7 @@ window.Foe = (() => {
   }
   function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function clear() {
+    NAV = null;
     for (const fo of FOES) { fo.anchor.gone = true; if (fo.warn && fo.warn.parent) fo.warn.parent.remove(fo.warn); if (fo.gs && fo.gs.parent) fo.gs.parent.remove(fo.gs); if (fo.f.root.parent) fo.f.root.parent.remove(fo.f.root); try { fo.f.hb.dispose(); } catch (e) {} }
     for (const h of HEADS) { if (h.g.parent) h.g.parent.remove(h.g); }
     for (const p of PIECES) { if (p.g.parent) p.g.parent.remove(p.g); }
@@ -293,6 +294,7 @@ window.Foe = (() => {
     if (!CTX) return; const ctx = CTX, P = ctx.player;
     CLK += dt;
     if (slowT > 0) { slowT -= dt; dt *= slowK; if (slowT <= 0) slowK = 1; } // 击杀慢动作：只作用于敌人/尸体/头/血，玩家照常
+    const SMART = !window.Mods || Mods.on('foe_smart'), DOORESC = !window.Mods || Mods.on('foe_door_escape');
     for (const fo of FOES) {
       const f = fo.f;
       if (fo.dead) { if (fo.rag) ragStep(fo, dt); if (fo.warn) fo.warn.visible = false; if (fo.gs) fo.gs.visible = false;
@@ -303,13 +305,13 @@ window.Foe = (() => {
       const face = Math.atan2(dx, dz);
       const see = ctx.sees(fo.pos, (fo.boss ? 16 : 9 + fo.rar * 2) * (P.crouch > 0.5 ? 0.55 : 1)) && (fo.seen || Math.abs(ang(face - fo.yaw)) < 1.4 || d < 3);
       if (see && !fo.seen) { alertNear(fo); fo.seen = true; fo.cd = Math.max(fo.cd, 0.5 + (1 - fo.iq) * 0.8); if (fo.boss) ctx.bossMeet(fo); else talk(fo, pickR(Math.random, SAY.see)); if (!fo.boss) fo.state = fo.brave ? 'chase' : 'flee'; else fo.state = 'chase'; }
-      if (fo.seen && d > 26) { fo.seen = false; fo.state = 'idle'; }
+      if (fo.seen && d > (SMART ? 34 : 26)) { fo.seen = false; fo.state = 'idle'; }
       let spd = 0, turnTo = null;
-      let strafe = 0;
+      let strafe = 0, goal = null;
       if (fo.atk) { const r = atkStep(fo, dt, d, face); turnTo = r.turnTo; spd = r.spd; } // 攻击：定格蓄力 → 慢起手 → 快出手（按实测命中帧判定）
       else if (fo.stag > 0) { /* 受击硬直 */ }
       else if (fo.block > 0) { turnTo = face; }
-      else if (fo.state === 'chase') {
+      else if (!SMART && fo.state === 'chase') {
         // 第十九轮：对峙距离 + 攻击令牌 + 平滑移动（旧版贴在 1.3m 绕圈游走、随时换向 = 用户说的“在你附近闪烁”、太快）
         turnTo = face;
         const hold = fo.armed ? 2.7 : 2.2, atkR = fo.armed ? 1.55 : 1.15, mine = tokenOK(fo);
@@ -327,16 +329,72 @@ window.Foe = (() => {
           else if (strafe) { f.play('Walk_Loop', { fade: 0.35, speed: 0.7 }); turnTo = face + strafe * 0.75; } // 侧移：身体偏向移动方向
           else f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.35 });
         }
-      } else if (fo.state === 'flee') {
+      } else if (!SMART && fo.state === 'flee') {
         turnTo = Math.atan2(-dx, -dz); spd = 3.2 + fo.rar * 0.2; f.play('Sprint_Loop', { fade: 0.2 });
         const pr = Math.hypot(fo.pos.x, fo.pos.z);
         if (pr > ctx.R - 3) { const tx = -fo.pos.z / pr, tz = fo.pos.x / pr, sg = (tx * -dx + tz * -dz) > 0 ? 1 : -1; turnTo = Math.atan2(tx * sg * 0.9 - fo.pos.x / pr * 0.3, tz * sg * 0.9 - fo.pos.z / pr * 0.3); if (d < 2.2 && fo.cd <= 0) { fo.state = 'chase'; talk(fo, pickR(Math.random, SAY.fight)); } }
         else if (fo.sayT <= 0 && Math.random() < 0.006) talk(fo, pickR(Math.random, SAY.flee));
+      }
+      else if (SMART && fo.state === 'retreat') { // 第二十一轮：重伤后退开整顿（聪明的敌人不会一味送死）
+        fo.retT -= dt; turnTo = Math.atan2(-dx, -dz); if (d > 7.5) { turnTo = face; spd = 0; f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.3 }); fo.hp = Math.min(fo.maxHp, fo.hp + fo.maxHp * 0.05 * dt); }
+        else { spd = 3.6; f.play('Jog_Fwd_Loop', { fade: 0.25, speed: 0.9 }); }
+        if (fo.retT <= 0 || (d < 2.6 && fo.cd <= 0)) { fo.state = 'chase'; fo.cd = 0.3; talk(fo, pickR(Math.random, SAY2.back)); }
+      }
+      else if (fo.state === 'chase') {
+        // 第二十一轮：更聪明的追击 —— 预判拦截、包抄站位、惩罚逃跑、丢失目标会去搜索；速度足以追上疾跑后没体力的玩家
+        const hold = fo.armed ? 2.7 : 2.2, atkR = fo.armed ? 1.55 : 1.15, mine = tokenOK(fo);
+        const sprint = fo.boss ? 5.9 : 4.9 + fo.iq * 1.1 + fo.rar * 0.15;
+        goal = [P.pos.x, P.pos.z, 'P']; const pv = ctx.pvel || { x: 0, z: 0 }, away = (pv.x * dx + pv.z * dz) / d; // 玩家远离我的速度
+        const track = see || ((fo.lostT || 0) < 0.05 || fo.t % 0.25 < dt) && d < 22 && ctx.sees(fo.pos, 22); if (track) { fo.lostT = 0; (fo.lastSeen || (fo.lastSeen = new V3())).set(P.pos.x, 0, P.pos.z); } else fo.lostT = (fo.lostT || 0) + dt;
+        if (!fo.boss && fo.hp < fo.maxHp * 0.3 && !fo.retreated && fo.iq > 0.45 && !fo.atk) { fo.retreated = true; fo.state = 'retreat'; fo.retT = 3 + Math.random() * 2.5; talk(fo, pickR(Math.random, SAY2.hurt)); }
+        else if (fo.lostT > 1.2 && fo.lastSeen) { // 看不见你了：去最后看见的位置找
+          const lx = fo.lastSeen.x - fo.pos.x, lz = fo.lastSeen.z - fo.pos.z, ld = Math.hypot(lx, lz);
+          if (ld > 1.2) { turnTo = Math.atan2(lx, lz); goal = [fo.lastSeen.x, fo.lastSeen.z, 'P']; spd = 3.4; f.play('Jog_Fwd_Loop', { fade: 0.3, speed: 0.85 }); } else { turnTo = fo.yaw + Math.sin(fo.t * 1.3) * 1.5; f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.3 }); }
+          if (fo.lostT > 7) { fo.state = 'idle'; fo.seen = false; talk(fo, pickR(Math.random, SAY2.lost)); }
+        }
+        else if (fo.armed && fo.cd <= 0 && mine && d > 2.3 && d < 5.2 && (away > 2.2 ? Math.random() < 0.06 : fo.iq > 0.6 && Math.random() < 0.01)) { attack(fo, d, 'Sword_Dash'); if (away > 2.2 && fo.atk && fo.sayT <= 0) talk(fo, pickR(Math.random, SAY2.run)); } // 你一转身逃跑，她就冲刺斩
+        else if (fo.cd <= 0 && mine) { // 轮到我：预判你的走位拦截，到出手距离就起手
+          if (d > atkR) { const lead = Math.min(0.9, d / sprint) * (0.3 + fo.iq * 0.7); turnTo = Math.atan2(dx + pv.x * lead, dz + pv.z * lead); spd = d > 4 ? sprint : Math.min(sprint, Math.max(2.2, away + 1.4)); f.play(spd > 3.3 ? 'Sprint_Loop' : 'Walk_Loop', { fade: 0.25, speed: spd > 3.3 ? 1 : 1.2 }); }
+          else { turnTo = face; attack(fo, d); }
+        }
+        else if (d > hold + 2.2) { // 追上来：远了就疾跑（带预判）
+          const lead = Math.min(1.1, d / sprint) * (0.3 + fo.iq * 0.7); turnTo = Math.atan2(dx + pv.x * lead, dz + pv.z * lead);
+          spd = d > 7 ? sprint : Math.min(sprint, Math.max(3.4, away + 1.5)); f.play(spd > 4.2 ? 'Sprint_Loop' : 'Jog_Fwd_Loop', { fade: 0.25, speed: spd > 4.2 ? 1 : 0.9 });
+        }
+        else { // 包抄：每个敌人占玩家周围不同的角度槽，不再全挤在正面；到位后站定观察/小幅游走
+          turnTo = face; let k = 0, n = 0; for (const o of FOES) { if (o.dead || o.state !== 'chase' || !o.seen) continue; if (o === fo) k = n; n++; }
+          const pf = Math.atan2(-Math.sin(ctx.player.yaw), -Math.cos(ctx.player.yaw)); // 玩家面朝方向（世界角）
+          const off = n <= 1 ? 0 : (k - (n - 1) / 2) * Math.min(1.1, 3.4 / n) * 1.25 + (fo.iq > 0.7 && n > 1 ? 0.25 : 0);
+          const sa = pf + off, gx = P.pos.x + Math.sin(sa) * hold, gz = P.pos.z + Math.cos(sa) * hold, ex = gx - fo.pos.x, ez = gz - fo.pos.z, ed = Math.hypot(ex, ez);
+          if (ed > 0.6) { // 走向自己的槽位：身体朝玩家，横着/倒着走过去
+            fo.slotV = fo.slotV || new V3(); fo.slotV.set(ex / ed, 0, ez / ed); strafe = 3; f.play('Walk_Loop', { fade: 0.35, speed: (fo.slotV.x * dx + fo.slotV.z * dz) < 0 ? -0.8 : 0.8 });
+          } else { fo.strafeT = (fo.strafeT || 0) - dt; if (fo.strafeT <= 0) { fo.strafeT = 1.4 + Math.random() * 1.8; const r0 = Math.random(); fo.strafeDir = r0 < 0.5 ? 0 : r0 < 0.75 ? -1 : 1; }
+            strafe = fo.strafeDir || 0; if (d < hold - 0.6) strafe = 2;
+            if (strafe === 2) f.play('Walk_Loop', { fade: 0.35, speed: -0.75 }); else if (strafe) f.play('Walk_Loop', { fade: 0.35, speed: 0.7 }); else f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.35 }); }
+          if (fo.sayT <= 0 && Math.random() < 0.004) talk(fo, pickR(Math.random, n > 1 ? SAY2.pack : SAY2.duel));
+        }
+      } else if (fo.state === 'flee') { // 第二十一轮：逃向最近的门——跑到门口就真的逃掉了（首级也就没了）
+        const doors = DOORESC ? ctx.doors || [] : []; let tg = null, best = 1e9;
+        for (const dr of doors) { const ddx = dr.x - fo.pos.x, ddz = dr.z - fo.pos.z, dd = Math.hypot(ddx, ddz) || 1; const toward = -(ddx * dx + ddz * dz) / dd / d; const cost = dd * (1 + Math.max(0, -toward) * 1.6); if (cost < best) { best = cost; tg = dr; } }
+        spd = 3.9 + fo.rar * 0.25 + fo.iq * 0.4; f.play('Sprint_Loop', { fade: 0.2 });
+        if (tg) { const ddx = tg.x - fo.pos.x, ddz = tg.z - fo.pos.z, dd = Math.hypot(ddx, ddz); turnTo = Math.atan2(ddx, ddz); if (d > 3) goal = [tg.x, tg.z, 'D' + doors.indexOf(tg)];
+          if (d < 3 && Math.abs(ang(Math.atan2(ddx, ddz) - face)) < 0.6) turnTo = Math.atan2(ddx, ddz) + (ang(face - Math.atan2(ddx, ddz)) > 0 ? -0.9 : 0.9); // 你挡在门前：绕开
+          if (fo.flash > 0) fo.doorT = 0; // 开门时挨了一刀：被打断
+          if (dd < 1.7) { spd = 0; turnTo = Math.atan2(ddx, ddz); f.play('Idle_Loop', { fade: 0.2 }); if (!fo.doorT) { fo.doorT = 1e-3; if (ctx.toast) ctx.toast(`🚪 ${fo.h.c.name} 正在开门逃跑——快追上砍她！`, '#ffcf80', 1.4); } fo.doorT += dt; if (fo.doorT > 1.2) { escape(fo); continue; } }
+          else if (fo.doorT && dd > 2.5) fo.doorT = 0;
+          if (!fo.doorSaid && dd < 8) { fo.doorSaid = true; talk(fo, pickR(Math.random, SAY2.door)); }
+        } else turnTo = Math.atan2(-dx, -dz);
+        if (d < 1.9 && fo.cd <= 0 && Math.random() < 0.02 + fo.iq * 0.02) { fo.state = 'chase'; fo.brave = true; talk(fo, pickR(Math.random, SAY.fight)); } // 被追上：困兽之斗
+        else if (fo.sayT <= 0 && Math.random() < 0.006) talk(fo, pickR(Math.random, SAY.flee));
       } else { f.play(fo.idleClip, { fade: 0.3 }); }
-      if (turnTo != null) fo.yaw += clampA(ang(turnTo - fo.yaw), 6 * dt * (0.6 + fo.iq));
+      if (SMART && spd > 0.5 && turnTo != null && !fo.atk) { // 第二十一轮：绕开树/石头/墙，卡住就换方向绕路
+        if (fo.sideT > 0) fo.sideT -= dt; if (fo.detour > 0) { fo.detour -= dt; turnTo = fo.detourYaw; } else turnTo = goal ? steer(fo, turnTo, goal) : avoidC(fo, turnTo);
+        fo.stuckT = (fo.stuckT || 0) + dt; if (fo.stuckT > 0.5) { const lp = fo.lastP || (fo.lastP = fo.pos.clone()), mv = Math.hypot(fo.pos.x - lp.x, fo.pos.z - lp.z); if (mv < spd * 0.5 * 0.3 && !fo.detour) { fo.detour = 0.9 + Math.random() * 0.6; fo.detourYaw = unstick(fo, turnTo); } lp.copy(fo.pos); fo.stuckT = 0; } }
+      if (turnTo != null) fo.yaw += clampA(ang(turnTo - fo.yaw), 6 * dt * (0.6 + fo.iq) * (spd > 4 ? 1.4 : 1));
       { // 第十九轮：速度带加速度（不再瞬间换向）；侧移/后退都以“面向玩家”的方向为基准
         let vx = 0, vz = 0; if (spd > 0) { vx = Math.sin(fo.yaw) * spd; vz = Math.cos(fo.yaw) * spd; }
-        if (strafe && !fo.atk && fo.stag <= 0) { if (strafe === 2) { vx -= Math.sin(face) * 0.8; vz -= Math.cos(face) * 0.8; } else { vx += Math.cos(face) * strafe * 0.65; vz -= Math.sin(face) * strafe * 0.65; } }
+        if (strafe === 3 && !fo.atk && fo.stag <= 0 && fo.slotV) { vx += fo.slotV.x * 1.6; vz += fo.slotV.z * 1.6; }
+        else if (strafe && !fo.atk && fo.stag <= 0) { if (strafe === 2) { vx -= Math.sin(face) * 0.8; vz -= Math.cos(face) * 0.8; } else { vx += Math.cos(face) * strafe * 0.65; vz -= Math.sin(face) * strafe * 0.65; } }
         const fv = fo.fv || (fo.fv = new V3()), kk = 1 - Math.exp(-(fo.atk ? 14 : 6) * dt); fv.x += (vx - fv.x) * kk; fv.z += (vz - fv.z) * kk;
         fo.pos.x += fv.x * dt; fo.pos.z += fv.z * dt;
         const pd = Math.hypot(fo.pos.x - P.pos.x, fo.pos.z - P.pos.z), mn = 1.05; // 永远不贴进玩家 1.05m 内（第一人称近裁剪穿模闪烁）
@@ -366,9 +424,53 @@ window.Foe = (() => {
   }
   let slowT = 0, slowK = 1; function slowmo(t, k) { slowT = Math.max(slowT, t); slowK = Math.min(k, slowT > 0 ? slowK : 1); }
   const ang = a => Math.atan2(Math.sin(a), Math.cos(a)), clampA = (a, m) => Math.max(-m, Math.min(m, a));
-  function collideList(p, r, cols) { for (const c of cols) { const ex = p.x - c.x, ez = p.z - c.z, e = Math.hypot(ex, ez), m = c.r + r; if (e < m && e > 1e-5) { p.x += ex / e * (m - e); p.z += ez / e * (m - e); } } const pr = Math.hypot(p.x, p.z), pl = CTX.R - 1; if (pr > pl) { p.x *= pl / pr; p.z *= pl / pr; } }
-  function collide(p, r) { const ctx = CTX; for (const c of ctx.cols) { const ex = p.x - c.x, ez = p.z - c.z, e = Math.hypot(ex, ez), m = c.r + r; if (e < m && e > 1e-5) { p.x += ex / e * (m - e); p.z += ez / e * (m - e); } } const pr = Math.hypot(p.x, p.z), pl = ctx.R - 1; if (pr > pl) { p.x *= pl / pr; p.z *= pl / pr; } }
+  function collideList(p, r, cols) { for (const c of cols) { const ex = p.x - c.x, ez = p.z - c.z, m = c.r + r, e2 = ex * ex + ez * ez; if (e2 >= m * m) continue; const e = Math.sqrt(e2); if (e > 1e-5) { p.x += ex / e * (m - e); p.z += ez / e * (m - e); } } const pr = Math.hypot(p.x, p.z), pl = CTX.R - 1; if (pr > pl) { p.x *= pl / pr; p.z *= pl / pr; } }
+  function collide(p, r) { const ctx = CTX; for (const c of ctx.cols) { const ex = p.x - c.x, ez = p.z - c.z, m = c.r + r, e2 = ex * ex + ez * ez; if (e2 >= m * m) continue; const e = Math.sqrt(e2); if (e > 1e-5) { p.x += ex / e * (m - e); p.z += ez / e * (m - e); } } const pr = Math.hypot(p.x, p.z), pl = ctx.R - 1; if (pr > pl) { p.x *= pl / pr; p.z *= pl / pr; } }
   function alertNear(src) { for (const o of FOES) if (o !== src && !o.dead && !o.seen && o.pos.distanceTo(src.pos) < 13) { o.seen = true; o.state = o.boss ? 'chase' : (o.brave ? 'chase' : 'flee'); o.cd = Math.max(o.cd, 0.8 + Math.random()); if (o.boss) CTX.bossMeet(o); else if (Math.random() < 0.5) setTimeout(() => talk(o, pickR(Math.random, ['有人闯进来了！', '在那边！', '小心——', '快去叫人！'])), 400 + Math.random() * 600); } }
+  const SAY2 = { hurt: ['唔……先退一步。', '别逼我……', '等等，喘口气——', '我还没输！'], back: ['再来！', '这次不会让你得逞。', '我看穿你了。'], lost: ['……跑哪去了？', '藏起来了吗……', '奇怪，刚才还在这。'],
+    run: ['想跑？！', '别走！', '站住——'], pack: ['包围它！', '从侧面上！', '一起上！', '别让它跑了！'], duel: ['来啊。', '你的破绽太多了。', '就这点本事？'], door: ['门就在前面……！', '快出去——！', '只要出了这扇门……'] };
+  function avoid(fo, yaw, look) { // 第二十一轮：找挡在路线上最近的圆形障碍，转向它的切线方向（大石头也能绕开）
+    const cols = CTX.cols, fx = Math.sin(yaw), fz = Math.cos(yaw); let best = null, bA = 1e9;
+    for (const c of cols) { const rx = c.x - fo.pos.x, rz = c.z - fo.pos.z, m = c.r + 0.5, L = look + m; if (rx * rx + rz * rz > L * L) continue; const along = rx * fx + rz * fz; if (along < -0.1) continue;
+      const lat = rx * fz - rz * fx; if (Math.abs(lat) < m && along < bA) { bA = along; best = { c, lat, m, rx, rz }; } }
+    let out = yaw;
+    if (best) { const dC = Math.hypot(best.rx, best.rz) || 1e-3, cA = Math.atan2(best.rx, best.rz), half = Math.asin(Math.min(1, best.m / dC)) + 0.12;
+      if (!(fo.sideT > 0)) fo.side = best.lat > 0 ? -1 : 1; fo.sideT = 1.5; // 选定绕行方向后坚持一会儿，沿着树丛/石堆整圈绕过去，不左右摇摆
+      out = cA + fo.side * half; }
+    const pr = Math.hypot(fo.pos.x, fo.pos.z); if (pr > CTX.R - 3.5) { const k = Math.min(1.5, (pr - (CTX.R - 3.5)) / 3), ox = Math.sin(out) - fo.pos.x / pr * k, oz = Math.cos(out) - fo.pos.z / pr * k; out = Math.atan2(ox, oz); }
+    return out; }
+  // 第二十一轮：导航网格 + 流场寻路（障碍全是圆，墙=一串小圆；局部绕行会被凹形死角困住，所以用 BFS 距离场）
+  let NAV = null; const NB = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+  function navBuild() { const R = CTX.R, cs = 0.8, n = Math.ceil(2 * R / cs) + 1, blk = new Uint8Array(n * n), lim = (R - 1.3) * (R - 1.3);
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const x = -R + i * cs, z = -R + j * cs; if (x * x + z * z > lim) blk[j * n + i] = 1; }
+    for (const c of CTX.cols) { const rr = c.r + 0.3, i0 = Math.max(0, Math.floor((c.x - rr + R) / cs)), i1 = Math.min(n - 1, Math.ceil((c.x + rr + R) / cs)), j0 = Math.max(0, Math.floor((c.z - rr + R) / cs)), j1 = Math.min(n - 1, Math.ceil((c.z + rr + R) / cs));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const x = -R + i * cs - c.x, z = -R + j * cs - c.z; if (x * x + z * z < rr * rr) blk[j * n + i] = 1; } }
+    NAV = { cols: CTX.cols, nc: CTX.cols.length, R, cs, n, blk, fields: new Map(), q: new Int32Array(n * n) }; }
+  function navCell(x, z) { const N = NAV, i = Math.max(0, Math.min(N.n - 1, Math.round((x + N.R) / N.cs))), j = Math.max(0, Math.min(N.n - 1, Math.round((z + N.R) / N.cs))); return j * N.n + i; }
+  function navFree(c, rad) { const N = NAV; if (!N.blk[c]) return c; const i0 = c % N.n, j0 = (c / N.n) | 0; for (let r = 1; r <= rad; r++) for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) { if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue; const i = i0 + di, j = j0 + dj; if (i < 0 || j < 0 || i >= N.n || j >= N.n) continue; const k = j * N.n + i; if (!N.blk[k]) return k; } return -1; }
+  function navField(key, x, z, minGap) { if (!NAV || NAV.cols !== CTX.cols || NAV.nc !== CTX.cols.length) navBuild(); const N = NAV; let F = N.fields.get(key);
+    const src = navFree(navCell(x, z), 6); if (src < 0) return null; if (F && (F.src === src || CLK - F.at < (minGap || 0))) return F.d;
+    if (!F) { F = { d: new Uint16Array(N.n * N.n), src: -1, at: 0 }; N.fields.set(key, F); } const d = F.d, q = N.q, n = N.n, blk = N.blk; d.fill(65535); F.src = src; F.at = CLK;
+    let h = 0, t = 0; d[src] = 0; q[t++] = src;
+    while (h < t) { const c = q[h++], i = c % n, j = (c / n) | 0, dc = d[c] + 1;
+      for (let k = 0; k < 8; k++) { const ii = i + NB[k][0], jj = j + NB[k][1]; if (ii < 0 || jj < 0 || ii >= n || jj >= n) continue; const e = jj * n + ii; if (blk[e] || d[e] <= dc) continue;
+        if (k >= 4 && (blk[j * n + ii] || blk[jj * n + i])) continue; d[e] = dc; q[t++] = e; } }
+    return d; }
+  function flowYaw(fo, d) { if (!d) return null; const N = NAV, n = N.n; let c = navFree(navCell(fo.pos.x, fo.pos.z), 3); if (c < 0 || d[c] === 65535) return null;
+    for (let s = 0; s < 3; s++) { const i = c % n, j = (c / n) | 0; let b = c, bd = d[c]; for (let k = 0; k < 8; k++) { const ii = i + NB[k][0], jj = j + NB[k][1]; if (ii < 0 || jj < 0 || ii >= n || jj >= n) continue; const e = jj * n + ii; if (d[e] < bd && !(k >= 4 && (N.blk[j * n + ii] || N.blk[jj * n + i]))) { bd = d[e]; b = e; } } if (b === c) break; c = b; }
+    const tx = -N.R + (c % n) * N.cs, tz = -N.R + ((c / n) | 0) * N.cs; if (Math.hypot(tx - fo.pos.x, tz - fo.pos.z) < 0.05) return null; return Math.atan2(tx - fo.pos.x, tz - fo.pos.z); }
+  function steer(fo, yaw, goal) { // 每个敌人约 8 次/秒重新规划（错开帧），其余帧沿用：直走模式沿用绕障偏角，流场模式沿用方向
+    if (fo.planAt != null && CLK - fo.planAt < 0.12) return fo.planFlow ? fo.planYaw : yaw + fo.planOff;
+    fo.planAt = CLK + (fo.id % 5) * 0.004; const r = steer0(fo, yaw, goal); fo.planFlow = r[1]; fo.planYaw = r[0]; fo.planOff = ang(r[0] - yaw); return r[0]; }
+  function avoidC(fo, yaw) { // 绕障（非寻路时）也限频
+    if (fo.avAt != null && CLK - fo.avAt < 0.1) return yaw + fo.avOff; fo.avAt = CLK + (fo.id % 5) * 0.004; const y = avoid(fo, yaw, 2.2); fo.avOff = ang(y - yaw); return y; }
+  function steer0(fo, yaw, goal) { // 直线畅通就直走（带小幅绕障），被挡住就沿流场走
+    const dx = goal[0] - fo.pos.x, dz = goal[1] - fo.pos.z, dist = Math.hypot(dx, dz);
+    if (clearRay(fo, Math.atan2(dx, dz), Math.min(dist, 9))) return [avoid(fo, yaw, 2.2), false];
+    const y = flowYaw(fo, navField(goal[2], goal[0], goal[1], goal[2] === 'P' ? 0.25 : 99)); return y == null ? [avoid(fo, yaw, 2.2), false] : [y, true]; }
+  function clearRay(fo, yaw, len) { const fx = Math.sin(yaw), fz = Math.cos(yaw); for (const c of CTX.cols) { const rx = c.x - fo.pos.x, rz = c.z - fo.pos.z, along = rx * fx + rz * fz; if (along < -0.2 || along > len + c.r) continue; if (Math.abs(rx * fz - rz * fx) < c.r + 0.45) return false; } const ex = fo.pos.x + fx * len, ez = fo.pos.z + fz * len; return Math.hypot(ex, ez) < CTX.R - 1.5; }
+  function unstick(fo, goal) { const pref = fo.side || (Math.random() < 0.5 ? 1 : -1); for (const a of [0.7, 1.3, 1.9, 2.5, 3.1]) for (const sg of [pref, -pref]) { const y = goal + a * sg; if (clearRay(fo, y, 2.6)) { fo.side = sg; fo.sideT = 2; return y; } } return goal + Math.PI; }
+  function escape(fo) { fo.dead = true; fo.escaped = true; fo.rag = null; fo.spurt = 0; if (fo.warn) fo.warn.visible = false; if (fo.gs) fo.gs.visible = false; if (fo.f.root.parent) fo.f.root.parent.remove(fo.f.root); talk(fo, ''); if (CTX.escaped) try { CTX.escaped(fo); } catch (e) { console.warn(e); } }
   function talk(fo, text, col) { if (!CTX || fo.dead) return; CTX.say(fo.anchor, text, col); fo.sayT = 3 + Math.random() * 2; }
   // 第十六轮：每个攻击动作实测（_tools/fclip.py：右手蓄力位→命中位的位移）得到命中时刻（动作内秒）与来刀方向（玩家屏幕角：0=右 90=上 ±180=左 -90=下）
   const D2R = Math.PI / 180;
@@ -501,7 +603,7 @@ window.Foe = (() => {
   function targets() {
     const out = [];
     HEADS.forEach((h, i) => out.push({ id: 'fh' + i + '_' + h.fo.id2, pos: h.g.position, r: 0.15, kind: 'head', onHit: (info) => { const v = (info.vel || new V3()).clone().multiplyScalar(0.45); v.y = Math.max(v.y, 1 + (info.speed || 4) * 0.1); h.vel.copy(v); h.av.set((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 14); h.rest = 0; sfx().thud && sfx().thud(0.6); return true; } }));
-    for (const fo of FOES) {
+    for (const fo of FOES) { if (fo.escaped) continue;
       const c = fo.f.bones.hips; if (!c) continue; const pos = c.getWorldPosition(new V3()); pos.y += 0.12;
       out.push({ id: fo.id2, pos, r: 1.05, kind: fo.boss ? 'boss' : 'foe', onHit: (info) => hit(fo, info) });
       if (fo.headOnPiece && !fo.decap) out.push({ id: fo.id2 + '_hp', pos: fo.f.holder.getWorldPosition(new V3()), r: 0.3, kind: 'foe', onHit: (info) => { if (info.kind !== 'thrust' && info.speed > 3) { decapitate(fo, info); return true; } return false; } });

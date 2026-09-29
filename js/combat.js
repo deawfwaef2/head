@@ -51,7 +51,8 @@ window.Combat = (() => {
     d.style.cssText = 'position:fixed;left:50%;top:calc(50% + 26px);transform:translateX(-50%);width:120px;height:5px;border-radius:3px;background:rgba(0,0,0,.45);pointer-events:none;display:none;z-index:20;box-shadow:0 0 6px rgba(0,0,0,.6)';
     const b = document.createElement('i'); b.style.cssText = 'display:block;height:100%;width:100%;border-radius:3px;background:linear-gradient(90deg,#ffd27a,#ff9a3a);transition:width .08s';
     const g = document.createElement('div'); g.style.cssText = 'position:absolute;left:50%;top:-44px;transform:translateX(-50%);font:600 13px sans-serif;color:#cfe6ff;text-shadow:0 1px 3px #000;opacity:0;transition:opacity .15s;white-space:nowrap';
-    d.appendChild(b); d.appendChild(g); document.body.appendChild(d); return { d, b, g };
+    const c = document.createElement('i'); c.style.cssText = 'position:absolute;left:0;top:8px;display:block;height:3px;width:0;border-radius:2px;background:#9fe0ff;box-shadow:0 0 6px #6cf';
+    d.appendChild(b); d.appendChild(g); d.appendChild(c); document.body.appendChild(d); return { d, b, g, c };
   }
 
   function init(game) {
@@ -143,6 +144,11 @@ window.Combat = (() => {
     if (G.uiOpen) { S.lmb = S.rmb = false; }
     // 顿帧：武器冻结一小会，屏震衰减
     { const idt = 1 / Math.max(1e-3, dt); _t.set(S.mAcc.x * idt, S.mAcc.y * idt, 0); S.mv.lerp(_t, Math.min(1, dt * 16)); S.mAcc.set(0, 0, 0); }
+    // 第二十一轮：挥幅（冲力）——只有“同一方向持续挥出”的距离才积累冲力；来回高频晃动每次反向都会清零 → 伤害很低
+    { const sp = S.mv.length(); if (!S.swD) { S.swD = new V3(1, 0, 0); S.arc = 0; }
+      if (!S.lmb || S.rmb || sp < 160) S.arc *= Math.exp(-dt * 7);
+      else { _t.copy(S.mv).multiplyScalar(1 / sp); const c = _t.dot(S.swD); if (c < 0.2) { S.arc *= 0.08; S.swD.copy(_t); if (S.arc < 5) S.flip = (S.flip || 0) + 1; } else S.swD.lerp(_t, Math.min(1, dt * 5)).normalize(); S.arc = Math.min(900, S.arc + sp * dt); }
+      S.flipT = (S.flipT || 0) + dt; if (S.flipT > 1) { S.flipT = 0; S.wiggle = (S.flip || 0) >= 5; S.flip = 0; } }
     if (S.stop > 0) { S.stop -= dt; S.shake *= 0.85; placeWeapon(); return; }
     const tired = S.stam <= 0 ? 0.5 : 1;
     let omega = 22 / Math.sqrt(S.wt) * tired; // 第十六轮：整体节奏放慢一点
@@ -198,7 +204,7 @@ window.Combat = (() => {
     }
     S.lastTip = (S.lastTip || new V3()).copy(_tipW); S.lastBase = (S.lastBase || new V3()).copy(_baseW);
     // HUD
-    hud.d.style.display = 'block'; hud.b.style.width = Math.max(0, S.stam) + '%'; hud.b.style.background = S.stam < 25 ? 'linear-gradient(90deg,#ff6a5a,#ff3a3a)' : 'linear-gradient(90deg,#ffd27a,#ff9a3a)';
+    hud.d.style.display = 'block'; hud.b.style.width = Math.max(0, S.stam) + '%'; { const k = S.lmb && S.thrust === 0 ? commitK() : 0, w = Math.round(k / 1.2 * 100); if (w !== hud.cw) { hud.cw = w; hud.c.style.width = w + '%'; hud.c.style.background = k >= 0.95 ? '#ffe070' : k > 0.45 ? '#9fe0ff' : '#5a7a90'; } } hud.b.style.background = S.stam < 25 ? 'linear-gradient(90deg,#ff6a5a,#ff3a3a)' : 'linear-gradient(90deg,#ffd27a,#ff9a3a)';
     hud.g.style.opacity = 0; drawOverlay(now);
     for (const [k, t] of S.hitCd) if (now - t > 0.3) S.hitCd.delete(k);
   }
@@ -223,10 +229,11 @@ window.Combat = (() => {
       for (const tg of list) {
         if (S.hitCd.has(tg.id)) continue;
         const d = segPointDist(p0, p1, tg.pos); if (d > tg.r) continue;
-        const speed = S.thrust > 0 ? Math.max(S.tipSpeed, 5) : S.tipSpeed * f;
-        if (speed < 2) continue;
+        const commit = commitK();
+        const speed = S.thrust > 0 ? Math.max(S.tipSpeed, 5) : S.tipSpeed * f * commit;
+        if (speed < 2) { if (S.wiggle && tg.kind !== 'head' && now - (S.wigT || 0) > 2.5) { S.wigT = now; G.toast && G.toast('🌀 来回乱晃没有冲力——大幅度挥砍 / 连点刺击才有伤害', '#9fd0ff', 1.8); } continue; }
         const info = { point: p1.clone(), vel: _vel.clone().multiplyScalar(f), speed, kind: S.thrust > 0 ? 'thrust' : 'slash', dir: dirName(), frac: f,
-          seg: { b0: S.lastBase.clone(), t0: S.lastTip.clone(), b1: _baseW.clone(), t1: _tipW.clone() }, from: fromAng(), charged: S.charged > 0 && S.thrust === 0, tipSpeed: S.thrust > 0 ? Math.max(S.tipSpeed, 5) : S.tipSpeed };
+          commit, seg: { b0: S.lastBase.clone(), t0: S.lastTip.clone(), b1: _baseW.clone(), t1: _tipW.clone() }, from: fromAng(), charged: S.charged > 0 && S.thrust === 0, tipSpeed: S.thrust > 0 ? Math.max(S.tipSpeed, 5) : S.tipSpeed };
         const res = tg.onHit ? tg.onHit(info) : true;
         if (res === false) continue; // 目标说“刃其实没碰到身体”：不进冷却，这一刀继续扫
         S.hitCd.set(tg.id, now); if (info.charged && tg.kind !== 'head') S.charged = 0;
@@ -235,6 +242,8 @@ window.Combat = (() => {
       }
     }
   }
+  // 冲力系数：挥幅 < 60px 几乎无伤；≥ 340px 满额；蓄力斩/刺击不受影响
+  function commitK() { if (S.thrust > 0) return 1; if (S.charged > 0) return 1.25; if (!XH() || (window.Mods && !Mods.on('swing_momentum'))) return 1; const a = S.arc || 0; return Math.max(0.1, Math.min(1.2, (a - 40) / 300)); }
   function XH() { return !window.Mods || Mods.on('crosshair_slash'); }
   function motion() { return XH() && S.lmb && S.thrust === 0 && S.mv.lengthSq() > 4e4 ? S.mv : S.hv; }
   function fromAng() { const v = motion(); return Math.atan2(-v.y, -v.x); }
