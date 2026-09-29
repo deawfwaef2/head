@@ -236,16 +236,18 @@ window.Worlds = (() => {
   function buildNode(node) {
     const st = STYLES[node.style], sky = SKY[st.sky], R = node.R, r = mulberry(node.seed), nz = noise2(node.seed & 0xffff);
     const sc = new THREE.Scene(); const cols = []; const inter = [];
+    const LP = window.WLayout ? WLayout.plan(node, nz) : null, Rf = LP ? LP.Rf : (() => R), RM = LP ? LP.Rmax : R; // 第十八轮 wlayout：不规则边界/地形/布局
     // 门的位置先定：均匀分布在边界上
     const doorList = node.adj.map(b => ({ to: b })); if (node.home || node.stone) doorList.push({ to: -1 });
-    const a0 = r() * Math.PI * 2; doorList.forEach((d, k) => { d.a = a0 + k / doorList.length * Math.PI * 2 + (r() - 0.5) * 0.5 / doorList.length; d.x = Math.cos(d.a) * (R - 0.6); d.z = Math.sin(d.a) * (R - 0.6); });
+    const a0 = r() * Math.PI * 2; doorList.forEach((d, k) => { d.a = a0 + k / doorList.length * Math.PI * 2 + (r() - 0.5) * 0.5 / doorList.length; d.x = Math.cos(d.a) * (Rf(d.a) - 0.6); d.z = Math.sin(d.a) * (Rf(d.a) - 0.6); });
+    if (LP) WLayout.paths(LP, doorList);
     const flat = (x, z) => { let f = 1; for (const d of doorList) f = Math.min(f, sstep(2.5, 6, Math.hypot(x - d.x, z - d.z))); return f; };
     const H = (x, z) => { const rr = Math.hypot(x, z), ang = Math.atan2(z, x);
-      const inner = (nz(x * 0.06 + 50, z * 0.06 + 50) - 0.5) * 1.6 * flat(x, z) * sstep(0, 5, rr);
-      const rim = st.hill * sstep(R + 0.5, R + 16, rr) * (0.55 + 0.9 * nz(Math.cos(ang) * 3 + 9, Math.sin(ang) * 3 + 9)) + st.hill * 1.2 * sstep(R + 20, R + 60, rr);
+      const fl = flat(x, z), inner = (nz(x * 0.06 + 50, z * 0.06 + 50) - 0.5) * 1.6 * (LP ? LP.relief : 1) * fl * sstep(0, 5, rr) + (LP ? WLayout.dH(LP, x, z, fl) : 0), Ra = LP ? Rf(ang) : R;
+      const rim = st.hill * sstep(Ra + 0.5, Ra + 16, rr) * (0.55 + 0.9 * nz(Math.cos(ang) * 3 + 9, Math.sin(ang) * 3 + 9)) + st.hill * 1.2 * sstep(Ra + 20, Ra + 60, rr);
       return inner + rim; };
     // 地形
-    const ext = R + 70, seg = Math.min(220, Math.round(ext * 2 / 1.1));
+    const ext = RM + 70, seg = Math.min(220, Math.round(ext * 2 / 1.1));
     const tg = new THREE.PlaneGeometry(ext * 2, ext * 2, seg, seg); tg.rotateX(-Math.PI / 2);
     const tp = tg.attributes.position; for (let i = 0; i < tp.count; i++) tp.setY(i, H(tp.getX(i), tp.getZ(i))); tg.computeVertexNormals();
     const gset = TEX[st.ground]; let gm;
@@ -259,12 +261,12 @@ window.Worlds = (() => {
         vertexShader: 'varying vec3 vD; void main(){ vD = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }',
         fragmentShader: 'uniform sampler2D map; uniform float k; varying vec3 vD; void main(){ vec3 d = normalize(vD); vec2 uv = vec2(atan(d.z, d.x) * 0.1591549 + 0.5, asin(clamp(d.y, -1.0, 1.0)) * 0.3183099 + 0.5); gl_FragColor = vec4(texture2D(map, uv).rgb * k, 1.0); }' });
       const skyM = new THREE.Mesh(new THREE.SphereGeometry(300, 48, 24), sm); skyM.frustumCulled = false; skyM.renderOrder = -10; skyM.userData.sky = 1; sc.add(skyM); sc.userData.skyM = skyM;
-      sc.environment = sky.env; sc.fog = new THREE.FogExp2(sky.horizon.clone().multiplyScalar(st.night ? 0.6 : 0.78), st.fog * (R > 30 ? 0.7 : 1));
+      sc.environment = sky.env; sc.fog = new THREE.FogExp2(sky.horizon.clone().multiplyScalar(st.night ? 0.6 : 0.78), Math.min(st.fog * (R > 30 ? 0.7 : 1) * (LP ? LP.fog : 1), Math.max(st.fog, 0.032)));
     } else { sc.fog = new THREE.FogExp2('#8899aa', 0.02); }
     // 光：太阳（从 HDRI 最亮方向）+ 半球补光
     let el = sky ? (0.5 - sky.sun[1]) * Math.PI : 0.8, az = sky ? (sky.sun[0] - 0.5) * Math.PI * 2 : 0.5; if (el < 0.35) el = 0.35 + (st.night ? 0.5 : 0);
     const sunDir = new V3(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)).normalize();
-    const sun = new THREE.DirectionalLight(st.night ? '#9fb4ff' : '#fff1dc', st.sun); sun.castShadow = true;
+    const sun = new THREE.DirectionalLight(st.night ? '#9fb4ff' : '#fff1dc', st.sun * (LP ? LP.sun : 1)); sun.castShadow = true;
     const ss = Math.min(26, R + 4); Object.assign(sun.shadow.camera, { left: -ss, right: ss, top: ss, bottom: -ss, near: 1, far: 160 }); sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
     sc.add(sun); sc.add(sun.target);
     const hemi = new THREE.HemisphereLight(sky ? sky.zenith : '#8899aa', sky ? sky.ground : '#443322', st.night ? 0.35 : 0.25); sc.add(hemi);
@@ -278,6 +280,7 @@ window.Worlds = (() => {
     const variants = (list) => list.flatMap(n => templates(n).map(t => ({ t, n })));
     // 地标（先放，保证有空间）
     const mk = pick(r, st.marks); const mx = (r() - 0.5) * R * 0.5, mz = (r() - 0.5) * R * 0.5; sc.userData.mark = mk; placeMark(mk, mx, mz);
+    const LPX = LP ? WLayout.dress(LP, { sc, H, R, cols, free, mark, put, variants }) : null;
     function placeMark(k, x, z) {
       const y = H(x, z);
       if (k === 'campfire' && window.Assets && Assets.has('stone_fire_pit')) { const f = Assets.fit('stone_fire_pit', { w: 1.3, x, y, z }); if (f) { sc.add(f); } const fl = Assets.flame(x, y + 0.15, z, 5.5); if (fl) sc.add(fl); const pl = new THREE.PointLight('#ff9a50', 2.2, 12, 2); pl.position.set(x, y + 0.9, z); sc.add(pl); sc.userData.fire = pl; cols.push({ x, z, r: 0.8 }); mark(x, z, 2.2); }
@@ -299,10 +302,11 @@ window.Worlds = (() => {
     if (!LITE) for (const [list, dens, s0, s1, kind] of st.props) {
       if (kind === 'fire') { const n = Math.max(0, Math.round(dens * area * (0.6 + r() * 0.8))); for (let i = 0; i < n; i++) { const a = r() * 6.28, d = R * (0.2 + r() * 0.7), x = Math.cos(a) * d, z = Math.sin(a) * d; if (!free(x, z, 1.5)) continue; mark(x, z, 1.5); const y = H(x, z); if (window.Assets && Assets.has('stone_fire_pit')) { const f = Assets.fit('stone_fire_pit', { w: 0.9, x, y, z }); if (f) sc.add(f); const fl = Assets.flame(x, y + 0.12, z, 4); if (fl) sc.add(fl); const pl = new THREE.PointLight('#ff7a30', 1.6, 9, 2); pl.position.set(x, y + 0.8, z); sc.add(pl); } cols.push({ x, z, r: 0.6 }); } continue; }
       const vs = variants(list); if (!vs.length) continue;
-      const cap = kind === 'grass' ? 2200 : kind === 'tree' ? 40 : 160;
-      const n = Math.min(cap, Math.round(dens * area * (0.7 + r() * 0.6)));
+      const cap = (kind === 'grass' ? 2200 : kind === 'tree' ? 40 : 160) * (LP && LP.clump && kind !== 'grass' ? 1.5 : 1);
+      const n = Math.min(cap, Math.round(dens * area * (LP ? WLayout.densK(LP, kind) : 1) * (0.7 + r() * 0.6)));
       for (let i = 0; i < n; i++) {
-        const a = r() * 6.28, d = R * Math.sqrt(r()) * 0.97, x = Math.cos(a) * d, z = Math.sin(a) * d, v = pick(r, vs), s = s0 + r() * (s1 - s0);
+        const a = r() * 6.28, d = RM * Math.sqrt(r()) * 0.97, x = Math.cos(a) * d, z = Math.sin(a) * d, v = pick(r, vs), s = s0 + r() * (s1 - s0);
+        if (LP && (d > Rf(a) * 0.97 || !WLayout.keep(LP, x, z, kind, r))) continue;
         const fr = Math.max(v.t.size.x, v.t.size.z) * s * 0.5;
         const rad = kind === 'grass' ? 0 : kind === 'plant' ? 0.4 : kind === 'tree' ? 1.0 : kind === 'wall' ? fr : Math.min(fr, 2.5);
         if (rad && !free(x, z, rad)) continue;
@@ -322,7 +326,7 @@ window.Worlds = (() => {
     if (!LITE) for (const [list, dens, s0, s1, kind] of st.props) {
       if (kind !== 'grass' && kind !== 'plant') continue; const vs = variants(list); if (!vs.length) continue;
       const ha = Math.PI * ((R + 18) * (R + 18) - R * R) / 100, n = Math.min(kind === 'grass' ? 1200 : 150, Math.round(dens * ha * 0.35));
-      for (let i = 0; i < n; i++) { const a = r() * 6.28, rr = R + 0.5 + r() * 17.5, v = pick(r, vs); put(v.t, Math.cos(a) * rr, Math.sin(a) * rr, (s0 + r() * (s1 - s0)) * 1.1, r() * 6.28, null, true); }
+      for (let i = 0; i < n; i++) { const a = r() * 6.28, rr = Rf(a) + 0.5 + r() * 17.5, v = pick(r, vs); put(v.t, Math.cos(a) * rr, Math.sin(a) * rr, (s0 + r() * (s1 - s0)) * 1.1, r() * 6.28, null, true); }
     }
     // 边界：两圈（近圈贴着可走边界，远圈在山坡上当背景）
     if (st.edge && !LITE) {
@@ -330,7 +334,7 @@ window.Worlds = (() => {
       if (vs.length) for (const [rr0, rr1, sk] of [[R + 0.8, R + 5, 1], [R + 7, R + 22, 1.35]]) {
         const n = Math.round(Math.PI * 2 * (rr0 + rr1) / 2 / (spacing * (sk > 1 ? 1.8 : 1)));
         for (let i = 0; i < n; i++) {
-          const a = i / n * Math.PI * 2 + (r() - 0.5) * 0.3 / n * 6; const rr = rr0 + r() * (rr1 - rr0);
+          const a = i / n * Math.PI * 2 + (r() - 0.5) * 0.3 / n * 6; const rr = rr0 + r() * (rr1 - rr0) + (Rf(a) - R);
           if (sk === 1 && doorList.some(d => Math.abs(Math.atan2(Math.sin(a - d.a), Math.cos(a - d.a))) * R < 3.2)) continue;
           const v = pick(r, vs), s = (s0 + r() * (s1 - s0)) * sk, x = Math.cos(a) * rr, z = Math.sin(a) * rr;
           put(v.t, x, z, s, r() * 6.28, null, sk > 1);
@@ -354,7 +358,7 @@ window.Worlds = (() => {
       cols.push({ x: d.x + Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z + Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 }, { x: d.x - Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z - Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 });
       return Object.assign(d, { g, label, home });
     });
-    return { sc, H, R, cols, doors, inter, sun, sunDir, terr, style: st };
+    return { sc, H, R, Rf: LP ? Rf : null, wx: LPX && LPX.wx, tag: LP ? LP.tag : '', lp: LP, cols, doors, inter, sun, sunDir, terr, style: st };
   }
   // 画布文字 → 精灵（门牌/气泡）
   function makeLabel(text, col) {
@@ -622,7 +626,7 @@ window.Worlds = (() => {
     } else { W.vel.x *= 0.8; W.vel.z *= 0.8; }
     W.vel.y -= 14 * dt; W.pos.addScaledVector(W.vel, dt);
     // 碰撞：边界圆 + 物体圆
-    const rr = Math.hypot(W.pos.x, W.pos.z), lim = B.R - 0.4; if (rr > lim) { W.pos.x *= lim / rr; W.pos.z *= lim / rr; }
+    const rr = Math.hypot(W.pos.x, W.pos.z), lim = (B.Rf ? B.Rf(Math.atan2(W.pos.z, W.pos.x)) : B.R) - 0.4; if (rr > lim) { W.pos.x *= lim / rr; W.pos.z *= lim / rr; }
     for (const c of B.cols) { const dx = W.pos.x - c.x, dz = W.pos.z - c.z, d = Math.hypot(dx, dz), m = c.r + 0.35; if (d < m && d > 1e-5) { W.pos.x += dx / d * (m - d); W.pos.z += dz / d * (m - d); } }
     const gy = B.H(W.pos.x, W.pos.z); if (W.pos.y <= gy) { W.pos.y = gy; W.vel.y = 0; W.onGround = true; } else if (W.pos.y > gy + 0.05) W.onGround = false;
     const moving = Math.hypot(W.vel.x, W.vel.z);
@@ -634,6 +638,7 @@ window.Worlds = (() => {
     // 太阳影子跟随
     B.sun.target.position.set(W.pos.x, W.pos.y, W.pos.z); B.sun.position.copy(B.sun.target.position).addScaledVector(B.sunDir, 70);
     if (B.sc.userData.skyM) B.sc.userData.skyM.position.copy(cam.position);
+    if (B.wx) try { B.wx(dt, cam.position, now); } catch (e) { B.wx = null; console.warn(e); }
     if (B.sc.userData.fire) B.sc.userData.fire.intensity = 2.2 * (0.85 + Math.sin(now * 13) * 0.08 + Math.sin(now * 29) * 0.05);
     // 门：靠近提示
     W.doorNear = null; for (const d of B.doors) { const dd = Math.hypot(W.pos.x - d.x, W.pos.z - d.z); if (dd < 2.6) W.doorNear = d; d.label.visible = Math.hypot(cam.position.x - d.x, cam.position.z - d.z) < 34; }
@@ -828,7 +833,7 @@ window.Worlds = (() => {
   }
   function fadeTo(v) { if (DOM) DOM.fade.style.opacity = v; }
   function banner(node) {
-    const st = STYLES[node.style], b = DOM.banner; b.querySelector('.n').textContent = node.name; b.querySelector('.s').textContent = `${node.loc.icon} ${node.loc.n} · ${st.n} · ${SIZES[node.size].n}${node.home ? ' · 回洞的门在这里' : ''}`;
+    const st = STYLES[node.style], b = DOM.banner; b.querySelector('.n').textContent = node.name; b.querySelector('.s').textContent = `${node.loc.icon} ${node.loc.n} · ${st.n} · ${SIZES[node.size].n}${node.home ? ' · 回洞的门在这里' : ''}${W.B && W.B.tag ? ' · ' + W.B.tag : ''}`;
     b.style.opacity = 1; clearTimeout(banner._t); banner._t = setTimeout(() => { b.style.opacity = 0; }, 2600);
     const bo = W.boss; if (bo) DOM.boss.querySelector('.bn').innerHTML = `👑 ${esc(bo.B.title)} · ${esc(bo.B.n)}`; DOM.boss.style.display = 'none';
   }
