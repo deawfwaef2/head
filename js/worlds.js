@@ -192,7 +192,7 @@ window.Worlds = (() => {
     const tr = (G.S.stats && G.S.stats.trips) || 0, r = mulberry((node.seed ^ Math.imul(tr + 7, 0x9E3779B1)) >>> 0), ri = Math.max(0, Lore.LOCS.findIndex(l => l.k === node.region));
     node.prey = []; node.chests = [];
     if (node.home) return;
-    const x = r(), n = x < 0.3 ? 0 : x < 0.72 ? 1 : x < 0.93 ? 2 : 3;
+    const x = r(), n = W && W.graph && W.graph.trip ? (node.boss ? 0 : x < 0.15 ? 0 : x < 0.55 ? 1 : x < 0.88 ? 2 : 3) : (x < 0.3 ? 0 : x < 0.72 ? 1 : x < 0.93 ? 2 : 3);
     for (let k = 0; k < n; k++) {
       let h = null;
       if (window.RPG && RPG.foe) try { h = RPG.foe(G.S, node.loc, (r() * 4294967296) >>> 0, G.usedNames, G.usedSig); } catch (e) { console.warn('foe', e); }
@@ -201,7 +201,31 @@ window.Worlds = (() => {
     }
     if (r() < 0.3 + (node.size === 'l' ? 0.3 : 0)) { const lo = node.loc.loot || [10, 30]; node.chests.push({ coin: Math.round((lo[0] + r() * (lo[1] - lo[0])) * (1.5 + r() * 2)), potion: r() < 0.25 + ri * 0.02 }); }
   }
-  function genGraph() { return genWorld((Math.random() * 4294967296) >>> 0); } // 兼容旧调用
+  // 第十四轮 14c（用户改回）：每次出门选地区，这一趟随机生成这个地区的地点图（入口=回洞门，最深处=霸主）
+  function genTrip(loc, seed) {
+    const r = mulberry(seed), di = Math.max(0, Lore.LOCS.findIndex(l => l.k === loc.k));
+    const N = 8 + Math.min(8, di) + Math.floor(r() * 4), P = [];
+    for (let t = 0; P.length < N && t < 6000; t++) { const p = { x: r() * 150, y: r() * 90 }; if (P.every(q => Math.hypot(q.x - p.x, q.y - p.y) > 17)) P.push(p); }
+    const n = P.length, adj = P.map(() => []), deg = new Array(n).fill(0), dist = (a, b) => Math.hypot(P[a].x - P[b].x, P[a].y - P[b].y);
+    const addE = (a, b) => { if (a === b || adj[a].includes(b)) return; adj[a].push(b); adj[b].push(a); deg[a]++; deg[b]++; };
+    const inT = new Set([0]); while (inT.size < n) { let best = null; for (const a of inT) for (let b = 0; b < n; b++) if (!inT.has(b)) { const d = dist(a, b); if (!best || d < best[2]) best = [a, b, d]; } addE(best[0], best[1]); inT.add(best[1]); }
+    for (let a = 0; a < n; a++) { const near = [...Array(n).keys()].filter(b => b !== a).sort((p, q) => dist(a, p) - dist(a, q)).slice(0, 4); for (const b of near) if (deg[a] < 5 && deg[b] < 5 && r() < 0.4 && dist(a, b) < 48) addE(a, b); }
+    let home = 0; P.forEach((p, i) => { if (p.x < P[home].x) home = i; });
+    const depth = new Array(n).fill(-1); depth[home] = 0; const qu = [home]; while (qu.length) { const a = qu.shift(); for (const b of adj[a]) if (depth[b] < 0) { depth[b] = depth[a] + 1; qu.push(b); } }
+    let far = home; depth.forEach((d, i) => { if (d > depth[far] || (d === depth[far] && P[i].x > P[far].x)) far = i; });
+    const pool = REGION[loc.k] || ['meadow'], usedN = new Set(), hasBoss = !!(window.Explore && Explore.BOSSES[loc.k]) && !(((G || window.__game).S.bosses) || {})[loc.k];
+    const nodes = P.map((p, i) => {
+      const style = Worlds._forceStyle || (i === far ? pool[0] : pick(r, pool));
+      const sz = i === home ? 's' : i === far ? 'l' : (() => { const x = r(); return x < 0.55 ? 's' : x < 0.88 ? 'm' : 'l'; })();
+      let nm; for (let t = 0; t < 30; t++) { const NM = NAMES[style]; nm = (t > 8 || r() < 0.15 ? pick(r, ['北', '南', '东', '西', '上', '下', '旧', '深', '远']) : '') + pick(r, NM[0]) + pick(r, NM[1]); if (!usedN.has(nm)) break; } usedN.add(nm);
+      const Rr = SIZES[sz].R[0] + r() * (SIZES[sz].R[1] - SIZES[sz].R[0]);
+      return { i, x: p.x, y: p.y, region: loc.k, loc, style, size: sz, R: Rr, name: nm, seed: (seed ^ Math.imul(i + 1, 2654435761)) >>> 0, adj: adj[i], depth: depth[i],
+        visited: false, known: false, home: i === home, stone: false, boss: i === far && hasBoss, prey: null, chests: null };
+    });
+    nodes[home].known = true; nodes[home].adj.forEach(b => nodes[b].known = true);
+    return { nodes, home, entry: home, far, loc, trip: true, seed, regions: [{ k: loc.k, loc, cx: 75, cy: 45, idx: nodes.map(n => n.i), entry: home, boss: far, stone: home }] };
+  }
+  function genGraph(loc, seed) { return loc ? genTrip(loc, seed >>> 0) : genWorld((Math.random() * 4294967296) >>> 0); }
   function noise2(seed) {
     const h = (x, y) => { let n = (x * 374761393 + y * 668265263 + seed * 69069) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
     const v = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), w = yf * yf * (3 - 2 * yf);
@@ -394,19 +418,22 @@ window.Worlds = (() => {
   // ================= 运行 =================
   function start(trip, api) {
     G = window.__game; if (!G) { api.fallback && api.fallback(); return; }
-    // 世界存档：seed + 已到过/已知的地点 + 最后点亮的魂门
-    const S = G.S; if (!S.world || !S.world.seed) S.world = { seed: (Math.random() * 4294967296) >>> 0, vis: [], known: [], stone: -1 };
-    const graph = genWorld(S.world.seed);
-    for (const i of S.world.vis || []) if (graph.nodes[i]) graph.nodes[i].visited = graph.nodes[i].known = true;
-    for (const i of S.world.known || []) if (graph.nodes[i]) graph.nodes[i].known = true;
-    for (const k of Object.keys(S.bosses || {})) { const R = graph.regions.find(x => x.k === k); if (R) graph.nodes[R.boss].boss = false; }
+    const bigMap = window.Mods && Mods.on('bigworld'); // 旧的“一整片大陆”保留成可选 MOD（默认关）
+    const S = G.S; let graph;
+    if (bigMap) {
+      if (!S.world || !S.world.seed) S.world = { seed: (Math.random() * 4294967296) >>> 0, vis: [], known: [], stone: -1 };
+      graph = genWorld(S.world.seed);
+      for (const i of S.world.vis || []) if (graph.nodes[i]) graph.nodes[i].visited = graph.nodes[i].known = true;
+      for (const i of S.world.known || []) if (graph.nodes[i]) graph.nodes[i].known = true;
+      for (const k of Object.keys(S.bosses || {})) { const R = graph.regions.find(x => x.k === k); if (R) graph.nodes[R.boss].boss = false; }
+    } else graph = genTrip(trip.loc, (Math.random() * 4294967296) >>> 0);
     const pool = (trip.res.heads || []).slice(); trip.res.heads = []; // 猎物要亲手砍
     W = { trip, api, graph, pool, cur: -1, B: null, pos: new V3(), vel: new V3(), onGround: true, prey: [], boss: null, dead: false, fade: 0, busy: true, t: 0, stepT: 0, hintT: 0, say: [], camFar: G.camera.far, doorNear: null, mapOpen: false };
     G.setUI(false); try { G.lockPointer(); } catch (e) {}
     ensureDom(); W.dom.root.style.display = 'block';
     if (!provReg && window.Combat) { Combat.addProvider(targets); provReg = true; }
     SFX.music && SFX.music('expedition'); SFX.roar && SFX.roar(0.6);
-    const st0 = graph.nodes[S.world.stone] && graph.nodes[S.world.stone].stone ? S.world.stone : graph.home;
+    const st0 = !graph.trip && graph.nodes[S.world.stone] && graph.nodes[S.world.stone].stone ? S.world.stone : graph.home;
     goto(st0, -1).catch(e => { console.warn('Worlds', e); stop(); api.fallback && api.fallback(); });
   }
   function doorName(node, d) {
@@ -417,7 +444,7 @@ window.Worlds = (() => {
     return t;
   }
   function remember(node) {
-    const w = G.S.world; if (!w) return; w.vis = w.vis || []; w.known = w.known || [];
+    const w = G.S.world; if (!w || W.graph.trip) return; w.vis = w.vis || []; w.known = w.known || [];
     if (!w.vis.includes(node.i)) w.vis.push(node.i);
     node.adj.forEach(b => { if (!w.known.includes(b) && !w.vis.includes(b)) w.known.push(b); });
     if (node.stone && w.stone !== node.i) { const first = w.stone !== node.i; w.stone = node.i; if (first && !node.home) setTimeout(() => G.toast && G.toast(`🌀 点亮了魂门「${node.name}」——下次出猎从这里出发，也可从这里回洞`, '#9fd0ff', 5), 900); }
@@ -729,7 +756,7 @@ window.Worlds = (() => {
   function toggleMap(v) {
     if (!W) return; W.mapOpen = v == null ? !W.mapOpen : v; DOM.map.style.display = W.mapOpen ? 'block' : 'none'; if (!W.mapOpen) return;
     const N = W.graph.nodes, K = N.filter(n => n.known), vis = N.filter(n => n.visited).length;
-    DOM.map.querySelector('.t').textContent = `🗺️ 魂首大陆 · 已踏足 ${vis}/${N.length} 处 · 霸主 ${Object.keys(G.S.bosses || {}).length}/${W.graph.regions.filter(R => window.Explore && Explore.BOSSES[R.k]).length}`;
+    DOM.map.querySelector('.t').textContent = W.graph.trip ? `🗺️ ${W.graph.loc.icon} ${W.graph.loc.n} · 已踏足 ${vis}/${N.length} 处` : `🗺️ 魂首大陆 · 已踏足 ${vis}/${N.length} 处 · 霸主 ${Object.keys(G.S.bosses || {}).length}/${W.graph.regions.filter(R => window.Explore && Explore.BOSSES[R.k]).length}`;
     const cv = DOM.map.querySelector('canvas'), Wd = Math.min(innerWidth * 0.9, 1100), Hd = Math.min(innerHeight * 0.76, 680); cv.width = Wd; cv.height = Hd; const g = cv.getContext('2d');
     // 只显示已知区域（越探越大），至少 150 单位见方；保持比例
     let x0 = Math.min(...K.map(n => n.x)), x1 = Math.max(...K.map(n => n.x)), y0 = Math.min(...K.map(n => n.y)), y1 = Math.max(...K.map(n => n.y));

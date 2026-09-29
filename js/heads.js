@@ -565,7 +565,7 @@ window.ModelHeads = (() => {
       grad: { value: new THREE.Vector2(look.gy - 0.03, look.gy + 0.03) },
       sway: { value: new V3() }, hTop: { value: top * 0.55 }, hLen: { value: Math.max(0.08, top * 0.55 - hairT.hairMinY) },
       ec1: { value: new THREE.Color(look.ec1) }, ec2: { value: new THREE.Color(look.ec2) }, dull: { value: look.glowEye ? 0.08 : 0.45 }, glow: { value: look.glowEye ? 0.9 : 0 }, shiny: { value: look.shiny || 0 },
-      skin: { value: new V3(sk.r / baseSkin.r, sk.g / baseSkin.g, sk.b / baseSkin.b) }, pale: { value: look.pale },
+      skin: { value: new V3(sk.r / baseSkin.r, sk.g / baseSkin.g, sk.b / baseSkin.b).multiply(look.skinMul ? new V3(...look.skinMul) : new V3(1, 1, 1)) }, pale: { value: look.pale },
       blood: { value: look.blood }, spat: { value: look.spat }, seed: { value: look.seed }, ph: { value: ((look.seed || 0) * 7.13) % 6.283 }, hover: { value: 0 }, mk: { value: new THREE.Vector3(...((look.mk && (!window.Mods || Mods.on('makeup'))) ? look.mk : [0, 0, 0])) },
       cutY: { value: faceMeta.bottom }, hH: { value: (faceMeta.skullTop || 0.1) - faceMeta.bottom },
       scar: { value: look.scar ? new THREE.Vector4(...look.scar) : new THREE.Vector4(-10, 0, 0, 0) },

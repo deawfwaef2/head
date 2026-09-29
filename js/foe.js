@@ -9,6 +9,7 @@ window.Foe = (() => {
     if (LOADED[name]) return LOADED[name];
     return LOADED[name] = new Promise((res, rej) => { if (window.BODY_MODELS && BODY_MODELS[name]) return res(); const s = document.createElement('script'); s.src = 'big/body/' + name + '.js'; s.onload = () => res(); s.onerror = () => rej(new Error('body ' + name)); document.head.appendChild(s); });
   }
+  let _tg = null; const TOON_GRAD = () => _tg || (_tg = (() => { const t = new THREE.DataTexture(new Uint8Array([120, 190, 235, 255]), 4, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })());
   function b64buf(s) { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; }
   // 载入身体模板（只解析一次，之后 SkeletonUtils 式克隆）
   async function template(name) {
@@ -22,10 +23,35 @@ window.Foe = (() => {
       m.envMapIntensity = 0.55; if (m.map) { m.map.anisotropy = 4; m.map.encoding = THREE.sRGBEncoding; }
       if (m.transparent && m.alphaTest === 0) { m.alphaTest = 0.4; m.transparent = false; m.depthWrite = true; } // 布料半透明边缘：改成裁剪，避免排序问题
       m.userData.skin = /SKIN|肌/i.test(m.name) || (/body/i.test(m.name) && !/cloth|tops|bottom|shoe|acc/i.test(m.name));
-      if (m.name === '__CUT__') { o.visible = false; o.userData.cut = true; }
+      if (m.name === '__CUT__') { o.visible = false; o.userData.cut = true; return; }
+      // 身体改用与首级相同的卡通材质（同一条光照曲线 + 同样的柔性压缩）：否则同样的肤色，头会比身体暗 40%
+      if (!window.Mods || Mods.on('foe_toon') !== false) {
+        const t = new THREE.MeshToonMaterial({ map: m.map || null, color: m.color ? m.color.clone() : new THREE.Color(1, 1, 1), gradientMap: TOON_GRAD(), transparent: false, alphaTest: m.alphaTest || 0, side: m.side, name: m.name });
+        t.userData.skin = m.userData.skin; o.material = t; m.dispose();
+      }
     });
+    try { sampleSkin({ E, root }); } catch (e) { console.warn('skin sample', name, e); }
     E.glb = null; // 解析完就丢掉 base64，省内存（被淘汰后会重新加载脚本）
-    return TMPL[name] = { name, E, gltf, root };
+    const T = TMPL[name] = { name, E, gltf, root }; T.skin = root.userData.skin || null; return T;
+  }
+  // 从身体贴图上读脖子一圈的真实肤色（原神身体皮肤和衣服同一张图，不能染色 → 让头跟身体一致）
+  function sampleSkin({ E, root }) {
+    const cy = E.cut ? E.cut.y : E.neckY, cx = E.cut ? E.cut.x : 0, cz = E.cut ? E.cut.z : 0;
+    const cvs = new Map(), px = [], v = new V3();
+    root.traverse(o => {
+      if (!o.isMesh || o.userData.cut) return; const m = Array.isArray(o.material) ? o.material[0] : o.material; const img = m && m.map && m.map.image; const uv = o.geometry.attributes.uv; if (!img || !uv) return;
+      let cv = cvs.get(img); if (!cv) { const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0, 512, 512); cv = g.getImageData(0, 0, 512, 512).data; cvs.set(img, cv); }
+      const pa = o.geometry.attributes.position;
+      for (let i = 0; i < pa.count; i++) { v.fromBufferAttribute(pa, i).applyMatrix4(o.matrixWorld); const dy = cy - v.y;
+        if (dy < 0.005 || dy > 0.07 || Math.hypot(v.x - cx, v.z - cz) > 0.075) continue;
+        const X = Math.min(511, Math.max(0, Math.floor(uv.getX(i) * 512))), Y = Math.min(511, Math.max(0, Math.floor(uv.getY(i) * 512))), k = (Y * 512 + X) * 4;
+        const r = cv[k] / 255, g = cv[k + 1] / 255, b = cv[k + 2] / 255; if (cv[k + 3] < 128) continue;
+        if (r > 0.45 && r >= g && g >= b * 0.85 && r - b < 0.45) px.push([r, g, b]); }
+    });
+    if (px.length < 6) return;
+    px.sort((a, b) => (b[0] + b[1] + b[2]) - (a[0] + a[1] + a[2])); const top = px.slice(0, Math.max(4, Math.floor(px.length * 0.5))); // 取亮的一半：避开贴图里画好的下巴阴影
+    const avg = [0, 1, 2].map(j => top.reduce((s, p) => s + p[j], 0) / top.length);
+    root.userData.skin = new THREE.Color().setRGB(avg[0], avg[1], avg[2]).getHexString();
   }
   // 克隆骨骼网格（three r147 没有内置 SkeletonUtils，这里按名字重绑）
   function cloneSkinned(src) {
@@ -50,10 +76,16 @@ window.Foe = (() => {
     const cut = []; root.traverse(o => { if (o.userData.cut) cut.push(o); });
     // 身体皮肤跟头的肤色一致
     const alive = opts.alive !== false;
+    if (T.skin && !TINT[bodyName]) { look.skinHex = '#' + T.skin; look.sk = look.sk || '象牙'; } // 身体不能染色：头随身体
+    if (SKIN_FIX[bodyName]) { const f = SKIN_FIX[bodyName], L = f[0] * 0.3 + f[1] * 0.59 + f[2] * 0.11; look.skinMul = f.map(x => +(L + (x - L) * 0.25).toFixed(3)); } // 主要校亮度，色相只跟 25%（避免脸发绿/发黄） // 渲染标定（_tools/calib.py）：脸颊与脖子渲染出来同色
     const hb = ModelHeads.create(alive ? Object.assign({}, look, { ex: {}, pale: 0, blood: 0, spat: 0 }) : look, { alive });
     hb.group.traverse(o => { if (o.isMesh && o.userData.kind === 'cut') o.visible = false; }); // 活人：头自己的断口盖藏起来
     const sk = hb.U && hb.U.skin && hb.U.skin.value;
-    root.traverse(o => { if (o.isMesh && o.material && o.material.userData && o.material.userData.skin && sk) o.material.color.setRGB(Math.min(1.3, sk.x), Math.min(1.3, sk.y), Math.min(1.3, sk.z)); });
+    if (TINT[bodyName]) { // 可染色身体：身体皮肤 × (头肤色 / 身体贴图肤色)，两边精确一致
+      const hc = new THREE.Color(look.skinHex).convertSRGBToLinear(), bc = T.skin ? new THREE.Color('#' + T.skin).convertSRGBToLinear() : null;
+      const k = bc ? [hc.r / bc.r, hc.g / bc.g, hc.b / bc.b] : (sk ? [sk.x, sk.y, sk.z] : [1, 1, 1]);
+      root.traverse(o => { if (o.isMesh && o.material && o.material.userData && o.material.userData.skin) o.material.color.setRGB(Math.min(1.6, k[0]), Math.min(1.6, k[1]), Math.min(1.6, k[2])); });
+    }
     // 挂头：静止姿势下算好相对 H_head 的偏移
     root.updateMatrixWorld(true);
     const fit = headFit(E), headBone = bones.head;
@@ -134,6 +166,8 @@ window.Foe = (() => {
     succubus: ['Mona', 'Rosaria'], fallen: ['Rosaria', 'Shenhe'], duchess: ['Ningguang', 'Rosaria'], shadow: ['Rosaria', 'Shenhe'], abyssqueen: ['Ningguang'],
     dragonprincess: ['Shenhe', 'Ningguang'], avatar: ['YaeMiko', 'Kokomi'], archangel: ['Kokomi', 'Shenhe'], dragonslayer: ['Eula', 'Jean'], dragonmiko: ['YaeMiko', 'Shenhe']
   };
+  // 每具身体的头肤色倍数：在同一光照下把首级脸颊渲染色对齐到身体脖子/上胸的渲染色（_tools/calib.py 迭代求得）
+  const SKIN_FIX = {"Jean":[0.613,0.652,0.764],"Noelle":[0.991,1.214,1.484],"Amber":[0.749,0.898,1.13],"Rosaria":[0.777,1.044,1.039],"Lisa":[1.272,1.554,1.757],"Sucrose":[2.954,2.213,2.941],"Xiangling":[1.607,1.518,1.406],"Ningguang":[1.019,1.205,1.436],"Furina":[0.849,0.949,1.125],"Kokomi":[0.82,0.839,0.784],"YaeMiko":[1.566,2.149,2.172],"Shenhe":[1.507,1.32,1.558],"Mona":[2.583,2.373,2.564],"Eula":[0.783,0.965,1.236],"Beidou":[0.747,0.767,0.855],"HikariCape":[0.97,1.115,1.302],"HikariScholar":[0.804,0.824,0.806],"AvatarSample_A":[1.04,0.986,1.08]};
   const TINT = { HikariCape: 1, HikariScholar: 1, AvatarSample_A: 1 }; // 皮肤是独立材质、能跟头同色的身体
   const LIGHT = ['瓷白', '象牙', '蜜色', '苍白'];
   const ARMED = { knight: 'antique_katana_01', paladin: 'ornate_medieval_mace', guard: 'antique_estoc', general: 'antique_katana_01', dragonknight: 'ornate_war_hammer', dragonslayer: 'antique_katana_01', merc: 'machete',
@@ -160,7 +194,6 @@ window.Foe = (() => {
     const light = LIGHT.includes(h.look.sk);
     if (!light) { const t = list.filter(b => TINT[b]); if (t.length) list = t; else if (r() < 0.45) list = ['HikariCape', 'HikariScholar']; }
     const b = pickR(r, list);
-    if (!TINT[b] && !light) { h.look.sk = r() < 0.5 ? '象牙' : '蜜色'; h.look.skinHex = ModelHeads.SKIN ? ModelHeads.SKIN[h.look.sk] : '#ffe9dc'; } // 这具身体的皮肤和衣服在同一张贴图上，头随身体
     return b;
   }
   // 武器：静止姿势（T）下剑身朝前(+Z)握在右手里，之后动作的世界旋转增量会把它带到原动作里的位置
@@ -243,7 +276,7 @@ window.Foe = (() => {
       else if (fo.block > 0) { turnTo = face; }
       else if (fo.state === 'chase') {
         turnTo = face;
-        const reach = fo.armed ? 1.9 : 1.35;
+        const reach = fo.armed ? 1.35 : 1.05;
         if (d > reach) { spd = d > 6 ? 4.4 : 2.9; f.play(d > 6 ? 'Sprint_Loop' : 'Jog_Fwd_Loop', { fade: 0.2 }); }
         else if (fo.cd <= 0) attack(fo, d);
         else f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.25 });
@@ -271,7 +304,7 @@ window.Foe = (() => {
   function talk(fo, text, col) { if (!CTX || fo.dead) return; CTX.say(fo.anchor, text, col); fo.sayT = 3 + Math.random() * 2; }
   function attack(fo, d) {
     const f = fo.f, s = CTX.st();
-    let clip, hitAt, reach = fo.armed ? 2.1 : 1.5;
+    let clip, hitAt, reach = fo.armed ? 1.75 : 1.35;
     if (fo.armed) { const r = Math.random(); clip = fo.boss && r < 0.25 ? 'Sword_Heavy_Combo' : r < 0.45 ? 'Sword_Regular_A' : r < 0.75 ? 'Sword_Regular_B' : 'Sword_Regular_C'; }
     else clip = pickR(Math.random, ['Punch_Jab', 'Punch_Cross', 'Melee_Hook']);
     const c = f.clips[clip]; if (!c) return;
@@ -294,43 +327,68 @@ window.Foe = (() => {
       if (dd < bd) { bd = dd; best = z; } }
     return best;
   }
+  // 刃的扫掠面（上一帧刃线 → 这一帧刃线）与每段骨头（胶囊）求最近距离；返回真正碰到的部位
+  const _sp = new V3(), _sa = new V3(), _sb = new V3(), _s0 = new V3(), _s1 = new V3();
+  function contact(fo, info) {
+    const sg = info.seg; if (!sg) { const z = zoneOf(fo, info.point); return z ? { zone: z, point: info.point, speed: info.speed } : null; }
+    const segs = [];
+    for (const [z, r] of ZN) { const bo = fo.f.bones[z]; if (!bo || (fo.gone && fo.gone.has(z)) || (z === 'head' && fo.decap)) continue;
+      const a = bo.getWorldPosition(new V3()), cb = CHILD[z] && fo.f.bones[CHILD[z]]; const b = cb ? cb.getWorldPosition(new V3()) : a.clone().add(new V3(0, z === 'head' ? 0.18 : 0.1, 0));
+      if (z === 'head') { const up = a.clone().sub(fo.f.bones.neck.getWorldPosition(new V3())).normalize(); a.addScaledVector(up, 0.06); b.copy(a).addScaledVector(up, 0.1); }
+      segs.push([z, a, b, r + (z === 'neck' ? 0.06 : 0.035)]); }
+    let best = null, bd = 1, neckB = null, nd = 1;
+    for (let i = 0; i <= 6; i++) { const u = i / 6; _s0.copy(sg.b0).lerp(sg.t0, u); _s1.copy(sg.b1).lerp(sg.t1, u);
+      for (let j = 0; j <= 4; j++) { _sp.copy(_s0).lerp(_s1, j / 4);
+        for (const [z, a, b, r] of segs) { _sa.subVectors(b, a); const t = Math.max(0, Math.min(1, _sb.subVectors(_sp, a).dot(_sa) / Math.max(1e-6, _sa.lengthSq()))); const d = _sb.copy(a).addScaledVector(_sa, t).distanceTo(_sp) / r;
+          if (d < bd || (z === 'neck' && d < nd)) { const hit = { zone: z, point: _sp.clone(), speed: info.kind === 'thrust' ? info.speed : Math.max(2, info.tipSpeed * (0.3 + 0.65 * u) / 0.95) }; if (d < bd) { bd = d; best = hit; } if (z === 'neck' && d < nd) { nd = d; neckB = hit; } } } } }
+    return neckB || best; // 刃确实扫过脖子（在脖子半径内）就算脖子：斩首要好砍
+  }
   function targets() {
     const out = [];
+    HEADS.forEach((h, i) => out.push({ id: 'fh' + i + '_' + h.fo.id2, pos: h.g.position, r: 0.15, kind: 'head', onHit: (info) => { const v = (info.vel || new V3()).clone().multiplyScalar(0.45); v.y = Math.max(v.y, 1 + (info.speed || 4) * 0.1); h.vel.copy(v); h.av.set((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 14); h.rest = 0; sfx().thud && sfx().thud(0.6); return true; } }));
     for (const fo of FOES) {
-      const c = fo.f.bones.chest || fo.f.bones.spine; if (!c) continue; const pos = c.getWorldPosition(new V3());
-      out.push({ id: fo.id2, pos, r: 0.75, kind: fo.boss ? 'boss' : 'foe', onHit: (info) => hit(fo, info) });
-      if (fo.headOnPiece && !fo.decap) out.push({ id: fo.id2 + '_hp', pos: fo.f.holder.getWorldPosition(new V3()), r: 0.3, kind: 'foe', onHit: (info) => { if (info.kind !== 'thrust' && info.speed > 4) decapitate(fo, info); } });
+      const c = fo.f.bones.hips; if (!c) continue; const pos = c.getWorldPosition(new V3()); pos.y += 0.12;
+      out.push({ id: fo.id2, pos, r: 1.05, kind: fo.boss ? 'boss' : 'foe', onHit: (info) => hit(fo, info) });
+      if (fo.headOnPiece && !fo.decap) out.push({ id: fo.id2 + '_hp', pos: fo.f.holder.getWorldPosition(new V3()), r: 0.3, kind: 'foe', onHit: (info) => { if (info.kind !== 'thrust' && info.speed > 3) { decapitate(fo, info); return true; } return false; } });
     }
     return out;
   }
   function hit(fo, info) {
-    const ctx = CTX; const zone = zoneOf(fo, info.point || fo.pos) || 'chest';
-    const slash = info.kind !== 'thrust', sp = Math.max(0.5, Math.min(1.8, info.speed / 8));
-    blood(info.point || fo.pos, slash ? 5 : 3, info.dir || info.vel);
+    const ctx = CTX; const c = contact(fo, info); if (!c) return false; // 刃没碰到身体：不算
+    const zone = c.zone, slash = info.kind !== 'thrust', spd = c.speed, sp = Math.max(0.5, Math.min(1.8, spd / 8));
+    info = Object.assign({}, info, { point: c.point, speed: spd });
+    blood(c.point, slash ? 6 : 3, info.vel);
     if (fo.dead) { // 尸体：可以继续砍——斩首、断肢、腰斩
-      if (zone === 'neck' && slash && info.speed > 5 && !fo.decap) decapitate(fo, info);
-      else if (slash && info.speed > 6.5 && /Arm|Leg/.test(zone)) sever(fo, zone, info);
-      else if (slash && info.speed > 9 && (zone === 'spine' || zone === 'hips') && !fo.halved) sever(fo, 'spine', info);
+      if (slash && zone === 'neck' && spd > 3 && !fo.decap) decapitate(fo, info);
+      else if (slash && /Arm|Leg/.test(zone) && spd > 4) sever(fo, zone, info);
+      else if (slash && (zone === 'spine' || zone === 'hips' || zone === 'chest' || zone === 'upperChest') && spd > 6.5 && !fo.halved) sever(fo, 'spine', info);
       else if (fo.rag) ragKick(fo, info, 0.6);
-      sfx().chop && sfx().chop(); return;
+      sfx().chop && sfx().chop(); return true;
     }
     // 活人：格挡 / 伤害
     if (fo.block > 0 && Math.abs(ang(Math.atan2(ctx.player.pos.x - fo.pos.x, ctx.player.pos.z - fo.pos.z) - fo.yaw)) < 1.1) {
-      if (fo.sayT <= 0) talk(fo, pickR(Math.random, SAY.block)); sfx().thud && sfx().thud(0.8); ctx.clang && ctx.clang(info.point); fo.block = Math.max(0, fo.block - 0.3); return;
+      if (fo.sayT <= 0) talk(fo, pickR(Math.random, SAY.block)); sfx().thud && sfx().thud(0.8); ctx.clang && ctx.clang(c.point); fo.block = Math.max(0, fo.block - 0.3); return true;
     }
     const q = ctx.power(fo), mult = zone === 'head' ? 1.6 : zone === 'neck' ? 1.8 : /Arm|Leg/.test(zone) ? 0.7 : 1;
-    const dealt = Math.max(1, Math.round((fo.boss ? 11 : 12) * q * sp * mult * (info.kind === 'thrust' ? 0.8 : 1) * (0.85 + Math.random() * 0.3)));
+    const dealt = Math.max(1, Math.round((fo.boss ? 11 : 12) * q * sp * mult * (slash ? 1 : 0.8) * (0.85 + Math.random() * 0.3)));
     fo.hp -= dealt; fo.flash = 0.15; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2);
     if (!fo.seen) { fo.seen = true; fo.state = fo.brave ? 'chase' : 'flee'; if (fo.boss) ctx.bossMeet(fo); }
     if (!fo.brave && Math.random() < 0.35) { fo.brave = true; fo.state = 'chase'; }
     if (fo.boss) ctx.bossHp(fo);
-    // 斩首：一记够快的横砍砍中脖子，且对方已经虚弱（或这一刀致命）
-    if (zone === 'neck' && slash && info.speed > 6 && (fo.hp <= 0 || fo.hp < fo.maxHp * 0.4)) { fo.hp = 0; die(fo, info, true); decapitate(fo, info); return; }
-    if (fo.hp <= 0) { die(fo, info, false); return; }
+    // 斩首：够快的横砍砍中脖子，且这一刀后她剩不到一半血（霸主要剩不到 25%）
+    if (slash && zone === 'neck' && spd > 4.5 && fo.hp <= fo.maxHp * (fo.boss ? 0.25 : 0.5)) { fo.hp = 0; die(fo, info, true); decapitate(fo, info); return true; }
+    if (fo.hp <= 0) {
+      die(fo, info, false);
+      if (slash && /Arm|Leg/.test(zone) && spd > 5) sever(fo, zone, info);                    // 致命一刀砍在四肢：顺势砍断
+      else if (slash && (zone === 'spine' || zone === 'hips') && spd > 9) sever(fo, 'spine', info); // 致命的快刀砍在腰：腰斩
+      return true;
+    }
+    if (zone === 'neck' && slash && !fo.boss) ctx.toast && fo.hp > fo.maxHp * 0.5 && Math.random() < 0.5 && ctx.toast('脖子砍中了——再削弱她一些就能一刀斩首', '#ffc0a0', 1.6);
     // 受击硬直（霸主不容易被打断）
     if (!fo.boss || Math.random() < 0.25 || sp > 1.3) { fo.atk = null; fo.stag = fo.boss ? 0.35 : 0.55; fo.f.play(zone === 'head' || zone === 'neck' ? 'Hit_Head' : sp > 1.3 ? 'Hit_Knockback' : 'Hit_Chest', { once: true, fade: 0.06, restart: true }); }
     if (fo.sayT <= 0 && Math.random() < 0.5) talk(fo, fo.boss ? '' : pickR(Math.random, SAY.hit), '#ffb0a0');
     sfx().chop && sfx().chop(); sfx().squish && sfx().squish(0.5);
+    return true;
   }
   function die(fo, info, quiet) {
     fo.dead = true; fo.atk = null; fo.anchor.gone = true;

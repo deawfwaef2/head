@@ -205,9 +205,11 @@ window.Combat = (() => {
         const d = segPointDist(p0, p1, tg.pos); if (d > tg.r) continue;
         const speed = S.thrust > 0 ? Math.max(S.tipSpeed, 5) : S.tipSpeed * f;
         if (speed < 2) continue;
+        const info = { point: p1.clone(), vel: _vel.clone().multiplyScalar(f), speed, kind: S.thrust > 0 ? 'thrust' : 'slash', dir: dirName(), frac: f,
+          seg: { b0: S.lastBase.clone(), t0: S.lastTip.clone(), b1: _baseW.clone(), t1: _tipW.clone() }, tipSpeed: S.thrust > 0 ? Math.max(S.tipSpeed, 5) : S.tipSpeed };
+        const res = tg.onHit ? tg.onHit(info) : true;
+        if (res === false) continue; // 目标说“刃其实没碰到身体”：不进冷却，这一刀继续扫
         S.hitCd.set(tg.id, now);
-        const info = { point: p1.clone(), vel: _vel.clone().multiplyScalar(f), speed, kind: S.thrust > 0 ? 'thrust' : 'slash', dir: dirName() };
-        tg.onHit && tg.onHit(info);
         const heavy = Math.min(1, speed / 10);
         S.stop = 0.03 + heavy * 0.06; S.shake = 0.004 + heavy * 0.012; if (G.kick) G.kick(heavy * 0.6);
       }

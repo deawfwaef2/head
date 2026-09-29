@@ -34,6 +34,7 @@ window.Mods = (() => {
     { id: 'stars', cat: 'look', icon: '⭐', n: '品质星级', d: '每个魂阶再细分 ★1–★5（下品→极品），产出与展厅分随星级变化。', def: true },
     // ---------- 玩法 ----------
     { id: 'regions', cat: 'play', icon: '🗺️', n: '新地域', d: '追加 8 个新狩猎地点（更长的成长线）与更深的洞窟层。', def: true },
+    { id: 'bigworld', cat: 'play', icon: '🌍', n: '一整片大陆', d: '不选地区：开局生成一张 270 个地点的巨大地图，自由探索（默认关：每次出门选地区、随机生成关卡）。', def: false },
     { id: 'foe_bodies', cat: 'play', icon: '🧍‍♀️', n: '真人敌人', d: '野外的人用各自原 VRM 的身体与服装、真实动作、AI 战斗、布娃娃尸体、斩首与断肢。关闭则退回光团猎物（省内存）。', def: true },
     { id: 'forge', cat: 'play', icon: '⚗️', n: '熔魂炉', d: '三颗首级熔成一颗更高阶的新首级。', def: true },
     { id: 'bowling', cat: 'play', icon: '🎳', n: '魂球道', d: '把首级扔向骷髅瓶，全中 STRIKE 连击。', def: true },

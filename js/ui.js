@@ -293,7 +293,7 @@ window.UI = (() => {
     return `<div class="loc-boss" style="margin-top:4px;font-size:12.5px;color:${done ? '#ffd060' : '#c8b8d8'}">${done ? `👑 已征服：${esc(B.title)}·${esc(B.n)}` : `👑 霸主：${(G.S.visits && G.S.visits[l.k]) ? esc(B.title) : '？？？'}（随机现身）`}</div>`;
   }
   function openExpedition() {
-    if (window.Worlds && (!window.Mods || Mods.on('worldgraph'))) { // 第十四轮：没有选关——直接走进那片大陆
+    if (window.Worlds && window.Mods && Mods.on('worldgraph') && Mods.on('bigworld')) { // 可选 MOD：一整片大陆，无选关
       const S = G.S, s0 = G.st(); if (S.hp < s0.maxHp * 0.35) G.toast(`⚠️ 你只剩 ${Math.round(S.hp)}/${s0.maxHp} 血，死在外面一切归零`, '#ff8060', 3.5);
       startTrip('village'); return;
     }
