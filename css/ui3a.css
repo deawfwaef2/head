@@ -43,8 +43,8 @@ body.ui3a #loading, body.ui3a #menu {
 }
 body.ui3a #loading::after, body.ui3a #menu::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
   background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,.75) 100%), repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 1px, transparent 1px 3px); }
-body.ui3a #menu > *:not(#u-embers):not(#credits), body.ui3a #loading > *:not(#u-embers) { position: relative; z-index: 2; }
-body.ui3a #credits { z-index: 2; }
+body.ui3a #menu > *:not(#u-embers), body.ui3a #loading > *:not(#u-embers) { position: relative; z-index: 2; }
+body.ui3a #credits { position: relative; bottom: auto; margin-top: clamp(8px, 2vh, 18px); max-width: 860px; }
 body.ui3a #u-embers { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
 body.ui3a #menu .title, body.ui3a #loading .title {
   font-family: var(--u-serif); font-weight: 900; font-size: clamp(54px, min(8.6vw, 15vh), 128px); letter-spacing: .28em; padding-left: .28em; line-height: 1.05;
@@ -58,7 +58,7 @@ body.ui3a .title small::before, body.ui3a .title small::after { content: ''; wid
 body.ui3a .title small::after { transform: scaleX(-1); }
 @keyframes u-title-in { from { opacity: 0; letter-spacing: .6em; filter: blur(14px) drop-shadow(0 0 40px #f22); } }
 @keyframes u-title-breathe { 50% { filter: drop-shadow(0 0 34px rgba(255,60,30,.65)) drop-shadow(0 4px 0 rgba(58,10,6,.9)); } }
-body.ui3a #menu .rules { position: relative; max-width: 700px; font-size: 14.5px; line-height: 2; color: #cdbd9f; margin: clamp(12px, 3vh, 26px) 0 clamp(14px, 3.6vh, 30px); padding: clamp(8px, 1.6vh, 16px) 40px; background: linear-gradient(90deg, transparent, rgba(0,0,0,.42) 18%, rgba(0,0,0,.42) 82%, transparent); animation: u-rise .9s var(--u-ease) .45s both; }
+body.ui3a #menu .rules { position: relative; max-width: 780px; font-size: 14.5px; line-height: 2; color: #cdbd9f; margin: clamp(12px, 3vh, 26px) 0 clamp(14px, 3.6vh, 30px); padding: clamp(8px, 1.6vh, 16px) 40px; background: linear-gradient(90deg, transparent, rgba(0,0,0,.42) 18%, rgba(0,0,0,.42) 82%, transparent); animation: u-rise .9s var(--u-ease) .45s both; }
 body.ui3a #menu .rules::before, body.ui3a #menu .rules::after { content: ''; position: absolute; left: 8%; right: 8%; height: 1px; background: linear-gradient(90deg, transparent, var(--u-gold-lo), transparent); }
 body.ui3a #menu .rules::before { top: 0; } body.ui3a #menu .rules::after { bottom: 0; }
 body.ui3a #menu .rules b { color: var(--u-gold); font-weight: 700; text-shadow: 0 0 10px rgba(231,194,122,.35); }
@@ -301,7 +301,7 @@ body.ui3a #wTop .n { font-family: var(--u-serif); font-size: 22px; letter-spacin
 body.ui3a #wTop .s { letter-spacing: .12em; color: var(--u-dim); margin-top: 2px; }
 body.ui3a #wHint { bottom: 22px; padding: 9px 30px; border-radius: 0; font-size: 14px; letter-spacing: .05em; color: var(--u-text); background: linear-gradient(90deg, transparent, rgba(6,3,6,.8) 14%, rgba(6,3,6,.8) 86%, transparent); }
 body.ui3a #wHint b { display: inline-block; color: var(--u-gold-hi); padding: 0 6px; margin: 0 2px; background: rgba(231,194,122,.13); border: 1px solid rgba(231,194,122,.38); border-radius: 3px; font-size: .92em; }
-body.ui3a #wBoss { top: auto; bottom: 108px; width: min(680px, 84vw); font-family: var(--u-serif); letter-spacing: .2em; font-size: 15px; text-shadow: 0 2px 6px #000; }
+body.ui3a #wBoss { top: 86px; width: min(680px, 84vw); font-family: var(--u-serif); letter-spacing: .2em; font-size: 15px; text-shadow: 0 2px 6px #000; }
 body.ui3a #wBoss .bar { height: 14px; border: 0; border-radius: 0; background: rgba(0,0,0,.7); margin-top: 6px; box-shadow: 0 0 0 1px rgba(231,194,122,.55), 0 0 0 4px rgba(0,0,0,.6), 0 0 0 5px rgba(231,194,122,.22); clip-path: none; }
 body.ui3a #wBoss .bar i { background: linear-gradient(180deg, rgba(255,255,255,.3), transparent 50%), linear-gradient(90deg, #7a1a10, #d8501c 55%, #ffd06a); box-shadow: 0 0 16px rgba(255,140,40,.7); transition: width .25s; }
 body.ui3a #wBanner { top: 30%; opacity: 0; transition: opacity 1s var(--u-ease); }
@@ -315,9 +315,11 @@ body.ui3a .wsay.dmg { background: none; font-family: var(--u-serif); -webkit-tex
 body.ui3a .wskills { bottom: 82px; gap: 10px; }
 body.ui3a .wskills .sk { position: relative; width: 62px; padding: 8px 0 6px; border-radius: 0; border: 0; background: linear-gradient(180deg, rgba(34,23,30,.95), rgba(10,6,9,.95)); box-shadow: inset 0 0 0 1px rgba(231,194,122,.4), 0 4px 14px rgba(0,0,0,.6); clip-path: polygon(0 8px, 8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px)); }
 body.ui3a .wskills .sk i { font-size: 22px; height: 26px; } body.ui3a .wskills .sk span { font-size: 11px; letter-spacing: .1em; color: #cbbd9f; }
-body.ui3a .wskills .sk b { position: absolute; left: 0; right: 0; top: 2px; margin: 0; text-align: center; font-size: 9.5px; color: var(--u-gold); letter-spacing: 0; pointer-events: none; display: none; }
+body.ui3a .wskills .sk b { position: absolute; left: 50%; top: -9px; margin: 0; transform: translateX(-50%); min-width: 18px; padding: 0 5px; height: 16px; line-height: 15px; text-align: center; font-size: 10px; font-weight: 800; color: var(--u-gold-hi); letter-spacing: 0; background: #2a1e22; border: 1px solid rgba(231,194,122,.6); border-radius: 3px; pointer-events: none; }
+body.ui3a .wskills .sk { overflow: visible; clip-path: none; margin-top: 8px; } body.ui3a .wskills .sk::before { content: ''; position: absolute; inset: 0; z-index: -1; clip-path: polygon(0 8px, 8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px)); background: linear-gradient(135deg, rgba(231,194,122,.7), rgba(231,194,122,.2) 50%, rgba(231,194,122,.55)); }
+body.ui3a .wskills .sk { isolation: isolate; background: none; box-shadow: none; } body.ui3a .wskills .sk::after { content: ''; position: absolute; inset: 1px; z-index: -1; clip-path: polygon(0 7px, 7px 0, calc(100% - 7px) 0, 100% 7px, 100% calc(100% - 7px), calc(100% - 7px) 100%, 7px 100%, 0 calc(100% - 7px)); background: linear-gradient(180deg, rgba(34,23,30,.96), rgba(10,6,9,.96)); }
 body.ui3a .wskills .sk.cd { opacity: .6; } body.ui3a .wskills .sk.cd span { color: #ff9a7a; font-weight: 800; }
-body.ui3a .wskills .sk.ready { box-shadow: inset 0 0 0 1px #ffe070, 0 0 20px rgba(255,208,64,.7); }
+body.ui3a .wskills .sk.ready { filter: drop-shadow(0 0 12px rgba(255,208,64,.85)); } body.ui3a .wskills .sk.ready::before { background: linear-gradient(135deg, #fff2b0, #ffc040 50%, #fff2b0); }
 body.ui3a .wcombo { right: 7%; top: 32%; } body.ui3a .wcombo b { font-family: var(--u-serif); font-size: 84px; letter-spacing: -.02em; filter: drop-shadow(0 4px 0 rgba(0,0,0,.7)) drop-shadow(0 0 22px rgba(255,80,40,.7)); }
 body.ui3a .wcombo span { font-family: var(--u-serif); letter-spacing: .4em; }
 body.ui3a .wach { border: 0; border-radius: 0; padding: 16px 44px; background: radial-gradient(ellipse at 50% 0%, rgba(160,110,20,.5), transparent 70%), linear-gradient(180deg, rgba(30,20,10,.94), rgba(10,6,4,.94)); box-shadow: 0 0 0 1px rgba(231,194,122,.7), 0 0 0 5px rgba(0,0,0,.7), 0 0 0 6px rgba(231,194,122,.3), 0 0 50px rgba(255,180,50,.4); clip-path: polygon(0 12px, 12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px)); }
@@ -326,6 +328,9 @@ body.ui3a #wMap { background: radial-gradient(ellipse at center, rgba(24,16,14,.
 body.ui3a #wFade { transition: opacity .35s ease; }
 body.ui3a #combatHud { height: 6px !important; border-radius: 0 !important; background: rgba(0,0,0,.6) !important; box-shadow: 0 0 0 1px rgba(231,194,122,.4) !important; clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 100%, 4px 100%); }
 body.ui3a #combatHud i { border-radius: 0 !important; background: linear-gradient(90deg, #ffe08a, #ff9a3a) !important; box-shadow: 0 0 10px rgba(255,170,60,.7); }
+
+/* 出猎世界激活时：隐藏洞内 HUD（世界有自己的 #wStat），避免重叠 */
+body.ui3a.u-world #hud, body.ui3a.u-world #hint, body.ui3a.u-world #hintTag { opacity: 0; pointer-events: none; }
 
 /* ---------- 7. 反馈层：受击 / 低血 / 点击粒子 ---------- */
 #u-fx { position: fixed; inset: 0; pointer-events: none; z-index: 40; }
@@ -340,4 +345,43 @@ body.ui3a .u-shakeui { animation: u-shakeui .3s; } @keyframes u-shakeui { 20% { 
 
 /* ---------- 8. 第三方组件（其他 Agent 新增 UI 追加到此处或联系 UI Agent）---------- */
 body.ui3a #modbox, body.ui3a .modbox { font-family: inherit; }
+/* MOD 管理器（mods.js 自带样式，靠 body.ui3a #modbox 覆盖） */
+body.ui3a #modbox { background: radial-gradient(ellipse at 50% 45%, rgba(24,8,12,.55), rgba(0,0,0,.9)); backdrop-filter: blur(8px) saturate(.8); font-family: inherit; }
+body.ui3a #modbox .mb { position: relative; border: 0; border-radius: 0; padding: 26px 34px 26px; color: var(--u-text); animation: u-modal-in .5s var(--u-ease); --g: var(--u-gold);
+  background: linear-gradient(var(--g), var(--g)) 0 0 / 26px 2px no-repeat, linear-gradient(var(--g), var(--g)) 0 0 / 2px 26px no-repeat, linear-gradient(var(--g), var(--g)) 100% 0 / 26px 2px no-repeat, linear-gradient(var(--g), var(--g)) 100% 0 / 2px 26px no-repeat, linear-gradient(var(--g), var(--g)) 0 100% / 26px 2px no-repeat, linear-gradient(var(--g), var(--g)) 0 100% / 2px 26px no-repeat, linear-gradient(var(--g), var(--g)) 100% 100% / 26px 2px no-repeat, linear-gradient(var(--g), var(--g)) 100% 100% / 2px 26px no-repeat,
+    radial-gradient(ellipse 90% 50% at 50% -8%, rgba(160,30,40,.2), transparent 70%), linear-gradient(180deg, rgba(30,20,26,.985), rgba(12,8,11,.99));
+  box-shadow: 0 0 0 1px rgba(231,194,122,.26), 0 0 0 7px rgba(6,4,7,.82), 0 0 0 8px rgba(231,194,122,.14), 0 40px 140px rgba(0,0,0,.92); }
+body.ui3a #modbox h2 { font-family: var(--u-serif); letter-spacing: .22em; background: linear-gradient(180deg, #fff6dc, #e7c27a 55%, #b98a45); -webkit-background-clip: text; background-clip: text; color: transparent; }
+body.ui3a #modbox .sub { color: var(--u-dim); }
+body.ui3a #modbox h3 { font-family: var(--u-serif); color: var(--u-gold); letter-spacing: .16em; padding-bottom: 6px; background: linear-gradient(90deg, rgba(231,194,122,.55), rgba(231,194,122,.08) 60%, transparent) bottom / 100% 1px no-repeat; }
+body.ui3a #modbox .mod { border-radius: 3px; border: 1px solid rgba(231,194,122,.16); background: linear-gradient(180deg, rgba(34,23,30,.96), rgba(17,11,15,.98)); transition: transform .2s var(--u-ease), border-color .2s, box-shadow .2s; }
+body.ui3a #modbox .mod:hover { border-color: rgba(231,194,122,.65); transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.55); }
+body.ui3a #modbox .mod.on { border-color: rgba(231,194,122,.7); background: linear-gradient(180deg, rgba(60,40,24,.75), rgba(26,16,12,.98)); box-shadow: inset 0 0 24px rgba(231,194,122,.08); }
+body.ui3a #modbox .mod small { color: var(--u-dim); }
+body.ui3a #modbox .tg { border-radius: 0; background: #2a2026; clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
+body.ui3a #modbox .tg:after { border-radius: 0; background: #8a7c68; }
+body.ui3a #modbox .on .tg { background: linear-gradient(90deg, #7a5a24, #e7c27a); } body.ui3a #modbox .on .tg:after { background: #fff8e0; box-shadow: 0 0 8px #ffe4a0; }
+body.ui3a #modbox .note { color: var(--u-gold); } body.ui3a #modbox .chg { color: #9fd8ff; }
+body.ui3a #modbox .bar { background: rgba(12,8,11,.96); }
+body.ui3a #modbox button { position: relative; isolation: isolate; border: 0; border-radius: 0; background: none; color: var(--u-text); letter-spacing: .1em; font-weight: 700; padding: 10px 22px; transition: transform .18s var(--u-ease), color .15s, filter .2s; }
+body.ui3a #modbox button::before { content: ''; position: absolute; inset: 0; z-index: -2; background: linear-gradient(135deg, rgba(231,194,122,.7), rgba(231,194,122,.22) 45%, rgba(231,194,122,.55)); clip-path: var(--u-ch); }
+body.ui3a #modbox button::after { content: ''; position: absolute; inset: 1px; z-index: -1; clip-path: var(--u-ch-in); background: linear-gradient(180deg, #2c1f26, #170f14); }
+body.ui3a #modbox button:hover { color: var(--u-gold-hi); transform: translateY(-1px); filter: drop-shadow(0 0 10px rgba(231,194,122,.35)); }
+body.ui3a #modbox button:active { transform: translateY(1px) scale(.97); }
+body.ui3a #modbox button.pri { color: #fff2e0; filter: drop-shadow(0 0 12px rgba(255,50,30,.3)); } body.ui3a #modbox button.pri::after { background: linear-gradient(180deg, #b01a16, #560a08); } body.ui3a #modbox button.pri::before { background: linear-gradient(135deg, #ffd6a0, #d24a3a 45%, #ffbe80); }
+
+/* 内容入场：弹窗内容 / 卡片依次浮现（--i 由 ui3a.js 写入；fill-mode 只用 backwards，避免锁住 hover 的 transform） */
+@keyframes u-in { from { opacity: 0; transform: translateY(14px); } }
+body.ui3a .modal > *:not(.m-head) { animation: u-in .45s var(--u-ease) backwards; animation-delay: calc(var(--i, 0) * 45ms + 60ms); }
+body.ui3a .bp-grid > *, body.ui3a .eqs > *, body.ui3a .locs > *, body.ui3a .hd-grid > *, body.ui3a .cx-grid > *, body.ui3a .st-row, body.ui3a .btys > *, body.ui3a .logs > * { animation: u-in .5s var(--u-ease) backwards; animation-delay: calc(var(--j, 0) * 28ms + 120ms); }
+/* 自定义光标（菜单/弹窗内）：金色菱形 */
+body.ui3a #menu, body.ui3a #uiroot, body.ui3a #modbox { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 2 3 19 7.500 14.500 10.500 21.500 13 20.500 10 13.500 16.500 13.500Z' fill='%23140d10' stroke='%23e7c27a' stroke-width='1.600' stroke-linejoin='round'/%3E%3C/svg%3E") 3 2, auto; }
+body.ui3a #menu button, body.ui3a #uiroot button, body.ui3a #uiroot [data-a], body.ui3a #modbox .mod, body.ui3a #modbox button { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 2 3 19 7.500 14.500 10.500 21.500 13 20.500 10 13.500 16.500 13.500Z' fill='%23e7c27a' stroke='%23140d10' stroke-width='1.600' stroke-linejoin='round'/%3E%3C/svg%3E") 3 2, pointer; }
+/* 加载小提示 */
+body.ui3a #u-tip { margin-top: 28px; max-width: 560px; font-size: 13px; letter-spacing: .14em; line-height: 1.9; color: rgba(214,196,160,.75); font-family: var(--u-serif); min-height: 3.6em; transition: opacity .6s; }
+body.ui3a #u-tip b { color: var(--u-gold); font-weight: 700; }
+/* 开局转场：菜单 → 游戏 */
+#u-curtain { position: fixed; inset: 0; z-index: 90; pointer-events: none; background: #000; opacity: 0; }
+#u-curtain.go { animation: u-curtain 1.05s ease-in-out; } @keyframes u-curtain { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0; } }
+
 @media (prefers-reduced-motion: reduce) { body.ui3a *, body.ui3a *::before, body.ui3a *::after { animation-duration: .01ms !important; } }

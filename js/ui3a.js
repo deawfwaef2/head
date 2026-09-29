@@ -264,6 +264,7 @@ window.UI3A = (() => {
   function pollHud() {
     const Gm = window.G; if (!Gm || !Gm.S || !Gm.st) return;
     let s; try { s = Gm.st(); } catch (e) { return; }
+    document.body.classList.toggle('u-world', !!(window.Worlds && Worlds.active));
     const S = Gm.S, max = Math.max(1, s.maxHp), pct = clamp(S.hp / max, 0, 1), ghost = $('#hpghost'), hw = $('.hpwrap');
     if (hp0 == null) { hp0 = S.hp; if (ghost) ghost.style.width = pct * 100 + '%'; }
     if (S.hp < hp0 - 0.5) {
@@ -296,13 +297,15 @@ window.UI3A = (() => {
 
   // ------------------------------------------------------------------ 抽卡：卡片出现时爆粒子
   function gachaWatch() {
-    const g = $('#gacha'); if (!g) return;
-    new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.classList && n.classList.contains('gcard')) setTimeout(() => {
+    const onCard = n => setTimeout(() => {
       const r = n.getBoundingClientRect(), col = getComputedStyle(n).getPropertyValue('--c').trim() || '#ffd890', hi = n.classList.contains('r4') ? 3 : n.classList.contains('r3') ? 2 : 1;
-      burst(r.left + r.width / 2, r.top + r.height * .45, { n: 14 * hi, color: col, speed: 200 + hi * 90, life: .9 + hi * .25, size: 2 + hi * .4, g: 240, up: false });
-      if (n.classList.contains('shiny')) burst(r.left + r.width / 2, r.top, { n: 30, color: '#ffe27a', speed: 380, life: 1.3, size: 2.4, g: 300 });
+      burst(r.left + r.width / 2, r.top + r.height * .45, { n: 14 * hi, color: col, speed: 200 + hi * 90, life: .9 + hi * .25, size: 1.6 + hi * .3, g: 240 });
+      if (n.classList.contains('shiny')) burst(r.left + r.width / 2, r.top, { n: 30, color: '#ffe27a', speed: 380, life: 1.3, size: 2, g: 300 });
       A.ping(520 + hi * 180);
-    }, 90); }).observe(g, { childList: true });
+    }, 90);
+    const attach = g => new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.classList && n.classList.contains('gcard')) onCard(n); }).observe(g, { childList: true });
+    const g = $('#gacha'); if (g) attach(g);
+    else new MutationObserver((ms, mo) => { const g2 = $('#gacha'); if (g2) { attach(g2); mo.disconnect(); } }).observe(document.body, { childList: true });
   }
 
   // ------------------------------------------------------------------ 菜单：存档信息 / 继续按钮 / 快捷键提示条
@@ -322,9 +325,31 @@ window.UI3A = (() => {
     let t0 = 0; const iv = setInterval(() => { const m = $('#menu'); if (m && !m.classList.contains('hidden')) { t0 = 0; return; } if (!t0) t0 = performance.now(); if (performance.now() - t0 > 28000) { h.classList.add('u-min'); clearInterval(iv); } }, 1000);
   }
 
+
+  // ------------------------------------------------------------------ 弹窗内容入场（给直接子元素 / 卡片写 --i / --j 用于错峰）
+  function stagger() {
+    const root = $('#uiroot'), panel = root && $('.modal', root); if (!panel) return;
+    const run = () => {
+      [...panel.children].forEach((c, i) => c.style.setProperty('--i', Math.min(i, 8)));
+      panel.querySelectorAll('.bp-grid,.eqs,.locs,.hd-grid,.cx-grid,.btys,.logs,.kv+.items,[data-stg]').forEach(g => [...g.children].forEach((c, j) => c.style.setProperty('--j', Math.min(j, 18))));
+      panel.querySelectorAll('.st-row').forEach((c, j) => c.style.setProperty('--j', j));
+    };
+    new MutationObserver(run).observe(panel, { childList: true }); run();
+    new MutationObserver(() => { if (root.classList.contains('on')) { panel.style.animation = 'none'; void panel.offsetWidth; panel.style.animation = ''; } }).observe(root, { attributes: true, attributeFilter: ['class'] });
+  }
+  const TIPS = ['<b>点击 60 次</b>才能把首级背回洞里——在外面，每一下都算数。', '完美格挡后，敌人的<b>脖子</b>没有防备。', '异色首级的产出是普通的<b>三倍</b>。', '首级放在<b>展示位</b>上，同族与同阶会产生共鸣。', '<b>长按 E</b> 进入精确摆放，绿色是可以放下的位置。', '在外面死掉，<b>一切归零</b>——先喝药，再进门。', '洞窟越深，<b>越暗</b>，也越值钱。'];
+  function loadTips() {
+    const l = $('#loading'); if (!l || $('#u-tip')) return; const t = document.createElement('div'); t.id = 'u-tip'; l.appendChild(t); let i = Math.floor(Math.random() * TIPS.length);
+    const show = () => { if (!t.isConnected) return; t.style.opacity = 0; setTimeout(() => { t.innerHTML = TIPS[i++ % TIPS.length]; t.style.opacity = 1; }, 450); }; show(); const iv = setInterval(() => { if (!t.isConnected) clearInterval(iv); else show(); }, 4200);
+  }
+  function curtain() {
+    const b = $('#startBtn'); if (!b) return; const c = document.createElement('div'); c.id = 'u-curtain'; document.body.appendChild(c);
+    b.addEventListener('click', () => { c.classList.remove('go'); void c.offsetWidth; c.classList.add('go'); burst(innerWidth / 2, innerHeight / 2, { n: 40, color: '#ff8a4a', speed: 520, life: 1, size: 2, g: 100 }); A.osc('sine', 80, 30, .8, .35); A.osc('sawtooth', 300, 40, .6, .05); }, true);
+  }
+
   // ------------------------------------------------------------------ 启动
   function init() {
-    sprite(); startIconObserver(); ensureFx(); hudInit(); gachaWatch(); menuInfo(); hintInit();
+    sprite(); loadTips(); startIconObserver(); ensureFx(); hudInit(); gachaWatch(); menuInfo(); hintInit(); stagger(); curtain();
     embers($('#menu')); embers($('#loading'));
     document.addEventListener('mouseover', hoverIn, true); document.addEventListener('pointermove', move, { passive: true }); document.addEventListener('pointerdown', down, true);
     setInterval(pollHud, 100);
