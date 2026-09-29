@@ -589,7 +589,7 @@ window.ModelHeads = (() => {
       if (!hat && r() < 0.3) LOOK.hx.ahoge = r() < 0.25 ? 2 : 1;
       LOOK.hn3 = { pony: '马尾', twin: '双马尾', drill: '钻头卷', bun: '丸子头', odango: '双丸子', braid: '麻花辫', braid2: '双麻花辫' }[LOOK.hx.s];
     } else if (grp !== 'godette' && !acc.includes('witchhat') && r() < 0.12) LOOK.hx = { s: null, ahoge: 1, seed: 1 + Math.floor(r() * 9999) };
-    if (!window.Mods || Mods.on('face_morph')) LOOK.fm = faceMorph(r, rarity);
+    // face_morph 已按用户要求删除（恐怖谷）
     return LOOK;
   }
 
@@ -814,7 +814,7 @@ window.ModelHeads = (() => {
       }
       matMap.set(key, out); return out;
     };
-    const FM = look.fm && F.eyeC && (!window.Mods || Mods.on('face_morph')) ? look.fm : null;
+    const FM = null; // face_morph 已删除：旧存档的 look.fm 被忽略
     const fmAB = (fk) => fk === 'eye' || fk === 'skin' ? [[FM.ew, FM.eh, FM.tilt], [FM.sp, FM.dy]] : [[FM.bs, FM.bs, FM.bt], [FM.sp * 0.5, FM.bdy]];
     const fmMat = (mt, src, kind) => {
       const fk = FM && fwKind(src, kind); if (!fk) return mt;

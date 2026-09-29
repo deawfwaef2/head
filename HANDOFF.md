@@ -849,3 +849,8 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 
 ## 第二十二轮（续 2）：移除左键惯性 + 麻袋翻找提速 + HUD 防闪烁 （UI Agent）
 用户反馈：① 按住左键的“武器惯性”太难受 → **移除**（`js/combat.js` `lookLmb` 现在直接返回 1：按住左键视角 1:1 跟手、灵敏度不降；`LK/drainLook` 保留但永远为空；MOD `wpn_feel` 改成只管“按住右键格挡 ×0.3”）；② 装东西时间太久 → `js/sack.js` 的固定 `RUM=5` 改成按动作分的 `DUR`（拿/放/丢 0.6s、腰带/使用 0.9s、换装 1.8s、塞首级 2.2s），所有 “5 秒” 文案已去掉；③ UI 闪烁 → `js/mods.js` 顶部新增全局 `setH(el,html)` / `setT(el,text)`（内容没变就不写 DOM）。已套用：洞内 `updateHud`（金币/战力/血条/准星提示 `ui.tip`——之前每帧重写 innerHTML）、`worlds.js` 的 `hud()`（标题/血条+状态/提示，血条 `.hp i` 现在是常驻节点只改 width）与 `skillHud()`。以后新写的逐帧/定时 HUD 一律用 `setH/setT`。
+
+## 第二十三轮(1)：删除 MOD face_morph（用户：恐怖谷，不好看）
+- `js/mods.js` 移除 face_morph 条目；`js/heads.js` 不再生成 `look.fm`，渲染时 `FM = null`（旧存档里的 fm 被忽略，脸恢复原模型）。faceMorph/fwWrap 函数暂留为死代码，可删。
+- 用户新要求：多下载高评分基础头模（MMD 等），越多越好、要多样；用户表示仓库之后会改成私人。战斗体验要“大师级”，现在违和、低级、不爽。
+- 注意：仓库 ~340MB，超过工作区 128MB → 在 /tmp 用 `--depth 1` 克隆操作，不要克隆进 /home/user。
