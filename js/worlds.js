@@ -189,25 +189,48 @@ window.Worlds = (() => {
   const PREY_SAY = { see: ['……有人来了。', '那是什么？！', '别过来……', '食、食人魔！', '快跑！'], flee: ['救命！', '别追了！', '我不想死……', '放过我吧！'], fight: ['我跟你拼了！', '滚开！', '你休想！'], hit: ['啊！', '呜……', '好痛……'] };
 
   // ================= 懒加载资产（big/world/*.js）=================
-  const LOADED = {}, MODELS = {}, TEX = {}, SKY = {}, TMPL = {};
-  const b64buf = (s) => { const bin = atob(s); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; };
+  const LOADED = {}, MODELS = {}, TEX = {}, SKY = {}, TMPL = {}, SCRP = {}, PREP = {}, DONE = {};
+  // 第十九轮（加载提速）：① 所有脚本并行下载 ② base64 解码交给浏览器（fetch data:）③ 贴图/模型并行解析 ④ 空闲时后台预热（邻居地点/热门地区）⑤ 进场前先渲一帧编译着色器
+  const PROF = window.__wprof = []; const tp = (l, t0) => PROF.push([l, Math.round(performance.now() - t0)]);
+  const b64sync = (s) => { const bin = atob(s); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; };
+  const b64buf = async (s) => { try { const r = await fetch('data:application/octet-stream;base64,' + s); return await r.arrayBuffer(); } catch (e) { return b64sync(s); } };
   const loadImg = (url) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url; });
+  const tick = () => new Promise(r => setTimeout(r, 0));
   function script(name) {
-    return new Promise(res => { const s = document.createElement('script'); s.src = 'big/world/' + name + '.js'; s.onload = () => res(true); s.onerror = () => { console.warn('world asset missing', name); res(false); }; document.head.appendChild(s); });
+    return SCRP[name] || (SCRP[name] = new Promise(res => { const s = document.createElement('script'); s.async = true; s.src = 'big/world/' + name + '.js'; s.onload = () => res(true); s.onerror = () => { console.warn('world asset missing', name); res(false); }; document.head.appendChild(s); }));
+  }
+  // 解析一个资产（模型 / 贴图组 / 天空）；同名只做一次。sky 需要渲染器（PMREM），没有就只下载脚本、稍后再解。
+  function prep(n) {
+    if (DONE[n]) return Promise.resolve();
+    if (PREP[n]) return PREP[n];
+    if (n.startsWith('sky_') && !(G || window.__game)) return script(n);
+    return PREP[n] = (async () => {
+      const t0 = performance.now(); const ok = await script(n); const A = window.ASSETS || {}; const v = A[n];
+      if (ok && v) try {
+        if (n.startsWith('tex_')) { const o = {}; await Promise.all(Object.keys(v).map(async k => { const t = new THREE.Texture(await loadImg(v[k])); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; if (k === 'diff') t.encoding = THREE.sRGBEncoding; t.needsUpdate = true; o[k] = t; })); TEX[n.slice(4)] = o; }
+        else if (n.startsWith('sky_')) SKY[n.slice(4)] = await parseSky(v);
+        else { const g = await new Promise(async (rs, rj) => { try { new THREE.GLTFLoader().parse(await b64buf(v), '', rs, rj); } catch (e) { rj(e); } }); prepModel(g.scene); MODELS[n] = g.scene; }
+      } catch (e) { console.warn('world asset', n, e); }
+      if (A[n]) A[n] = null; DONE[n] = 1; LOADED[n] = 1; delete PREP[n]; tp(n, t0); await tick();
+    })();
   }
   async function need(names, onProg) {
-    const list = [...new Set(names)].filter(n => !LOADED[n]); let i = 0;
-    for (const n of list) {
-      LOADED[n] = 1; const ok = await script(n); const A = window.ASSETS || {}; const v = A[n];
-      if (ok && v) try {
-        if (n.startsWith('tex_')) { const o = {}; for (const k of Object.keys(v)) { const t = new THREE.Texture(await loadImg(v[k])); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; if (k === 'diff') t.encoding = THREE.sRGBEncoding; t.needsUpdate = true; o[k] = t; } TEX[n.slice(4)] = o; }
-        else if (n.startsWith('sky_')) SKY[n.slice(4)] = await parseSky(v);
-        else { const g = await new Promise((rs, rj) => new THREE.GLTFLoader().parse(b64buf(v), '', rs, rj)); prepModel(g.scene); MODELS[n] = g.scene; }
-      } catch (e) { console.warn('world asset', n, e); }
-      if (A[n]) A[n] = null; i++; onProg && onProg(i / list.length, n);
-      await new Promise(r => setTimeout(r, 0));
-    }
+    const list = [...new Set(names)].filter(n => !DONE[n]); let i = 0; list.forEach(script);
+    await Promise.all(list.map(async n => { await prep(n); i++; onProg && onProg(i / list.length, n); }));
   }
+  // 后台预热队列：一次一个，主线程空闲时才做；进图/加载期间暂停（加载优先）
+  const WQ = []; let wRun = false;
+  const idle = (f) => (window.requestIdleCallback ? requestIdleCallback(f, { timeout: 1500 }) : setTimeout(f, 60));
+  function warm(names) { for (const n of names) if (!DONE[n] && !WQ.includes(n)) WQ.push(n); if (!wRun) { wRun = true; idle(pump); } }
+  async function pump() {
+    if (W && W.busy) return idle(pump);
+    const n = WQ.shift(); if (!n) { wRun = false; return; }
+    try { await prep(n); } catch (e) {}
+    idle(pump);
+  }
+  function warmRegion(k) { const pool = REGION[k]; if (!pool) return; const names = []; [...new Set(pool)].forEach(sn => { const st = STYLES[sn]; names.push('sky_' + st.sky, 'tex_' + st.ground); st.props.forEach(p => { if (p[4] === 'fire') return; p[0].forEach(x => names.push(x.replace('#*', ''))); }); if (st.edge) st.edge[0].forEach(x => { names.push(x.replace('#*', '')); if (LO[x]) names.push(x + '_lo'); }); }); warm(names.filter(n => n !== 'brazier')); }
+  try { document.addEventListener('mouseover', (e) => { const c = e.target && e.target.closest && e.target.closest('.loc[data-v]'); if (c) warmRegion(c.dataset.v); }, { passive: true }); } catch (e) {}
+  setTimeout(() => { try { warmRegion('village'); } catch (e) {} }, 6000); // 首次出猎多半从村庄出发：菜单停留的空闲时间里先把草甸/深林备好
   const windMats = [];
   function prepModel(sc) {
     sc.traverse(o => {
@@ -349,8 +372,10 @@ window.Worlds = (() => {
       return (h(xi, yi) * (1 - u) + h(xi + 1, yi) * u) * (1 - w) + (h(xi, yi + 1) * (1 - u) + h(xi + 1, yi + 1) * u) * w; };
     return (x, y) => v(x, y) * 0.55 + v(x * 2.1 + 17, y * 2.1 - 5) * 0.3 + v(x * 4.3 - 9, y * 4.3 + 3) * 0.15;
   }
+  const WHITE = new THREE.Color(1, 1, 1);
+  const styleOf = (node) => (window.WGen && WGen.on()) ? WGen.style(node, STYLES[node.style]) : STYLES[node.style]; // 第十九轮：基因组样式（每个地点独一份）
   function buildNode(node) {
-    const st = STYLES[node.style], sky = SKY[st.sky], R = node.R, r = mulberry(node.seed), nz = noise2(node.seed & 0xffff);
+    const st = styleOf(node), g = st.g || null, sky = SKY[st.sky], R = node.R, r = mulberry(node.seed), nz = noise2(node.seed & 0xffff);
     const sc = new THREE.Scene(); const cols = []; const inter = [];
     const LP = window.WLayout ? WLayout.plan(node, nz) : null, Rf = LP ? LP.Rf : (() => R), RM = LP ? LP.Rmax : R; // 第十八轮 wlayout：不规则边界/地形/布局
     // 门的位置先定：均匀分布在边界上
@@ -360,46 +385,48 @@ window.Worlds = (() => {
     let Rmin = R; if (LP) for (let i = 0; i < 24; i++) Rmin = Math.min(Rmin, Rf(i / 24 * Math.PI * 2));
     const LY = layPlan(node, Rmin, doorList); // 第十八轮（总管理师）：布局原型，与 wlayout 叠加；用不规则边界的最小半径
     const flat = (x, z) => { let f = 1; for (const d of doorList) f = Math.min(f, sstep(2.5, 6, Math.hypot(x - d.x, z - d.z))); return f; };
-    const H = (x, z) => { const rr = Math.hypot(x, z), ang = Math.atan2(z, x);
+    const H0 = (x, z) => { const rr = Math.hypot(x, z), ang = Math.atan2(z, x);
       const fl = flat(x, z), inner = (nz(x * 0.06 + 50, z * 0.06 + 50) - 0.5) * 1.6 * (LP ? LP.relief : 1) * fl * sstep(0, 5, rr) + (LP ? WLayout.dH(LP, x, z, fl) : 0), Ra = LP ? Rf(ang) : R;
       const rim = st.hill * sstep(Ra + 0.5, Ra + 16, rr) * (0.55 + 0.9 * nz(Math.cos(ang) * 3 + 9, Math.sin(ang) * 3 + 9)) + st.hill * 1.2 * sstep(Ra + 20, Ra + 60, rr);
       return inner + rim + (LY.dh ? LY.dh(x, z) : 0); };
+    let H = H0; if (g) { WGen.prepare(st, node, { R, Rmin, nz, doorList, LY, H0 }); H = (x, z) => g.h(x, z, H0(x, z), flat(x, z)); }
     // 地形
     const ext = RM + 70, seg = Math.min(220, Math.round(ext * 2 / 1.1));
     const tg = new THREE.PlaneGeometry(ext * 2, ext * 2, seg, seg); tg.rotateX(-Math.PI / 2);
-    const tp = tg.attributes.position; for (let i = 0; i < tp.count; i++) tp.setY(i, H(tp.getX(i), tp.getZ(i))); tg.computeVertexNormals();
+    const tp = tg.attributes.position; for (let i = 0; i < tp.count; i++) tp.setY(i, H(tp.getX(i), tp.getZ(i))); tg.computeVertexNormals(); if (g) WGen.paint(tg, { st, LP, R });
     const gset = TEX[st.ground]; let gm;
-    if (gset && window.Assets && Assets.triplanar) { gm = Assets.triplanar(gset, { scale: st.gs, normal: 1.1, env: 0.35, ao: 0.9 }); gm.envMap = sky ? sky.env : null; }
-    else gm = new THREE.MeshStandardMaterial({ color: '#556644', roughness: 1 });
+    if (gset && window.Assets && Assets.triplanar) { gm = Assets.triplanar(gset, { scale: st.gs, normal: 1.1, env: 0.35, ao: 0.9, vertexColors: !!g }); gm.envMap = sky ? sky.env : null; }
+    else gm = new THREE.MeshStandardMaterial({ color: '#556644', roughness: 1, vertexColors: !!g });
     if (st.tint) gm.color = new THREE.Color(st.tint);
     const terr = new THREE.Mesh(tg, gm); terr.receiveShadow = true; sc.add(terr);
     // 天空（与 PMREM 同一套等距柱状映射）
     if (sky) {
-      const sm = new THREE.ShaderMaterial({ uniforms: { map: { value: sky.bg }, k: { value: st.night ? 0.9 : 1.1 } }, depthWrite: false, side: THREE.BackSide, fog: false,
+      const sm = new THREE.ShaderMaterial({ uniforms: { map: { value: sky.bg }, k: { value: g ? g.skyK * Math.pow(g.sunK, 0.5) : (st.night ? 0.9 : 1.1) }, tint: { value: g ? g.skyTint : new THREE.Color(1, 1, 1) } }, depthWrite: false, side: THREE.BackSide, fog: false,
         vertexShader: 'varying vec3 vD; void main(){ vD = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }',
-        fragmentShader: 'uniform sampler2D map; uniform float k; varying vec3 vD; void main(){ vec3 d = normalize(vD); vec2 uv = vec2(atan(d.z, d.x) * 0.1591549 + 0.5, asin(clamp(d.y, -1.0, 1.0)) * 0.3183099 + 0.5); gl_FragColor = vec4(texture2D(map, uv).rgb * k, 1.0); }' });
-      const skyM = new THREE.Mesh(new THREE.SphereGeometry(300, 48, 24), sm); skyM.frustumCulled = false; skyM.renderOrder = -10; skyM.userData.sky = 1; sc.add(skyM); sc.userData.skyM = skyM;
-      sc.environment = sky.env; sc.fog = new THREE.FogExp2(sky.horizon.clone().multiplyScalar(st.night ? 0.6 : 0.78), Math.min(st.fog * (R > 30 ? 0.7 : 1) * (LP ? LP.fog : 1), Math.max(st.fog, 0.032)));
+        fragmentShader: 'uniform sampler2D map; uniform float k; uniform vec3 tint; varying vec3 vD; void main(){ vec3 d = normalize(vD); vec2 uv = vec2(atan(d.z, d.x) * 0.1591549 + 0.5, asin(clamp(d.y, -1.0, 1.0)) * 0.3183099 + 0.5); gl_FragColor = vec4(texture2D(map, uv).rgb * k * tint, 1.0); }' });
+      const skyM = new THREE.Mesh(new THREE.SphereGeometry(300, 48, 24), sm); skyM.frustumCulled = false; skyM.renderOrder = -10; if (g) skyM.rotation.y = g.yaw; skyM.userData.sky = 1; sc.add(skyM); sc.userData.skyM = skyM;
+      sc.environment = sky.env; sc.fog = g ? new THREE.FogExp2(sky.horizon.clone().multiplyScalar(st.night ? 0.6 : 0.78).multiply(g.fogMul), Math.max(0.006, Math.min(st.fog * (R > 30 ? 0.7 : 1) * (LP ? LP.fog : 1) * g.fk, (st.night ? 1.5 : 1.15) / (R + 14)))) : new THREE.FogExp2(sky.horizon.clone().multiplyScalar(st.night ? 0.6 : 0.78), Math.min(st.fog * (R > 30 ? 0.7 : 1) * (LP ? LP.fog : 1), Math.max(st.fog, 0.032)));
     } else { sc.fog = new THREE.FogExp2('#8899aa', 0.02); }
     // 光：太阳（从 HDRI 最亮方向）+ 半球补光
-    let el = sky ? (0.5 - sky.sun[1]) * Math.PI : 0.8, az = sky ? (sky.sun[0] - 0.5) * Math.PI * 2 : 0.5; if (el < 0.35) el = 0.35 + (st.night ? 0.5 : 0);
+    let el = sky ? (0.5 - sky.sun[1]) * Math.PI : 0.8, az = sky ? (sky.sun[0] - 0.5) * Math.PI * 2 : 0.5; if (el < 0.35) el = 0.35 + (st.night ? 0.5 : 0); if (g) az -= g.yaw;
     const sunDir = new V3(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)).normalize();
-    const sun = new THREE.DirectionalLight(st.night ? '#9fb4ff' : '#fff1dc', st.sun * (LP ? LP.sun : 1)); sun.castShadow = true;
+    const sun = new THREE.DirectionalLight(g ? g.sunCol : (st.night ? '#9fb4ff' : '#fff1dc'), st.sun * (LP ? LP.sun : 1) * (g ? g.sunK : 1)); sun.castShadow = true;
     const ss = Math.min(26, R + 4); Object.assign(sun.shadow.camera, { left: -ss, right: ss, top: ss, bottom: -ss, near: 1, far: 160 }); sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
     sc.add(sun); sc.add(sun.target);
-    const hemi = new THREE.HemisphereLight(sky ? sky.zenith : '#8899aa', sky ? sky.ground : '#443322', st.night ? 0.35 : 0.25); sc.add(hemi);
+    const hemi = new THREE.HemisphereLight(sky ? sky.zenith : '#8899aa', sky ? sky.ground : '#443322', (st.night ? 0.35 : 0.25) * (g ? g.hemK : 1)); sc.add(hemi);
     // 散布：网格防重叠
     const occ = new Map(), cell = 1.2, ck = (x, z) => Math.floor(x / cell) + ',' + Math.floor(z / cell);
     const free = (x, z, rad) => { const n = Math.ceil(rad / cell); const cx = Math.floor(x / cell), cz = Math.floor(z / cell); for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) if (occ.get((cx + i) + ',' + (cz + j))) return false; return true; };
     const mark = (x, z, rad) => { const n = Math.ceil(rad / cell); const cx = Math.floor(x / cell), cz = Math.floor(z / cell); for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) occ.set((cx + i) + ',' + (cz + j), 1); };
     doorList.forEach(d => mark(d.x * 0.93, d.z * 0.93, 3.2));
     const inst = new Map(), instNS = new Map(); // 模板 → 矩阵列表（NS = 不投影，远景）
-    const put = (tm, x, z, s, ry, y0, ns) => { const m = new THREE.Matrix4().compose(new V3(x, (y0 != null ? y0 : H(x, z)) - 0.04 * s, z), new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), ry), new V3(s, s, s)); const M = ns ? instNS : inst; if (!M.has(tm)) M.set(tm, []); M.get(tm).push(m); };
+    const put = (tm, x, z, s, ry, y0, ns, uc) => { const m = new THREE.Matrix4().compose(new V3(x, (y0 != null ? y0 : H(x, z)) - 0.04 * s, z), new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), ry), new V3(s, s, s)); if (uc) m.uc = uc; const M = ns ? instNS : inst; if (!M.has(tm)) M.set(tm, []); M.get(tm).push(m); };
     const variants = (list) => list.flatMap(n => templates(n).map(t => ({ t, n })));
     // 地标（先放，保证有空间）
     const spots = []; try { layPlace(LY, { sc, H, put, variants, mark, cols, doorList, spots, st, sky, node }); } catch (e) { console.warn('layout', LY.k, e); }
     const mk = pick(r, st.marks.filter(m => !(LY.k === 'camp' && m === 'campfire') && !(LY.k === 'henge' && m === 'stones'))); let mx = (r() - 0.5) * R * 0.5, mz = (r() - 0.5) * R * 0.5; for (let t = 0; t < 25 && !free(mx, mz, 4.5); t++) { const a = r() * 6.28, d = R * (0.25 + r() * 0.55); mx = Math.cos(a) * d; mz = Math.sin(a) * d; } sc.userData.mark = mk; placeMark(mk, mx, mz);
     const LPX = LP ? WLayout.dress(LP, { sc, H, R, cols, free, mark, put, variants }) : null;
+    const GD = g ? (() => { try { return WGen.dress(g, { sc, H, R, cols, put, variants, mark, free, spots, doorList, LP, sky, sunDir }); } catch (e) { console.warn('wgen dress', e); return null; } })() : null;
     function placeMark(k, x, z) {
       const y = H(x, z);
       if (k === 'campfire' && window.Assets && Assets.has('stone_fire_pit')) { const f = Assets.fit('stone_fire_pit', { w: 1.3, x, y, z }); if (f) { sc.add(f); } const fl = Assets.flame(x, y + 0.15, z, 5.5); if (fl) sc.add(fl); const pl = new THREE.PointLight('#ff9a50', 2.2, 12, 2); pl.position.set(x, y + 0.9, z); sc.add(pl); sc.userData.fire = pl; cols.push({ x, z, r: 0.8 }); mark(x, z, 2.2); }
@@ -418,20 +445,22 @@ window.Worlds = (() => {
     });
     // 普通散布
     const area = Math.PI * R * R / 100;
-    if (!LITE) for (const [list, dens, s0, s1, kind] of st.props) {
+    if (!LITE) for (const [list, dens, s0, s1, kind, fkind] of st.props) {
       if (kind === 'fire') { const n = Math.max(0, Math.round(dens * area * (0.6 + r() * 0.8))); for (let i = 0; i < n; i++) { const a = r() * 6.28, d = R * (0.2 + r() * 0.7), x = Math.cos(a) * d, z = Math.sin(a) * d; if (!free(x, z, 1.5)) continue; mark(x, z, 1.5); const y = H(x, z); if (window.Assets && Assets.has('stone_fire_pit')) { const f = Assets.fit('stone_fire_pit', { w: 0.9, x, y, z }); if (f) sc.add(f); const fl = Assets.flame(x, y + 0.12, z, 4); if (fl) sc.add(fl); const pl = new THREE.PointLight('#ff7a30', 1.6, 9, 2); pl.position.set(x, y + 0.8, z); sc.add(pl); } cols.push({ x, z, r: 0.6 }); } continue; }
       const vs = variants(list); if (!vs.length) continue;
-      const cap = (kind === 'grass' ? 2200 : kind === 'tree' ? 40 : 160) * (LP && LP.clump && kind !== 'grass' ? 1.5 : 1);
+      const LOV = {}; if (g && kind === 'tree') for (const v of vs) { const lo = templates(v.n + '_lo'); LOV[v.n] = lo && lo[0] || null; }
+      const cap = (kind === 'grass' ? (g ? 3200 : 2200) : kind === 'tree' ? (g ? 64 : 40) : 160) * (LP && LP.clump && kind !== 'grass' ? 1.5 : 1);
       const n = Math.min(cap, Math.round(dens * area * (LP ? WLayout.densK(LP, kind) : 1) * (0.7 + r() * 0.6)));
       for (let i = 0; i < n; i++) {
         const a = r() * 6.28, d = RM * Math.sqrt(r()) * 0.97, x = Math.cos(a) * d, z = Math.sin(a) * d, v = pick(r, vs), s = s0 + r() * (s1 - s0);
         if (LP && (d > Rf(a) * 0.97 || !WLayout.keep(LP, x, z, kind, r))) continue;
+        if (g && !WGen.keep(g, kind, x, z, r, fkind)) continue;
         const fr = Math.max(v.t.size.x, v.t.size.z) * s * 0.5;
         const rad = kind === 'grass' ? 0 : kind === 'plant' ? 0.4 : kind === 'tree' ? 1.0 : kind === 'wall' ? fr : Math.min(fr, 2.5);
         if (rad && !free(x, z, rad)) continue;
         if (LY.skip && LY.skip(kind, x, z)) continue;
         if (kind !== 'grass' && Math.hypot(x, z) < 2.5 && node.home) continue;
-        const ry = r() * 6.28; put(v.t, x, z, s, ry); if (rad) mark(x, z, rad * (kind === 'plant' ? 0.5 : 1));
+        const ry = r() * 6.28; if (g && kind === 'tree' && d > R * 0.5 && LOV[v.n]) { const lv = LOV[v.n]; if (lv) { put(lv, x, z, s, ry, undefined, false, WGen.ic(g, kind, x, z, r)); if (rad) mark(x, z, rad); cols.push({ x, z, r: 0.35 * s }); continue; } } put(v.t, x, z, s, ry, undefined, false, g ? WGen.ic(g, fkind || kind, x, z, r) : undefined); if (rad) mark(x, z, rad * (kind === 'plant' ? 0.5 : 1));
         if (kind === 'tree') cols.push({ x, z, r: 0.35 * s });
         else if (kind === 'rock' || kind === 'prop' || kind === 'lamp') { if (fr > 0.25) cols.push({ x, z, r: Math.min(fr * 0.85, 2.4) }); }
         else if (kind === 'wall') { // 长条墙：沿长轴放一串圆
@@ -443,10 +472,10 @@ window.Worlds = (() => {
       }
     }
     // 山坡上也长草/灌木（不投影、无碰撞）
-    if (!LITE) for (const [list, dens, s0, s1, kind] of st.props) {
-      if (kind !== 'grass' && kind !== 'plant') continue; const vs = variants(list); if (!vs.length) continue;
+    if (!LITE) for (const [list, dens, s0, s1, kind, fkind] of st.props) {
+      if ((kind !== 'grass' && kind !== 'plant') || fkind === 'flower') continue; const vs = variants(list); if (!vs.length) continue;
       const ha = Math.PI * ((R + 18) * (R + 18) - R * R) / 100, n = Math.min(kind === 'grass' ? 1200 : 150, Math.round(dens * ha * 0.35));
-      for (let i = 0; i < n; i++) { const a = r() * 6.28, rr = Rf(a) + 0.5 + r() * 17.5, v = pick(r, vs); put(v.t, Math.cos(a) * rr, Math.sin(a) * rr, (s0 + r() * (s1 - s0)) * 1.1, r() * 6.28, null, true); }
+      for (let i = 0; i < n; i++) { const a = r() * 6.28, rr = Rf(a) + 0.5 + r() * 17.5, v = pick(r, vs); if (g && !WGen.keep(g, kind, Math.cos(a) * rr, Math.sin(a) * rr, r)) continue; put(v.t, Math.cos(a) * rr, Math.sin(a) * rr, (s0 + r() * (s1 - s0)) * 1.1, r() * 6.28, null, true, g ? WGen.ic(g, kind, Math.cos(a) * rr, Math.sin(a) * rr, r) : undefined); }
     }
     // 边界：两圈（近圈贴着可走边界，远圈在山坡上当背景）
     if (st.edge && !LITE) {
@@ -457,7 +486,7 @@ window.Worlds = (() => {
           const a = i / n * Math.PI * 2 + (r() - 0.5) * 0.3 / n * 6; const rr = rr0 + r() * (rr1 - rr0) + (Rf(a) - R);
           if (sk === 1 && doorList.some(d => Math.abs(Math.atan2(Math.sin(a - d.a), Math.cos(a - d.a))) * R < 3.2)) continue;
           const v = pick(r, vs), s = (s0 + r() * (s1 - s0)) * sk, x = Math.cos(a) * rr, z = Math.sin(a) * rr;
-          put(v.t, x, z, s, r() * 6.28, null, sk > 1);
+          put(v.t, x, z, s, r() * 6.28, null, sk > 1, g ? WGen.ic(g, 'tree', x, z, r) : undefined);
         }
       }
     }
@@ -465,6 +494,7 @@ window.Worlds = (() => {
     for (const [M, ns] of [[inst, false], [instNS, true]]) for (const [tm, ms] of M) for (const p of tm.parts) {
       const im = new THREE.InstancedMesh(p.geo, p.mat, ms.length);
       ms.forEach((m, i) => im.setMatrixAt(i, new THREE.Matrix4().multiplyMatrices(m, p.m)));
+      if (g) { const leaf = p.mat.alphaTest > 0; ms.forEach((m, i) => { const u = m.uc; im.setColorAt(i, u ? (leaf ? u.L : u.B) : WHITE); }); }
       im.instanceMatrix.needsUpdate = true; im.frustumCulled = false; im.castShadow = !ns && !(p.mat.alphaTest > 0 && tm.size.y < 1.2); im.receiveShadow = !ns; sc.add(im);
     }
     // 门
@@ -478,7 +508,7 @@ window.Worlds = (() => {
       cols.push({ x: d.x + Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z + Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 }, { x: d.x - Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z - Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 });
       return Object.assign(d, { g, label, home });
     });
-    return { sc, H, R, Rf: LP ? Rf : null, wx: LPX && LPX.wx, tag: LP ? LP.tag : '', lp: LP, cols, doors, inter, sun, sunDir, terr, style: st, spots, lay: LY.k, bossAt: LY.boss ? new V3(LY.boss.x, 0, LY.boss.z) : null };
+    return { sc, H, R, Rf: LP ? Rf : null, wx: (LPX && LPX.wx) || GD ? (dt, p, now) => { if (LPX && LPX.wx) LPX.wx(dt, p, now); if (GD) GD.update(dt, p, now); } : null, tag: [LP ? LP.tag : '', g ? g.tag.join(' · ') : ''].filter(Boolean).join(' · '), lp: LP, cols, doors, inter, sun, sunDir, terr, style: st, spots, lay: LY.k, bossAt: LY.boss ? new V3(LY.boss.x, 0, LY.boss.z) : null };
   }
   // 画布文字 → 精灵（门牌/气泡）
   function makeLabel(text, col) {
@@ -661,19 +691,20 @@ window.Worlds = (() => {
     try { G.save && G.save(); } catch (e) {}
   }
   function stylesOf(i) { const lk = layOf(W.graph.nodes[i]), ln = LAYOUTS[lk] ? LAYOUTS[lk].need : []; return stylesOf0(i).concat(ln).filter((n, k, a) => a.indexOf(n) === k); }
-  function stylesOf0(i) { if (LITE) { const st0 = STYLES[W.graph.nodes[i].style]; return ['sky_' + st0.sky, 'tex_' + st0.ground]; } const st = STYLES[W.graph.nodes[i].style]; const names = ['sky_' + st.sky, 'tex_' + st.ground]; st.props.forEach(p => p[0].forEach(n => names.push(n.replace('#*', '')))); if (st.edge) st.edge[0].forEach(n => { names.push(n.replace('#*', '')); if (LO[n]) names.push(n + '_lo'); }); ['namaqualand_boulder_03', 'namaqualand_boulder_04', 'rock_09', 'horse_statue_01', 'gothic_statue', 'wooden_barrels_01', 'Barrel_02', 'wooden_military_crate', 'dead_tree_trunk', 'dead_tree_trunk_02', 'dead_quiver_trunk'].forEach(n => names.push(n)); return names.filter(n => n !== 'brazier'); }
+  function stylesOf0(i) { if (LITE) { const st0 = styleOf(W.graph.nodes[i]); return ['sky_' + st0.sky, 'tex_' + st0.ground]; } const st = styleOf(W.graph.nodes[i]); if (st.g) return WGen.assets(st, W.graph.nodes[i]); const names = ['sky_' + st.sky, 'tex_' + st.ground]; st.props.forEach(p => p[0].forEach(n => names.push(n.replace('#*', '')))); if (st.edge) st.edge[0].forEach(n => { names.push(n.replace('#*', '')); if (LO[n]) names.push(n + '_lo'); }); ['namaqualand_boulder_03', 'namaqualand_boulder_04', 'rock_09', 'horse_statue_01', 'gothic_statue', 'wooden_barrels_01', 'Barrel_02', 'wooden_military_crate', 'dead_tree_trunk', 'dead_tree_trunk_02', 'dead_quiver_trunk'].forEach(n => names.push(n)); return names.filter(n => n !== 'brazier'); }
   async function goto(i, from) {
     W.busy = true; const node = W.graph.nodes[i];
     fadeTo(1); await wait(260);
     W.dom.load.style.display = 'flex'; W.dom.loadT.textContent = `前往「${node.name}」……`;
-    await need(stylesOf(i), (p) => { W.dom.loadB.style.width = Math.round(p * 100) + '%'; });
-    // 预加载相邻地点的资产（后台）
-    setTimeout(() => { if (!W) return; node.adj.forEach(b => need(stylesOf(b))); }, 1500);
+    const tg0 = performance.now(); PROF.length = 0;
+    await need(stylesOf(i), (p) => { W.dom.loadB.style.width = Math.round(p * 100) + '%'; }); tp('need', tg0);
+    // 预热相邻地点的资产（后台、空闲时、一次一个）
+    setTimeout(() => { if (!W) return; node.adj.forEach(b => warm(stylesOf(b))); }, 800);
     if (!W) return;
     if (W.B) disposeNode();
     W.cur = i; node.visited = true; node.known = true; node.adj.forEach(b => W.graph.nodes[b].known = true); remember(node);
     if (!node.prey) populate(node);
-    const B = W.B = buildNode(node);
+    const tb0 = performance.now(); const B = W.B = buildNode(node); tp('build', tb0);
     W.foes = null; W.prey = []; W.boss = null;
     const wantBoss = node.boss && !(G.S.bosses || {})[node.region] && window.Explore && Explore.BOSSES[node.region];
     if (window.Foe && !/[?&]nofoe=1/.test(location.search) && !(window.Mods && !Mods.on('foe_bodies'))) {
@@ -696,7 +727,8 @@ window.Worlds = (() => {
     G.player.yaw = Math.atan2(-ins.x, -ins.z); G.player.pitch = -0.05;
     B.sc.add(G.camera); G.camera.far = 400; G.camera.updateProjectionMatrix();
     if (window.Combat && Combat.attach) Combat.attach(B.sc);
-    W.dom.load.style.display = 'none'; hud(); banner(node);
+    try { const tc0 = performance.now(); const cm = G.camera; cm.position.set(W.pos.x, W.pos.y + EYE, W.pos.z); cm.rotation.set(G.player.pitch, G.player.yaw, 0, 'YXZ'); cm.updateMatrixWorld(true); if (G.post && G.post.on) G.post.render(B.sc, cm); else G.renderer.render(B.sc, cm); tp('firstframe', tc0); } catch (e) { console.warn('precompile', e); } // 进场前先渲一帧：着色器编译/贴图上传都藏在加载画面后面
+    tp('total', tg0); W.dom.load.style.display = 'none'; hud(); banner(node);
     await wait(60); fadeTo(0); W.busy = false;
     if (W.boss) setTimeout(() => { if (W && W.boss) bossSay(W.boss.B.say, 5); }, 1500);
   }
@@ -995,5 +1027,5 @@ window.Worlds = (() => {
       if (n.i === W.cur) { g.fillStyle = '#ffd060'; g.font = 'bold 13px sans-serif'; g.fillText('▲ 你在这里', x, y + rad + 15); } });
   }
 
-  return { start, frame, onKey, onDown, stop, get active() { return !!W; }, get _W() { return W; }, STYLES, REGION, genGraph, genWorld, need, _debug: { goto: (i) => W && goto(i, W.cur), buildNode, targets } };
+  return { start, frame, onKey, onDown, stop, get active() { return !!W; }, get _W() { return W; }, STYLES, REGION, genGraph, genWorld, need, warm, warmRegion, _debug: { goto: (i) => W && goto(i, W.cur), buildNode, targets } };
 })();
