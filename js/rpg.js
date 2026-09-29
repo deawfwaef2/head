@@ -116,12 +116,14 @@ window.RPG = (() => {
         const mem = Lore.memory(r, c, { weapon: wpn, q: qq, hurt });
         const h = { c, look, sig, mem, story: Lore.backstory(r, c), app: Lore.appearance(c, look), date: Date.now() };
         heads.push(h);
-        beats.push({ t: `你遇到了【${Lore.RAR[c.rar]}】${c.raceN}${c.idN}「${c.name}」。` + (dmg > 0 ? `一番厮杀后你砍下了她的头（-${dmg} HP）。` : '你轻松地砍下了她的头。'), hp: -dmg, head: h, enc: i });
+        beats.push({ t: `你遇到了【${Lore.RAR[c.rar]}】${c.raceN}${c.idN}「${c.name}」。` + (dmg > 0 ? `一番厮杀后你砍下了她的头（-${dmg} HP）。` : '你轻松地砍下了她的头。'), hp: -dmg, head: h, enc: i, who: h, won: true, dmg });
       } else if (won) {
-        beats.push({ t: `你又砍翻了一个${c.idN}「${c.name}」，可背篓已经满了，只能把她的头留在原地。` + (dmg > 0 ? `（-${dmg} HP）` : ''), hp: -dmg, enc: i, coin: Math.round(loc.loot[0] * 0.3) });
+        const who = { c, look: ModelHeads.randomLook(r, c.lookRace, c.rar) };
+        beats.push({ t: `你又砍翻了一个${c.idN}「${c.name}」，可背篓已经满了，只能把她的头留在原地。` + (dmg > 0 ? `（-${dmg} HP）` : ''), hp: -dmg, enc: i, coin: Math.round(loc.loot[0] * 0.3), who, won: true, full: true, dmg });
       } else {
         const fail = [`${c.raceN}${c.idN}「${c.name}」${Lore.ID[c.id].fight}。你被打得节节败退，她趁机逃走了。`, `你扑向${c.idN}「${c.name}」，却中了她的圈套。等你挣脱时她早已不见踪影。`, `「${c.name}」比你强。你被她${Lore.ID[c.id].fight.slice(0, 12)}……狼狈地逃了出来。`];
-        beats.push({ t: Lore.pick(r, fail) + (dmg > 0 ? `（-${dmg} HP）` : ''), hp: -dmg, enc: i });
+        const who = { c, look: ModelHeads.randomLook(r, c.lookRace, c.rar) };
+        beats.push({ t: Lore.pick(r, fail) + (dmg > 0 ? `（-${dmg} HP）` : ''), hp: -dmg, enc: i, who, won: false, dmg });
       }
     }
     const coins = Math.round((loc.loot[0] + r() * (loc.loot[1] - loc.loot[0])) * (0.5 + Math.min(1.5, q) * 0.5));
@@ -161,6 +163,22 @@ window.RPG = (() => {
     if (c.rar >= 2 || shiny || r() < 0.35) { const A = EPI_A[Math.floor(r() * EPI_A.length)], idn = Lore.ID[c.id].n; c.title = r() < 0.5 ? `${A}之${idn}` : `${A}的${c.traits[0]}${idn}`; }
     if (c.rar >= 3 || shiny || (c.rar === 2 && r() < 0.3)) look.glowEye = 1;
   }
+  // 地区 BOSS 的首级（第十轮）：B = Explore.BOSSES[k]
+  function bossHead(S, st, loc, B, usedNames, usedSig) {
+    const r = Math.random;
+    const c = Lore.makeCharacter(r, loc, usedNames, luckOf(S));
+    const R = Lore.RACES[B.race] || Lore.RACES.human;
+    Object.assign(c, { race: B.race, raceN: R.n, id: B.id, idN: B.title, rar: 4, name: B.n, boss: loc.k, traits: B.traits.slice(), belief: B.belief, goal: B.goal });
+    c.lookRace = Object.assign({}, R.look, { acc: Object.assign({}, (R.look || {}).acc || {}) });
+    const look = ModelHeads.randomLook(r, c.lookRace, 4);
+    Object.assign(look, B.look || {}); look.blood = 0.25; look.spat = 0.1;
+    rollExtras(r, c, look, luckOf(S));
+    c.shiny = 1; look.shiny = look.shiny || 3; look.glowEye = 1; c.title = B.title;
+    let sig = sigOf(look); usedSig.add(sig); usedNames.add(c.name);
+    const wpn = EQUIP.weapon.tiers[S.eq.weapon || 0].n;
+    const mem = Lore.memory(r, c, { weapon: wpn, q: st.power / (loc.rec * B.pow), hurt: 0.4 });
+    return { c, look, sig, mem, story: B.story, app: Lore.appearance(c, look), date: Date.now() };
+  }
   function sigOf(l) { return [l.f, l.h, l.hn, l.hn2, l.en, l.en2, l.sk, l.feat || '', (l.acc || []).join('+'), l.exT, l.paint, l.hx ? l.hx.s + (l.hx.ahoge || '') : ''].join('|'); }
 
   // 熔魂炉：凝聚出一颗指定稀有度的新首级
@@ -178,5 +196,5 @@ window.RPG = (() => {
     const mem = Lore.memory(r, c, { weapon: '熔魂炉的烈焰', q: 2, hurt: 0 });
     return { c, look, sig, mem, story: Lore.backstory(r, c), app: Lore.appearance(c, look), date: Date.now() };
   }
-  return { STATS, EQUIP, SLOTS, CONSUM, TRAIN, AFF, stats, eqSum, trainCost, expedition, sigOf, rollExtras, luckOf, forgeHead };
+  return { STATS, EQUIP, SLOTS, CONSUM, TRAIN, AFF, stats, eqSum, trainCost, expedition, sigOf, rollExtras, luckOf, forgeHead, bossHead };
 })();

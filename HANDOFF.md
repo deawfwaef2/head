@@ -259,3 +259,26 @@
 6. 高质量 CC0 模型替换场景/建筑/道具/头饰（Poly Haven 等），更多小装饰，重做构图。
 7. 更多地区、品质细分、女角色种类与差异化（种族材质/瞳形/体态特征）。
 - 素材立场：仓库在 GitHub 上，提交即分发 → 仍只用许可允许再分发的素材（CC0 / CC-BY / VRM 允许再分发）。
+
+---
+## 第十轮 · 阶段 2 完成记录（长按 E 摆放模式，commit 2a2e8b0）
+- game.js：长按 E（>350ms）进入摆放；绿色=可放 / 红色=不可放预览 + 落点圆环；表面法线判定（墙面不可放，地面/桌面可放）；挂架自动吸附空位；滚轮旋转（Shift 微调）、R 换姿势（HP_POSE / RESTS）；左键/E 确认，右键/Esc 取消。
+- 独立 `hpRay`（far 6.5），不要复用共享 `ray`（far 3.4）。提示文字必须在 `ui.tip.innerHTML` 之前最后赋值，否则被 else-if 链覆盖。
+- G 导出：startHP / confirmHP / cancelHP / updateHP / get hplace。
+
+## 第十轮 · 阶段 3+4 完成记录（第一人称出猎 + 叙事引擎 + BOSS）
+新文件（index.html 顺序：… ui → tale → explore_world → explore → seance …）：
+- `js/explore_world.js`（ExWorld）：9 个地区主题（天空渐变+太阳、雾、贴路平坦的起伏地形+顶点色、蜿蜒土路+路边石、风中摆动的实例化草、地区布景道具、粒子：花粉/萤火/尘/花瓣/鬼火/余烬/雪、鸟群、炊烟、风车、旗帜、岩浆、浮岩）。新地区没有主题时按 loc.color 自动生成。
+  - **颜色坑**：主渲染器是 sRGB 输出 + ACES，所有手写颜色必须 `ExWorld.lin()`（sRGB→线性），否则整体发白。顶点色/实例色同理。
+- `js/tale.js`（Tale）：因素叙事引擎。性格→9 种声线；因素＝是否察觉（注意力：性格/目击/恶名/伤势/立誓杀你）、实力差 q、你的伤势、本地恶名 S.rep[k]、仁名 S.mercy[k]、本趟是否目击你杀人、信仰、宿愿、武器、发色瞳色、地点意象。句子带条件+权重，最近 80 句去重。API：ctx / intro / greet / talk(n) / spare / last / win / fightWin / fightLose / spareGo / sneakBy。
+- `js/explore.js`（Explore）：
+  - 复用 G.renderer（不开第二个 GL 上下文），`__pauseMain`，自己的 rAF；标题卡（地区色渐变，不黑屏）遮住建世界 + `renderer.compile` 预编译；结束时全部 dispose，恢复 #menu / HUD（body.exploring 隐藏洞内 HUD）。
+  - 路长 L=210m，自动行走 3.1m/s，按住鼠标/空格 7.5m/s，点按加速；鼠标位置环顾；步伐摇晃+脚步声。
+  - beats 映射到路上位置；非遭遇 beat 路过即出现在左下文字流；遭遇 beat 在路上站着真实角色（makeFigure：ModelHeads.create(alive 版 look, {alive:true}) + 程序身体：56 个身份→OUT 表 dress/gown/robe/armor/leather/work + 围裙/披风/毛领/袴/翅膀(white/dark/bat)/尾巴/武器；脖子半径取 meta.cut.r 伸进断面藏住截面；呼吸、眨眼、看向镜头）。
+  - 遭遇选项：察觉→⚔️动手/🗣️交谈(两轮)/🚶放她走；未察觉→🗡️偷袭(伤害减半)/🗣️搭话/🚶绕开。放过会从 res.heads 移除该首级并 S.mercy[k]++；击杀 S.rep[k]++ 并设置本趟“目击”。胜负仍用 RPG.expedition 预算结果（平衡不变）。rpg.js 现在给每个遭遇 beat 附 `who {c, look}`、`won`、`dmg`、`full`。
+  - 扩展钩子：`Explore.hooks.choices`（数组，f(o, opts) 追加选项）、`Explore.hooks.pick(o, k, api)`（返回 true 表示已处理）——阶段 5 招揽 NPC 用这个接。
+  - 旅途抉择事件（ui.js EVENTS）在路上有实体道具（箱子/祭坛/魂光/篝火/商队/战场/路牌），ui.js 新增无 DOM 的 `applyChoice(ev,i)`。
+  - BOSS：`Explore.BOSSES`（9 地区，名/称号/种族/身份/性格/信仰/宿愿/look 覆盖/台词/传记/pow/col）。出现率 0.22 + 0.13×(本地出猎次数-1)，上限 0.85，已击败不再出现；位置 0.84L，雾色渐变。决斗：她显示意图（重击/连刺/施法），闪避克重击、格挡克连刺、猛攻克施法；第 4 个地区起有假动作（部分会提示“有些古怪”）；可撤退（挨 12% 伤害）。胜利：`RPG.bossHead()` 生成神魂首级（c.boss=k），`S.bosses[k]`；全部地区 BOSS 集齐 → `S.won` + 一次性胜利画面「魂首窟之主」，之后继续游戏。
+  - 新存档字段：S.visits / S.rep / S.mercy / S.bosses / S.won。
+- MOD：`explore3d`（play，默认开）；关闭则回到旧的“点击 60 次”文字旅途（ui.js textTrip）。3D 构建失败也会自动退回文字旅途。
+- 测试脚本（/tmp，会丢）：ex.py（地区路/遭遇/BOSS 截图）、ex2.py（多地区完整一趟）、ex3.py（全部世界+56 套服装 NaN 检查）、ex4.py（偷袭击杀 + BOSS 决斗胜利）。调试：`Explore.forceBoss = true`、`Explore._X`。

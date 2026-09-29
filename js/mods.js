@@ -30,6 +30,7 @@ window.Mods = (() => {
     { id: 'forge', cat: 'play', icon: '⚗️', n: '熔魂炉', d: '三颗首级熔成一颗更高阶的新首级。', def: true },
     { id: 'bowling', cat: 'play', icon: '🎳', n: '魂球道', d: '把首级扔向骷髅瓶，全中 STRIKE 连击。', def: true },
     { id: 'dresser', cat: 'play', icon: '💄', n: '化妆台', d: '给首级换头饰、染发、换表情。需要「头饰」。', def: true, requires: ['headwear'] },
+    { id: 'explore3d', cat: 'play', icon: '🌄', n: '第一人称出猎', d: '出洞后在 3D 地区里沿路前进：路上站着真实的角色，可以交谈、放过或偷袭；地区霸主（BOSS）会随机现身。关闭则回到“点击 60 次”的文字旅途。', def: true },
     { id: 'chess', cat: 'play', icon: '♟️', n: '头棋殿', d: '首级当棋子，和斯尼克下棋或同屏双人。', def: true },
     { id: 'rebirth', cat: 'play', icon: '♻️', n: '轮回祭坛', d: '献祭一世换永久魂核天赋。', def: true },
     { id: 'thief', cat: 'play', icon: '👻', n: '盗魂灵入侵', d: '盗魂灵定期来偷首级，左键打散。', def: true },

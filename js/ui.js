@@ -313,6 +313,16 @@ window.UI = (() => {
     const at = res.beats.map((b, i) => i === 0 ? 0 : Math.round(i / (n - 1) * TAPS));
     trip = { loc, res, at, taps: 0, shown: 0, hp0: G.S.hp, coins: 0, log: [], dead: false, done: false, choose: null,
       ev: [Math.round(TAPS * (0.3 + Math.random() * 0.1)), Math.round(TAPS * (0.62 + Math.random() * 0.1))], evPool: EVENTS.slice().sort(() => Math.random() - 0.5) };
+    if (window.Explore && window.ExWorld && (!window.Mods || Mods.on('explore3d'))) {
+      root.classList.remove('on'); cur = null; if (document.pointerLockElement) document.exitPointerLock();
+      Explore.start(trip, { choose: applyChoice, finish: finishTrip, die, fallback: () => textTrip() });
+      return;
+    }
+    textTrip();
+  }
+  function textTrip() {
+    const loc = trip.loc;
+    G.setUI && G.setUI(true);
     SFX.music('expedition'); SFX.roar(0.7);
     open('trip', `<div class="trip" style="--lc:${loc.color}">
       <div class="trip-top"><div class="trip-loc">${loc.icon} ${loc.n}</div><div class="trip-hp"><div class="hpline"><div class="hpfill" id="tripHp"></div><span id="tripHpT"></span></div></div></div>
@@ -397,6 +407,22 @@ window.UI = (() => {
     feed.appendChild(p); requestAnimationFrame(() => p.classList.add('in')); feed.scrollTop = feed.scrollHeight;
     const cta = document.getElementById('tripCta'); if (cta) cta.dataset.old = cta.innerHTML, cta.innerHTML = '⚖️ 做出选择（1 / 2）';
     SFX.open && SFX.open();
+  }
+  // 3D 探索用：只结算不碰 DOM，返回 {msg, coin, heal, hurt, head, headMsg}
+  function applyChoice(ev, i) {
+    const s = G.st(), r = ev.o[i][1](), out = { msg: r.msg };
+    let rec = { t: ev.t + ' → ' + ev.o[i][0] + '：' + r.msg };
+    if (r.coin) { G.addCoins(r.coin); trip.coins += r.coin; out.coin = r.coin; rec.d = `魂晶+${r.coin}`; }
+    if (r.heal) { const n = Math.round(s.maxHp * r.heal); G.S.hp = Math.min(s.maxHp, G.S.hp + n); out.heal = n; rec.d = `+${n} HP`; }
+    if (r.hurt) { const n = Math.max(1, Math.round(s.maxHp * r.hurt * (1 - s.dodge))); G.damage(n); out.hurt = n; rec.d = `-${n} HP`; }
+    trip.log.push(rec);
+    if (r.head) {
+      const res2 = RPG.expedition(G.S, s, trip.loc, (Math.random() * 4294967296) >>> 0, G.usedNames, G.usedSig);
+      const hb = res2.beats.find(b => b.head);
+      if (hb && trip.res.heads.length < s.cap) { const c = hb.head.c; trip.res.heads.push(hb.head); out.head = hb.head; out.headMsg = hb.t + ` 💀 获得首级【${RN[c.rar]}】${c.name}`; trip.log.push({ t: hb.t, cls: 'gethead' }); SFX.chop(); if (c.rar >= 2) SFX.fanfare(c.rar); }
+      else out.headMsg = trip.res.heads.length >= s.cap ? '可你的麻袋已经装满了，只能目送猎物远去。' : '猎物消失在了夜色里。';
+    }
+    return out;
   }
   function pickChoice(i) {
     const ev = trip && trip.choose; if (!ev || !ev.o[i]) return; trip.choose = null;
