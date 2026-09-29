@@ -456,3 +456,11 @@
 - **接入**：game.js 主循环 `Worlds.active` 时整帧交给 `Worlds.frame`；按键在世界里先给 `Worlds.onKey`（Tab/Esc 放行）；鼠标左键在世界里第一次点击 = 拔刀。combat.js 新增 `Combat.attach(scene)`（刃光挂到当前场景），洞里首级目标在世界里屏蔽。ui.js `startTrip` 优先走 Worlds；MOD `worldgraph`（默认开，关掉 = 旧的点击 60 次面板）。
 - **测试**：`_w.html`（gitignore）= 不带洞窟的世界查看器（`?k=地区&style=风格&n=节点&q=mid`），`_tools/wshot.py` 截图。完整游戏 + 世界在 2GB 沙箱 swiftshader 下会 OOM，只能分开测。
 - **已知/待办**：第 4 步真实敌人身体（身体 VRM 源路径 CREDITS 里只记了作者，需要重新检索）；门目前是独立铁门/城门 + 灯笼；三人称等身体到位后做。
+
+### 第十四轮进度 · 第 5 步验证（总管理师）
+- 已推送 2d49338（worlds.js + big/world 资产）、a27c5fc（CREDITS）。
+- **流程测试通过**（`_tools/wflow.py`，页面 `_t2.html?wlite=1`＝去掉洞窟家具资产 + 不散布植被，否则 2GB 沙箱 swiftshader 爆内存；这是测试环境限制，不是泄漏：textures/geometries/programs 数量稳定）：出猎 → 进入世界 → 走到回魂首窟门 → E → 回到洞窟，trips+1，相机/远裁面复原，无报错。
+- **逻辑测试通过**（`_tools/wlogic.py`，查看器 `_w.html` 里桩了 Explore/RPG）：霸主发现玩家并出手（8 秒 100→82 血），6 次重砍（speed 10）击杀，首级进背包，`S.bosses` 记下；猎物看见玩家后反向逃跑，一击捕获。
+- `?wlite=1`：worlds 调试开关，不散布植被/远环（仅测试用）。`Worlds._debug.targets(center)` 可直接拿到战斗目标。
+- 画面：草甸（meadow）草仍偏稀——草丛模型面数高（grass_medium_01），加密要么做草卡片要么 LOD，**交给画面协作者**；王城（capital）夜景已看过，OK。沼泽/荒野/要塞/山巅风格尚未截图。
+- 平衡待真人手感：霸主 6 刀偏快，等第 4 步 foe.js 身体+动作做完一起调。
