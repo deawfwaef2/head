@@ -15,6 +15,8 @@ window.Mods = (() => {
     { id: 'r_ink', cat: 'render', group: 'render', icon: '🖋️', n: '水墨', d: '去色 + 墨线 + 宣纸，仅保留血色与魂光的红。' },
     { id: 'outline', cat: 'render', icon: '✏️', n: '额外描边', d: '在任意画风上叠加细墨线（赛璐璐/水墨已自带描边，与之冲突）。', conflicts: ['r_anime', 'r_ink'] },
     { id: 'bloom', cat: 'render', icon: '🌟', n: '魂光泛光', d: '魂光、火焰、稀有光柱发出柔和泛光。', def: false },
+    // ---------- 界面（第十九轮 UI Agent） ----------
+    { id: 'ui3a', cat: 'ui', icon: '💎', n: '3A 界面皮肤', d: '黑曜石+血金主题：斜切角按钮、四角括饰面板、SVG 图标、聚光灯卡片、血条残影、受击/低血反馈、悬停与点击音效、菜单余烬。关闭则回到旧界面。', def: true },
     // ---------- 性能 ----------
     { id: 'lod', cat: 'perf', icon: '⚡', n: '万首优化', d: '远处首级自动降级 / 隐藏，休眠首级不再计算物理，支持上万颗首级（冰窖存储）。强烈建议开启。', def: true },
     { id: 'steady_save', cat: 'perf', icon: '💾', n: '平滑自动存档', d: '每 20 秒在浏览器空闲时自动保存（离开页面仍会立即保存），减少周期性卡顿；关闭后恢复旧的 8 秒同步存档。', def: true },
@@ -107,7 +109,7 @@ window.Mods = (() => {
   }
 
   // ---------------- 管理器界面 ----------------
-  const CATN = { render: '🖼️ 画风渲染（只能选一个画风）', perf: '⚡ 性能', look: '🧬 角色外观', play: '🎲 玩法', asset: '🏛️ 模型与材质' };
+  const CATN = { render: '🖼️ 画风渲染（只能选一个画风）', ui: '💎 界面', perf: '⚡ 性能', look: '🧬 角色外观', play: '🎲 玩法', asset: '🏛️ 模型与材质' };
   let box = null;
   function css() {
     if (document.getElementById('modcss')) return;

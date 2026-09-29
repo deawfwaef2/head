@@ -232,9 +232,14 @@
   .dots { margin-top: 14px; } .dots i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #3a2818; margin: 0 4px; } .dots i.on { background: #ff5040; }
 .model-license{margin:12px 0;padding:12px 14px;border:1px solid #665039;border-radius:10px;background:rgba(32,23,17,.72);color:#e4cda7;line-height:1.55}.model-license small{color:#b9a88e;font-size:.86em}
   body.film #hud, body.film #hint, body.film #cross, body.film #labels, body.film .musicBtn, body.film #tip { display: none !important; }
+  /* UI3A 关闭时的旧界面兜底 */
+  #hud .u-top { display: flex; align-items: center; gap: 10px; } #hud .u-gem { display: none; } #hud .u-lbl { font-size: 13px; color: #a89070; } #hud .u-pow { font-size: 13px; color: #c9b08a; margin-top: 4px; } #hud .u-pow svg { display: none; } #hpghost { display: none; }
+  kbd { font: inherit; font-weight: 700; color: #ffcf70; margin-right: 3px; } #hint span { margin-right: 10px; white-space: nowrap; } #menu .keys span { margin: 0 8px; } #hintTag { display: none; }
 </style>
+<link rel="stylesheet" href="css/ui3a.css">
 </head>
 <body>
+<script>try{var __m=JSON.parse(localStorage.getItem('soulhead_mods')||'{}');if(__m.ui3a!==false)document.body.classList.add('ui3a');}catch(e){document.body.classList.add('ui3a');}</script>
 <div id="game"></div>
 <div id="vign"></div>
 <div id="labels"></div>
@@ -242,13 +247,16 @@
 <div id="tip"></div>
 <div id="toast"></div>
 <div id="hud">
-  <div class="row"><div id="coins">0</div><div style="font-size:13px;color:#a89070">🔮 魂晶</div></div>
-  <div class="hpwrap"><div id="hpbar"></div><div id="hptxt"></div></div>
-  <div class="sub">⚔️ 战力 <span id="power">0</span></div>
+  <div class="u-top">
+    <div class="u-gem"><svg viewBox="0 0 24 24"><path d="M12 2.5 19 8.5 16.5 20.5H7.5L5 8.5Z"/><path d="M5 8.5H19M12 2.5 9.5 8.5 12 20.5 14.5 8.5Z"/></svg></div>
+    <div><div id="coins">0</div><div class="u-lbl">魂晶</div></div>
+    <div class="u-pow"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#e7c27a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 18.5 5.5M18.5 5.5H14M18.5 5.5V10M20 20 5.5 5.5M5.5 5.5H10M5.5 5.5V10"/></svg><span id="power">0</span></div>
+  </div>
+  <div class="hpwrap"><div id="hpghost"></div><div id="hpbar"></div><div id="hptxt"></div></div>
   <div id="headcount"></div>
 </div>
 <button class="musicBtn" id="musicCorner" onclick="SFX.toggleMusic()" title="M 键也可以">🎵 BGM 开</button>
-<div id="hint">M 开关BGM · WASD 移动 · Shift 跑 · C 下蹲 · 左键把玩 · F 拔刀（按住左键挥砍/连点刺/右键格挡）· I 查看 · E 拿起/互动 · 手持首级：滚轮转向 / V 换表情 · 右键投掷 · 麻袋：E 扛起/倒出，Q 放下 · B 建造 · Tab 菜单 · H 喝药 · J 成就 · K 首级收藏 · O MOD</div>
+<div id="hint"><span><kbd>WASD</kbd>移动</span><span><kbd>Shift</kbd>跑</span><span><kbd>C</kbd>下蹲</span><span><kbd>左键</kbd>把玩</span><span><kbd>F</kbd>拔刀 <small style="opacity:.6">左键挥砍 · 连点刺 · 右键格挡</small></span><span><kbd>E</kbd>拿起/互动</span><span><kbd>I</kbd>查看</span><span><kbd>滚轮</kbd>转向 <kbd>V</kbd>换表情 <kbd>右键</kbd>投掷</span><span><kbd>Q</kbd>放下麻袋</span><span><kbd>B</kbd>建造</span><span><kbd>Tab</kbd>菜单</span><span><kbd>H</kbd>喝药</span><span><kbd>J</kbd>成就</span><span><kbd>K</kbd>收藏</span><span><kbd>O</kbd>MOD</span><span><kbd>M</kbd>BGM</span></div>
 <div id="menu" class="hidden">
   <div class="title">魂首窟<small>SOULHEAD CAVE · 食人魔的收藏</small></div>
   <div class="rules">你是被月之魔女诅咒的食人魔<b>格罗克</b>，只能以亡魂为食。<br>
@@ -258,7 +266,7 @@
   <button class="bigbtn" id="startBtn">开始游戏</button>
   <button class="bigbtn" id="modBtn" style="margin-left:10px;background:linear-gradient(135deg,#3a2a50,#2a1a3a)">🧩 MOD</button>
   <button class="smallbtn" id="resetBtn">删除存档重新开始</button> <button class="smallbtn musicBtn" onclick="SFX.toggleMusic()">🎵 BGM 开</button>
-  <div class="keys">WASD 移动 · 鼠标 视角 · 左键 把玩首级 · E 互动 · F 查看首级故事 · B 建造 · Tab 属性/装备 · Esc 暂停</div>
+  <div class="keys"><span><kbd>WASD</kbd>移动</span><span><kbd>鼠标</kbd>视角</span><span><kbd>左键</kbd>把玩首级</span><span><kbd>E</kbd>互动</span><span><kbd>I</kbd>查看首级故事</span><span><kbd>B</kbd>建造</span><span><kbd>Tab</kbd>属性/装备</span><span><kbd>Esc</kbd>暂停</span></div>
   <div id="credits">头部基础模型：pixiv Inc. VRoid 样例 (CC0 / 使用条款)、VirtualCast VRM 样例 (VRM Public License)、Godette by SirRichard94 (CC-BY)、以及 24 位 VRoid 社区作者公开的 VRM 模型 —— 经裁切、混搭与改造。<br>音乐：Kevin MacLeod (incompetech.com) CC-BY 4.0 · 音效：Kenney (CC0)。详见 CREDITS.md</div>
 </div>
 <div id="loading"><div class="title" style="font-size:52px">魂首窟</div><div id="loadtxt">加载中…（如一直停在这里，请用 Chrome / Edge 打开）</div><div id="loadbar"><i></i></div></div>
@@ -395,6 +403,7 @@
 <script src="models/props_pack.js"></script>
 <script src="js/sanctum.js"></script>
 <script src="js/oddities.js"></script>
+<script src="js/ui3a.js"></script>
 <script>
 (async () => {
   const bar = document.querySelector('#loadbar i'), txt = document.getElementById('loadtxt');
