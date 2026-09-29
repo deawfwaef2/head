@@ -840,3 +840,9 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - `js/sack.js`：新材料 `meat 生肉 / fang 兽牙 / horn 兽角`、消耗品 `stew 炖肉(+50%)`，配方：炖肉、兽牙磨刀石、兽角版“铁笼背架”；`Sack.carcass(b,W)` 生成 kind:'corpse' 的尸骸（按 `dropsOf` 预生成物品，按 E 搜身）。
 - `js/worlds.js`：`goto` 里出生点确定后 `Beasts.spawn`（保证离出生点 ≥14m）；`disposeNode`→`Beasts.clear`；帧更新与 `targets` 拼接。`?nobeast=1` 可关。
 - 测试：`_tools/wv/beasts.html`（gitignored）最小场景，模拟 ctx 验证 AI/受击/死亡。整游戏 headless 会 OOM，未端到端跑过——若实机有报错请先看 `Beasts` 相关 console。
+
+## 第二十二轮（续）：麻袋 UI 放大 + 物品 3D 图标 + 闪烁修复（MOD `item_3d`，默认开）
+- `items/items.js`（base64 GLB，按需加载，~2.3MB）+ `items/LICENSE.txt`：Quaternius「Medieval Weapons Pack / RPG Asset Pack / Modular Dungeon Pack」（CC0），取自 GitHub 镜像 beep2bleep/FreeAssetsByKenneyNLandQuaternius 的 FBX，用 three r147 的 FBXLoader+GLTFExporter 在 headless 浏览器里转成 GLB（转换脚本不入库）。
+- `js/itemicons.js`（新）：`ItemIcons.url(id)` 返回缓存的 3D 渲染小图（共享一个离屏 WebGL 渲染器，每个模型只渲染一次）；映射：w0–w6 武器、a1–a5 盾（当护甲）、h* 骑士盔、c* 宝石（各不同）、b* 箱子、iron/cloth/herb/dust/hide/bone/wood/gem/potion/bigpotion/bandage/whet 各有模型；没有模型的（meat/fang/horn/stew/head 等）仍用 emoji。个别 FBX 颜色丢失（全白）→ `TINT` 按网格顺序上色。
+- `js/sack.js`：`CELL` 由固定 40px 改为随屏幕自适应 44–64px（`css()` 里算）；格子里用 `<img>`（异步加载完成后自动重绘一次）；物品菜单顶部显示 120px 大图；**闪烁修复**：`hud()`（麻袋翻找进度条）原先每帧 `innerHTML` 重写，现在只在文字变化时才写，进度条只改 width。
+- 测试页 `_tools/wv/icons.html`（gitignored）为图标联系表。未做：可旋转的 3D 预览（现在是 3/4 角度静态图）。

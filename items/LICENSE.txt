@@ -1,0 +1,2 @@
+Item models: Quaternius "Medieval Weapons Pack", "RPG Asset Pack", "Modular Dungeon Pack" (CC0 1.0, https://quaternius.com).
+Converted FBX -> GLB (three.js FBXLoader + GLTFExporter).

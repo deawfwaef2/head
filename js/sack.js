@@ -7,7 +7,7 @@
 window.Sack = (() => {
   const G = new Proxy({}, { get: (_, k) => { const g = window.G || window.__game; return g && g[k]; } });
   const on = () => !(window.Mods && !Mods.on('sack_grid'));
-  const RUM = 5, CELL = 40;
+  const RUM = 5; let CELL = 40; // CELL 随屏幕自适应（css() 里计算）：第二十二轮把格子从 40px 放大到 44~64px
   const RARC = ['#b9b4aa', '#7fd07a', '#5fa6ff', '#c27cff', '#ffb347', '#ff5a4a', '#ffe27a'];
   const RARN = ['普通', '优良', '稀有', '史诗', '传说', '神话', '神话'];
   const IT = {};
@@ -251,7 +251,7 @@ window.Sack = (() => {
   const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const toast = (t, c, d) => G.toast && G.toast(t, c, d);
   function css() {
-    if (document.getElementById('skCSS')) return; const st = document.createElement('style'); st.id = 'skCSS';
+    if (document.getElementById('skCSS')) return; CELL = Math.max(44, Math.min(64, Math.floor(Math.min(innerWidth / 19, innerHeight / 12.5)))); const st = document.createElement('style'); st.id = 'skCSS';
     st.textContent = `
 #skUI{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:70;background:linear-gradient(180deg,rgba(18,14,20,.96),rgba(8,6,10,.97));border:1px solid var(--u-gold,#b8914a);box-shadow:0 20px 60px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,220,150,.15);padding:14px 16px 10px;color:#e8dcc8;font:13px/1.4 system-ui,"Noto Sans CJK SC",sans-serif;user-select:none;max-width:96vw;max-height:94vh;overflow:auto}
 .sk-host{color:#e8dcc8;user-select:none}
@@ -263,7 +263,8 @@ window.Sack = (() => {
 .sk-it{position:absolute;box-sizing:border-box;border:1px solid var(--rc);background:linear-gradient(160deg,rgba(255,255,255,.07),rgba(0,0,0,.25)),rgba(30,24,30,.92);box-shadow:inset 0 0 12px color-mix(in srgb,var(--rc) 35%,transparent);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;text-align:center}
 .sk-list .sk-it,.sk-slot .sk-it{position:relative}
 .sk-it:hover{filter:brightness(1.35);z-index:3}
-.sk-it i{font-style:normal;font-size:20px;line-height:1}
+.sk-it i{font-style:normal;font-size:${Math.round(CELL * 0.5)}px;line-height:1}
+.sk-it img{flex:1 1 0;min-height:0;width:100%;object-fit:contain;pointer-events:none;filter:drop-shadow(0 2px 3px #000c)}.sk-it.i3 b{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,#000c);text-align:center;font-size:${Math.max(10, Math.round(CELL * 0.2))}px}.sk-menu .mi{display:block;width:120px;height:120px;margin:4px auto 0;cursor:default;background:radial-gradient(circle,#3a2c1e,#0e0a0e 70%)}.sk-menu .mi:hover{background:radial-gradient(circle,#3a2c1e,#0e0a0e 70%)}.sk-menu .mi img{width:100%;height:100%;object-fit:contain}
 .sk-it b{font-size:10px;font-weight:600;color:#eee;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
 .sk-it em{position:absolute;right:2px;bottom:0;font-style:normal;font-size:11px;font-weight:800;color:#fff;text-shadow:0 0 3px #000}
 .sk-it .pg{position:absolute;left:0;bottom:0;height:4px;background:#ffd27a;box-shadow:0 0 6px #ffb040}
@@ -285,7 +286,7 @@ window.Sack = (() => {
   function tile(o, extra) { // 物品方块
     const [w, h] = dims(o), d = IT[o.id] || {}, rc = RARC[Math.min(6, rarOf(o))];
     const q = Q.find(j => j.o === o || (j.hd && o.h && j.hd.h === o.h)), pg = q && Q[0] === q ? `<span class="pg" style="width:${q.t / RUM * 100}%"></span>` : '';
-    return `<div class="sk-it${q ? ' q' : ''}" data-u="${o.u}" ${extra || ''} style="--rc:${rc};width:${w * CELL - 2}px;height:${h * CELL - 2}px;${o.x != null && extra == null ? `left:${o.x * CELL + 1}px;top:${o.y * CELL + 1}px` : ''}" title="${esc(nameOf(o))}"><i>${d.icon || '?'}</i>${h > 1 || w > 1 ? `<b>${esc(nameOf(o))}</b>` : ''}${o.n > 1 ? `<em>${o.n}</em>` : ''}${pg}</div>`;
+    return `<div class="sk-it${q ? ' q' : ''}${window.ItemIcons && ItemIcons.has(o.id) && ItemIcons.ready ? ' i3' : ''}" data-u="${o.u}" ${extra || ''} style="--rc:${rc};width:${w * CELL - 2}px;height:${h * CELL - 2}px;${o.x != null && extra == null ? `left:${o.x * CELL + 1}px;top:${o.y * CELL + 1}px` : ''}" title="${esc(nameOf(o))}">${(() => { const u = window.ItemIcons && ItemIcons.url(o.id); return u ? `<img src="${u}" alt="">` : `<i>${d.icon || '?'}</i>`; })()}${h > 1 || w > 1 ? `<b>${esc(nameOf(o))}</b>` : ''}${o.n > 1 ? `<em>${o.n}</em>` : ''}${pg}</div>`;
   }
   function sackHtml(I) {
     const g = I.sack, used = g.items.reduce((a, o) => { const [w, h] = dims(o); return a + w * h; }, 0);
@@ -369,7 +370,8 @@ window.Sack = (() => {
     }
     if (!acts.length) return;
     closeMenu(); menuEl = document.createElement('div'); menuEl.className = 'sk-menu';
-    menuEl.innerHTML = `<div class="t" style="color:${RARC[rarOf(o)]}">${d.icon || ''} ${esc(nameOf(o))}${o.n > 1 ? ' ×' + o.n : ''}</div>${d.desc || o.h ? `<div class="d">${esc(o.h ? `${RN[o.h.c.rar] || ''} · 回洞倒袋时滚出来` : d.desc)}</div>` : ''}` + acts.map((a, i) => `<div data-i="${i}">${a[0]}</div>`).join('');
+    const miu = window.ItemIcons && ItemIcons.url(o.id);
+    menuEl.innerHTML = (miu ? `<div class="mi"><img src="${miu}" alt=""></div>` : '') + `<div class="t" style="color:${RARC[rarOf(o)]}">${d.icon || ''} ${esc(nameOf(o))}${o.n > 1 ? ' ×' + o.n : ''}</div>${d.desc || o.h ? `<div class="d">${esc(o.h ? `${RN[o.h.c.rar] || ''} · 回洞倒袋时滚出来` : d.desc)}</div>` : ''}` + acts.map((a, i) => `<div data-i="${i}">${a[0]}</div>`).join('');
     document.body.appendChild(menuEl); menuEl.style.left = Math.min(innerWidth - 180, e.clientX + 4) + 'px'; menuEl.style.top = Math.min(innerHeight - 40 - acts.length * 30, e.clientY + 4) + 'px';
     menuEl.querySelectorAll('[data-i]').forEach(el => el.onmousedown = (ev) => { ev.stopPropagation(); const a = acts[+el.dataset.i]; closeMenu(); a[1](); });
     setTimeout(() => addEventListener('mousedown', closeMenu, { once: true }), 0);
@@ -380,15 +382,18 @@ window.Sack = (() => {
     if (!on()) return false; css(); inv(); const W = W_(); if (!W) return false;
     cont = L || null; if (cont) { itemsOf(cont); SFX.open && SFX.open(); }
     if (!panel || mode !== 'wild') { closePanel(); panel = document.createElement('div'); panel.id = 'skUI'; document.body.appendChild(panel); mode = 'wild'; }
-    G.setUI(true); render(); return true;
+    G.setUI(true); render(); if (window.ItemIcons && !ItemIcons.ready) ItemIcons.onReady(() => { if (panel && !drag) render(); }); return true;
   }
   function closePanel(relock) { closeMenu(); if (mode === 'wild' && panel) { panel.remove(); panel = null; mode = null; cont = null; G.setUI(false); if (relock) try { G.lockPointer(); } catch (e) {} } }
   function toggleWild() { if (mode === 'wild') closePanel(true); else openWild(null); }
-  function mountCave(host) { if (!on() || !host) return; css(); inv(); closePanel(); host.className = 'sk-host'; panel = host; mode = 'cave'; cont = null; render(); }
+  function mountCave(host) { if (!on() || !host) return; css(); inv(); closePanel(); host.className = 'sk-host'; panel = host; mode = 'cave'; cont = null; render(); if (window.ItemIcons && !ItemIcons.ready) ItemIcons.onReady(() => { if (panel === host && !drag) render(); }); }
   function hud() {
     if (!Q.length) return; if (!hudEl) { hudEl = document.createElement('div'); hudEl.id = 'skHud'; document.body.appendChild(hudEl); css(); }
     const j = Q[0], nm = j.k === 'head' ? `把首级「${j.hd.h.c.name}」塞进麻袋` : j.k === 'take' ? `装进麻袋：${nameOf(j.o)}` : j.k === 'use' ? `从麻袋里翻出${nameOf(j.o)}` : j.k === 'equip' ? `翻出并换上${nameOf(j.o)}` : `翻找：${nameOf(j.o)}`;
-    hudEl.style.display = 'block'; hudEl.innerHTML = `🎒 ${esc(nm)} · ${(RUM - j.t).toFixed(1)}s${Q.length > 1 ? ` · 还有 ${Q.length - 1} 件` : ''}<div class="bar"><i style="width:${j.t / RUM * 100}%"></i></div>`;
+    hudEl.style.display = 'block'; // 第二十二轮：只在文字变化时重写 DOM，进度条只改宽度（原先每帧 innerHTML 导致闪烁）
+    const txt = `🎒 ${esc(nm)} · ${(RUM - j.t).toFixed(1)}s${Q.length > 1 ? ` · 还有 ${Q.length - 1} 件` : ''}`;
+    if (!hudEl._bar) { hudEl.innerHTML = '<span class="tx"></span><div class="bar"><i></i></div>'; hudEl._bar = hudEl.querySelector('.bar i'); hudEl._tx = hudEl.querySelector('.tx'); }
+    if (hudEl._t !== txt) { hudEl._t = txt; hudEl._tx.innerHTML = txt; } hudEl._bar.style.width = j.t / RUM * 100 + '%';
     if (panel && mode === 'wild') { const pg = panel.querySelector('.sk-it.q .pg'); if (pg) pg.style.width = j.t / RUM * 100 + '%'; }
   }
   function queueHead(hd, ok, done) { if (!on()) return false; if (!canAdd(inv().sack, mk('head', 1))) { toast('麻袋里没有 2×2 的空位放首级（Tab 整理 / 倒掉点东西）', '#ffb070', 2.5); return true; } if (Q.some(j => j.hd === hd)) return true; queue({ k: 'head', hd, ok, done }); toast('把首级塞进麻袋……（5 秒，别挨打）', '#ffd890', 1.6); return true; }
