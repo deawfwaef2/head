@@ -352,3 +352,10 @@
   8. `pickle_barrels` **腌渍魂桶阵**（3 槽位敞口橡木桶）：首级在幽绿防腐魂液中上下漂浮，随浸泡时长产出从 ×1.8 升至 ×4.2，按 E 搅桶榨取。
   9. `vault` **万首冰窖**（4 槽位寒冰柱 + 寒铁大门）：补完 `Unlocks.R.vault` 实体建筑，建成后魂库每存 10 颗首级全局产出 +2%（最高 +120%），按 E 打开魂库。
 
+
+### 第十三轮画质 Agent ↔ 协同 Agent 分工（画质 Agent 追记）
+- 画质 Agent 负责：`js/master.js`、`js/assets.js`、`js/builds_ph.js`（旧建筑类型的换装）、`js/cave.js`、`assets/*.js`、`tools/phpack.py`/`phtex.py`，以及 game.js 中渲染/武器相关段落。
+- 协同 Agent 负责：`js/sanctum.js`、`models/props_pack.js`、`js/cards.js`（新建筑）。
+- 已换装的旧类型：table / chest / candles / rack / brazier / torch / bounty / dresser / nest(改名哥特大床) / throne。**下一批**：showcase、seance、headrack、pole、forge、altar、lava、cage、banner、训练器材；缺骷髅/水晶/蘑菇/毛皮/龙骨等 Poly Haven 没有的模型，需另找来源（禁止程序化）。
+- 已知重复：GothicCommode_01 / ornate_mirror_01 / wine_barrel_01 / large_iron_gate 在 `assets/` 与 `props_pack.js` 各有一份（约 2MB），以后可统一到 `Assets`。
+- `Assets.fit(名, {w|h|d, x,y,z, ry, rx, rz, node})` 可按目标尺寸摆放任意资产；`Assets.flame(x,y,z,s,col)` 序列帧火焰；`Assets.clone()` 共享几何体已标 `__shared`，移除建筑时不会被 dispose。
