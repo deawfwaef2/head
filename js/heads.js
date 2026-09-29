@@ -60,6 +60,7 @@ window.ModelHeads = (() => {
             const src = m.material; const nm = src.name || '';
             SRC.set(m, src);
             m.userData.kind = kindOf(m, nm, entry);
+            if (m.userData.kind === 'cut') fixCutUV(m.geometry);
             m.renderOrder = /Highlight/i.test(nm) ? 4 : /Iris/i.test(nm) ? 3 : /Eyeline|Eyelash|Brow/i.test(nm) ? 3 : /EyeWhite/i.test(nm) ? 2 : 0;
             if ((m.userData.kind === 'hair' || m.userData.kind === 'iris' || m.userData.kind === 'brow') && !lum.has(src)) lum.set(src, avgLum(src.map));
             m.geometry.computeBoundingSphere();
@@ -86,6 +87,17 @@ window.ModelHeads = (() => {
 
   // ---------- 断面材质（黑暗奇幻：皮、肉、颈椎、气管） ----------
   let cutMat = null;
+  // 断面 UV 按实际几何重新映射（部分模型转换时按错误半径算 UV，导致整个断面落在外圈肤色区）
+  function fixCutUV(geo) {
+    const p = geo.attributes.position; if (!p) return;
+    let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+    for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2; let R = 1e-5;
+    for (let i = 0; i < p.count; i++) R = Math.max(R, Math.hypot(p.getX(i) - cx, p.getZ(i) - cz));
+    const uv = new Float32Array(p.count * 2);
+    for (let i = 0; i < p.count; i++) { uv[i * 2] = 0.5 + (p.getX(i) - cx) / (2 * R) * 0.96; uv[i * 2 + 1] = 0.5 + (p.getZ(i) - cz) / (2 * R) * 0.96; }
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  }
   function getCut() {
     if (cutMat) return cutMat;
     const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
@@ -191,6 +203,7 @@ window.ModelHeads = (() => {
           float segD(vec2 p, vec2 a, vec2 b){ vec2 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0); return length(pa-ba*h); }
           void main() {`)
         .replace('#include <map_fragment>', `#include <map_fragment>
+          if (vHP.y < uCutY + 0.0012) discard; // 断面以下的皮肤（部分 VRoid 2.x 模型颈部超出切面、盖住断面）一律裁掉
           diffuseColor.rgb *= uSkin;
           float gl = dot(diffuseColor.rgb, vec3(0.3,0.59,0.11));
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(gl) * vec3(0.9, 0.93, 1.0), uPale);
@@ -231,7 +244,7 @@ window.ModelHeads = (() => {
           vec3 blood = mix(vec3(0.20, 0.0, 0.01), vec3(0.42, 0.02, 0.03), sp);
           diffuseColor.rgb = mix(diffuseColor.rgb, blood, bm * 0.88);`);
     };
-    m.customProgramCacheKey = () => 'skin5';
+    m.customProgramCacheKey = () => 'skin6';
     return m;
   }
 
