@@ -329,3 +329,26 @@
 - **洞窟**（cave.js）：dark_rock 岩壁 / rock_ground 地面（三平面）、rock_face_01 崖面沿墙（`wallR(a)` 与穹顶同噪声求墙半径）、namaqualand 巨石 + rock_moss_set_02 苔石（带碰撞）、stone_fire_pit + 5×5 序列帧火焰精灵（`cave.update(now)`）、出口 large_iron_gate + 两盏 Lantern_01、商摊 WoodenTable_01/treasure_chest/wine_barrel_01/wooden_crate_01/Lantern_01。缺资产时退回旧程序化（仅兜底）。
 - **武器**：7 档全换真实模型（baseball_bat / ornate_medieval_mace / machete / ornate_war_hammer / wooden_axe_02 / antique_katana_01+紫辉 / antique_estoc+血辉），自动找长轴与握柄端。绿色球形拳头在真实武器时隐藏（待找手臂模型）。
 - **待办**：建筑 builds.js 全部类型换 Poly Haven 模型（分批）；地精商人换真实模型；手臂模型；更多灯光（壁挂提灯/烛台）。
+
+---
+
+## 协同 Agent 记录（新建筑群、高精 3D 家具模型包 & 把玩首级新机制扩展）
+
+### 多 Agent 协同防冲突约定（请所有协同模型遵守）
+1. **文件解耦**：本协同 Agent 新增的建筑模型包与玩法全部放在独立模块 `models/props_pack.js`、`js/sanctum.js`、`js/cards.js` 中，只通过 `BuildCat.C`、`Unlocks.R`、`G.HOOK`（`frame` / `e` / `click` / `tip`）挂载，不直接改 `js/builds.js`、`js/cave.js`、`js/game.js`，避免与第十三轮画质重做 Agent 发生合并冲突。
+2. **材质与光影兼容**：`PropModels` 生成的网格已开启 `castShadow`/`receiveShadow` 并自动挂载 `Assets.env(G.renderer)`，与 `js/master.js` 渲染管线完全兼容。
+3. **每次 push 前先 `git pull --rebase`**：保留所有协同 Agent 的提交，绝不覆盖。
+
+### 协同 Stage 1 已完成（高精度 3D 模型包 + 9 座藏首/展示新建筑）
+- **`models/props_pack.js`（约 5.0MB）**：从 Poly Haven 打包 18 个 CC0 扫描 3D 模型（含漫反射 + 法线贴图 WebP 与 meshoptimizer 减面量化）：`GothicCabinet_01`（敞门处理）、`GothicCommode_01`、`Chandelier_01`、`wooden_display_shelves_01`、`marble_bust_01`（颈部截断处理）、`gothic_statue`（颈部截断处理）、`antique_ceramic_vase_01`、`wine_barrel_01`（去盖敞口处理）、`bench_vice_01`、`BarberShopChair_01`、`vintage_grandfather_clock_01`、`cannon_01`、`dartboard`、`chemistry_set`、`round_wooden_table_01`、`large_iron_gate`、`ornate_mirror_01`、`spinning_wheel_01`。
+- **`js/sanctum.js`（Stage 1 藏首与陈列建筑群）**：
+  1. `gothic_cabinet` **哥特藏首橱**（6 槽位双层敞门哥特木橱）：展厅分 ×1.6，空手按 E 触发「开柜巡礼」令柜内全体首级战栗并按身份多样性爆发魂晶。
+  2. `head_chandelier` **枝形首级吊灯**（6 槽位悬吊旋转铁艺吊灯）：自带照明 + 2.8m 光环（×1.35），把玩灯上任一首级会使整座吊灯摇摆并连锁触发全灯位。
+  3. `curio_shelf` **百首博古架**（8 槽位四层高容量展示架）：单座可容纳 8 颗首级，空手按 E 触发从下至上的「多米诺魂浪」。
+  4. `gothic_commode` **魔镜雕花供案**（4 槽位配鎏金魔镜）：首级直面镜中死颜，周期性或按 E 赋予全员「镜花残响 ×2」。
+  5. `bust_pedestal` **无头大理石胸像**（1 槽位颈口无缝嫁接）：把任意女角色首级嫁接到古典大理石胸像肩颈上，按 E 切换 4 种雕塑姿态并触发咏叹。
+  6. `headless_statue` **无头圣女石像**（1 槽位等身哥特长袍石像嫁接）：将首级安在修道院无头石像颈口，修女/圣女/公主/骑士身份额外 ×1.5。
+  7. `soul_urns` **人头花瓶·魂瓮台**（3 槽位传世古董花瓶插首）：自动酿造「魂露」，按 E 痛饮魂露获大量魂晶并恢复 18% 生命。
+  8. `pickle_barrels` **腌渍魂桶阵**（3 槽位敞口橡木桶）：首级在幽绿防腐魂液中上下漂浮，随浸泡时长产出从 ×1.8 升至 ×4.2，按 E 搅桶榨取。
+  9. `vault` **万首冰窖**（4 槽位寒冰柱 + 寒铁大门）：补完 `Unlocks.R.vault` 实体建筑，建成后魂库每存 10 颗首级全局产出 +2%（最高 +120%），按 E 打开魂库。
+
