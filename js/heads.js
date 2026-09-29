@@ -70,6 +70,25 @@ window.ModelHeads = (() => {
     return 'other';
   }
 
+  // ---------- 第二十二轮：五官形变（look.fm）——眼睛大小/宽窄/吊垂/间距/高低 + 眉高/眉倾 + 脸型缩放 ----------
+  // VRoid 的眼/眉是浮在脸皮上的独立网格：只对这些网格做顶点形变，与脸皮不冲突；每个头一份材质（uniform 各不相同），着色器程序共享。
+  function eyeCentres(meshes) {
+    const ir = meshes.filter(m => m.userData.kind === 'iris'); if (!ir.length) return null;
+    let sx = 0, n = 0; for (const m of ir) { const p = m.geometry.attributes.position; for (let i = 0; i < p.count; i++) { sx += p.getX(i); n++; } } if (!n) return null; const mid = sx / n;
+    const L = [0, 0, 0, 0], R = [0, 0, 0, 0];
+    for (const m of ir) { const p = m.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const T = p.getX(i) >= mid ? R : L; T[0] += p.getX(i); T[1] += p.getY(i); T[2] += p.getZ(i); T[3]++; } }
+    if (!L[3] || !R[3]) return null;
+    return { mid, l: [L[0] / L[3], L[1] / L[3], L[2] / L[3]], r: [R[0] / R[3], R[1] / R[3], R[2] / R[3]] };
+  }
+  const FW_GLSL = 'if (uFB.z > 0.5) { bool rt = transformed.x >= uFM; vec3 C = rt ? uFR : uFL; float sg = rt ? 1.0 : -1.0; vec2 d0 = transformed.xy - C.xy; float w = 1.0; if (uFB.w > 0.0) w = 1.0 - smoothstep(uFB.w * 0.4, uFB.w, length(d0 * vec2(1.0, 1.1))); vec2 d = d0 * uFA.xy; float a = uFA.z * sg; float ca = cos(a), sa = sin(a); d = vec2(ca * d.x - sa * d.y, sa * d.x + ca * d.y); transformed.xy = mix(transformed.xy, C.xy + d + vec2(uFB.x * sg, uFB.y), w); }';
+  function fwWrap(mat, A, B, ec, fall) {
+    const old = mat.onBeforeCompile, oldKey = mat.customProgramCacheKey ? mat.customProgramCacheKey() : '';
+    const U = { uFA: { value: new THREE.Vector4(A[0], A[1], A[2], 0) }, uFB: { value: new THREE.Vector4(B[0], B[1], 1, fall || 0) }, uFL: { value: new V3(ec.l[0], ec.l[1], ec.l[2]) }, uFR: { value: new V3(ec.r[0], ec.r[1], ec.r[2]) }, uFM: { value: ec.mid } };
+    mat.onBeforeCompile = function (sh, r) { if (old) old.call(mat, sh, r); Object.assign(sh.uniforms, U);
+      sh.vertexShader = sh.vertexShader.replace('void main() {', 'uniform vec4 uFA; uniform vec4 uFB; uniform vec3 uFL; uniform vec3 uFR; uniform float uFM;\nvoid main() {').replace('#include <morphtarget_vertex>', '#include <morphtarget_vertex>\n' + FW_GLSL); };
+    mat.customProgramCacheKey = () => oldKey + '|fw1'; mat.needsUpdate = true; return mat;
+  }
+  const fwKind = (src, kind) => kind === 'skin' ? (/Face/i.test(src && src.name || '') ? 'skin' : null) : /Brow/i.test(src && src.name || '') || kind === 'brow' ? 'brow' : (kind === 'iris' || kind === 'hl' || /Iris|EyeWhite|Eyeline|Eyelash|Highlight|eye_trans|EyeExtra/i.test(src && src.name || '')) ? 'eye' : null;
   function parseOne(entry) {
     return new Promise((res) => {
       try {
@@ -105,7 +124,8 @@ window.ModelHeads = (() => {
           try { if (window.Mods && Mods.on('head_repair')) fitCut(meshes, entry); else fitCutLegacy(meshes, entry); } catch (e) { console.warn('fitCut', entry.file, e); }
           const hairMeshes = meshes.filter(m => m.userData.kind === 'hair');
           let hairMinY = 0; hairMeshes.forEach(m => { m.geometry.computeBoundingBox(); hairMinY = Math.min(hairMinY, m.geometry.boundingBox.min.y); });
-          T.push({ meta: entry, meshes, hairMeshes, faceMeshes: meshes.filter(m => m.userData.kind !== 'hair'), lum, hairMinY, shared: new Map() });
+          let eyeC = null; try { eyeC = eyeCentres(meshes); } catch (e) { }
+          T.push({ eyeC, meta: entry, meshes, hairMeshes, faceMeshes: meshes.filter(m => m.userData.kind !== 'hair'), lum, hairMinY, shared: new Map() });
           res(true);
         }, (e) => { console.warn('模型解析失败', entry.file, e); res(false); });
       } catch (e) { console.warn(e); res(false); }
@@ -497,6 +517,22 @@ window.ModelHeads = (() => {
 
   // ---------- 随机外观（种族约束由 lore 传入） ----------
   // race: {skins:[名], feat:[...], hair:[名], eye:[名], acc:{name:prob}, faces:[file]?}
+  // 五官原型 × 连续抖动：吊眼(凌厉)/垂眼(温柔)/大眼(人偶)/细长眼(冷艳)/困倦/圆润/瓜子/方颌…
+  const FM_TYPES = [
+    { n: '凌厉', w: 2.2, ew: [0.95, 1.12], eh: [0.78, 0.94], tilt: [0.12, 0.26], sp: [-0.003, 0.006], dy: [-0.002, 0.004], bs: [0.95, 1.1], bt: [0.16, 0.36], bdy: [-0.006, 0.0], fx: [0.93, 1.0], fy: [1.0, 1.06], fz: [0.98, 1.05] },
+    { n: '温柔', w: 2.2, ew: [0.98, 1.1], eh: [1.02, 1.2], tilt: [-0.26, -0.1], sp: [0.0, 0.008], dy: [-0.005, 0.0], bs: [0.95, 1.05], bt: [-0.3, -0.1], bdy: [0.001, 0.008], fx: [0.98, 1.06], fy: [0.95, 1.02], fz: [0.98, 1.04] },
+    { n: '人偶', w: 1.8, ew: [1.1, 1.24], eh: [1.14, 1.34], tilt: [-0.06, 0.06], sp: [0.002, 0.011], dy: [-0.006, -0.001], bs: [1.0, 1.1], bt: [-0.1, 0.1], bdy: [0.002, 0.01], fx: [1.0, 1.08], fy: [0.93, 0.99], fz: [1.0, 1.06] },
+    { n: '冷艳', w: 1.8, ew: [1.05, 1.22], eh: [0.72, 0.88], tilt: [0.02, 0.14], sp: [-0.004, 0.003], dy: [0.0, 0.005], bs: [1.0, 1.15], bt: [0.05, 0.22], bdy: [-0.004, 0.003], fx: [0.9, 0.98], fy: [1.02, 1.09], fz: [0.96, 1.02] },
+    { n: '困倦', w: 1.2, ew: [1.0, 1.14], eh: [0.8, 0.95], tilt: [-0.2, -0.04], sp: [0.0, 0.006], dy: [-0.007, -0.002], bs: [0.95, 1.05], bt: [-0.25, -0.05], bdy: [0.0, 0.006], fx: [0.98, 1.06], fy: [0.96, 1.03], fz: [1.0, 1.05] },
+    { n: '圆润', w: 1.4, ew: [1.0, 1.15], eh: [1.05, 1.22], tilt: [-0.1, 0.05], sp: [0.0, 0.007], dy: [-0.006, 0.0], bs: [0.95, 1.05], bt: [-0.1, 0.1], bdy: [0.0, 0.006], fx: [1.06, 1.14], fy: [0.92, 0.98], fz: [1.0, 1.07] },
+    { n: '瓜子', w: 1.4, ew: [0.92, 1.05], eh: [0.92, 1.08], tilt: [0.0, 0.14], sp: [-0.004, 0.002], dy: [0.0, 0.005], bs: [0.95, 1.05], bt: [0.0, 0.2], bdy: [-0.004, 0.004], fx: [0.88, 0.95], fy: [1.04, 1.1], fz: [0.95, 1.02] },
+    { n: '寻常', w: 1.6, ew: [0.94, 1.08], eh: [0.92, 1.1], tilt: [-0.1, 0.1], sp: [-0.003, 0.005], dy: [-0.004, 0.003], bs: [0.95, 1.06], bt: [-0.15, 0.15], bdy: [-0.004, 0.004], fx: [0.95, 1.05], fy: [0.96, 1.05], fz: [0.97, 1.04] }
+  ];
+  function faceMorph(r, rarity) {
+    let t = r() * FM_TYPES.reduce((a, b) => a + b.w, 0), T = FM_TYPES[0]; for (const x of FM_TYPES) { if ((t -= x.w) <= 0) { T = x; break; } }
+    const u = (rg) => rg[0] + (rg[1] - rg[0]) * r(), q = (v) => +v.toFixed(4);
+    return { t: T.n, ew: q(u(T.ew)), eh: q(u(T.eh)), tilt: q(u(T.tilt)), sp: q(u(T.sp)), dy: q(u(T.dy)), bs: q(u(T.bs)), bt: q(u(T.bt)), bdy: q(u(T.bdy)), fx: q(u(T.fx)), fy: q(u(T.fy)), fz: q(u(T.fz)) };
+  }
   function randomLook(r, race = {}, rarity = 0) {
     const faceIdx = race.faces ? Math.max(0, idxOf(pick(r, race.faces))) : Math.floor(r() * T.length);
     const face = T[faceIdx];
@@ -553,6 +589,7 @@ window.ModelHeads = (() => {
       if (!hat && r() < 0.3) LOOK.hx.ahoge = r() < 0.25 ? 2 : 1;
       LOOK.hn3 = { pony: '马尾', twin: '双马尾', drill: '钻头卷', bun: '丸子头', odango: '双丸子', braid: '麻花辫', braid2: '双麻花辫' }[LOOK.hx.s];
     } else if (grp !== 'godette' && !acc.includes('witchhat') && r() < 0.12) LOOK.hx = { s: null, ahoge: 1, seed: 1 + Math.floor(r() * 9999) };
+    if (!window.Mods || Mods.on('face_morph')) LOOK.fm = faceMorph(r, rarity);
     return LOOK;
   }
 
@@ -777,12 +814,21 @@ window.ModelHeads = (() => {
       }
       matMap.set(key, out); return out;
     };
+    const FM = look.fm && F.eyeC && (!window.Mods || Mods.on('face_morph')) ? look.fm : null;
+    const fmAB = (fk) => fk === 'eye' || fk === 'skin' ? [[FM.ew, FM.eh, FM.tilt], [FM.sp, FM.dy]] : [[FM.bs, FM.bs, FM.bt], [FM.sp * 0.5, FM.bdy]];
+    const fmMat = (mt, src, kind) => {
+      const fk = FM && fwKind(src, kind); if (!fk) return mt;
+      const key = 'fm|' + mt.uuid; if (matMap.has(key)) return matMap.get(key);
+      let x = mt; if (!own.includes(mt)) { x = mt.clone(); x.onBeforeCompile = mt.onBeforeCompile; x.customProgramCacheKey = mt.customProgramCacheKey; own.push(x); }
+      const [A, B] = fmAB(fk); fwWrap(x, A, B, F.eyeC, fk === 'skin' ? 0.05 : 0); matMap.set(key, x); return x;
+    };
+    if (FM) g.scale.set(FM.fx, FM.fy, FM.fz);
     const presets = F.meta.presets || {};
     const byName = {};
     const hlMeshes = [];
     for (const m of F.faceMeshes) {
       if (m.userData.kind === 'hl' && !opts.alive) continue; // 死眼：去掉高光（通灵 MV 里的“生前”版本保留）
-      const c = new THREE.Mesh(m.geometry, getMat(m, F)); c.name = m.name; c.renderOrder = m.renderOrder; c.userData.kind = m.userData.kind;
+      const c = new THREE.Mesh(m.geometry, fmMat(getMat(m, F), SRC.get(m), m.userData.kind)); c.name = m.name; c.renderOrder = m.renderOrder; c.userData.kind = m.userData.kind;
       if (m.userData.kind === 'hl') hlMeshes.push(c);
       if (m.morphTargetInfluences) { c.morphTargetInfluences = new Array(m.morphTargetInfluences.length).fill(0); c.morphTargetDictionary = m.morphTargetDictionary; }
       byName[m.name] = c; g.add(c);
@@ -815,6 +861,7 @@ window.ModelHeads = (() => {
           sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'varying float vFront;\nvoid main() {\n if (vFront < 0.2) discard;');
         };
         mm.customProgramCacheKey = () => 'eyemask1';
+        if (FM) { const fk = fwKind(src, k); if (fk) { const [A, B] = fmAB(fk); fwWrap(mm, A, B, F.eyeC); } }
         maskMats.set(src, mm); own.push(mm); }
       const mk = new THREE.Mesh(m.geometry, mm); mk.renderOrder = 1; mk.name = m.name + '_mask';
       if (c0.morphTargetInfluences) { mk.morphTargetInfluences = c0.morphTargetInfluences; mk.morphTargetDictionary = c0.morphTargetDictionary; }
@@ -846,6 +893,7 @@ window.ModelHeads = (() => {
     get ready() { return ready; },
     get count() { return T.length; },
     files: () => T.map(t => t.meta.file),
+    debug: () => T.map(t => ({ f: t.meta.file, eye: !!t.eyeC, m: t.faceMeshes.map(m => m.name + ':' + ((SRC.get(m) || {}).name) + ':' + m.userData.kind + ':' + (m.geometry.attributes.position.count)) })),
     // 第十六轮（总管理师）：某个外观会用到的脸/发型贴图 —— 倒袋前逐帧 renderer.initTexture 预上传，避免首次渲染时同步解码大贴图卡顿
     mapsFor(look) { const out = new Set(); for (const k of [look.f, look.h]) { let i = idxOf(k); if (i < 0) i = 0; const t = T[i]; if (t) t.meshes.forEach(m => { const s = SRC.get(m) || m.material; if (s && s.map) out.add(s.map); }); } return [...out]; },
     meta: (file) => { const i = idxOf(file); return i >= 0 ? T[i].meta : null; },

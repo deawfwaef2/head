@@ -817,3 +817,9 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - `js/combat.js`（总管理师文件，最小改动）：`onMove` 左键分支返回 `lookLmb(dx,dy)`（MOD `wpn_feel` 开：输入进 `LK` 累计、返回 0，由 `update()` 开头 `drainLook(dt)` 用临界阻尼 smoothDamp 追上——总转角 = 鼠标输入（灵敏度不降），时间常数按 `S.wt`：0.8→35ms、1.5→120ms；松开左键后 30ms 追平；收刀/开界面立即补齐）；右键分支 `FEEL()? 0.3 : 旧逻辑`。MOD 关 = 第二十轮行为（×0.42 / ×0.45）。
 - `js/worlds.js`：`goto()` 里 `nodeStory` 仅在 MOD `loc_story`（默认**关**）时调用；函数本身保留。
 - `js/mods.js`：`guard_slowlook` 后加 `wpn_feel`（默认开）、`loc_story`（默认关）。
+
+## 第二十二轮（UI/地图 Agent）：五官形变 — 脸不再千篇一律（MOD `face_morph`，默认开）
+用户：女角色脸看着都一样、光改头发不喜欢，要组合更丰富。
+- `js/heads.js`：`randomLook` 末尾追加 `LOOK.fm = faceMorph(r)`（追加在最后一次抽签之后 → 旧种子的其余外观不变；已存档首级没有 `fm` → 完全不变）。8 种五官原型（凌厉/温柔/人偶/冷艳/困倦/圆润/瓜子/寻常）× 连续抖动：眼宽/眼高/吊垂角/眼距/眼高低、眉大小/眉倾/眉高、脸型 fx·fy·fz（整个头组缩放）。
+- 实现：VRoid 眼/眉是浮在脸皮上的独立网格，只对这些网格（+ 脸皮网格眼周带软衰减，避免眼周贴图叠影）在顶点着色器里绕左右眼中心形变（`fwWrap`，接在 `morphtarget_vertex` 之后；uniform 每个头独立，着色器程序共享）；每头克隆共享眼材质（`own` 里，`dispose` 会释放）；`eyemask` 模板遮罩材质同样形变。眼中心在 `parseOne` 里由虹膜网格左右聚类算出（`T[i].eyeC`）。无虹膜网格的模型（Godette）不做眼形变，只做脸型缩放。
+- `ModelHeads.debug()` 列出各模型脸部网格；`_tools/wv/heads.html`（gitignored）是首级联系表预览，`?ms=0,1,..` 选模型（整套 39 个会 OOM）。
