@@ -128,8 +128,8 @@ window.startGame = function () {
   }
   function xpMul() { return 1 + headBonus().xp; }
   function st() {
-    const b = buildBonus(), hb = headBonus(); if (!hb.any) return RPG.stats(S, b);
-    const m = Object.assign({}, b); for (const k of ['hp', 'str', 'ter', 'agi', 'soul', 'regen', 'cap']) m[k] = (m[k] || 0) + hb[k]; return RPG.stats(S, m);
+    const b = buildBonus(), hb = headBonus(), pb = window.Props ? Props.bonus() : null; if (!hb.any && !pb) return RPG.stats(S, b);
+    const m = Object.assign({}, b); for (const k of ['hp', 'str', 'ter', 'agi', 'soul', 'regen', 'cap']) m[k] = (m[k] || 0) + (hb[k] || 0) + (pb ? pb[k] || 0 : 0); return RPG.stats(S, m);
   }
 
   // ---------------- 首级 ----------------
@@ -813,7 +813,7 @@ window.startGame = function () {
   function trigger(h, src, mult = 1) {
     const s = st();
     const cap = hasAff(h, 'charm') ? 20 : 10;
-    let v = h.yield * mult * s.yieldMul * globalMul() * auraMul(h.g.position) * beaconMul(h) * (h.buff && h.buff > clock.elapsedTime ? 2 : 1) * (src === 'manual' || src === 'hold' ? (1 + Math.min(combo, cap) * 0.1) : 1);
+    let v = h.yield * mult * s.yieldMul * globalMul() * auraMul(h.g.position) * (window.Props ? Props.auraMul(h.g.position) : 1) * (window.Props && (src === 'manual' || src === 'hold') ? Props.pokeMul(h.g.position) : 1) * beaconMul(h) * (h.buff && h.buff > clock.elapsedTime ? 2 : 1) * (src === 'manual' || src === 'hold' ? (1 + Math.min(combo, cap) * 0.1) : 1);
     let tag = '';
     if (src === 'auto' && hasAff(h, 'wrath') && Math.random() < 0.2) { v *= 5; tag = '怨念爆发！'; SFX.play('heavy', 0.4, 1.4); burst(h.g.position, '#b04aff', 30, 1.6, 0.8, 1); }
     if ((src === 'manual' || src === 'hold') && hasAff(h, 'destiny') && Math.random() < 0.12) { v *= 15; tag = '🌠天命 ×15！'; SFX.fanfare(3); }

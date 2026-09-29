@@ -74,6 +74,7 @@ window.Sack = (() => {
     const [w, h] = BAGSZ[Math.min(BAGSZ.length - 1, S.eq.bag || 0)]; S.inv.sack.w = w; S.inv.sack.h = h;
     for (const L of [S.inv.sack.items, S.inv.stash, S.inv.pending]) for (const o of L) if (o && o.u >= uid) uid = o.u + 1;
     if (window.Books && Books.starter) try { Books.starter(S.inv); } catch (e) { console.warn('Books.starter', e); }
+    if (window.Props && Props.starter) try { Props.starter(S.inv); } catch (e) { console.warn('Props.starter', e); }
     return S.inv;
   }
   // ---- 格子运算 ----
@@ -115,6 +116,7 @@ window.Sack = (() => {
     else if (kind === 'corpse') { mats(1 + Math.floor(r() * 2), ['cloth', 'cloth', 'bone', 'hide', 'iron', 'dust']); if (extra && extra.armed && r() < 0.4) out.push(rollW(r, lv, 0));
       if (r() < 0.12) add('potion', 1, 1); if (extra && extra.boss) { out.push(rollEquip(r, lv, 1.5)); out.push(rollW(r, lv, 1.5)); add('gem', 1, 2); add('dust', 6, 12); } }
     { const bkI = window.Books && Books.rollLoot(r, kind, lv, extra); if (bkI) out.push(bkI); } // 第二十二轮：书与笔记
+    { const pr = window.Props && Props.rollLoot ? Props.rollLoot(r, kind, lv, extra) : null; if (pr) out.push(...pr); } // 续 4：道具原料
     return out;
   }
   // worlds.populate：给地点分配容器（只定种类，物品首次打开时再按种子生成）
@@ -146,7 +148,7 @@ window.Sack = (() => {
   }
   function carcass(b, W) { // 第二十二轮：野兽尸骸（不掉首级，只有材料）
     if (!on() || !W || !W.B || !window.Beasts) return; const nd = W.graph.nodes[W.cur];
-    const L = { kind: 'corpse', name: `${b.T.n}的尸骸`, lv: lvOf(nd), seed: b.e.seed >>> 0, items: Beasts.dropsOf(b).map(([id, n]) => mk(id, n)), extra: {}, x: b.pos.x, z: b.pos.z };
+    const L = { kind: 'corpse', name: `${b.T.n}的尸骸`, lv: lvOf(nd), seed: b.e.seed >>> 0, items: Beasts.dropsOf(b).map(([id, n]) => mk(id, n)).concat(window.Props && Props.carcassExtra ? Props.carcassExtra() : []), extra: {}, x: b.pos.x, z: b.pos.z };
     W.B.inter.push({ kind: 'loot', L, x: L.x, z: L.z, corpse: true });
   }
   const itemsOf = (L) => L.items || (L.items = L.kind === 'pile' ? [] : roll(L.kind, L.lv || 0, L.seed || 1, L.extra));
@@ -313,12 +315,14 @@ window.Sack = (() => {
   function renderCave() {
     const I = inv(), S = G.S;
     if (I.pending.length) pourPending();
-    const tabs = `<div class="sk-tabs">${[['items', '🎒 储物 · 麻袋'], ['ench', '🔮 附魔强化'], ['craft', '🔨 合成']].concat(window.Books && Books.on() ? [['books', '📖 典籍']] : []).map(([k, n]) => `<button class="sk-btn ${caveTab === k ? 'on' : ''}" data-tab="${k}">${n}</button>`).join('')}<span style="margin-left:auto;color:#f3d9a0">🔮 ${Math.floor(S.coins).toLocaleString()}</span></div>`;
+    const tabs = `<div class="sk-tabs">${[['items', '🎒 储物 · 麻袋'], ['ench', '🔮 附魔强化'], ['craft', '🔨 合成']].concat(window.Books && Books.on() ? [['books', '📖 典籍']] : []).concat(window.Props && Props.on() ? [['props', '🧷 道具']] : []).map(([k, n]) => `<button class="sk-btn ${caveTab === k ? 'on' : ''}" data-tab="${k}">${n}</button>`).join('')}<span style="margin-left:auto;color:#f3d9a0">🔮 ${Math.floor(S.coins).toLocaleString()}</span></div>`;
     let body = '';
     if (caveTab === 'items') {
       const st = I.stash.slice().sort((a, b) => ((IT[b.id] || {}).kind === 'equip') - ((IT[a.id] || {}).kind === 'equip') || rarOf(b) - rarOf(a));
       body = `<div class="sk-cols"><div class="sk-col"><h4>📦 储物箱 <small>点击物品：装进麻袋 / 装备 / 使用 / 分解（洞里整理不计时）</small></h4><div class="sk-list" id="skCont" style="max-width:${CELL * 9}px">${st.map(o => tile(o, '')).join('') || '<span style="color:#877">空空如也——去野外搜刮吧。</span>'}</div></div>${sackHtml(I)}</div>
         <div class="sk-foot">武器与装备只能在野外搜刮（容器、武器架、尸体、霸主）。回洞倒袋时，麻袋里的所有东西都会倒出来：首级进洞，其余进储物箱。</div>`;
+    } else if (caveTab === 'props' && window.Props) {
+      body = Props.tabHtml();
     } else if (caveTab === 'books' && window.Books) {
       body = Books.tabHtml(I.sack.items.concat(I.stash));
     } else if (caveTab === 'ench') {
@@ -333,6 +337,7 @@ window.Sack = (() => {
     }
     panel.innerHTML = tabs + body; bind(panel);
     if (caveTab === 'books' && window.Books) Books.bindTab(panel, I.sack.items.concat(I.stash));
+    if (caveTab === 'props' && window.Props) Props.bindTab(panel, render);
   }
   function findU(u) { const I = inv(); u = +u; for (const [where, L] of [['sack', I.sack.items], ['stash', I.stash], ['cont', cont ? itemsOf(cont) : []]]) { const o = L.find(q => q.u === u); if (o) return [o, where]; } const bi = I.belt.findIndex(q => q && q.u === u); if (bi >= 0) return [I.belt[bi], 'belt', bi]; return [null]; }
   function bind(root) {
@@ -375,6 +380,7 @@ window.Sack = (() => {
       if (where === 'sack') { acts.push(['放回储物箱', () => { I.sack.items.splice(I.sack.items.indexOf(o), 1); stashAdd(o); render(); }]); if (d.kind === 'equip') acts.push(['装备', () => { I.sack.items.splice(I.sack.items.indexOf(o), 1); equip(o, stashAdd); render(); }]); }
       if (where === 'belt') acts.push(['放回储物箱', () => { I.belt[bi] = null; stashAdd(o); render(); }]);
     }
+    if (d.kind === 'prop' && window.Props && (where === 'stash' || where === 'sack')) acts.unshift(['放置到洞里', () => Props.startPlace(d.ptype)]);
     if (d.kind === 'book' && o.bk && window.Books && (where === 'sack' || where === 'stash')) acts.unshift(...Books.menu(o, wild));
     if (!acts.length) return;
     closeMenu(); menuEl = document.createElement('div'); menuEl.className = 'sk-menu';

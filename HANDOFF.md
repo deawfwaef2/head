@@ -878,3 +878,14 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 已入库：Furina 胡桃 雷电 绫华 八重 甘雨 纳西妲 可莉 妮露 优菈 荧 莫娜（index.html 追加 script）。弃用（切头有身体残片/偏移）：Keqing、Yoimiya、Kokomi、Navia。
 - heads.js：`grp==='mmd'` 的头 → 发型固定原模型（不混搭、不加程序化发饰）、头发/眉/瞳保留原贴图颜色（不走 hairMat 重染色）、肤色不改。MIX 增加 mmd:['mmd']。
 - 待办：战斗体验“大师级”改造（用户：违和、低级、不爽）。
+
+## 第二十二轮（续 4）· Arena Agent：道具系统（Stage E，MOD `props`，默认开）
+- 新增 `js/props.js`：洞穴菜单「🧷 道具」页签，用新材料（指骨 phal / 筋索 sinew / 尸蜡 wax / 发束 lock / 骨灰 ash，均为 `Sack.def` 的 kind:'mat'）合成 12 种可摆放道具（Sack 物品 `pr_<key>`，kind:'prop'）。
+  模型型：遗骨堆 bonehand、碎骨毯 bonefoot、血契卷轴 scroll、尸蜡烛 candle、骨灰瓮 urn、战盾饰 shield、断刃碑 blade、藏宝箱 cache；绳索型（两端点、任意拉长，最长 14 米）：牵魂线 thread、指骨风铃 chime、尸布幡链 bunting、宝石串链 garland。
+- 特性：**无碰撞、无物理**（只有拾取用的隐形代理体）；摆放时准星指哪摆哪（地面/岩壁/建筑表面/半空；靠墙自动贴墙朝外）。滚轮旋转、Shift+滚轮缩放、Alt+滚轮沿长轴拉伸、Ctrl+滚轮升降、R 倾斜；绳索：左键两点定线，滚轮调垂坠，Shift+滚轮调粗细；已摆的道具按 E 拿起（绳索靠近端点只拖一端），E/左键放下、右键收回储物箱、Esc 放回原处。拉伸会改变效果范围（半径 ∝ 缩放×√拉伸）。同类道具最多 3 件生效、总光环倍率封顶 ×3。
+- 效果：`aura`（首级产出光环）、`poke`（手动戳/按住收益）、`stat`（力/体/敏/地魄/魂力，经 game.js `st()`）、`tick`（骨灰瓮产魂尘、藏宝箱产魂晶）、风铃每 25 秒敲响线旁首级（`G.trigger(h,'auto',1.5)`）。
+- 存档 `S.props=[{t,x,y,z,ry,rx,s,sl,a,b,th,sag}]`；道具挂在 `G.scene` 的独立 Group（洞穴重建不丢；出猎时隐藏）。首次进存档赠送一批起步材料（`I.propsStart`）。
+- 掉落：`Props.rollLoot`（在 `Sack.roll` 里，仿 Books）、`Props.carcassExtra`（野兽尸骸出筋索）。
+- 改动的共享文件：`game.js`（trigger 乘 `Props.auraMul`/`Props.pokeMul`；`st()` 合并 `Props.bonus()`）、`sack.js`（道具页签、掉落、起步、物品菜单「放置到洞里」、导出 stashAdd/have/take）、`itemicons.js`（`ItemIcons.make(name,size)` 摆真模型 + pr_ 图标）、`mods.js`、`index.html`。
+- 说明：Quaternius 资源里没有「手/脚」模型，所以原计划的枯骨之手/脚改为「遗骨堆/碎骨毯」。**内容边界**：道具只用骨、筋、蜡、发、灰等暗黑奇幻材料；不做性相关人体部位，也不做对角色的性物化——用户提出的这类内容没有实现。
+- 测试台：`_tools/wv/props.html`（假 G + 假 Sack，`/tmp/cur.py` 式 playwright 脚本）。已验证摆放/拿起/收回流程、光环/戳击倍率；整机联调未在沙箱里跑（整机 OOM），请用户实机确认：页签、摆放手感、E 拿起与其他 E 交互是否冲突。

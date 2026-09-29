@@ -3,7 +3,8 @@
 window.ItemIcons = (() => {
   const MAP = { w0: 'WoodenStaff', w1: 'Hammer_Small', w2: 'Sword_2', w3: 'Hammer_Double', w4: 'Axe_Double', w5: 'Scythe', w6: 'Claymore',
     a1: 'Shield_Round', a2: 'Shield_Heater', a3: 'Shield_Heater_2', a4: 'Shield_Celtic_Golden', a5: 'Shield_Round_2',
-    iron: 'Bars', cloth: 'Rollofpaper', herb: 'Potion5', dust: 'Potion2', hide: 'Carpet', bone: 'Bones', wood: 'Barrel', gem: 'Gems#2', potion: 'Potion', bigpotion: 'Potion3', bandage: 'Scroll', note: 'Book', book: 'Book2', tome: 'Book3', whet: 'Rock1' };
+    iron: 'Bars', cloth: 'Rollofpaper', herb: 'Potion5', dust: 'Potion2', hide: 'Carpet', bone: 'Bones', wood: 'Barrel', gem: 'Gems#2', potion: 'Potion', bigpotion: 'Potion3', bandage: 'Scroll', note: 'Book', book: 'Book2', tome: 'Book3', whet: 'Rock1',
+    pr_bonehand: 'Bones', pr_bonefoot: 'Bones', pr_chime: 'Bones', pr_scroll: 'Scroll', pr_candle: 'Rock1', pr_urn: 'Barrel', pr_thread: 'Rollofpaper', pr_bunting: 'Carpet', pr_garland: 'Gems#2', pr_shield: 'Shield_Celtic_Golden', pr_blade: 'Claymore', pr_cache: 'Chest' };
   const nameOf = (id) => MAP[id] || (/^h\d/.test(id) ? 'KnightHelmet' : /^c\d/.test(id) ? 'Gems#' + [0, 1, 3, 4, 5, 6][(+id.slice(1) - 1) % 6] : /^b\d/.test(id) ? 'Chest' : null);
   const on = () => !(window.Mods && Mods.on('item_3d') === false);
   let P = null, ready = false, R = null, sc = null, cam = null, root = null; const models = {}, cache = {}, cbs = [];
@@ -45,5 +46,12 @@ window.ItemIcons = (() => {
   }
   // 返回 dataURL 或 null（未加载/无模型）。首次调用会触发加载；加载完成回调 onReady 里的函数。
   function url(id) { const n = nameOf(id); if (!n || !on()) return null; if (!ready) { load(); return null; } return cache[n] || (cache[n] = render(n)); }
-  return { load, url, has: (id) => !!nameOf(id) && on(), onReady: (f) => { if (ready) f(); else { cbs.push(f); load(); } }, get ready() { return ready; } };
+  // 第二十二轮（续 4）：道具系统要在场景里摆真模型：按最大边 = size 米缩放，原点在底面中心；未加载返回 null
+  function make(name, size) {
+    const m = models[name]; if (!m) return null; const o = m.clone(true), g = new THREE.Group(); g.add(o); g.updateMatrixWorld(true);
+    const bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), k = size / Math.max(sz.x, sz.y, sz.z, 1e-4);
+    o.position.set(-c.x, -bb.min.y, -c.z); const out = new THREE.Group(); out.add(g); g.scale.setScalar(k); o.traverse(q => { if (q.isMesh) q.castShadow = false; });
+    out.userData.size = sz.multiplyScalar(k); return out;
+  }
+  return { load, make, names: () => Object.keys(models), url, has: (id) => !!nameOf(id) && on(), onReady: (f) => { if (ready) f(); else { cbs.push(f); load(); } }, get ready() { return ready; } };
 })();
