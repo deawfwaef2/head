@@ -298,6 +298,7 @@ window.startGame = function () {
   let locked = false, noLock = false, playing = false, uiOpen = false;
   const ray = new THREE.Raycaster(); ray.far = 3.4;
   let film = null; // 电影模式：自由镜头
+  let hplace = null, eDown = 0, eLong = false;
   let held = null, bagGroup = null, bagCarrying = false, heldYaw = 0, heldFace = 0, buildMode = null, buildRot = 0, ghost = null, ghostOk = false;
   const lastHeldPos = new V3(), heldVel = new V3();
   function lockPointer() { if (noLock) { startPlaying(); return; } try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => { noLock = true; startPlaying(); }); } catch (e) { noLock = true; startPlaying(); } }
@@ -327,16 +328,18 @@ window.startGame = function () {
   });
   document.addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; if (noLock && dragLook && e.button === 0) { dragLook = false; if (dragMoved < 6) action(0); } });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
-  canvas.addEventListener('wheel', e => { if (!playing || uiOpen) return; if (film && !held) { e.preventDefault(); camera.fov = Math.max(12, Math.min(95, camera.fov * (e.deltaY > 0 ? 1.06 : 0.94))); camera.updateProjectionMatrix(); return; } if (held) { e.preventDefault(); heldYaw += Math.sign(e.deltaY) * 0.32; } }, { passive: false });
+  canvas.addEventListener('wheel', e => { if (!playing || uiOpen) return; if (film && !held) { e.preventDefault(); camera.fov = Math.max(12, Math.min(95, camera.fov * (e.deltaY > 0 ? 1.06 : 0.94))); camera.updateProjectionMatrix(); return; } if (hplace) { e.preventDefault(); hplace.yaw += Math.sign(e.deltaY) * (e.shiftKey ? Math.PI / 36 : Math.PI / 12); return; } if (held) { e.preventDefault(); heldYaw += Math.sign(e.deltaY) * 0.32; } }, { passive: false });
   let lastX = 0;
   document.addEventListener('keydown', e => {
     keys[e.code] = true;
+    if (hplace && e.code === 'Escape') { cancelHP(); return; }
     if (window.UI && UI.onKey(e)) return;
     if (!playing || uiOpen) return;
     if (e.code === 'KeyP' && (!window.Mods || Mods.on('film'))) { toggleFilm(); return; }
     if (e.code === 'KeyG' && held) { placeHeld(); return; }
     if (film && (e.code === 'BracketLeft' || e.code === 'BracketRight')) { film.sp = Math.max(0.3, Math.min(12, film.sp * (e.code === 'BracketRight' ? 1.4 : 0.7))); toast('镜头速度 ' + film.sp.toFixed(1), '#ccc', 0.8); return; }
-    if (e.code === 'KeyE') interactE();
+    if (e.code === 'KeyE') { if (e.repeat) return; if (hplace) { confirmHP(); return; } eDown = performance.now(); eLong = false; return; } // 短按 = 松开时交互；长按 = 摆放模式
+    if (e.code === 'KeyR' && hplace) { hplace.pose = (hplace.pose + (e.shiftKey ? RESTS.length - 1 : 1)) % RESTS.length; SFX.click(); toast('姿势：' + HP_POSE[hplace.pose], '#8fe0a0', 0.9); return; }
     if (e.code === 'KeyF') inspectLook();
     if (e.code === 'KeyR' && buildMode) { buildRot = ((buildRot + (e.shiftKey ? -0.125 : 0.125)) % 4 + 4) % 4; SFX.click(); toast(`旋转 ${Math.round(buildRot * 90)}°（R / Shift+R，每次 11.25°）`, '#8fe0a0', 0.8); }
     if (e.code === 'KeyQ' && held) throwHeld(true);
@@ -347,7 +350,7 @@ window.startGame = function () {
     if (e.code === 'KeyX') { const t = performance.now(); if (t - lastX < 450) { doubleX(); lastX = 0; } else { lastX = t; toast('再按一次 X：碾碎首级吸魂 / 拆除建筑', '#f88', 1); } }
     if (e.code === 'Escape' && buildMode) cancelBuild();
   });
-  document.addEventListener('keyup', e => { keys[e.code] = false; });
+  document.addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'KeyE' && eDown) { const long = eLong; eDown = 0; if (!long && playing && !uiOpen) interactE(); } });
 
   // 准星目标：射线命中 → 该头；否则 3m 内、与视线夹角 < ~6.5° 的最接近视线中心者（不隔建筑）
   const _tf = new V3(), _tv = new V3();
@@ -371,6 +374,7 @@ window.startGame = function () {
     return null;
   }
   function action(btn) {
+    if (hplace) { if (btn === 0) confirmHP(); else if (btn === 2) cancelHP(); return; }
     if (buildMode) { if (btn === 0) placeBuild(); else cancelBuild(); return; }
     if (btn === 2) { if (bagCarrying) { bagCarrying = false; if (bagGroup) { bagGroup.position.copy(player.pos).add(new V3(0, 0, -0.8)); bagGroup.position.y = 0; } toast('麻袋放下了。', '#ccc'); } else if (held) throwHeld(false); return; }
     if (btn === 0) for (const f of HOOK.click) { try { if (f()) return; } catch (e) { console.warn(e); } }
@@ -422,6 +426,70 @@ window.startGame = function () {
     const up = n.y > 0.5; h.g.position.copy(hit.point).addScaledVector(up ? UP : n, up ? supportH(h) + 0.005 : RC + 0.01);
     h.vel.set(0, 0, 0); h.av.set(0, 0, 0); h.sleep = 0; SFX.thud(0.3, 1); toast('轻轻放下了。', '#ccc', 0.8);
   }
+  // ---------------- 首级摆放模式（第十轮）：长按 E → 绿色/红色预览，贴附朝上的表面 / 自动吸附空展位，遵守物理 ----------------
+  const HP_POSE = ['断面朝下（立）', '右脸贴地', '左脸贴地', '后脑贴地', '脸朝下'];
+  const hpOk = new THREE.MeshBasicMaterial({ color: '#5dff7a', transparent: true, opacity: 0.42, depthWrite: false, blending: THREE.AdditiveBlending });
+  const hpBad = new THREE.MeshBasicMaterial({ color: '#ff3a3a', transparent: true, opacity: 0.38, depthWrite: false, blending: THREE.AdditiveBlending });
+  const hpRing = new THREE.Mesh(new THREE.RingGeometry(RC * 0.9, RC * 1.1, 40), new THREE.MeshBasicMaterial({ color: '#5dff7a', transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
+  hpRing.rotation.x = -Math.PI / 2; hpRing.visible = false; hpRing.raycast = () => {}; scene.add(hpRing);
+  const _hq = new THREE.Quaternion(), _hy = new THREE.Quaternion(), hpRay = new THREE.Raycaster(); hpRay.far = 6.5;
+  function startHP(h) {
+    if (!h || hplace || buildMode || cine) return false;
+    if (held !== h) unmount(h);
+    held = null;
+    const i = heads.indexOf(h); if (i >= 0) heads.splice(i, 1);
+    if (lod) lod.release(h);
+    h.g.visible = true; h.blob.visible = false; h.vel.set(0, 0, 0); h.av.set(0, 0, 0);
+    // 绿色外壳：共享几何，换成半透明叠加材质，略放大
+    const ov = new THREE.Group(); h.g.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(h.g.matrixWorld).invert();
+    h.hb.group.traverse(o => { if (o.isMesh && o.geometry && o.visible) { const m = new THREE.Mesh(o.geometry, hpOk); m.matrixAutoUpdate = false; m.matrix.multiplyMatrices(inv, o.matrixWorld); m.raycast = () => {}; m.renderOrder = 6; ov.add(m); } });
+    ov.scale.setScalar(1.025); h.g.add(ov);
+    hplace = { h, ov, yaw: player.yaw, pose: 0, ok: false, mount: null };
+    SFX.click(); toast('🟩 摆放模式：左键/E 放下 · 滚轮旋转（Shift 微调）· R 换姿势 · 右键/Esc 取消', '#8fe0a0', 3.5);
+    return true;
+  }
+  function setHPTint(ok) { if (!hplace) return; hplace.ok = ok; const m = ok ? hpOk : hpBad; hplace.ov.children.forEach(c => c.material = m); hpRing.material.color.set(ok ? '#5dff7a' : '#ff3a3a'); }
+  function updateHP() {
+    const hp = hplace; if (!hp) return; const h = hp.h;
+    hpRay.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const objs = [cave.group]; for (const b of builds) objs.push(b.g); for (const o of heads) objs.push(o.hit);
+    const hit = hpRay.intersectObjects(objs, true).find(x => x.distance < 6 && !(x.object.material && x.object.material.transparent && x.object.material.opacity < 0.3 && x.object.material.visible !== false));
+    hp.mount = null; hpRing.visible = false;
+    if (!hit) { h.g.position.copy(camera.position).addScaledVector(hpRay.ray.direction, 2.2); setHPTint(false); return; }
+    // 命中了哪座建筑 / 哪颗头
+    let b = null; for (let o = hit.object; o && !b; o = o.parent) b = builds.find(x => x.g === o) || null;
+    // 1) 空展位吸附
+    if (b && CAT[b.type].mount && b.heads) {
+      const slot = freeSlot(b, hit.point);
+      if (slot >= 0 && mountPos(b, slot).distanceTo(hit.point) < 0.6) {
+        const s = slotsOf(CAT[b.type])[slot];
+        h.g.quaternion.setFromEuler(new THREE.Euler(0, -b.rot * Math.PI / 2 + (s[3] != null ? s[3] : Math.PI), 0)); seatHead(h, b, slot);
+        hp.mount = { b, slot }; setHPTint(true); return;
+      }
+    }
+    const n = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : UP.clone();
+    if (hit.object.userData && hit.object.userData.head) n.subVectors(hit.point, hit.object.userData.head.g.position).normalize(); // 叠在别的头上
+    // 2) 朝上的表面：按姿势 + 旋转摆好，底部贴合
+    _hq.setFromUnitVectors(RESTS[hp.pose], DOWN); _hy.setFromAxisAngle(UP, hp.yaw); h.g.quaternion.copy(_hy).multiply(_hq);
+    if (n.y < 0.55) { h.g.position.copy(hit.point).addScaledVector(n, RC + 0.02); setHPTint(false); return; } // 墙面：物理上放不住
+    h.g.position.copy(hit.point); h.g.position.y += supportH(h) + 0.004;
+    hpRing.position.set(hit.point.x, hit.point.y + 0.006, hit.point.z); hpRing.visible = true;
+    let ok = camera.position.distanceTo(hit.point) < 5.5 && Math.hypot(h.g.position.x, h.g.position.z) < cave.R - 0.75;
+    if (ok && Math.hypot(h.g.position.x - cave.firePos.x, h.g.position.z - cave.firePos.z) < 0.75) ok = false;
+    if (ok) for (const o of heads) { if (o.g.position.distanceToSquared(h.g.position) < (RC * 1.85) ** 2) { ok = false; break; } }
+    setHPTint(ok);
+  }
+  function endHP() { const hp = hplace; if (!hp) return null; hp.h.g.remove(hp.ov); hpRing.visible = false; hplace = null; heads.push(hp.h); return hp; }
+  function confirmHP() {
+    if (!hplace) return;
+    updateHP();
+    if (!hplace.ok) { SFX.deny(); toast('这里放不稳 / 放不下', '#f66', 1); return; }
+    const hp = endHP(), h = hp.h;
+    if (hp.mount) { mountHead(h, hp.mount.b, hp.mount.slot); }
+    else { h.vel.set(0, 0, 0); h.av.set(0, 0, 0); h.sleep = 1.05; h.grounded = true; SFX.thud(0.35, 1.1); burst(h.g.position.clone().setY(h.g.position.y - supportH(h)), '#d8c8a8', 8, 0.5, 0.5, -2); }
+    save();
+  }
+  function cancelHP() { const hp = endHP(); if (!hp) return; held = hp.h; heldYaw = 0; hp.h.sleep = 0; SFX.click(); }
   function startSeance(h) {
     if (!window.Seance || Seance.active) return;
     setUI(true); SFX.play('bell', 0.5, 0.8);
@@ -990,6 +1058,8 @@ window.startGame = function () {
     const dt = Math.min(0.05, clock.getDelta()); const now = clock.elapsedTime;
     if ((window.Seance && Seance.active) || window.__pauseMain) return; // 通灵 MV / 头棋等全屏小游戏期间暂停主场景渲染
     for (const f of HOOK.frame) { try { f(dt, now); } catch (e) { console.warn(e); } }
+    if (eDown && !eLong && performance.now() - eDown > 350) { eLong = true; if (playing && !uiOpen && !cine && !bagCarrying) { const tgt = held || targetHead(lookHit()); if (tgt) startHP(tgt); else eLong = false; } }
+    if (hplace) updateHP();
     updateAim(now); ModelHeads.tick(now); updateCine(dt); updateCineFx(dt);
     for (const h of heads) if (h.aura) { const ap = h.aura.geometry.attributes.position; for (let i = 0; i < ap.count; i++) { let y = ap.getY(i) + dt * (0.06 + (i % 5) * 0.015); if (y > 0.38) y = -0.15; ap.setY(i, y); } ap.needsUpdate = true; h.aura.position.copy(h.g.position); h.aura.rotation.y = now * 0.25 + h.rec.id; h.aura.visible = h.g.visible !== false; }
     // 自适应分辨率
@@ -1141,13 +1211,14 @@ window.startGame = function () {
         aimHead = th;
         let htip = null; for (const f of HOOK.tip) { try { htip = f(hit, held); } catch (e) {} if (htip) break; }
         if (htip) tip = htip;
-        else if (held) tip = `手持「${held.rec.c.name}」 · <b>左键</b>把玩 · <b>滚轮</b>转向 · <b>V</b>换表情 · <b>E</b>放下/插桩 · <b>右键</b>扔 · <b>F</b>查看`;
-        else if (hit && hit.head) { const c = hit.head.rec.c; tip = `<span style="color:${RAR[c.rar].c}">【${RAR[c.rar].n}】</span>${c.shiny ? ' <span style="color:#ffe27a">✨异色</span>' : ''} <b>${c.name}</b>${c.title ? ` <small style="color:#e6c7a0">『${c.title}』</small>` : ''} · ${c.raceN}${c.idN}${(c.aff || []).length ? '<br><small>' + c.aff.map(k => RPG.AFF[k] ? RPG.AFF[k].icon + RPG.AFF[k].n : '').join(' ') + '</small>' : ''}<br><small>左键把玩 · E 拿起 · F 查看/回忆 · XX 碾碎</small>`; }
+        else if (held) tip = `手持「${held.rec.c.name}」 · <b>左键</b>把玩 · <b>滚轮</b>转向 · <b>V</b>换表情 · <b>E</b>放下/插桩 · <b>长按E</b>精确摆放 · <b>右键</b>扔 · <b>F</b>查看`;
+        else if (hit && hit.head) { const c = hit.head.rec.c; tip = `<span style="color:${RAR[c.rar].c}">【${RAR[c.rar].n}】</span>${c.shiny ? ' <span style="color:#ffe27a">✨异色</span>' : ''} <b>${c.name}</b>${c.title ? ` <small style="color:#e6c7a0">『${c.title}』</small>` : ''} · ${c.raceN}${c.idN}${(c.aff || []).length ? '<br><small>' + c.aff.map(k => RPG.AFF[k] ? RPG.AFF[k].icon + RPG.AFF[k].n : '').join(' ') + '</small>' : ''}<br><small>左键把玩 · E 拿起 · 长按E 摆放 · F 查看/回忆 · XX 碾碎</small>`; }
         else if (player.pos.distanceTo(cave.exitPos) < 2.6) tip = '<b>[E]</b> 离开洞窟，出去狩猎';
         else if (player.pos.distanceTo(cave.merchantPos) < 2.4) tip = '<b>[E]</b> 和地精行商斯尼克交易';
         else if (hit && hit.build) { const d = CAT[hit.build.type]; tip = `<b>${d.n}</b>` + (d.train ? ' · <b>[E]</b> 开始训练' : '') + (d.mount ? (() => { const n = hit.build.heads.length, k = hit.build.heads.filter(Boolean).length; return (k ? ' · 左键把玩 · E 取下' : '') + (k < n ? ' · 手持首级按 E 插上' : '') + (n > 1 ? ` · ${k}/${n} 位` : ''); })() : '') + ' <small>· XX 拆除</small>'; }
       }
     }
+    if (hplace) tip = `🟩 摆放「${hplace.h.rec.c.name}」 · ${hplace.mount ? '吸附到展位' : HP_POSE[hplace.pose]} · <b>左键/E</b>放下 · <b>滚轮</b>旋转(Shift微调) · <b>R</b>换姿势 · <b>右键/Esc</b>取消`;
     ui.tip.innerHTML = tip; ui.tip.style.display = tip ? 'block' : 'none';
     ui.cross.classList.toggle('active', !!tip && !buildMode);
     ui.vign.style.background = S.hp / s.maxHp < 0.3 ? 'radial-gradient(ellipse at center, transparent 55%, rgba(160,0,0,0.45) 100%)' : '';
@@ -1159,7 +1230,7 @@ window.startGame = function () {
     _dbg: { submitBounty: h => submitBounty(h), interactE: () => interactE(), startSeance: h => startSeance(h), carry() { bagCarrying = true; }, unloadBag: () => unloadBag(), get cine() { return cine; } },
     hasAff, yieldOf, exhibit, codexInfo, daily, DAILY, bounties, rerollBounties, EX_T, fmtN, S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
     save, wipe, setUI, lockPointer, spawnReturnHeads, addHeadRecs, createReturnBag, usedSig, usedNames, headOf, removeHead, refreshWeapon, burst, get cave() { return cave; },
-    post, lod, get lodStat() { return lodStat; }, storeHead, takeOut, storeLoose, vaultCount, MAX_HEADS, VAULT_MAX, HOOK, rebuildHead, floatText, spawnBeam, gachaCard, lookHit, unmount, soulWisp, trigger, SAVE_KEY, get clock() { return clock; }, get held() { return held; }, set held(v) { held = v; }, get keys() { return keys; }, get cine() { return cine; }, setUIOpen: v => setUI(v),
+    post, lod, get lodStat() { return lodStat; }, startHP, confirmHP, cancelHP, updateHP, get hplace() { return hplace; }, storeHead, takeOut, storeLoose, vaultCount, MAX_HEADS, VAULT_MAX, HOOK, rebuildHead, floatText, spawnBeam, gachaCard, lookHit, unmount, soulWisp, trigger, SAVE_KEY, get clock() { return clock; }, get held() { return held; }, set held(v) { held = v; }, get keys() { return keys; }, get cine() { return cine; }, setUIOpen: v => setUI(v),
     get playing() { return playing; }, get uiOpen() { return uiOpen; }, renderer, camera, scene, poke, mountHead, createHead, addBuild
   };
   window.__game = G;
