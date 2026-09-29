@@ -431,3 +431,17 @@
 - **#2 眼白发黑**：`js/heads.js` 约 666 行 `getMat()` 里 `EyeWhite` 分支（MeshToonMaterial 重建）、约 696–712 行眼部 stencil `_mask` 网格（`alphaTest: 0.35, colorWrite: false`）、约 67 行 `renderOrder`（EyeWhite=2）。先确认原 VRM 眼白贴图有无 alpha，再看 `tools/glbpack.py` 转 WebP/JPEG 时是否丢了 alpha（JPEG 没有 alpha → 透明区变黑）。
 - **#3 断口圆片**：`js/heads.js` 约 92 行“第十一轮：断面按脖子真实轮廓重建”那段 + `tools/vrm2head.py` 的封盖步骤；`uCutY` uniform（约 238 行）控制断面着色高度。
 - **#4 皮肤发绿**：`js/heads.js` 约 238–248 行皮肤着色注入 `diffuseColor.rgb *= uSkin`，`uSkin = 目标肤色 / baseSkin('#fbe6da')`（约 458–466 行）；若某模型原贴图本身偏色或 `randomLook` 给了异常肤色值，除法会放大偏色。逐模型打印 `U.skin`。
+
+### C 补充 · 第十四轮用户决策（ask_user 结果，长期有效）
+- **视角**：第一人称 / 第三人称越肩 **可切换（V 键，手持首级时 V 仍是换表情）**，默认第三人称（需要身体系统完成后开放）。
+- **挥砍手感**：**武器实时跟随鼠标**（Exanima / Hellish Quart 式），砍到哪算哪，伤害取决于刃尖真实速度。
+- **洞内键位冲突**：**按键拔刀切换**——F 拔刀/收刀；拔刀时左右键 = 战斗，收刀时 = 原操作（把玩/投掷）。首级查看改为 **I** 键。
+- **旧“点 60 次 + 面板”出行**：保留为**可选 MOD**，默认用新随机世界探索。
+
+### 第十四轮进度 · 第 1 步完成：战斗内核 `js/combat.js`（MOD `gesture_combat`，默认开）
+- 接入点（game.js 仅加了单行拦截）：mousemove（`Combat.onMove` 返回镜头转动系数：挥砍 0.12、格挡 0.3）、mousedown/mouseup（`onDown/onUp`，拔刀时吞掉原操作）、F/I 键、旧挥棒动画在拔刀时跳过、新增 `HOOK.pre`（相机就位后、渲染前：屏震/以后第三人称相机）。`G` 新暴露 `vm`、`weapon`、`fist`、`held`。
+- 手：解析解临界阻尼弹簧跟随目标（任意帧率稳定；显式欧拉在低帧率会发散，已踩坑）；刚度 ∝ 1/√武器重量；体力耗尽时减半。刃：从右肩 PIVOT 向外辐射 + 被手速拖拽（重量感），刃口朝运动方向。
+- 刺：左键按下 <190ms 且拖动小 → 刺；连点排队连刺（最多 2 个）。格挡：右键按住，轻移鼠标选 上/下/左/右 四向姿态（HUD 显示）。
+- 命中：刃上 5 点逐帧扫掠（线段-球），`Combat.addProvider(center => [{id, pos, r, kind, onHit(info)}])`；`info = {point, vel, speed, kind:'slash'|'thrust', dir}`。命中 → 顿帧 30–90ms + 屏震 + 目标回调。内置目标：地上散落的首级（被砍飞，挂载/手持的不动——第七轮规则）。
+- 测试：`/tmp` 下的确定性脚本直接循环 `Combat.update(1/60)`（headless 帧率太低，不能靠 setInterval 模拟手势）。实测横扫刃尖 10.6 m/s，刺 8.5 m/s 命中，下劈命中。
+- **下一步（第 2 步）**：找回 VRM 身体（`tools/vrm2body.py`，身体+骨骼+蒙皮保留，禁止再删）→ 训练假人/敌人用真身体；然后第 3 步动画重定向、第 4 步敌人 AI（格挡判定要接 `Combat.guardDir` 与敌人刃线的碰撞 = 弹刀）。

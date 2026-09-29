@@ -144,7 +144,7 @@ window.startGame = function () {
     const p = new THREE.Points(g, new THREE.PointsMaterial({ map: auraTex, color: col, size: 0.05, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     return p;
   }
-  const HOOK = { frame: [], e: [], click: [], tip: [] };
+  const HOOK = { frame: [], e: [], click: [], tip: [], pre: [] }; // pre：相机就位后、渲染前（第十四轮：屏震/第三人称）
   function rebuildHead(h) {
     const rec = h.rec, old = h.hb; h.g.remove(old.group); old.dispose();
     const hb = ModelHeads.create(rec.look); hb.group.scale.setScalar(HS); hb.group.position.y = -0.005; h.g.add(hb.group);
@@ -323,10 +323,10 @@ window.startGame = function () {
     const k = W[1] / len; const g = new THREE.Group(); inner.scale.setScalar(k); inner.position.y = W[1] / 2 - 0.12; g.add(inner);
     if (W[2]) src.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(W[2]); o.material.emissiveIntensity = 0.35; o.material.emissiveMap = o.material.map; } });
     g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
-    g.rotation.set(-0.6, 0, -0.35); g.position.set(0, 0.02, -0.06); g.userData.asset = 1;
+    g.rotation.set(-0.6, 0, -0.35); g.position.set(0, 0.02, -0.06); g.userData.asset = 1; g.userData.len = W[1];
     return g;
   }
-  function refreshWeapon() { if (weaponMesh) vm.remove(weaponMesh); weaponMesh = assetWeapon(S.eq.weapon || 0) || makeWeapon(S.eq.weapon || 0); fist.visible = !weaponMesh.userData.asset; vm.add(weaponMesh); }
+  function refreshWeapon() { if (weaponMesh) vm.remove(weaponMesh); weaponMesh = assetWeapon(S.eq.weapon || 0) || makeWeapon(S.eq.weapon || 0); fist.visible = !weaponMesh.userData.asset; vm.add(weaponMesh); if (window.Combat && Combat.onWeapon) try { Combat.onWeapon(); } catch (e) {} }
   refreshWeapon();
   let swing = 0;
 
@@ -353,18 +353,20 @@ window.startGame = function () {
     if (!playing || uiOpen) return;
     if (!locked && !(noLock && dragLook)) return;
     let dx = e.movementX, dy = e.movementY; if (Math.abs(dx) > 250 || Math.abs(dy) > 250) return;
+    if (window.Combat && Combat.drawn) { const k = Combat.onMove(dx, dy); dx *= k; dy *= k; } // 第十四轮：挥砍/格挡时鼠标主要控制武器
     if (noLock) dragMoved += Math.abs(dx) + Math.abs(dy);
     player.yaw -= dx * 0.0022; player.pitch = Math.max(-1.45, Math.min(1.45, player.pitch - dy * 0.0022));
   });
   canvas.addEventListener('mousedown', e => {
     if (uiOpen) return;
     if (!playing) return;
+    if (window.Combat && Combat.drawn && !hplace && !buildMode && !held && Combat.onDown(e.button)) { if (noLock && e.button === 0) { dragLook = true; dragMoved = 99; } return; }
     if (noLock && e.button === 0) { dragLook = true; dragMoved = 0; mouseDown = true; return; }
     if (cine) { cine.fast = true; return; }
     if (e.button === 0) mouseDown = true;
     action(e.button);
   });
-  document.addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; if (noLock && dragLook && e.button === 0) { dragLook = false; if (dragMoved < 6) action(0); } });
+  document.addEventListener('mouseup', e => { if (window.Combat && Combat.drawn) Combat.onUp(e.button); if (e.button === 0) mouseDown = false; if (noLock && dragLook && e.button === 0) { dragLook = false; if (dragMoved < 6) action(0); } });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('wheel', e => { if (!playing || uiOpen) return; if (film && !held) { e.preventDefault(); camera.fov = Math.max(12, Math.min(95, camera.fov * (e.deltaY > 0 ? 1.06 : 0.94))); camera.updateProjectionMatrix(); return; } if (hplace) { e.preventDefault(); hplace.yaw += Math.sign(e.deltaY) * (e.shiftKey ? Math.PI / 36 : Math.PI / 12); return; } if (held) { e.preventDefault(); heldYaw += Math.sign(e.deltaY) * 0.32; } }, { passive: false });
   let lastX = 0;
@@ -378,7 +380,8 @@ window.startGame = function () {
     if (film && (e.code === 'BracketLeft' || e.code === 'BracketRight')) { film.sp = Math.max(0.3, Math.min(12, film.sp * (e.code === 'BracketRight' ? 1.4 : 0.7))); toast('镜头速度 ' + film.sp.toFixed(1), '#ccc', 0.8); return; }
     if (e.code === 'KeyE') { if (e.repeat) return; if (hplace) { confirmHP(); return; } eDown = performance.now(); eLong = false; return; } // 短按 = 松开时交互；长按 = 摆放模式
     if (e.code === 'KeyR' && hplace) { hplace.pose = (hplace.pose + (e.shiftKey ? RESTS.length - 1 : 1)) % RESTS.length; SFX.click(); toast('姿势：' + HP_POSE[hplace.pose], '#8fe0a0', 0.9); return; }
-    if (e.code === 'KeyF') inspectLook();
+    if (e.code === 'KeyF') { if (window.Combat && Combat.enabled && !held && !hplace && !buildMode && !bagCarrying) Combat.toggle(); else inspectLook(); }
+    if (e.code === 'KeyI') inspectLook();
     if (e.code === 'KeyR' && buildMode) { buildRot = ((buildRot + (e.shiftKey ? -0.125 : 0.125)) % 4 + 4) % 4; SFX.click(); toast(`旋转 ${Math.round(buildRot * 90)}°（R / Shift+R，每次 11.25°）`, '#8fe0a0', 0.8); }
     if (e.code === 'KeyQ' && held) throwHeld(true);
     if (e.code === 'KeyQ' && bagCarrying) { bagCarrying = false; if (bagGroup) { bagGroup.position.copy(player.pos).add(new V3(0, 0, -0.8)); bagGroup.position.y = 0; } toast('你放下了麻袋。靠近它按 E 再扛起。', '#ccc'); }
@@ -1184,7 +1187,7 @@ window.startGame = function () {
     if (shake > 0) { shake -= dt; camera.position.x += (Math.random() - 0.5) * shake * 0.1; camera.position.y += (Math.random() - 0.5) * shake * 0.1; }
     // 视角模型
     swing = Math.max(0, swing - dt * 5);
-    vm.rotation.x = -Math.sin(swing * Math.PI) * 0.7; vm.position.y = -0.42 + bob * 0.5 - Math.sin(swing * Math.PI) * 0.05;
+    if (!(window.Combat && Combat.drawn)) { vm.rotation.x = -Math.sin(swing * Math.PI) * 0.7; vm.position.y = -0.42 + bob * 0.5 - Math.sin(swing * Math.PI) * 0.05; }
     vm.visible = !held;
 
     acc2 += dt; let steps = 0;
@@ -1264,6 +1267,7 @@ window.startGame = function () {
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) ui.toast.classList.remove('show'); }
     updateHeadShadows(dt);
     if (post && post.setRayLight && cave) post.setRayLight(_rayP.set(cave.firePos.x, 0.75, cave.firePos.z), 1);
+    for (const f of HOOK.pre) { try { f(dt, now); } catch (e) { console.warn(e); } }
     if (post && post.on) post.render(scene, camera); else renderer.render(scene, camera);
   }
   function floorOf(p) { return cave && cave.floorAt ? cave.floorAt(p.x, p.z) : 0; }
@@ -1310,9 +1314,10 @@ window.startGame = function () {
     hasAff, yieldOf, exhibit, codexInfo, daily, DAILY, bounties, rerollBounties, EX_T, fmtN, S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
     save, wipe, setUI, lockPointer, spawnReturnHeads, addHeadRecs, createReturnBag, usedSig, usedNames, headOf, removeHead, refreshWeapon, burst, get cave() { return cave; },
     post, lod, get lodStat() { return lodStat; }, startHP, confirmHP, cancelHP, updateHP, get hplace() { return hplace; }, storeHead, takeOut, storeLoose, vaultCount, MAX_HEADS, VAULT_MAX, HOOK, rebuildHead, floatText, spawnBeam, gachaCard, lookHit, unmount, soulWisp, trigger, SAVE_KEY, get clock() { return clock; }, get held() { return held; }, set held(v) { held = v; }, get keys() { return keys; }, get cine() { return cine; }, setUIOpen: v => setUI(v),
-    get playing() { return playing; }, get uiOpen() { return uiOpen; }, renderer, camera, scene, poke, mountHead, createHead, addBuild
+    get playing() { return playing; }, get uiOpen() { return uiOpen; }, vm, get weapon() { return weaponMesh; }, fist, get held() { return held; }, renderer, camera, scene, poke, mountHead, createHead, addBuild
   };
   window.__game = G;
   if (window.Play) try { Play.init(); } catch (e) { console.warn('Play.init', e); }
+  if (window.Combat) try { Combat.init(G); HOOK.frame.push((dt, now) => Combat.update(dt, now)); HOOK.pre.push(() => Combat.prerender()); } catch (e) { console.warn('Combat.init', e); }
   if (window.UI) UI.init();
 };
