@@ -129,6 +129,14 @@ window.ModelHeads = (() => {
     return mix(mix(mix(hh3(i),hh3(i+vec3(1,0,0)),f.x),mix(hh3(i+vec3(0,1,0)),hh3(i+vec3(1,1,0)),f.x),f.y),
                mix(mix(hh3(i+vec3(0,0,1)),hh3(i+vec3(1,0,1)),f.x),mix(hh3(i+vec3(0,1,1)),hh3(i+vec3(1,1,1)),f.x),f.y),f.z); }`;
 
+  // 卡通材质的柔性光照压缩：篝火点光源会把首级（尤其深色头发）直接冲成白色——这是画面“廉价感”的主因。
+  // 对有效光照倍数做 1-exp 软膝盖（≈1.08 封顶），暗处略提亮；只影响 MeshToonMaterial（首级/头饰），不影响洞穴与建筑。
+  if (THREE.ShaderLib.toon && !THREE.ShaderLib.toon.__soft) {
+    THREE.ShaderLib.toon.fragmentShader = THREE.ShaderLib.toon.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+    { vec3 _dl = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse; float _lk = dot(_dl, vec3(0.299, 0.587, 0.114)); float _lr = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)) * 0.3183 + 1e-4; float _ex = _lk / _lr;
+      if (_ex > 1e-4) { float _t = (1.0 - exp(-_ex * 1.2)) * 1.08; float _s = clamp(_t / _ex, 0.0, 1.3); reflectedLight.directDiffuse *= _s; reflectedLight.indirectDiffuse *= _s; } }`);
+    THREE.ShaderLib.toon.__soft = 1;
+  }
   const BRZ = (!window.Mods || Mods.on('breeze')) ? '1.0' : '0.0';
   function injectVertex(sh, sway) {
     sh.vertexShader = sh.vertexShader

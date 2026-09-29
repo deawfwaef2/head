@@ -11,9 +11,10 @@ window.startGame = function () {
 
   // ---------------- 渲染器 ----------------
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-  let pixelRatio = Math.min(devicePixelRatio, 1.5);
+  let pixelRatio = Math.min(devicePixelRatio, (window.Mods && Mods.on('lowspec')) ? 0.85 : 1.5);
   renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth, innerHeight);
   renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
+  const post = window.Post ? Post.create(renderer) : null; // 画风 MOD 后处理链
   document.getElementById('game').appendChild(renderer.domElement);
   const canvas = renderer.domElement;
   const scene = new THREE.Scene();
@@ -1080,7 +1081,7 @@ window.startGame = function () {
     // HUD
     hudT -= dt; if (hudT <= 0) { hudT = 0.15; updateHud(); }
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) ui.toast.classList.remove('show'); }
-    renderer.render(scene, camera);
+    if (post && post.on) post.render(scene, camera); else renderer.render(scene, camera);
   }
   function groundY(p) {
     for (const b of builds) { const d = CAT[b.type]; if (!d.surface) continue; const [hx, hz] = fpOf(b.type, b.rot); if (Math.abs(p.x - b.x) < hx && Math.abs(p.z - b.z) < hz && p.y >= d.surface) return d.surface; }
@@ -1123,7 +1124,7 @@ window.startGame = function () {
     _dbg: { submitBounty: h => submitBounty(h), interactE: () => interactE(), startSeance: h => startSeance(h), carry() { bagCarrying = true; }, unloadBag: () => unloadBag(), get cine() { return cine; } },
     hasAff, yieldOf, exhibit, codexInfo, daily, DAILY, bounties, rerollBounties, EX_T, fmtN, S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
     save, wipe, setUI, lockPointer, spawnReturnHeads, addHeadRecs, createReturnBag, usedSig, usedNames, headOf, removeHead, refreshWeapon, burst, get cave() { return cave; },
-    HOOK, rebuildHead, floatText, spawnBeam, gachaCard, lookHit, unmount, soulWisp, trigger, SAVE_KEY, get clock() { return clock; }, get held() { return held; }, set held(v) { held = v; }, get keys() { return keys; }, get cine() { return cine; }, setUIOpen: v => setUI(v),
+    post, HOOK, rebuildHead, floatText, spawnBeam, gachaCard, lookHit, unmount, soulWisp, trigger, SAVE_KEY, get clock() { return clock; }, get held() { return held; }, set held(v) { held = v; }, get keys() { return keys; }, get cine() { return cine; }, setUIOpen: v => setUI(v),
     get playing() { return playing; }, get uiOpen() { return uiOpen; }, renderer, camera, scene, poke, mountHead, createHead, addBuild
   };
   window.__game = G;
