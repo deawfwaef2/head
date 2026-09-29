@@ -747,3 +747,19 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   - 存档：`S.inv = {sack, belt, stash, pending}`，`S.eqPlus.weapon`；旧存档的药剂自动迁入腰带/储物箱。首级对象在格子里是不可枚举属性，不进 JSON。
 - **改动点**：`worlds.js`（populate `node.loot`、buildNode `Sack.placeLoot`、onDeath 尸体、hitPlayer 打断、power ×磨刀石、takeHead/capture/bossWin 走格子、leaveHome/dieNow、interNear 取最近、onKey Tab/B/E/H、openChest、HUD `🎒 格 · 💀`）；`ui.js`（finishTrip `Sack.homeArrive`、equip 页）；`game.js`（倒袋结束 `Sack.pourPending`、洞里 H）；`rpg.js`（eqSum 附魔加成）；`foe.js`（导出 `hasHead`）；`mods.js`（`sack_grid`）；`index.html` 加 `js/sack.js`。
 - 测试：`_tools/wsack.py`（野外容器/翻找/拖动/菜单/倒袋/回洞）、`_sk.html`（洞里储物·附魔·合成，gitignored）。
+
+## 第十九轮（陈列/地图 Agent）：流畅度 II —— 不改画面的渲染减负（追加）
+用户：「大幅度优化游戏流畅度，不影响画面效果」。
+**实测结论**（CDP CPU profile + renderer.info，_t.html，22 座陈列 + 211 颗首级）：每帧 ~9000 次 draw call / 750 万三角形；游戏逻辑 JS 每帧仅 ~3ms，
+瓶颈在 three.js 逐网格提交。首级占 ~6400 次（每颗 ~30 网格），篝火点光源立方体阴影 ~500 次/帧，其余（洞窟+建筑）~500。
+帧率一低 game.js 自适应就会降画质档/关阴影/降分辨率 → 减负就是保画面。
+- 新文件 **js/perf2.js**（MOD `perf2`，cat perf，默认开；mods.js 在 `lod` 后插一项；index.html 在 `rites.js` 后加 `<script src="js/perf2.js">`）。未改 game.js / lod.js / heads.js。
+  - ① **阴影缓存**：包一层 `G.renderer.render`，只在 `HOOK.pre` 之后那一次主场景渲染里：先 `scene.updateMatrixWorld()`，
+    对所有 castShadow 网格逐项比较（世界矩阵、链上可见性、geometry id/position.version、morph 权重、材质 id、instance 版本）+ 投影光源位置/范围/贴图，
+    有变化才 `light.shadow.needsUpdate=true`（投影光源 `shadow.autoUpdate=false`），另外每 60 帧兜底重画；本次渲染临时 `matrixWorldAutoUpdate=false` 避免重复遍历。
+    只作用于 G.scene 里的投影光源（出猎世界不受影响）。副作用（好的）：lod 替身拍照不再顺带重画立方体阴影。静止场景实测每帧省 ~35% draw call。
+  - ② **首级静态合批**：9m 内完整显示的首级，把 hb.group 下「同材质、同 renderOrder、无 morph、无模板、非透明、默认 onBeforeCompile、无 userData、链上无骨骼」的网格
+    按相对 hb.group 的矩阵烘成一个 `p2merge` 网格（负行列式翻转绕序），原网格 `visible=false` + `userData.p2hid`（保留引用）。带骨骼的首级整颗跳过；
+    `hb.dispose` 被包一层释放合并几何。每颗 ~30 → ~22 网格。像素对比（暂停主循环同帧渲染合并前后）：均值差 0.0004，>8 的像素 0.001%。
+  - 调试：`window.__p2={shadow:false,merge:false}`；`Perf2.stat()`；`Perf2.mergeAll()`。
+- 工具（/home/user/bak/tools，不在仓库）：prof.py（CPU profile）、sstat.js/sbreak.js（场景负载拆分）、calls*.js（每帧 draw call）、ab.py / det.py（像素 A/B）。
