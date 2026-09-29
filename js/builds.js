@@ -25,6 +25,7 @@ window.BuildCat = (() => {
   const flameMats = {};
   const fMat = (col, op) => { const k = col + op; if (!flameMats[k]) flameMats[k] = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, blending: THREE.NormalBlending, depthWrite: false, fog: false, side: THREE.DoubleSide }); return flameMats[k]; };
   const flame = (x, y, z, s = 1, col = '#ff9a3a') => {
+    if (window.Assets && Assets.img && Assets.img('fire')) { const af = Assets.flame(x, y, z, s, col); if (af) return af; } // 第十三轮：序列帧火焰
     const g = new THREE.Group();
     const c = new THREE.Color(col);
     const f = mesh(new THREE.ConeGeometry(0.055 * s, 0.2 * s, 10, 1, true), fMat(col, 0.32), 0, 0.1 * s, 0); g.add(f);

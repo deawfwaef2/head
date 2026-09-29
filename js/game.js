@@ -224,7 +224,7 @@ window.startGame = function () {
     const i = builds.indexOf(b); if (i >= 0) builds.splice(i, 1);
     if (b.heads) { b.heads.forEach(h => { if (h) { h.mount = null; h.sleep = 0; } }); b.heads.fill(null); }
     scene.remove(b.g); if (b.label) b.label.remove();
-    b.g.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
+    b.g.traverse(o => { if (o.isMesh && !o.geometry.__shared) o.geometry.dispose(); });
     rebuildColliders(); persistBuilds();
   }
   function persistBuilds() { S.builds = builds.map(b => ({ type: b.type, x: +b.x.toFixed(2), z: +b.z.toFixed(2), rot: +(+b.rot).toFixed(4) })); }

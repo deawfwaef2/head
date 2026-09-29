@@ -24,7 +24,7 @@ window.Assets = (() => {
         else if (k.startsWith('img_')) { const t = new THREE.Texture(await loadImg(A[k])); t.encoding = THREE.sRGBEncoding; t.needsUpdate = true; IMG[k.slice(4)] = t; }
         else {
           const sc = await parseGLB(A[k]);
-          sc.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; const m = o.material; if (m && m.isMeshStandardMaterial) { m.envMapIntensity = 0.35; if (m.map) m.map.anisotropy = 8; } } });
+          sc.traverse(o => { if (o.isMesh) { o.geometry.__shared = true; o.castShadow = true; o.receiveShadow = true; const m = o.material; if (m && m.isMeshStandardMaterial) { m.envMapIntensity = (m.metalness > 0.5 && m.roughness < 0.3) || m.roughness < 0.12 ? 0.1 : 0.35; if (m.map) m.map.anisotropy = 8; } } });
           MODELS[k] = sc;
         }
       } catch (e) { console.warn('asset', k, e); }
@@ -41,7 +41,7 @@ window.Assets = (() => {
     if (envTex || !hdriSrc) return envTex;
     const c = document.createElement('canvas'); c.width = hdriSrc.width; c.height = hdriSrc.height; const g = c.getContext('2d'); g.drawImage(hdriSrc, 0, 0);
     const d = g.getImageData(0, 0, c.width, c.height).data; const n = c.width * c.height; const hf = new Uint16Array(n * 4);
-    for (let i = 0; i < n; i++) { const e = d[i * 4 + 3]; const f = e ? Math.pow(2, e - 136) : 0; hf[i * 4] = THREE.DataUtils.toHalfFloat(d[i * 4] * f); hf[i * 4 + 1] = THREE.DataUtils.toHalfFloat(d[i * 4 + 1] * f); hf[i * 4 + 2] = THREE.DataUtils.toHalfFloat(d[i * 4 + 2] * f); hf[i * 4 + 3] = THREE.DataUtils.toHalfFloat(1); }
+    for (let i = 0; i < n; i++) { const e = d[i * 4 + 3]; let f = e ? Math.pow(2, e - 136) : 0; const mx = Math.max(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]) * f; if (mx > 1.5) f *= 1.5 / mx; /* 压住洞口阳光，防止镜面/黄铜反射过曝 */ hf[i * 4] = THREE.DataUtils.toHalfFloat(d[i * 4] * f); hf[i * 4 + 1] = THREE.DataUtils.toHalfFloat(d[i * 4 + 1] * f); hf[i * 4 + 2] = THREE.DataUtils.toHalfFloat(d[i * 4 + 2] * f); hf[i * 4 + 3] = THREE.DataUtils.toHalfFloat(1); }
     const t = new THREE.DataTexture(hf, c.width, c.height, THREE.RGBAFormat, THREE.HalfFloatType); t.mapping = THREE.EquirectangularReflectionMapping; t.magFilter = t.minFilter = THREE.LinearFilter; t.flipY = true; t.needsUpdate = true;
     const pm = new THREE.PMREMGenerator(renderer); envTex = pm.fromEquirectangular(t).texture; pm.dispose(); t.dispose();
     // 只给外部资产材质挂环境光（首级保持原有调校）
@@ -78,5 +78,36 @@ window.Assets = (() => {
     m.customProgramCacheKey = () => 'tri1' + (opt.flat ? 'f' : '');
     return m;
   }
-  return { init, has, clone, part, names, tex: n => TEX[n], img: n => IMG[n], env, triplanar, get models() { return MODELS; } };
+  // 序列帧火焰（建筑用：烛台/火把/火盆），onBeforeRender 自驱动，无需全局 tick
+  let _gl = null;
+  const glowT = () => { if (_gl) return _gl; const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.3, 'rgba(255,255,255,0.35)'); r.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); return (_gl = new THREE.CanvasTexture(c)); };
+  function flame(x, y, z, s, col) {
+    s = s || 1; const img = IMG.fire; if (!img) return null;
+    const g = new THREE.Group(); g.position.set(x || 0, y || 0, z || 0); g.userData.flame = true;
+    const c = new THREE.Color(col || '#ff9a3a'), hsl = {}; c.getHSL(hsl);
+    const warm = hsl.h > 0.02 && hsl.h < 0.14; // 橙黄火保持贴图原色，其它颜色（魂火）染色
+    const tint = warm ? new THREE.Color(2.2, 1.35, 0.8) : new THREE.Color(1, 1, 1).lerp(c, 0.75).multiplyScalar(2.2);
+    const t = img.clone(); t.needsUpdate = true; t.repeat.set(0.2, 0.2);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, color: tint, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false }));
+    sp.center.set(0.5, 0.08); sp.scale.set(0.2 * s, 0.3 * s, 1); sp.raycast = () => {};
+    const ph = Math.random() * 25, spd = 24 + Math.random() * 8;
+    sp.onBeforeRender = () => { const fr = Math.floor(performance.now() * 0.001 * spd + ph) % 25; t.offset.set((fr % 5) * 0.2, 1 - (Math.floor(fr / 5) + 1) * 0.2); };
+    g.add(sp);
+    const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowT(), color: (warm ? new THREE.Color('#ff8a3a') : c).clone().multiplyScalar(0.5), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false }));
+    gl.scale.setScalar(0.3 * s); gl.position.y = 0.05 * s; gl.raycast = () => {}; g.add(gl);
+    return g;
+  }
+  // 把模型按目标尺寸放进一个组：o = { w, h, d（任给其一=等比；给多个=分轴）, x, y, z, ry, rx, rz }
+  function fit(name, o) {
+    o = o || {}; const m = o.node ? part(name, o.node) : clone(name); if (!m) return null;
+    const inner = new THREE.Group(); if (o.ry) m.rotation.y = o.ry; inner.add(m); inner.updateMatrixWorld(true);
+    const bb = new THREE.Box3().setFromObject(m), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
+    m.position.set(-c.x, -bb.min.y, -c.z);
+    const ks = [o.w && o.w / sz.x, o.h && o.h / sz.y, o.d && o.d / sz.z].filter(Boolean); const u = ks.length ? ks[0] : 1;
+    if (ks.length > 1) inner.scale.set(o.w ? o.w / sz.x : u, o.h ? o.h / sz.y : u, o.d ? o.d / sz.z : u); else inner.scale.setScalar(u);
+    const out = new THREE.Group(); out.add(inner); out.position.set(o.x || 0, o.y || 0, o.z || 0); out.rotation.set(o.rx || 0, 0, o.rz || 0);
+    out.userData.size = new THREE.Vector3(sz.x * inner.scale.x, sz.y * inner.scale.y, sz.z * inner.scale.z);
+    return out;
+  }
+  return { flame, fit, init, has, clone, part, names, tex: n => TEX[n], img: n => IMG[n], env, triplanar, get models() { return MODELS; } };
 })();
