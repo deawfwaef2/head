@@ -854,3 +854,15 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - `js/mods.js` 移除 face_morph 条目；`js/heads.js` 不再生成 `look.fm`，渲染时 `FM = null`（旧存档里的 fm 被忽略，脸恢复原模型）。faceMorph/fwWrap 函数暂留为死代码，可删。
 - 用户新要求：多下载高评分基础头模（MMD 等），越多越好、要多样；用户表示仓库之后会改成私人。战斗体验要“大师级”，现在违和、低级、不爽。
 - 注意：仓库 ~340MB，超过工作区 128MB → 在 /tmp 用 `--depth 1` 克隆操作，不要克隆进 /home/user。
+
+## 第二十二轮（续 3）：魂印 24 种 + 书与笔记「名字对证」（UI Agent）
+用户需求：书（世界观）与笔记（多样内容）当战利品；文中角色名特殊颜色；读书时鼠标释放 + ✕ 关闭；洞里可“拿书”指向名字，与洞里同名的头对证 → 这颗头获得新词条；设计更多词条并让 UI 更直观；书/笔记的名字 60% 来自已有首级、40% 来自世界里活着的猎物；一本书一个名字只能领一次。
+- **魂印（词条）9 → 24**：`js/rpg.js` `AFF` 每项加 `cat`（yield 产出/play 把玩/show 展示/fight 战力/lore 典籍）；`src:'lore'` 的 4 种（通晓 sage、先知 oracle、遗骨 relic、天命 destiny）不会随机出现，只能靠读书对证得到。新增 wild：博识 scholar、贵胄 noble、回响 echo、悬赏犬 bounty、守魂 guardian、战魂 warlord、疾风 windrunner、魂匠 keeper、回春 regen、扛首 porter、师承 mentor。导出 `RPG.AFF_CAT/AFF_WILD/AFF_LORE/affHTML(k,'card'|'pill')`。
+- **效果钩子**（`js/game.js`）：`yieldOf`（scholar/noble/sage）、`exhibit`（noble/sage 评分）、`trigger`（echo、scholar 经验、destiny、lucky）、`doubleX`（relic ×8）、`submitBounty`（bounty ×1.5）、悬赏 aff 类只抽 `AFF_WILD`；**展示在洞里的头给玩家属性**：新增 `headBonus()`（1 秒缓存，每种最多计 5 颗）→ 并入 `st()`：guardian 生命 +12、warlord 力量/凶威 +1、windrunner 敏捷 +2、keeper 魂力 +1、regen 洞内回血 +40%、porter 出猎容量 +1（最多 +3）、mentor 狩猎经验 +6%（`G.xpMul()`，worlds.js `gainXp` 使用，小数累计在 `S._xf`）。`js/seance.js`：oracle ×3。
+- **词条 UI**：`RPG.affHTML`；首级详情（`js/ui.js`）改成分类色条卡片（图标+名称+类别标签+说明，头部有“魂印 N”摘要）；图鉴卡/准星提示用彩色小标签 `.a-pill`；CSS 在 `index.html`（`.affs .aff`、`.a-pill`）与 `css/ui3a.css` 末尾。
+- **书与笔记**（MOD `books`，默认开）：`js/bookdata.js`（固定世界观书 12 本 + 碎片词库 + 页边批注）、`js/books.js`（生成/阅读器/持书/对证/典籍页签）。笔记 10 种模板（日记/通缉令/书信/遗书/账本/审讯记录/猎人手记/祷文/名册/酒馆闲话）；书/典籍含：九个地区风物志（带霸主与名人录）、魂印通鉴（从 `RPG.AFF` 现场生成）、洞窟年鉴、九位霸主纪、《食人魔的第一课》等；霸主尸体必掉“霸主手记”典籍。物品 id `note/book/tome`（`kind:'book'`，`o.bk` 是内容，会进存档 JSON），3D 图标来自 Quaternius `Book/Book2/Book3`（已追加进 `items/items.js`，CC0）。
+- **名字**：文中 `⟦名字⟧` 标记 → 金（洞里有她）/ 红（还没找到）/ 青✔（已对证）。生成时 `drawer()`：60% 取 `S.heads`，40% 取 `Worlds.peekPrey(r)`（新增，必要时提前 `populate` 节点；结果与真正进入一致），都没有则 `Lore.makeCharacter` 现编。`bk.cl[name]` 记录已领取。
+- **读**：麻袋菜单/“📖 典籍”页签 → 阅读（`#bkRead`，鼠标释放，✕ 或 Esc 关闭，点名字看状态，洞里有“对证”按钮）。**持书**（仅洞里）：“拿在手里” → 左下角手持面板 + 屏幕指向标记（T 切换指向名字、Y 阅读），对准名字吻合的头按左键对证（`HOOK.click`/`HOOK.tip`）。
+- **奖励**：`claim()` 按 `hash(bookId|name)` 确定性地给一枚魂印（tome 75%/book 45%/note 20% 概率是典籍类，其余 wild），一颗头最多 6 枚，另赠魂晶。
+- **掉落**：`sack.js` `roll()` 末尾调用 `Books.rollLoot`（宝箱 26%、木箱 13%、尸体 15%…）；`inv()` 里首次调用 `Books.starter` 送一本教程书 + 一张笔记；`corpse()` 的 `extra.B` 带霸主信息。
+- 测试：`_tools/wv/books.html` 是无游戏依赖的阅读器/对证测试页（需要把 `bosses.js` 放在同目录，见提交说明）；整包游戏 headless 仍会 OOM，未整体跑过——**用户请重点试：洞里典籍页签、拿书对证、野外搜箱出书**。

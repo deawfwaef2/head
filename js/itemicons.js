@@ -3,7 +3,7 @@
 window.ItemIcons = (() => {
   const MAP = { w0: 'WoodenStaff', w1: 'Hammer_Small', w2: 'Sword_2', w3: 'Hammer_Double', w4: 'Axe_Double', w5: 'Scythe', w6: 'Claymore',
     a1: 'Shield_Round', a2: 'Shield_Heater', a3: 'Shield_Heater_2', a4: 'Shield_Celtic_Golden', a5: 'Shield_Round_2',
-    iron: 'Bars', cloth: 'Rollofpaper', herb: 'Potion5', dust: 'Potion2', hide: 'Carpet', bone: 'Bones', wood: 'Barrel', gem: 'Gems#2', potion: 'Potion', bigpotion: 'Potion3', bandage: 'Scroll', whet: 'Rock1' };
+    iron: 'Bars', cloth: 'Rollofpaper', herb: 'Potion5', dust: 'Potion2', hide: 'Carpet', bone: 'Bones', wood: 'Barrel', gem: 'Gems#2', potion: 'Potion', bigpotion: 'Potion3', bandage: 'Scroll', note: 'Book', book: 'Book2', tome: 'Book3', whet: 'Rock1' };
   const nameOf = (id) => MAP[id] || (/^h\d/.test(id) ? 'KnightHelmet' : /^c\d/.test(id) ? 'Gems#' + [0, 1, 3, 4, 5, 6][(+id.slice(1) - 1) % 6] : /^b\d/.test(id) ? 'Chest' : null);
   const on = () => !(window.Mods && Mods.on('item_3d') === false);
   let P = null, ready = false, R = null, sc = null, cam = null, root = null; const models = {}, cache = {}, cbs = [];
@@ -21,7 +21,7 @@ window.ItemIcons = (() => {
     }));
   }
   // 这几个 FBX 的材质颜色在导出时丢失（全白）→ 按网格顺序上色
-  const TINT = { Barrel: [0x8a5a2e, 0x5a5f66, 0x6b4423], KnightHelmet: [0x8f98a3, 0x8f98a3, 0xb08a3a, 0x7a828d], Rollofpaper: [0xe4d8bd], Scroll: [0xe8dcc0], Gems: [0xff2a3a, 0x2a6aff, 0x2aff6a, 0xffd02a, 0xb02aff, 0x2affe0, 0xf4f4ff] };
+  const TINT = { Barrel: [0x8a5a2e, 0x5a5f66, 0x6b4423], KnightHelmet: [0x8f98a3, 0x8f98a3, 0xb08a3a, 0x7a828d], Rollofpaper: [0xe4d8bd], Book: [0x8a6a3e], Scroll: [0xe8dcc0], Gems: [0xff2a3a, 0x2a6aff, 0x2aff6a, 0xffd02a, 0xb02aff, 0x2affe0, 0xf4f4ff] };
   function tintAll() {
     for (const k of Object.keys(TINT)) { const m = models[k]; if (!m) continue; let i = 0; const ms = [];
       m.traverse(o => { if (o.isMesh) { const mats = Array.isArray(o.material) ? o.material : [o.material]; const same = mats.length; mats.forEach((mt, j) => { const c = TINT[k][k === 'Gems' ? ms.length % 7 : i % TINT[k].length]; if (mt.color && (mt.color.getHex() === 0xffffff)) { mt.color.setHex(c); mt.map = null; mt.needsUpdate = true; } if (k !== 'Gems') i++; }); ms.push(o); } });

@@ -73,6 +73,7 @@ window.Sack = (() => {
     if (!(window.Worlds && Worlds.active)) S.inv.sack.items = S.inv.sack.items.filter(o => o.id !== 'head' || o.h); // 读档后失效的首级格子
     const [w, h] = BAGSZ[Math.min(BAGSZ.length - 1, S.eq.bag || 0)]; S.inv.sack.w = w; S.inv.sack.h = h;
     for (const L of [S.inv.sack.items, S.inv.stash, S.inv.pending]) for (const o of L) if (o && o.u >= uid) uid = o.u + 1;
+    if (window.Books && Books.starter) try { Books.starter(S.inv); } catch (e) { console.warn('Books.starter', e); }
     return S.inv;
   }
   // ---- 格子运算 ----
@@ -90,7 +91,7 @@ window.Sack = (() => {
   const canAdd = (g, o) => addTo({ w: g.w, h: g.h, items: g.items.map(q => Object.assign({}, q)) }, Object.assign({}, o), false);
   const stashAdd = (o) => { const st = inv().stash, d = IT[o.id]; if (d.st > 1) for (const q of st) if (q.id === o.id && !q.plus) { q.n += o.n; return; } delete o.x; delete o.y; delete o.r; st.push(o); };
   const RN = ['凡魂', '灵魂', '英魂', '圣魂', '神魂'];
-  const nameOf = (o) => o.id === 'head' && o.h ? `【${RN[o.h.c.rar] || ''}】${o.h.c.name}` : (IT[o.id] ? IT[o.id].n : o.id) + (o.plus ? ` +${o.plus}` : '');
+  const nameOf = (o) => o.bk ? `《${o.bk.ti}》` : o.id === 'head' && o.h ? `【${RN[o.h.c.rar] || ''}】${o.h.c.name}` : (IT[o.id] ? IT[o.id].n : o.id) + (o.plus ? ` +${o.plus}` : '');
   const rarOf = (o) => o.id === 'head' && o.h ? o.h.c.rar : (IT[o.id] ? IT[o.id].rar : 0);
 
   // ---- 掉落 ----
@@ -113,6 +114,7 @@ window.Sack = (() => {
     else if (kind === 'rack') { out.push(rollW(r, lv, 0.4)); if (r() < 0.4) add('whet', 1, 1); }
     else if (kind === 'corpse') { mats(1 + Math.floor(r() * 2), ['cloth', 'cloth', 'bone', 'hide', 'iron', 'dust']); if (extra && extra.armed && r() < 0.4) out.push(rollW(r, lv, 0));
       if (r() < 0.12) add('potion', 1, 1); if (extra && extra.boss) { out.push(rollEquip(r, lv, 1.5)); out.push(rollW(r, lv, 1.5)); add('gem', 1, 2); add('dust', 6, 12); } }
+    { const bkI = window.Books && Books.rollLoot(r, kind, lv, extra); if (bkI) out.push(bkI); } // 第二十二轮：书与笔记
     return out;
   }
   // worlds.populate：给地点分配容器（只定种类，物品首次打开时再按种子生成）
@@ -139,7 +141,7 @@ window.Sack = (() => {
   }
   function corpse(fo, W) { // 敌人死后：尸体可搜
     if (!on() || !W || !W.B) return; const nd = W.graph.nodes[W.cur];
-    const L = { kind: 'corpse', name: `${fo.h.c.name}的尸体`, lv: lvOf(nd), seed: ((((fo.h.look && fo.h.look.seed) || Math.floor(Math.random() * 1e6)) * 2654435761) >>> 0), items: null, extra: { armed: fo.armed, boss: !!fo.boss }, x: fo.pos.x, z: fo.pos.z, fo };
+    const L = { kind: 'corpse', name: `${fo.h.c.name}的尸体`, lv: lvOf(nd), seed: ((((fo.h.look && fo.h.look.seed) || Math.floor(Math.random() * 1e6)) * 2654435761) >>> 0), items: null, extra: { armed: fo.armed, boss: !!fo.boss, B: fo.boss || null }, x: fo.pos.x, z: fo.pos.z, fo };
     W.B.inter.push({ kind: 'loot', L, x: L.x, z: L.z, corpse: true });
   }
   function carcass(b, W) { // 第二十二轮：野兽尸骸（不掉首级，只有材料）
@@ -311,12 +313,14 @@ window.Sack = (() => {
   function renderCave() {
     const I = inv(), S = G.S;
     if (I.pending.length) pourPending();
-    const tabs = `<div class="sk-tabs">${[['items', '🎒 储物 · 麻袋'], ['ench', '🔮 附魔强化'], ['craft', '🔨 合成']].map(([k, n]) => `<button class="sk-btn ${caveTab === k ? 'on' : ''}" data-tab="${k}">${n}</button>`).join('')}<span style="margin-left:auto;color:#f3d9a0">🔮 ${Math.floor(S.coins).toLocaleString()}</span></div>`;
+    const tabs = `<div class="sk-tabs">${[['items', '🎒 储物 · 麻袋'], ['ench', '🔮 附魔强化'], ['craft', '🔨 合成']].concat(window.Books && Books.on() ? [['books', '📖 典籍']] : []).map(([k, n]) => `<button class="sk-btn ${caveTab === k ? 'on' : ''}" data-tab="${k}">${n}</button>`).join('')}<span style="margin-left:auto;color:#f3d9a0">🔮 ${Math.floor(S.coins).toLocaleString()}</span></div>`;
     let body = '';
     if (caveTab === 'items') {
       const st = I.stash.slice().sort((a, b) => ((IT[b.id] || {}).kind === 'equip') - ((IT[a.id] || {}).kind === 'equip') || rarOf(b) - rarOf(a));
       body = `<div class="sk-cols"><div class="sk-col"><h4>📦 储物箱 <small>点击物品：装进麻袋 / 装备 / 使用 / 分解（洞里整理不计时）</small></h4><div class="sk-list" id="skCont" style="max-width:${CELL * 9}px">${st.map(o => tile(o, '')).join('') || '<span style="color:#877">空空如也——去野外搜刮吧。</span>'}</div></div>${sackHtml(I)}</div>
         <div class="sk-foot">武器与装备只能在野外搜刮（容器、武器架、尸体、霸主）。回洞倒袋时，麻袋里的所有东西都会倒出来：首级进洞，其余进储物箱。</div>`;
+    } else if (caveTab === 'books' && window.Books) {
+      body = Books.tabHtml(I.sack.items.concat(I.stash));
     } else if (caveTab === 'ench') {
       const p = S.eqPlus.weapon || 0, c = enchCost(p), t = RPG.EQUIP.weapon.tiers[S.eq.weapon || 0];
       const need = (id, n) => n ? `<span class="${have(id) >= n ? 'ok' : 'no'}">${IT[id].icon}${IT[id].n} ${have(id)}/${n}</span>` : '';
@@ -328,6 +332,7 @@ window.Sack = (() => {
         return `<div class="sk-rc"><span class="nm" style="color:${RARC[d.rar]}">${d.icon} ${d.n}${rc.n > 1 ? '×' + rc.n : ''}</span><span class="nd">${Object.entries(rc.need).map(([k, n]) => `<span class="${have(k) >= n ? 'ok' : 'no'}">${IT[k].icon}${IT[k].n} ${have(k)}/${n}</span>`).join(' ')} · <span class="${S.coins >= rc.coin ? 'ok' : 'no'}">🔮${rc.coin}</span><br><small>${esc(d.desc || '')}</small></span><button class="sk-btn" data-craft="${i}" ${ok ? '' : 'disabled'}>合成</button></div>`; }).join('');
     }
     panel.innerHTML = tabs + body; bind(panel);
+    if (caveTab === 'books' && window.Books) Books.bindTab(panel, I.sack.items.concat(I.stash));
   }
   function findU(u) { const I = inv(); u = +u; for (const [where, L] of [['sack', I.sack.items], ['stash', I.stash], ['cont', cont ? itemsOf(cont) : []]]) { const o = L.find(q => q.u === u); if (o) return [o, where]; } const bi = I.belt.findIndex(q => q && q.u === u); if (bi >= 0) return [I.belt[bi], 'belt', bi]; return [null]; }
   function bind(root) {
@@ -370,10 +375,11 @@ window.Sack = (() => {
       if (where === 'sack') { acts.push(['放回储物箱', () => { I.sack.items.splice(I.sack.items.indexOf(o), 1); stashAdd(o); render(); }]); if (d.kind === 'equip') acts.push(['装备', () => { I.sack.items.splice(I.sack.items.indexOf(o), 1); equip(o, stashAdd); render(); }]); }
       if (where === 'belt') acts.push(['放回储物箱', () => { I.belt[bi] = null; stashAdd(o); render(); }]);
     }
+    if (d.kind === 'book' && o.bk && window.Books && (where === 'sack' || where === 'stash')) acts.unshift(...Books.menu(o, wild));
     if (!acts.length) return;
     closeMenu(); menuEl = document.createElement('div'); menuEl.className = 'sk-menu';
     const miu = window.ItemIcons && ItemIcons.url(o.id);
-    menuEl.innerHTML = (miu ? `<div class="mi"><img src="${miu}" alt=""></div>` : '') + `<div class="t" style="color:${RARC[rarOf(o)]}">${d.icon || ''} ${esc(nameOf(o))}${o.n > 1 ? ' ×' + o.n : ''}</div>${d.desc || o.h ? `<div class="d">${esc(o.h ? `${RN[o.h.c.rar] || ''} · 回洞倒袋时滚出来` : d.desc)}</div>` : ''}` + acts.map((a, i) => `<div data-i="${i}">${a[0]}</div>`).join('');
+    menuEl.innerHTML = (miu ? `<div class="mi"><img src="${miu}" alt=""></div>` : '') + `<div class="t" style="color:${RARC[rarOf(o)]}">${d.icon || ''} ${esc(nameOf(o))}${o.n > 1 ? ' ×' + o.n : ''}</div>${d.desc || o.h || o.bk ? `<div class="d">${esc(o.h ? `${RN[o.h.c.rar] || ''} · 回洞倒袋时滚出来` : o.bk ? `${o.bk.sub || ''}（${o.bk.names.length} 个名字）` : d.desc)}</div>` : ''}` + acts.map((a, i) => `<div data-i="${i}">${a[0]}</div>`).join('');
     document.body.appendChild(menuEl); menuEl.style.left = Math.min(innerWidth - 180, e.clientX + 4) + 'px'; menuEl.style.top = Math.min(innerHeight - 40 - acts.length * 30, e.clientY + 4) + 'px';
     menuEl.querySelectorAll('[data-i]').forEach(el => el.onmousedown = (ev) => { ev.stopPropagation(); const a = acts[+el.dataset.i]; closeMenu(); a[1](); });
     setTimeout(() => addEventListener('mousedown', closeMenu, { once: true }), 0);
@@ -409,5 +415,5 @@ window.Sack = (() => {
     if (e.code === 'KeyH') { e.preventDefault(); e.stopImmediatePropagation(); quickUse(); return; }
   }, true);
   function frame(dt) { if (buffT > 0) buffT -= dt; tick(dt); }
-  return { on, IT, RECIPES, inv, lvOf, genLoot, placeLoot, corpse, carcass, openWild, toggleWild, closePanel, mountCave, frame, interrupt, queueHead, capture, heads, tripEnd, onDeath, pourPending, homeArrive, quickUse, dmgMul, usage, itemsOf, roll, addTo, canAdd, get panelOpen() { return mode === 'wild' && !!panel; }, get queue() { return Q; } };
+  return { on, IT, def, mk, RECIPES, inv, lvOf, genLoot, placeLoot, corpse, carcass, openWild, toggleWild, closePanel, mountCave, frame, interrupt, queueHead, capture, heads, tripEnd, onDeath, pourPending, homeArrive, quickUse, dmgMul, usage, itemsOf, roll, addTo, canAdd, get panelOpen() { return mode === 'wild' && !!panel; }, get queue() { return Q; } };
 })();

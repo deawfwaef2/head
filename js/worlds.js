@@ -1086,5 +1086,11 @@ window.Worlds = (() => {
       if (n.i === W.cur) { g.fillStyle = '#ffd060'; g.font = 'bold 13px sans-serif'; g.fillText('▲ 你在这里', x, y + rad + 15); } });
   }
 
-  return { start, frame, onKey, onDown, stop, get active() { return !!W; }, get _W() { return W; }, STYLES, REGION, genGraph, genWorld, need, warm, warmRegion, _debug: { goto: (i) => W && goto(i, W.cur), buildNode, targets } };
+  // 第二十二轮：书里的名字要取“这趟世界里还活着的猎物”。没进过的地点也可以提前 populate（按节点种子，结果与真正进入时一致）
+  function peekPrey(r) {
+    if (!W || !W.graph) return null; const ns = W.graph.nodes.filter(n => !n.home && !n.boss); if (!ns.length) return null;
+    for (let t = 0; t < 6; t++) { const nd = ns[Math.floor(r() * ns.length)]; if (!nd.prey) { try { populate(nd); } catch (e) { return null; } } if (nd.prey && nd.prey.length) { const h = nd.prey[Math.floor(r() * nd.prey.length)]; if (h && h.c) return { c: h.c, where: `${nd.loc.n}·${nd.name}` }; } }
+    return null;
+  }
+  return { start, frame, onKey, onDown, stop, peekPrey, get active() { return !!W; }, get _W() { return W; }, STYLES, REGION, genGraph, genWorld, need, warm, warmRegion, _debug: { goto: (i) => W && goto(i, W.cur), buildNode, targets } };
 })();
