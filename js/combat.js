@@ -96,12 +96,29 @@ window.Combat = (() => {
     if (btn === 2) S.rmb = false;
     return true;
   }
+  // 第二十一轮（用户）：挥砍（按住左键）灵敏度不降低，但镜头按武器重量带惯性（越重越"拖"、松手前会继续滑一点）；不按住没有惯性；
+  //   格挡（按住右键）灵敏度更低 ×0.3。MOD wpn_feel（默认开）；关掉恢复第二十轮的 ×0.42/×0.45。
+  const FEEL = () => !window.Mods || !Mods.on || Mods.on('wpn_feel');
+  const LK = { tx: 0, ty: 0, cx: 0, cy: 0, vx: 0, vy: 0 };
+  function lookLmb(dx, dy) { if (!FEEL()) return 0.42; LK.tx += dx; LK.ty += dy; return 0; }
+  function lookTau() { return 0.035 + 0.085 * Math.max(0, Math.min(1, (S.wt - 0.8) / 0.7)); } // 轻刀 35ms · 重锤 120ms
+  function drainLook(dt, flush) {
+    if (!LK.tx && !LK.ty && !LK.cx && !LK.cy) return;
+    const P = G.player; if (!P) return;
+    if (flush) { const ax = LK.tx - LK.cx, ay = LK.ty - LK.cy; P.yaw -= ax * 0.0022; P.pitch = Math.max(-1.45, Math.min(1.45, P.pitch - ay * 0.0022)); LK.tx = LK.ty = LK.cx = LK.cy = LK.vx = LK.vy = 0; return; }
+    const tau = S.lmb ? lookTau() : 0.03, w = 2 / tau, x = w * dt, e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x); // 临界阻尼 smoothDamp
+    const step = (c, t, v) => { const ch = c - t, tmp = (v + w * ch) * dt; return [t + (ch + tmp) * e, (v - w * tmp) * e]; };
+    const [nx, vx] = step(LK.cx, LK.tx, LK.vx), [ny, vy] = step(LK.cy, LK.ty, LK.vy);
+    const ax = nx - LK.cx, ay = ny - LK.cy; LK.cx = nx; LK.cy = ny; LK.vx = vx; LK.vy = vy;
+    P.yaw -= ax * 0.0022; P.pitch = Math.max(-1.45, Math.min(1.45, P.pitch - ay * 0.0022));
+    if (Math.abs(LK.tx - LK.cx) < 0.05 && Math.abs(LK.ty - LK.cy) < 0.05 && Math.abs(vx) + Math.abs(vy) < 0.5) { drainLook(0, true); }
+  }
   // 返回镜头转动系数：挥砍/格挡时鼠标主要用于控制武器
   function onMove(dx, dy) {
     if (!drawn) return 1;
-    if (S.lmb && XH()) { S.mAcc.x += dx; S.mAcc.y -= dy; S.drag += Math.hypot(dx, dy) * 0.0062; return 0.42; }
-    if (S.lmb) { const k = 0.0062; S.ctrl.x += dx * k; S.ctrl.y -= dy * k; S.drag += Math.hypot(dx, dy) * k; const r = Math.hypot(S.ctrl.x, S.ctrl.y); if (r > 1.25) { S.ctrl.x *= 1.25 / r; S.ctrl.y *= 1.25 / r; } return 0.42; } // 旧：鼠标控制武器轨迹 // 第十八轮：挥砍 = 刀尖锁在准星上，鼠标只转镜头
-    if (S.rmb) { S.guard.x += dx * 0.022; S.guard.y -= dy * 0.022; const r = Math.hypot(S.guard.x, S.guard.y); if (r > 1) { S.guard.x /= r; S.guard.y /= r; } return window.Mods && Mods.on('guard_slowlook') ? 0.45 : 1; } // 第十九轮：用户要求格挡时降灵敏度
+    if (S.lmb && XH()) { S.mAcc.x += dx; S.mAcc.y -= dy; S.drag += Math.hypot(dx, dy) * 0.0062; return lookLmb(dx, dy); }
+    if (S.lmb) { const k = 0.0062; S.ctrl.x += dx * k; S.ctrl.y -= dy * k; S.drag += Math.hypot(dx, dy) * k; const r = Math.hypot(S.ctrl.x, S.ctrl.y); if (r > 1.25) { S.ctrl.x *= 1.25 / r; S.ctrl.y *= 1.25 / r; } return lookLmb(dx, dy); } // 旧：鼠标控制武器轨迹 // 第十八轮：挥砍 = 刀尖锁在准星上，鼠标只转镜头
+    if (S.rmb) { S.guard.x += dx * 0.022; S.guard.y -= dy * 0.022; const r = Math.hypot(S.guard.x, S.guard.y); if (r > 1) { S.guard.x /= r; S.guard.y /= r; } return FEEL() ? 0.3 : (window.Mods && Mods.on('guard_slowlook') ? 0.45 : 1); } // 第十九轮：用户要求格挡时降灵敏度
     return 1;
   }
   function queueThrust() { if (S.thrust > 0.55 || S.thrust === 0) { S.thrust = 0.0001; S.thrustSide = -S.thrustSide; S.stam -= 9; SFX.play('draw', 0.35, 1.5); } else S.thrustQ = Math.min(2, S.thrustQ + 1); }
@@ -140,6 +157,7 @@ window.Combat = (() => {
   const _t = new V3(), _b = new V3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4(), _x = new V3(), _y = new V3(), _z = new V3(), UP = new V3(0, 1, 0);
   const _tipW = new V3(), _baseW = new V3(), _vel = new V3(), _seg = new V3(), _cp = new V3();
   function update(dt, now) {
+    drainLook(dt, !drawn || !wpn || G.uiOpen);
     if (!drawn || !wpn) { if (hud && hud.d.style.display !== 'none' && !drawn) hud.d.style.display = 'none'; if (threatSrc && !G.uiOpen) drawOverlay(now); else if (ov) { if (ovDirty) { ov.g.clearRect(0, 0, 560, 560); ovDirty = false; } ov.eKey = ''; ov.edge.style.opacity = 0; } return; } // 第十九轮：没拔刀也提示来刀
     if (G.uiOpen) { S.lmb = S.rmb = false; }
     // 顿帧：武器冻结一小会，屏震衰减
