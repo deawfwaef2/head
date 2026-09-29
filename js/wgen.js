@@ -188,18 +188,19 @@ window.WGen = (() => {
   const PIECES = {
     fallen: { n: '倒卧巨木', st: 'forest swamp meadow wilds ruins peak', need: ['dead_tree_trunk', 'root_cluster_01'], rad: 6 },
     watch: { n: '残破哨塔', st: 'ruins fortress wilds capital abyss meadow', need: ['modular_fort_01', 'rock_07'], rad: 6 },
-    graves: { n: '荒墓', st: 'forest ruins swamp meadow capital abyss', need: ['rock_face_02', 'dead_tree_trunk_02'], rad: 6 },
+    graves: { n: '荒墓', st: 'forest ruins swamp meadow capital abyss', need: ['rock_09', 'rock_07', 'dead_tree_trunk_02', 'dead_quiver_trunk'], rad: 6 },
     cache: { n: '遗弃补给', st: 'meadow forest wilds swamp fortress capital peak ruins', need: ['wooden_crate_02', 'wooden_barrels_01', 'wicker_basket_01', 'wooden_bucket_01'], rad: 4 },
     gate: { n: '无门之门', st: 'ruins forest wilds peak abyss meadow swamp', need: [], rad: 3.5 },
     idol: { n: '神像广场', st: 'capital ruins fortress abyss meadow', need: ['gothic_statue', 'horse_statue_01'], rad: 7 },
     boulders: { n: '巨岩群', st: 'wilds peak forest meadow abyss swamp', need: ['namaqualand_boulder_03', 'namaqualand_boulder_04', 'rock_moss_set_01'], rad: 6 },
     fairy: { n: '花环', st: 'meadow forest swamp ruins', need: ['flower_gazania', 'flower_empodium', 'tree_stump_02'], rad: 4.5 },
     lanterns: { n: '灯径', st: 'capital fortress ruins meadow forest', need: ['street_lamp_01'], rad: 3 },
-    parlor: { n: '遗落的客厅', st: 'wilds forest meadow swamp ruins', need: [], rad: 4, rare: 1 },
+    parlor: { n: '遗落的野餐', st: 'wilds forest meadow swamp ruins capital', need: ['wooden_picnic_table', 'painted_wooden_bench', 'wooden_stool_01', 'wicker_basket_01', 'wooden_barrels_01'], rad: 4 },
     pyre: { n: '焚烧堆', st: 'abyss wilds fortress ruins swamp', need: ['dead_tree_trunk', 'dry_branches_medium_01'], rad: 4 },
     ring: { n: '立石环', st: 'meadow forest wilds ruins peak swamp abyss', need: ['namaqualand_boulder_04', 'rock_face_02', 'rock_face_01'], rad: 6 }
   };
   function pickPieces(r, node, sn, g) {
+    if (window.__wgenForce && window.__wgenForce[node.i]) return [Object.assign({ k: window.__wgenForce[node.i] }, PIECES[window.__wgenForce[node.i]])];
     const ok = Object.keys(PIECES).filter(k => PIECES[k].st.split(' ').includes(sn) && !(PIECES[k].rare && r() > 0.22)), cnt = node.size === 's' ? (r() < 0.65 ? 1 : 0) : node.size === 'm' ? 1 + (r() < 0.45 ? 1 : 0) : 2 + (r() < 0.5 ? 1 : 0), out = [];
     for (let i = 0; i < cnt && ok.length; i++) { const k = ok.splice(Math.floor(r() * ok.length), 1)[0]; out.push(Object.assign({ k }, PIECES[k])); }
     return out;
@@ -315,8 +316,9 @@ window.WGen = (() => {
     const light = (x, y, z, col, I, D) => { if (X.lights.n >= 2) return; X.lights.n++; const pl = new THREE.PointLight(col, I, D, 2); pl.position.set(x, y, z); sc.add(pl); return pl; };
     const one = (names) => { const vs = variants(names); return vs.length ? vs[Math.floor(r() * vs.length)] : null; };
     const wdOK = (x, z, rad) => !g.wd || g.wd(x, z).d > rad + 1.2;
-    const spotFor = (rad) => { for (let t = 0; t < 80; t++) { const a = r() * 6.283, d = R * (0.1 + r() * 0.62), x = Math.cos(a) * d, z = Math.sin(a) * d;
-      if (!free(x, z, rad) || !wdOK(x, z, rad) || Math.hypot(x, z) + rad > R - 1.5) continue; if (LP && LP.pathD && LP.pathD(x, z) < rad + 0.6) continue; if (doorList.some(dd => Math.hypot(dd.x - x, dd.z - z) < rad + 5)) continue; return [x, z]; } return null; };
+    const spotFor = (rad0) => { const why = { free: 0, wd: 0, edge: 0, path: 0, door: 0 }; g.why = why; for (let t = 0; t < 160; t++) { const rad = t < 60 ? rad0 : t < 110 ? rad0 * 0.7 : rad0 * 0.45, a = r() * 6.283, d = R * (0.06 + r() * 0.72), x = Math.cos(a) * d, z = Math.sin(a) * d;
+      if (Math.hypot(x, z) + rad > R - 1.5) { why.edge++; continue; } if (!free(x, z, rad)) { why.free++; continue; } if (!wdOK(x, z, rad)) { why.wd++; continue; } if (LP && LP.pathD && LP.pathD(x, z) < rad + 0.6) { why.path++; continue; } if (doorList.some(dd => Math.hypot(dd.x - x, dd.z - z) < rad + 5)) { why.door++; continue; } return [x, z]; } return null; };
+    const putH = (name, x, z, o, ry, dy) => { const v = one([name]); if (!v) return 0; const sz = v.t.size, k = o.h ? o.h / Math.max(0.1, sz.y) : o.w / Math.max(0.1, sz.x, sz.z); put(v.t, x, z, k, ry, dy != null ? H(x, z) + dy : undefined); return k; };
     const axis = (v, th) => v.t.size.x >= v.t.size.z ? -th : Math.PI / 2 - th; // 让模型长轴指向 th
     const B = {
       fallen(x, z) { const a0 = r() * 6.283, vs = variants(['dead_tree_trunk', 'dead_tree_trunk_02']), n = 1 + (r() < 0.5 ? 1 : 0);
@@ -330,20 +332,20 @@ window.WGen = (() => {
         const rk = variants(['rock_07']); for (let i = 0; i < 6 && rk.length; i++) { const a = r() * 6.28, d = 2.5 + r() * 3.5; put(rk[0].t, x + Math.cos(a) * d, z + Math.sin(a) * d, (0.4 + r() * 0.5) / Math.max(0.3, rk[0].t.size.x), r() * 6.28); }
         const f = fitR('stone_fire_pit', { w: 1.0 }); if (f) { const fx = x + 3, fz = z + 1.5; place(f, fx, fz, 0); flame(fx, H(fx, fz) + 0.12, fz, 4); light(fx, H(fx, fz) + 0.9, fz, '#ff9a50', 1.8, 10); cols.push({ x: fx, z: fz, r: 0.6 }); }
         for (let i = 0; i < 3; i++) { const a = r() * 6.28; spots.push({ x: x + Math.cos(a) * 5, z: z + Math.sin(a) * 5 }); } },
-      graves(x, z) { const vs = variants(['rock_face_02']), rows = 2 + (r() < 0.5 ? 1 : 0), per = 4 + Math.floor(r() * 3), a0 = r() * 3.14, ca = Math.cos(a0), sa = Math.sin(a0);
-        for (let i = 0; i < rows; i++) for (let j = 0; j < per; j++) { if (r() < 0.12 || !vs.length) continue; const u = (j - (per - 1) / 2) * 1.9 + (r() - 0.5) * 0.4, w = (i - (rows - 1) / 2) * 2.4 + (r() - 0.5) * 0.4, px = x + u * ca - w * sa, pz = z + u * sa + w * ca, v = vs[0], hgt = 0.9 + r() * 0.7, s = hgt / Math.max(0.3, v.t.size.y);
+      graves(x, z) { const vs = variants(['rock_09', 'rock_07']), qt = variants(['dead_quiver_trunk']), rows = 2 + (r() < 0.5 ? 1 : 0), per = 4 + Math.floor(r() * 3), a0 = r() * 3.14, ca = Math.cos(a0), sa = Math.sin(a0);
+        for (let i = 0; i < rows; i++) for (let j = 0; j < per; j++) { if (r() < 0.12 || !vs.length) continue; const isQ = qt.length && r() < 0.4, u = (j - (per - 1) / 2) * 1.9 + (r() - 0.5) * 0.4, w = (i - (rows - 1) / 2) * 2.4 + (r() - 0.5) * 0.4, px = x + u * ca - w * sa, pz = z + u * sa + w * ca, v = isQ ? qt[0] : vs[Math.floor(r() * vs.length)], hgt = isQ ? 1.3 + r() * 0.7 : 0.55 + r() * 0.45, s = hgt / Math.max(0.3, v.t.size.y);
           put(v.t, px, pz, s, a0 + Math.PI / 2 + (r() - 0.5) * 0.25, H(px, pz) - 0.12 * s); cols.push({ x: px, z: pz, r: 0.42 }); }
         const ln = fitR('Lantern_01', { h: 0.4 }); if (ln) { place(ln, x + 0.7, z + 0.4, 0, 0); flame(x + 0.7, H(x + 0.7, z + 0.4) + 0.2, z + 0.4, 1.2); light(x + 0.7, H(x, z) + 1, z + 0.4, '#ffb070', 1.0, 7); }
         const dt = variants(['dead_tree_trunk_02']); if (dt.length) { const th = a0 + 1.4; put(dt[0].t, x + Math.cos(th) * (per * 1.1 + 2), z + Math.sin(th) * (per * 1.1 + 2), 4.5 / Math.max(dt[0].t.size.x, dt[0].t.size.z), axis(dt[0], a0)); }
         for (let i = 0; i < 3; i++) spots.push({ x: x + (r() - 0.5) * 8, z: z + (r() - 0.5) * 6 }); },
       cache(x, z) { const ry = r() * 6.28, f = fitR('stone_fire_pit', { w: 0.9 }); place(f, x, z, 0); if (f) { flame(x, H(x, z) + 0.12, z, 3.6); light(x, H(x, z) + 0.9, z, '#ff9a50', 1.6, 9); cols.push({ x, z, r: 0.6 }); }
-        const items = [['wooden_crate_02', { w: 0.8 }, 2.0, 1.2], ['wooden_barrels_01', { h: 0.95 }, -2.1, 0.9], ['wicker_basket_01', { w: 0.5 }, -1.4, -1.9], ['wooden_bucket_01', { w: 0.42 }, 1.6, -1.7], ['wooden_crate_02', { w: 0.7 }, 2.6, 2.2]];
-        for (const it of items) { const o = fitR(it[0], it[1]); if (!o) continue; const [px, pz] = loc(it[2], it[3], x, z, ry); place(o, px, pz, r() * 6.28); cols.push({ x: px, z: pz, r: 0.4 }); }
+        const items = [['wooden_crate_02', { w: 0.9 }, 2.0, 1.2], ['wooden_barrels_01', { h: 1.0 }, -2.1, 0.9], ['wicker_basket_01', { w: 0.55 }, -1.4, -1.9], ['wooden_bucket_01', { w: 0.45 }, 1.6, -1.7], ['wooden_crate_02', { w: 0.75 }, 2.6, 2.2]];
+        for (const it of items) { const [px, pz] = loc(it[2], it[3], x, z, ry); if (putH(it[0], px, pz, it[1], r() * 6.28)) cols.push({ x: px, z: pz, r: 0.42 }); }
         mark(x, z, 3.5); for (let i = 0; i < 2; i++) { const a = r() * 6.28; spots.push({ x: x + Math.cos(a) * 3.4, z: z + Math.sin(a) * 3.4 }); } },
       gate(x, z) { const ry = r() * 6.28, gt = fitR('large_iron_gate', { h: 3.6 }); place(gt, x, z, ry); const rk = variants(['rock_09', 'rock_07']);
         for (const sx of [-1, 1]) { const [px, pz] = loc(sx * 2.2, 0, x, z, ry); if (rk.length) put(rk[0].t, px, pz, 1.6 / Math.max(0.3, rk[0].t.size.y), r() * 6.28); flame(px, H(px, pz) + 0.9, pz, 2.4); cols.push({ x: px, z: pz, r: 0.7 }); }
         light(x, H(x, z) + 2, z, '#9ab8ff', 1.3, 9); const [bx, bz] = loc(0, 2.2, x, z, ry); spots.push({ x: bx, z: bz }, { x: bx + 1.5, z: bz }); },
-      idol(x, z) { const horse = r() < 0.4, nm = horse ? 'horse_statue_01' : 'gothic_statue', o = fitR(nm, { h: horse ? 3.6 : 3.0 }); place(o, x, z, r() * 6.28); cols.push({ x, z, r: 1.1 });
+      idol(x, z) { const horse = r() < 0.4, nm = horse ? 'horse_statue_01' : 'gothic_statue'; putH(nm, x, z, { h: horse ? 3.8 : 3.2 }, r() * 6.28); cols.push({ x, z, r: 1.1 });
         const n = 5 + Math.floor(r() * 3), a0 = r() * 6.28; for (let i = 0; i < n; i++) { const a = a0 + i / n * 6.283, px = x + Math.cos(a) * 4.6, pz = z + Math.sin(a) * 4.6, f = fitR('stone_fire_pit', { w: 0.8 }); if (!f) break; place(f, px, pz, a); if (i % 2 === 0) flame(px, H(px, pz) + 0.1, pz, 3); cols.push({ x: px, z: pz, r: 0.5 }); }
         light(x, H(x, z) + 2.4, z, '#ffb070', 1.7, 12); mark(x, z, 5.5); for (let i = 0; i < 3; i++) { const a = a0 + (i + 0.5) / 3 * 6.283; spots.push({ x: x + Math.cos(a) * 3, z: z + Math.sin(a) * 3 }); } },
       boulders(x, z) { const vs = variants(['namaqualand_boulder_03']), sm = variants(['rock_moss_set_01#*']), n = 5 + Math.floor(r() * 4);
@@ -358,11 +360,12 @@ window.WGen = (() => {
         for (let i = 0; i < 3; i++) { const a = r() * 6.28; spots.push({ x: x + Math.cos(a) * 3.6, z: z + Math.sin(a) * 3.6 }); } },
       lanterns(x, z) { const a = r() * 6.28, n = 5, dx = Math.cos(a), dz = Math.sin(a), bent = (r() - 0.5) * 0.5;
         for (let i = 0; i < n; i++) { const t = (i - (n - 1) / 2) * 5, aa = a + bent * (i - 2) * 0.2, px = x + dx * t + Math.cos(aa + 1.57) * Math.sin(i) * 0.6, pz = z + dz * t + Math.sin(aa + 1.57) * Math.sin(i) * 0.6; if (!wdOK(px, pz, 1) || Math.hypot(px, pz) > R - 1.5) continue;
-          const o = fitR('street_lamp_01', { h: 3.6 }); place(o, px, pz, aa); cols.push({ x: px, z: pz, r: 0.3 }); flame(px, H(px, pz) + 3.15, pz, 2.2); if (i === 0 || i === n - 1 || i === 2) light(px, H(px, pz) + 3.1, pz, '#ffc27a', 1.3, 9); }
+          if (!putH('street_lamp_01', px, pz, { h: 3.6 }, aa)) continue; cols.push({ x: px, z: pz, r: 0.3 }); flame(px, H(px, pz) + 3.1, pz, 2.2); if (i === 0 || i === n - 1 || i === 2) light(px, H(px, pz) + 3.1, pz, '#ffc27a', 1.3, 9); }
         spots.push({ x: x + dx * 2.5 + dz * 2, z: z + dz * 2.5 - dx * 2 }, { x: x - dx * 2.5 - dz * 2, z: z - dz * 2.5 + dx * 2 }); },
-      parlor(x, z) { const ry = r() * 6.28, A = window.Assets; if (!A) return; const list = [['Sofa_01', { w: 1.9 }, 0, 0.6, 0], ['Television_01', { w: 0.8 }, 0, -2.2, Math.PI], ['Rockingchair_01', { w: 0.8 }, -2.2, 0.2, 0.6], ['ClassicConsole_01', { w: 1.1 }, 2.4, -0.8, -1.4], ['chinese_armchair', { w: 0.85 }, 2.0, 1.6, -0.4]];
-        for (const it of list) { const o = fitR(it[0], it[1]); if (!o) continue; const [px, pz] = loc(it[2], it[3], x, z, ry); place(o, px, pz, ry + it[4]); cols.push({ x: px, z: pz, r: 0.6 }); }
-        spots.push({ x: x + 2.5, z: z + 2.5 }); },
+      parlor(x, z) { const ry = r() * 6.28, T = [['wooden_picnic_table', { w: 2.6 }, 0, 0, 0], ['painted_wooden_bench', { w: 1.8 }, 0, 1.7, 0], ['painted_wooden_bench', { w: 1.8 }, 0, -1.7, Math.PI], ['wooden_stool_01', { h: 0.5 }, 2.4, 0.4, 0.5], ['wicker_basket_01', { w: 0.5 }, -2.0, 1.6, 1], ['wooden_barrels_01', { h: 0.9 }, -2.6, -0.8, 0]];
+        for (const it of T) { const [px, pz] = loc(it[2], it[3], x, z, ry); if (putH(it[0], px, pz, it[1], ry + it[4])) cols.push({ x: px, z: pz, r: 0.6 }); }
+        const ln = fitR('Lantern_01', { h: 0.4 }); if (ln) { place(ln, x, z, 0, 0.78); flame(x, H(x, z) + 0.95, z, 1.1); light(x, H(x, z) + 1.4, z, '#ffb070', 0.9, 7); }
+        mark(x, z, 3.6); spots.push({ x: x + 3, z: z + 1.5 }, { x: x - 3, z: z - 1.5 }); },
       pyre(x, z) { const vs = variants(['dead_tree_trunk', 'dead_tree_trunk_02']), br = variants(['dry_branches_medium_01#*']); let layer = 0;
         for (let i = 0; i < 9 && vs.length; i++) { const lay = Math.floor(i / 3), v = vs[i % vs.length], th = lay * 1.05 + (i % 3) * 1.05 + r() * 0.2, L = 3.2 - lay * 0.5, s = L / Math.max(v.t.size.x, v.t.size.z); put(v.t, x, z, s, axis(v, th), H(x, z) + lay * 0.32); layer = lay; }
         for (let i = 0; i < 5 && br.length; i++) { const a = r() * 6.28, d = 1.4 + r() * 1.6; put(br[0].t, x + Math.cos(a) * d, z + Math.sin(a) * d, 1.2 + r() * 0.6, r() * 6.28); }
@@ -398,6 +401,7 @@ window.WGen = (() => {
     }
     // -- 布景
     try { buildPieces(g, X); } catch (e) { console.warn('wgen pieces', e); }
+    { const got = new Set((g.placed || []).map(q => PIECES[q.k].n)); g.tag = g.tag.filter(t => !g.pieces.some(p => p.n === t) || got.has(t)); }
     // -- 光束
     const sd = X.sunDir; if (g.shafts && sd && sd.y > 0.15) { const grp = new THREE.Group(), n = 7 + Math.floor(r() * 6), mats = [], q = new THREE.Quaternion().setFromUnitVectors(new V3(0, 1, 0), sd.clone().normalize());
       for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * R * 0.95, x = Math.cos(a) * d, z = Math.sin(a) * d, Lh = 26 + r() * 14, w = 1.6 + r() * 3.4, mt = new THREE.MeshBasicMaterial({ map: softTex('beam'), color: g.sunCol, transparent: true, opacity: 0.1 + r() * 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }); mt.userData.b = mt.opacity; mt.userData.ph = r() * 6.28; mats.push(mt);
