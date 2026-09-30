@@ -55,7 +55,7 @@ window.FaceFill = (() => {
       reflectedLight.directSpecular *= mix(0.3, 0.7, _sk); reflectedLight.indirectSpecular *= mix(0.35, 0.8, _sk); /* 头发/衣服：硬高光压到 30%，不再是一块块塑料反光 */
       reflectedLight.indirectSpecular += vec3(1.0, 0.93, 0.88) * 0.035 * _fr * _dk * _sk; }`;
   function sssPatch(sh) { if (!sssOn() || sh.fragmentShader.indexOf('SSS_BLOCK') >= 0 || sh.fragmentShader.indexOf('#include <lights_fragment_end>') < 0) return; sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n' + SSS_GLSL); }
-  function inject(sh, k, toon, hp) {
+  function inject(sh, k, toon, hp, head) {
     if (!toon) { animePatch(sh); sssPatch(sh); }
     sh.uniforms.uFill = u; if (hp) sh.uniforms.uHeadK = hk; if (toon) { sh.uniforms.uEnvA = ea; sh.uniforms.uKneeOff = ko; }
     if (toon) sh.fragmentShader = sh.fragmentShader.replace('float _s = clamp(_t / _ex, 0.0, 1.3);', 'float _s = clamp(_t / _ex, 0.0, 1.3); if (uKneeOff > 1.001) { float _t2 = _ex <= 1.0 ? _ex : 1.0 + (uKneeOff - 1.0) * (1.0 - exp((1.0 - _ex) / (uKneeOff - 1.0))); _s = _t2 / _ex; }');
@@ -66,12 +66,12 @@ window.FaceFill = (() => {
       { vec3 litC = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse; float al = max(dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)), 1e-3) * 0.3183; // 与上面软膝盖同单位：满光≈1.08
         float lr = dot(litC, vec3(0.299, 0.587, 0.114)) / al; float fc = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
         totalEmissiveRadiance += diffuseColor.rgb * 0.3183 * max(0.0, uFill * ${k.toFixed(2)} - lr) * (0.45 + 0.55 * fc); }`);
-    if (window.CharLight) CharLight.patch(sh); // R47 char_unify
+    if (window.CharLight) CharLight.patch(sh, toon || head); // R47 char_unify（head：头材质 → 弱化自身投影）
   }
   const HPBR_OBC = function (sh) { animePatch(sh); sssPatch(sh); sh.uniforms.uHeadK = hk; sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform float uHeadK;\nvoid main() {').replace('#include <lights_physical_fragment>', 'diffuseColor.rgb *= uHeadK;\n#include <lights_physical_fragment>'); }; // R33：head_pbr 头材质的默认注入（hair/skin 自带 onBeforeCompile 的由 wrap 注入同一句）
   function wrap(m, k) { // 包一层 onBeforeCompile（clone() 不会复制它：克隆后要重新包）
     if (!m || !(m.isMeshToonMaterial || (m.isMeshStandardMaterial && window.Mods && (Mods.on('char_lift') || Mods.on('char_unify')))) || done.has(m)) return m; /* R29 char_lift：身体默认是 PBR 标准材质（foe_toon 关）→ 以前完全没补光，洞里发黑 */ const prev = m.customProgramCacheKey(), o = m.onBeforeCompile;
-    const toon = !!m.isMeshToonMaterial, hp = !!(m.userData && m.userData.hpbr) && o !== HPBR_OBC; m.onBeforeCompile = function (sh, r) { o.call(this, sh, r); inject(sh, k, toon, hp); }; m.customProgramCacheKey = () => prev + '|ff' + k + (toon ? 'e' : '') + (hp ? 'h' : '') + (animeOn() ? 'A' : '') + (sssOn() ? 'S' : '') + (window.CharLight && CharLight.on() ? 'U' : ''); done.add(m); return m;
+    const toon = !!m.isMeshToonMaterial, hp = !!(m.userData && m.userData.hpbr) && o !== HPBR_OBC; const head = !!(m.userData && m.userData.hpbr); m.onBeforeCompile = function (sh, r) { o.call(this, sh, r); inject(sh, k, toon, hp, head); }; m.customProgramCacheKey = () => prev + '|ff' + k + (toon ? 'e' : '') + (hp ? 'h' : '') + (animeOn() ? 'A' : '') + (sssOn() ? 'S' : '') + (window.CharLight ? CharLight.key() + (head ? 'h' : '') : ''); done.add(m); return m;
   }
   return { u, wrap, tune, hk, HPBR_OBC, animeOn, sssOn, world() { worldT = performance.now(); }, env(c) { if (c) envA.copy(c).multiplyScalar(0.55); else envA.setRGB(0, 0, 0); } };
 })();

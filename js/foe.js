@@ -102,6 +102,7 @@ window.Foe = (() => {
     const local = new M4().multiplyMatrices(inv, want); local.decompose(holder.position, holder.quaternion, holder.scale);
     hb.group.scale.setScalar(fit.s); holder.add(hb.group); headBone.add(holder);
     hb.group.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+    if (window.CharLight) CharLight.dress(root); // R47 char_outline：勾线外壳（身体+头）
     return { root, bones, E, hb, holder, cut, fit, look, bodyName, alive: true };
   }
   // ---- 动作重定向：UAL 世界旋转增量 → 这具身体的局部旋转（每个身体模板算一次，克隆体共用 AnimationClip）----
