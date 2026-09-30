@@ -603,11 +603,15 @@ window.ModelHeads = (() => {
     const u = (rg) => rg[0] + (rg[1] - rg[0]) * r(), q = (v) => +v.toFixed(4);
     return { t: T.n, ew: q(u(T.ew)), eh: q(u(T.eh)), tilt: q(u(T.tilt)), sp: q(u(T.sp)), dy: q(u(T.dy)), bs: q(u(T.bs)), bt: q(u(T.bt)), bdy: q(u(T.bdy)), fx: q(u(T.fx)), fy: q(u(T.fy)), fz: q(u(T.fz)) };
   }
+  /* R31 MOD head_qc：逐个目检后仍然怪异、暂不能修的头模（八云紫 PMD 脸皮与全身同一材质→发白发光；黑鸟 帽子整个盖住脸），不进随机池/混发池；已存档的头照常显示 */
+  const QC_BAD = ['CLS_YakumoYukari', 'NTE_Blackbird'];
+  const qcBad = (i) => !!(T[i] && QC_BAD.includes(T[i].meta.file) && window.Mods && Mods.on('head_qc'));
   function randomLook(r, race = {}, rarity = 0) {
-    const faceIdx = race.faces ? Math.max(0, idxOf(pick(r, race.faces))) : tierFace(r(), rarity); // 第二十五轮 MOD tier_look：按魂阶加权挑脸模
+    let faceIdx = race.faces ? Math.max(0, idxOf(pick(r, race.faces))) : tierFace(r(), rarity); // 第二十五轮 MOD tier_look：按魂阶加权挑脸模
+    for (let k = 0; k < 12 && qcBad(faceIdx); k++) faceIdx = tierFace(r(), rarity);
     const face = T[faceIdx];
     const grp = face.meta.grp || 'vroid';
-    const allHair = T.map((t, i) => i).filter(i => T[i].hairMeshes.length && !T[i].meta.noHair);
+    const allHair = T.map((t, i) => i).filter(i => T[i].hairMeshes.length && !T[i].meta.noHair && !qcBad(i));
     const compatible = allHair.filter(i => (MIX[grp] || [grp]).includes(T[i].meta.grp || 'vroid'));
     const hairCands = compatible.length ? compatible : allHair;
     const nativeHair = face.hairMeshes.length > 0 && !face.meta.noHair;

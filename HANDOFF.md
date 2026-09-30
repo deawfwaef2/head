@@ -1233,3 +1233,13 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **修复**：声明单独成行；`foeEvent` 拆成 `foeEvent → try { foeEvent0 } catch`，Recall.log / CombatFX.event 也各自 try；`combat.js` 两处 `tg.onHit()` 包 try，出错也按“已命中”进冷却（绝不每帧重复结算）。修后测试台：1 刀 1 次命中，6 种操作（click/flick/hold/wave/mash/drift）都正常击杀。
 - **给后续 agent（重要）**：这是本项目第二次“代码被行尾 `//` 注释吞掉”（第一次是 combat.js 屏震）。**不要把新代码接在已有注释的同一行后面**。检查脚本（我放在 /tmp，未入库，思路很简单）：逐行找 `//` 之后含 `const x =` / `a.b =` / `if (…)` 且以 `;`/`}` 结尾的注释。另外我用 eslint `no-undef`（把所有 `window.X =` 当全局）扫了 js/*.js：除 BODY_MODELS/BEAST_GLB（数据文件定义）外只发现 `sanctum.js:581 hs[0].NM(rec.c)`（rec 未定义）→ 已改为 `NM(hs[0].rec.c)`。
 - 测试台用法补充：`tools/test/fight.html` 需要 `big/anim/ual.js` 和部分 `big/body/*.js`（稀疏克隆要 `git sparse-checkout add`）；`bots.js` 不是页面自带，drive.py 第一步用 `(0,eval)(bots源码)` 注入。
+
+## R31b — 用户：“卡芙卡头有问题！看上去非常怪异！你检查！”（逐个目检所有非 VRoid 头）
+- **根因 1（切掉嘴/下巴）**：tools/vrm2head.py 用“IRIS 材质”定位眼睛→按眼睛推切口。部分模型把墨镜/发饰也命名成 EYE_Iris（卡芙卡墨镜在头顶）→ 眼睛被定位偏高→切口切到嘴。修：只保留与眼白高度重叠的虹膜图元（打印 `R31 eye filter: drop [...]`）。
+- **根因 2（长脖子/颈部肉团）**：同一 bug 反向——12 个原神头的脑后发饰被命名为 Iris → 眼睛偏低→切口低 10~25cm（申鹤脖子上一团肉、绫华/芙宁娜长颈）。同上修复后重转。
+- **根因 3（脸皮没识别）**：tools/pmx2vrm.py 新增：繁体「顏」(海瑟音)、材质名 `head`(女士怪物版)、プロセカ VBS `mtl_chr_NN`/`mtl_chr_ehl`、通用名材质改看日文贴图名（顔.png/眼球.bmp，结月缘 ver7）、环境变量 `FACE_MATS=材质名,...` 手动指定（秦始皇「新規」）。
+- **重转 21 个头**（models/ 覆盖）：HSR_Kafka HSR_Hysilens CLS_Yukari CLS_MikuVBS CLS_LLHonoka CLS_LLNozomi GI_LaSignora NTE_Blackbird CLS_QinYYB（commit 3376782）+ GI_YaeMiko KukiShinobu HuTao Beidou Clorinde Ganyu Eula Furina KamisatoAyaka Nilou Rosaria Shenhe。
+- 检查指标（新增头时请跑）：FACE_SKIN 最低点 − cut.y 应 ≤ ~0.03（>0.04 = 长脖子）；(眼白最低点−cut.y)/(头顶−cut.y) 应 ≈0.2~0.35（<0.15 = 切到嘴）。工具：/home/user/bak/tools/glbinfo.py。
+- **MOD `head_qc`**（默认开，js/heads.js randomLook 前 QC_BAD + js/mods.js）：CLS_YakumoYukari（PMD 脸皮与全身同一材质→发白发光）、NTE_Blackbird（帽子盖住整张脸）不进随机池/混发池；存档里已有的照常显示。以后修好可从 QC_BAD 移除。
+- 仍可留意：ZZZ_Lucia 下巴下有一片独立切口圆片（装到身体上被脖子挡住，未处理）；CLS_YakumoRan/CLS_RemTda 颈略长（0.04~0.06，装身体上看着正常）。
+- 改动文件：js/heads.js（randomLook 前 +QC_BAD/qcBad，allHair 过滤）、js/mods.js（+head_qc）、tools/vrm2head.py、tools/pmx2vrm.py、models/（21 个）、HANDOFF.md。
