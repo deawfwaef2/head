@@ -416,10 +416,10 @@ window.Chess = (() => {
   // ---- 反馈：表情 / 台词气泡 / 飘字 / 横幅 / 粒子 ----
   const EXMAP = { worry: { sad: 0.45, surprised: 0.2 }, sel: { happy: 0.55 }, hov: { relaxed: 0.45, happy: 0.15 }, happy: { happy: 0.85 }, hurt: { sad: 0.8, surprised: 0.45 }, angry: { angry: 0.75 }, shock: { surprised: 0.5 } };
   const sn = c => String(NM(c)).split('·')[0];
-  function face(p, key, dur) { if (p && p.hb) { p.exTimed = key; p.exT = dur || 1; } }
+  function face(p, key, dur) { return; /* R37：头颅不变表情 */ if (p && p.hb) { p.exTimed = key; p.exT = dur || 1; } }
   function plLine(c, key) { const PL = window.PERSONA_LINES; if (!PL || !window.Persona) return ''; const d = PL.p[Persona.archOf(c)]; if (!d) return ''; const ix = []; PL.keys.forEach((k, i) => { if (k === key) ix.push(i); }); return ix.length ? d.l[pickS(ix)] || '' : ''; }
   function toScreen(v3) { const v = v3.clone().project(cam); return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight, z: v.z }; }
-  function talk(p, key, txt) { if (!p || !p.rec || !st) return; const c = p.rec.c; const t = txt || plLine(c, key) || (window.Overhear ? Overhear.bio(c).catch : ''); if (!t) return;
+  function talk(p, key, txt) { return; /* R37：用户要求头颅在棋局中不说话（无气泡） */ if (!p || !p.rec || !st) return; const c = p.rec.c; const t = txt || plLine(c, key) || (window.Overhear ? Overhear.bio(c).catch : ''); if (!t) return;
     while (st.bubs.length >= 3) { const o = st.bubs.shift(); o.el.remove(); }
     const d = document.createElement('div'); d.className = 'ch-bub'; d.style.setProperty('--c', RCOL[c.rar]); d.innerHTML = `<b style="color:${RCOL[c.rar]};font-size:12px">${esc(sn(c))}</b><br>${esc(t)}`; el.appendChild(d); st.bubs.push({ el: d, p, t: 2.4 + t.length * 0.05 }); }
   function floater(text, at, col) { const pos = typeof at === 'number' ? sqPos(at) : at.clone(); pos.y += 0.9; const s = toScreen(pos), d = document.createElement('div'); d.className = 'ch-fl'; d.style.cssText = `left:${s.x}px;top:${s.y}px;--c:${col || '#ffe080'}`; d.textContent = text; el.appendChild(d); setTimeout(() => d.remove(), 1400); }
@@ -544,10 +544,10 @@ window.Chess = (() => {
       const selp = st.selP === p, hov = st.hoverP === p, thr = humTurn && st.threat && st.threat.has(p.sq) && p.s === st.turn;
       p.lift += ((selp ? 0.26 : hov ? 0.11 : 0) - p.lift) * Math.min(1, dt * 12);
       yw.position.y = p.lift + (p.jumpY || 0) + Math.sin(now * 2 + p.sq * 1.7) * 0.022 + (thr ? Math.sin(now * 16) * 0.012 : 0);
-      let d = c.t + (p.s ? -0.1 : 0.1) - yw.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); yw.rotation.y += d * Math.min(1, dt * 7);
+      const base = p.s === 1 ? 0 : Math.PI; let d = base + 0.3 * Math.sin(c.t - base) - yw.rotation.y; /* R37：头朝向对手，仅随镜头小幅偏转（≤0.3rad） */ d = Math.atan2(Math.sin(d), Math.cos(d)); yw.rotation.y += d * Math.min(1, dt * 7);
       const h = yw.position.y; ud.shadow.scale.setScalar(Math.max(0.5, 1 - h * 0.6)); ud.shadow.material.opacity = 0.42 - Math.min(0.2, h * 0.3);
       ud.ring.scale.setScalar(selp ? 1.12 + Math.sin(now * 7) * 0.08 : thr ? 1 + Math.sin(now * 12) * 0.05 : 1); ud.ring.material.color.set(thr ? '#ff3030' : p.s ? '#5ab0ff' : '#ff8a52');
-      if (p.exT > 0) p.exT -= dt; const key = p.exT > 0 ? p.exTimed : thr ? 'worry' : selp ? 'sel' : hov ? 'hov' : '';
+      if (p.exT > 0) p.exT -= dt; const key = ''; /* R37：无表情变化 */
       if (p.hb && key !== p.exKey) { p.exKey = key; try { p.hb.setExpression(EXMAP[key] || {}); } catch (e) {} } }
     // 标记动画
     if (markGroup) markGroup.children.forEach(m => { const k = m.userData.kind, o = m.userData.op; if (k === 'mv') { const s = 1 + Math.sin(now * 5) * 0.15; m.scale.set(s, s, s); } else if (k === 'xs' || k === 'xs2') { m.rotation.z = Math.PI / 4 + Math.sin(now * 3) * 0.25; m.material.opacity = o * (0.7 + 0.3 * Math.sin(now * 6)); }
