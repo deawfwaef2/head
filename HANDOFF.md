@@ -1404,3 +1404,11 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **坑**：worlds.js / foe.js 很多是一行长语句，**不要在行中间插 `//` 注释**（我第一次就把 Recall/CombatFX 调用注释掉了，已修，见 R36-talent fix）。
 - **测试**：`tools/test/talents.html`（假 G/Worlds/Foe 的 UI+引擎台，`VW=1600 VH=900 drive.py` 截图各页）；`tools/test/fight.html` 已加载 foe_abs + talents_data + talents，可用真 `foe.js` 逐个施放 31 个技能（需自己塞 `Worlds._W`/`G.HOOK`/`G.st=()=>RPG.stats(G.S,{})`，见本轮提交记录）。`drive.py` 支持 `VW/VH` 环境变量。完整 index.html 在 2GB 沙箱里跑不起来，**未做整包实机测试**，要看用户反馈（尤其 #wStat/#wHint 位置、`.wskills` 旧条已在 tbon 下隐藏）。
 - R35b 验证（真实游戏，960×540 无头）：C/U/Z 页签切换、Esc 关闭；出洞狩猎界面的地区精英栏和徽标；雾溪村出猎时到达大窗口正常弹出，逐字打字、空格跳过/进入，#arTrack 支线追踪和 #h2Sense 叠放正确。图标 🐦‍⬛ / 𓂀 显示不出来，已换成 🩺 / 🏺。
+
+## R36b（用户：C 下蹲被精英界面占了 / 头像塑料要 3D shader+次表面散射 / 不要头发-头-饰品混搭绑定 / 怎么一下秒 BOSS / 武器属性要更详细）
+- **C 键还给下蹲**：`elites.js` 删掉 C 键监听（R35b 已同步改提示）。精英挑战只在**探索地图（出洞选地点）**每个地区的「👑 精英挑战」栏里看/发起；R35UI 的 `elite` 页签仍可从 U/Z 窗口进。
+- **秒杀 BOSS 的原因与修复**（`foe.js`）：① 破绽中（broken）横砍脖子 = 处决，不看血量（霸主也吃）；② E 处决 `Foe.execute` 直接 `hp=0`；③ 天赋暴击/技能叠乘没有上限。现在：霸主/精英 BOSS/猎手（`fo.boss||fo.hunter||fo.eliteId`）单刀最多扣最大血量 10%；破绽脖子斩与 `Foe.execute` 只有在血量 ≤25% 才真正处决，否则吃一记 15% 重创并提示；天赋 `h_exec/h_storm` 同步。普通敌人不变。
+- **武器详细属性 `js/wpnspec.js`（`window.WpnSpec`）**：只读，用 combat.js 的真实公式算：自重（WEIGHT）、握长、轻击/收招/重击的前摇·出刀·间隔·触及·体力·单击伤害、三连节奏与连击输出、暴击、部位倍率、蓄力时间，并与当前武器逐项对比（▲▼）。显示位置：铁匠台（forge.js 武器卡 + 下一阶折叠对比）、背包悬浮提示（sack.js，紧凑版 `WpnSpec.tip`）。**改 combat.js 的 mmAttack 公式时要同步改这里。**
+- **MOD `skin_sss`（默认开，heads.js `SSS_GLSL`）**：3D 真人皮肤质感。保留 PBR，只对“肤色像素”（按反照率色相/饱和度/亮度判定，头发衣服不受影响）加：明暗交界带血红色散射、背光侧暖色填充、掠射角红色透光边、整体微暖；头发/衣服硬高光压到 30%、皮肤 55~70%，另加极淡油脂光泽。极暗环境不抬亮。**`anime_shade` 默认改为关**（用户要 3D shader 风格；mods.js 迁移 `__v8` 一次性关掉）。测试台 `tools/test/shade.html?sss=0|1&anime=1`（脸朝向 yaw≈2.45~2.7）。
+- **MOD `head_native`（默认开）**：头保持原样。迁移 `__v9` 把 `hair_mix2`（跨头发型）和 `acc_mix`（跨头饰品库）关掉；MMD/原神头不再叠程序化头饰（heads.js HeadWear.build 前的判断）。想要混搭：关 head_native 并手动开那两项。没动 VRoid 系头自己的发型替换。
+- 测试：`fight.html` 里 boss 被 `Foe.execute` 不死（hp 150→127）、`mult:50` 的脖子重击只扣 10%。
