@@ -1161,3 +1161,21 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   - 反馈：选中抬起+光环脉冲+表情；可走/可吃(红)/特殊(金菱)三种落点；被威胁的己方棋子红框脉冲+担心表情；落地挤压拉伸+涟漪+尘粒+轻震屏（吃子 0.3，无慢镜头）；吃子粒子爆发、“斩 +n”飘字、连斩/重创/斩首/将军/晋升横幅、将军红色晕影；台词气泡（PERSONA_LINES：see/fight/taunt/atk/pain/die/fear/low…，每 7–13s 闲聊）；胜负时全军表情+烟花。
   - 调试钩子：`Chess._scr(sq)` 返回该格屏幕坐标，`_st/_move/_gen` 同前。测试页 `_tools/wv/chess.html`（gitignored）。
 - **卡牌 `recall.js` cardHTML**：没有可玩的卡牌游戏（`cardtable` 只是解锁说明），所以做的是**牌面查看器**：大牌面+鼠标倾斜反光（神魂/圣魂/异色有流光箔）、“怎么读这张牌”（费用/攻击/生命含义）、关键词逐条解释、**稻草人试打**（`window.RecallCard.duel`：打出→战吼→攻击/飘字/血条→反击，魂盾/剧毒/吸魂/狂怒/疾风/回响/嘲讽/潜行都有对应演出）。完整卡牌对战未做，属于后续独立系统。
+
+## R27 头模 — 用户：“更多！多来点经典 MMD，日本作者的、大师级的、VOC 的、东方的”（+更多头发/饰品）
+- **新增 26 个头**（models/CLS_*.js，共约 72MB），三个 MOD（js/mods.js 紧跟 pack_nte 之后，cat:'look'，默认开）：
+  - `pack_voc` 9：CLS_MikuAnimasa / MikuYYB10 / MikuRacing / MikuVBS / HakuAnimasa / KaitoAnimasa / MeikoAnimasa / IA / Yukari
+  - `pack_touhou` 4：CLS_Mokou / Kaguya / YakumoRan / YakumoYukari
+  - `pack_cls` 13：CLS_RemTda / Tohru / 2B / Mikasa / Junko / Brahma / QinYYB / LLHonoka / LLEri / LLKotori / LLUmi / LLMaki / LLNozomi
+  - 登记在 js/headpacks.js 的 HEAD_PACKS（沿用 document.write 同步加载，关掉的包不加载）。CREDITS.md 已加“仅限私人使用”条目。
+- **更多头发/饰品**：不另做——hair_mix2 / acc_mix 会自动把这些新 mmd 头的头发和头饰（八云紫帽、八云蓝帽、妹红蝴蝶结、梵天冠、秦冠、雷姆发箍、托尔角…）纳入跨头库，hairFitOK / fitAcc 照常把关。
+- **tools/pmx2vrm.py 修复**（其他 PMX 也受益）：
+  1. 罗马字材质名（kao/kami/mayu/matsuge/kurome/eyebase/mimi）；通用名（材質N/mat N/新規材質）按贴图文件名回退（cls2，正则 `\d` 之前误写成 `\\d` 已修）。
+  2. 面具/仮面/mask → cloth（“面”字曾把面具判成脸皮）；“表情”“shade” → 脸部贴片（hairshade 曾盖住 LoveLive 的脸）。
+  3. SKIN 材质不做 alpha 裁剪（梵天脸贴图带透明通道 → 整张脸被裁掉）。
+  4. PMX 脸皮并在身体皮肤材质里（结月缘「肌」、IA「skin」、秦「body01」）时，按头骨权重拆出脸皮（PMD 早已有）。
+  5. 贴图路径大小写不敏感（八云紫 BodyA.png vs bodyA.png）。
+- tools/pmxread.py：头签名放宽为 `PMX`（2B 的签名是 "PMX."）；PMD 里尾巴骨（尻尾/tail）→ cloth，舌骨 → 歯（八云蓝九尾曾被当“肌”切进头里）。
+- 八云蓝/八云紫用 `--sc 0.9`（原模型偏大，1.25 时 skinW 0.37，比常见 0.21 大）；其余 `--sc 1.25 --hair-drop 0.04 --grp mmd --noflip`。
+- **放弃**：MMJ 初音、日野森雫（PJSK 头身分离文件，仓库里只有身体）；YYB GenZ（vrm2head 内存溢出 >1.6GB）；YYB Base 初音（源仓库缺 Hair.png，头发全白）。
+- 改动文件：js/headpacks.js、js/mods.js（+3 行）、tools/pmx2vrm.py、tools/pmxread.py、models/CLS_*.js、CREDITS.md、HANDOFF.md。未碰 UI Agent 的文件，也未碰 game.js / combat.js。

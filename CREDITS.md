@@ -114,3 +114,10 @@ models/GI_*.js：原神角色 MMD 模型（模型提供 miHoYo，各改造者见
 ## MMD 头模包（第二十五轮，grp: mmd）— ⚠ 仅限私人使用
 models/HSR_*.js（崩坏：星穹铁道，miHoYo）、models/ZZZ_*.js（绝区零，miHoYo）、models/NTE_*.js（异环，Hotta Studio）：各游戏官方发布的 MMD 模型，取自 phoshco.github.io 镜像。
 原规约禁止二次配布与猎奇/血腥用途；用户已知悉并表示仓库将设为私人。**不得公开发布/商用。** 由 js/headpacks.js 按 MOD pack_hsr / pack_zzz / pack_nte 加载。
+
+## 经典日系 MMD 头模包（第二十七轮，grp: mmd）— ⚠ 仅限私人使用
+models/CLS_*.js，由 js/headpacks.js 按 MOD pack_voc / pack_touhou / pack_cls 加载。均非 CC0，原规约大多禁止二次配布及猎奇/血腥用途；用户已知悉并表示仓库设为私人。**不得公开发布/商用。**
+- VOCALOID/VOICEROID：初音未来・KAITO・MEIKO・弱音ハク（あにまさ式，Animasa）；YYB 式初音 10th；Racing Miku 2022；VBS 初音；IA（IA-beta_custom）；結月ゆかり ver7。
+- 东方 Project（上海アリス幻樂団 二次创作）：藤原妹紅、蓬莱山輝夜、八雲藍 Ver1.00B、八雲紫 Ver1.011A。
+- 其他：Tda 式レム（Re:ゼロ）、トール（小林さんちのメイドラゴン）、2B（NieR:Automata）、ミカサ（進撃の巨人）、江ノ島盾子（ダンガンロンパ）、大梵天（深空之眼）、YYB 式秦始皇、LoveLive! μ's 六人（穂乃果・絵里・ことり・海未・真姫・希）。
+- 来源：takahirox/mmd-viewer-js、bear0830/mmd、若干 babylon-mmd 示例仓库中附带的模型；原作者见各模型 readme。转换脚本 tools/pmx2vrm.py + tools/vrm2head.py（只取头部）。
