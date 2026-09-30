@@ -56,3 +56,18 @@ window.__metric = async function () {
 };
 </script>
 <script>window.__dbg = async function () { await ModelHeads.init(); return ModelHeads.cutDbg().join('\n'); };</script>
+<script>
+window.__skin = async function () {
+  await ModelHeads.init(); const out = [];
+  for (const f of ModelHeads.files()) {
+    const base = ModelHeads.randomLook(() => 0.5, {}, 0); const look = Object.assign({}, base, { f, h: f });
+    let hb; try { hb = ModelHeads.create(look); } catch (e) { continue; }
+    const g = hb.group; g.updateMatrixWorld(true); const bs = new THREE.Box3(), ba = new THREE.Box3(); let hs = false;
+    g.traverse(m => { if (!m.isMesh) return; const k = m.userData.kind; const b = new THREE.Box3().setFromObject(m); ba.union(b); if (k === 'skin') { bs.union(b); hs = true; } });
+    const s = bs.getSize(new THREE.Vector3()), a = ba.getSize(new THREE.Vector3());
+    out.push(f + ' grp=' + (hb.meta && hb.meta.grp) + ' skin=' + s.x.toFixed(3) + 'x' + s.y.toFixed(3) + ' all=' + a.y.toFixed(3));
+    hb.dispose && hb.dispose();
+  }
+  return out.join('\n');
+};
+</script>

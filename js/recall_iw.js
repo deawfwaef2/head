@@ -286,7 +286,7 @@ body.riw-on #cross,body.riw-on #tip,body.riw-on #hint,body.riw-on #labels,body.r
     { /* 测量首级：包围盒中心（头局部坐标）与高度 → 姿势整体按 k 缩放（设计基准：头高 0.26m） */
       const q0 = h.g.quaternion.clone(); h.g.quaternion.identity(); h.g.updateMatrixWorld(true);
       const bb = new THREE.Box3().setFromObject(h.hb && h.hb.group ? h.hb.group : h.g), sz = bb.getSize(new THREE.Vector3()), ctr = bb.getCenter(new THREE.Vector3());
-      S.hc = ctr.sub(h.g.position); S.k = Math.max(0.5, Math.min(3, (sz.y || 0.26) / 0.26)); h.g.quaternion.copy(q0); h.g.updateMatrixWorld(true); S.hsz = sz.toArray().map(v => +v.toFixed(3)); }
+      S.hc = ctr.sub(h.g.position); S.k = Math.max(0.5, Math.min(3, (sz.y || 0.26) / 0.26)); { /* R37：非 VRoid 头（MMD 系）的包围盒把发量/发饰/兽耳都算进去（0.27~0.59 vs VRoid 中位 0.30）→ k 偏大 → 手被放大、头显得小。非 VRoid 头的 k 向 VRoid 中位数（1.15）收敛 */ let gp = ''; try { const lk = (h.rec && h.rec.look) || (rec && rec.look); const mt = lk && window.ModelHeads && ModelHeads.meta(lk.f); gp = (mt && mt.grp) || ''; } catch (e) { } if (gp && gp !== 'vroid') { S.kRaw = S.k; S.k = Math.max(1.05, Math.min(1.3, 1.15 + 0.1 * (S.k - 1.15))); } } h.g.quaternion.copy(q0); h.g.updateMatrixWorld(true); S.hsz = sz.toArray().map(v => +v.toFixed(3)); }
     Object.assign(S, { openAt: performance.now(), active: true, h, rec, cb: cb || {}, act: '', t: 0, yaw: 0, pitch: 0, dist: 0, drag: null, play: 0, fov0: G.camera.fov, openT: 0, shake: 0, pend: null });
     cur = null; G.setUI(true); document.body.classList.add('riw-on');
     el.style.display = 'block'; requestAnimationFrame(() => el.classList.add('on')); panel(null); refresh();
