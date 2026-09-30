@@ -128,14 +128,27 @@ window.Combat = (() => {
     const T = pre ? rhSum(ms, 120) : rhSum(ms, 160); if (T.m >= (pre ? 9 : 5)) { const [dx, dy] = snap8(T.x, T.y); return [dx, dy, M.combo >= 2 ? 'fin' : 'light']; }
     return COMBO[M.combo % 3];
   }
+  // 第二十六轮(j)：攻击 CD（MOD atk_cd，默认开；用户：“攻击你最好设计 CD”）——轻斩 0.5s / 三连终结 0.75s / 重斩 0.95s（×√武器重量）才能出下一刀；
+  //   CD 中按左键 = 缓冲一刀，CD 一结束立刻出（不吞输入）；准星外圈细弧显示 CD 进度。关掉 = 原来的无 CD 连斩。
+  const CDM = () => !window.Mods || Mods.on('atk_cd') !== false;
+  let cdEl = null;
+  function mmCdUi() {
+    if (typeof document === 'undefined') return; const ms = performance.now(), on = CDM() && drawn && M.cdUntil > ms && M.cdLen > 0;
+    if (!cdEl) { if (!on) return; cdEl = document.createElement('div'); cdEl.id = 'atkCd'; cdEl.style.cssText = 'position:fixed;left:50%;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;pointer-events:none;z-index:9;transition:opacity .12s';
+      cdEl.innerHTML = '<svg width="34" height="34" viewBox="0 0 34 34"><circle cx="17" cy="17" r="14" fill="none" stroke="#0007" stroke-width="3"/><circle class="p" cx="17" cy="17" r="14" fill="none" stroke="#ffe2b0" stroke-width="2" stroke-linecap="round" stroke-dasharray="88" stroke-dashoffset="88" transform="rotate(-90 17 17)"/></svg>'; document.body.appendChild(cdEl); }
+    cdEl.style.opacity = on ? '0.85' : '0'; if (!on) return;
+    const k = 1 - (M.cdUntil - ms) / M.cdLen; cdEl.querySelector('.p').setAttribute('stroke-dashoffset', (88 * (1 - Math.max(0, Math.min(1, k)))).toFixed(1));
+  }
   function mmAttack(d, type) {
     if (!drawn || S.rmb || S.sw) return false; const heavy = type === 'heavy', fin = type === 'fin';
+    if (CDM() && performance.now() < (M.cdUntil || 0)) { M.buf = performance.now(); M.bufType = heavy ? 'heavy' : null; if (heavy) M.bufD = [d[0], d[1]]; return false; } // CD 中：缓冲
     const as = mmPick(); // 第二十六轮（用户：一直点就没力气、砍不动）：体力 6/9/16 → 4/6/12；范围内没有敌人时空挥只耗 35%（追人、试刀不会被掏空）
     if (!mmSpend((heavy ? 12 : fin ? 6 : 4) * (as ? 1 : 0.35), heavy ? 'charged' : 'swing')) return false;
     const kk = Math.sqrt(S.wt) * ((window.Stamina && Stamina.ex) ? 1.3 : 1), wu = (heavy ? 0.05 : fin ? 0.09 : 0.08) * kk, dur = wu + (heavy ? 0.25 : fin ? 0.22 : 0.15) * kk, pw = heavy ? 1 : fin ? 0.95 : 0.85;
     S.sw = { t: 0, dur, dx: d[0], dy: d[1], pw, charged: heavy, v: new V3(d[0], d[1], 0), hit: false, h0: S.hand.clone(), as, lunged: 0, rk: 1, mm: true, wu, ms0: performance.now(), type, step: M.combo, set: new Set(), sgn: -1, tid: as ? as.tid : null, hold: 0 };
     S.thrust = 0; S.thrustQ = 0; S.hitCd.clear(); S.charge = 0; S.charged = 0; M.buf = 0; M.bufType = null;
     M.combo = heavy ? 0 : (M.combo + 1) % 3; if (fin) M.combo = 0;
+    if (CDM()) { M.cdLen = (heavy ? 950 : fin ? 750 : 500) * Math.sqrt(Math.max(0.6, S.wt || 1)) * ((window.Stamina && Stamina.ex) ? 1.3 : 1); M.cdUntil = performance.now() + M.cdLen; }
     if (window.CombatFX && CombatFX.on) CombatFX.swing(d[0], d[1], pw, heavy); else SFX.play('draw', 0.4, heavy ? 0.9 : 1.3);
     return true;
   }
@@ -153,8 +166,9 @@ window.Combat = (() => {
   function mmTick(dt) { // 每帧：连击超时 / 缓冲输入 / 甩鼠标出刀 / 蓄力
     const ms = performance.now(); if (!S.sw && M.combo && ms - M.endT > 1100) M.combo = 0;
     if (S.rmb) { M.buf = 0; S.charge = 0; return; }
-    if (M.buf && !S.sw && ms - M.endT >= 35) { const ok = ms - M.buf < 320, ty = M.bufType; M.buf = 0; M.bufType = null; if (ok) { if (ty === 'heavy') mmAttack([M.bufD[0], M.bufD[1], 'heavy'], 'heavy'); else { const d = mmDir(ms); mmAttack(d, d[2]); } } }
-    if (S.lmb && !S.sw && ms - M.endT > 45 && ms - S.lmbT > 60) { const T = rhSum(ms, 150); if (T.m >= 5) { // 按住左键 + 鼠标有任何偏移 = 朝那个方向连续出刀（不用大幅甩动）
+    const cdOk = !CDM() || ms >= (M.cdUntil || 0);
+    if (M.buf && !S.sw && ms - M.endT >= 35 && cdOk) { const ok = ms - M.buf < (CDM() ? 480 : 320), ty = M.bufType; M.buf = 0; M.bufType = null; if (ok) { if (ty === 'heavy') mmAttack([M.bufD[0], M.bufD[1], 'heavy'], 'heavy'); else { const d = mmDir(ms); mmAttack(d, d[2]); } } }
+    if (S.lmb && !S.sw && ms - M.endT > 45 && ms - S.lmbT > 60 && cdOk) { const T = rhSum(ms, 150); if (T.m >= 5) { // 按住左键 + 鼠标有任何偏移 = 朝那个方向连续出刀（不用大幅甩动）
          const [dx, dy] = snap8(T.x, T.y); RH.length = 0; mmAttack([dx, dy, M.combo >= 2 ? 'fin' : 'light'], M.combo >= 2 ? 'fin' : 'light'); return; } }
     if (S.lmb && !S.sw && ms - S.lmbT > 260 && ms - M.endT > 120 && rhSum(ms, 200).m < 26) { if (S.charged <= 0) { S.charge = Math.min(1, S.charge + dt / 0.6); if (S.charge >= 1) { S.charged = 9; try { SFX.play('draw', 0.6, 0.7); } catch (e) {} if (!M.toasted) { M.toasted = true; G.toast && G.toast('⚡ 蓄力完成：松开左键 = 重斩（破防）', '#ffd24a', 1.4); } } } }
     else if (!S.lmb) S.charge = 0;
@@ -363,7 +377,7 @@ window.Combat = (() => {
       else { _t.copy(S.mv).multiplyScalar(1 / sp); const c = _t.dot(S.swD); if (c < 0.2) { S.arc *= 0.08; S.swD.copy(_t); if (S.arc < 5) S.flip = (S.flip || 0) + 1; } else S.swD.lerp(_t, Math.min(1, dt * 5)).normalize(); S.arc = Math.min(900, S.arc + sp * dt); }
       S.flipT = (S.flipT || 0) + dt; if (S.flipT > 1) { S.flipT = 0; S.wiggle = (S.flip || 0) >= 5; S.flip = 0; } }
     S.shake *= Math.exp(-dt * 12); // 第二十二轮：屏震逐帧衰减（原来只在顿帧里衰减）
-    if (MM()) { mmCamFx(dt); if (!S.sw || !S.sw.mm) mmTick(dt); else if (S.lmb) { /* 出刀中：只缓冲 */ } }
+    if (MM()) { mmCamFx(dt); mmCdUi(); if (!S.sw || !S.sw.mm) mmTick(dt); else if (S.lmb) { /* 出刀中：只缓冲 */ } }
     if (S.stop > 0) { S.stop -= dt; S.shake *= 0.85; placeWeapon(); return; }
     const tired = S.stam <= 0 || (window.Stamina && Stamina.ex) ? 0.5 : 1;
     let omega = 22 / Math.sqrt(S.wt) * tired; // 第十六轮：整体节奏放慢一点
