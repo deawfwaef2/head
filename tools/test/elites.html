@@ -1,0 +1,35 @@
+<!doctype html><html><head><meta charset="utf-8"><title>el</title>
+<style>body{margin:0;background:linear-gradient(#3a3a5a,#202030);height:100vh;color:#eee;font-family:system-ui,"Noto Sans CJK SC",sans-serif}</style></head><body>
+<script src="../../lib/three.min.js"></script>
+<script>
+// R35 Elites / Victory2 逻辑测试（桩）
+const V=THREE.Vector3, toasts=[];
+window.G={S:{hp:100,eq:{},heads:new Array(9).fill({}),bosses:{wilds:{},forest:{}},stats:{kills:70,trips:3,earned:5000}},st:()=>({power:window.__pw||180,maxHp:260,def:10}),addCoins:c=>(window.__coins=(window.__coins||0)+c),save(){},toast:t=>toasts.push(t),usedNames:new Set(),usedSig:new Set(),setUI(){},lockPointer(){}};
+window.RPG={foe:(S,loc,seed)=>({c:{name:'x',rar:2,seed},look:{seed}})};
+window.SFX={roar(){}};
+let lastPop=null;
+window.Foe={foes:[],ctx:()=>({R:24}),say(){},populate:async(ctx,list,opt)=>{lastPop={role:window.__forceRole,aff:window.__forceAff};return list.map(it=>({h:it.h,dead:false,hp:50,maxHp:50,aff:{relentless:1},pos:new V()}));}};
+window.Explore={checkVictory(){return 'old'}};
+window.Worlds={active:false,_W:null,onKey(e){return 'orig'},_debug:{goto:async i=>{const W=Worlds._W;W.cur=i;await Foe.populate({},W.graph.nodes[i].prey.map(h=>({h})));}}};
+window.UI={_startTrip(k){ const loc=Lore.LOCS.find(l=>l.k===k); Worlds.active=true; Worlds._W={graph:{trip:true,nodes:[{i:0,home:true,loc,x:10,y:40,style:'x',depth:0}]},cur:0,stats:{},busy:false,pos:new V(),trip:{coins:0},doorNear:null}; window.__trip=k; }};
+</script>
+<script src="../../js/mods.js"></script><script src="../../js/lore.js"></script><script src="../../js/foe_abs.js"></script><script src="../../js/elites.js"></script>
+<script>
+const errs=[];window.onerror=(m,s,l)=>errs.push(m+'@'+l);const W8=ms=>new Promise(r=>setTimeout(r,ms));
+setTimeout(async()=>{
+ const E=Elites; if(window.DevMode) DevMode.O.unl=false;
+ console.log('RES unlocked='+E.ALL.filter(d=>E.unlocked(d)).map(d=>d.id).join(','));
+ console.log('RES odds='+E.D.slice(0,4).map(d=>d.id+':'+Math.round(E.odds(d).p*100)+'%/'+E.odds(d).my+'刀').join(' '));
+ E.challenge('pirate'); await W8(600);
+ const W=Worlds._W, fo=E.E&&E.E.fo;
+ console.log('RES trip='+window.__trip+' arena='+(W.graph.nodes[W.cur]||{}).name+' role='+lastPop.role+' aff='+lastPop.aff+' fo='+(fo?JSON.stringify({hp:fo.maxHp,rec:fo.absRec,sk:fo.skPool}):'none'));
+ W.doorNear={to:0}; console.log('RES door='+(Worlds.onKey({code:'KeyE'})===true));
+ fo.dead=true; await W8(400); console.log('RES dead='+!!E.SS().dead.pirate+' coins='+window.__coins+' door='+Worlds.onKey({code:'KeyE'}));
+ console.log('RES locked moon='+!E.unlocked(E.MOON)+' vic='+JSON.stringify(E.victoryState())+' check='+Explore.checkVictory());
+ E.D.forEach(d=>E.SS().dead[d.id]=1); E.SS().dead.moon=1; G.S.bosses={a:1,b:1,c:1,d:1,e:1,f:1,g:1}; G.S.h2={L:{a:{dead:1},b:{dead:1},c:{dead:1},d:{dead:1}}};
+ console.log('RES full='+JSON.stringify(E.victoryState())+' check='+Explore.checkVictory());
+ E.SS().dead={pirate:1}; G.S.bosses={wilds:{},forest:{}}; G.S.h2={L:{a:{esc:2}}}; G.S.won=0; Worlds.active=false;
+ E.toggle(true); await W8(300);
+ console.log('RES errs='+JSON.stringify(errs)); document.title='done';
+},500);
+</script></body></html>

@@ -1360,3 +1360,10 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - UI：左侧感应条 #h2Sense、顶部猎手血条 #h2Bar（战力对比/胜率/逃跑倒计时）、U 键档案面板 #h2Pn（等级构成、差距、预估胜率、几刀/几下）。
 - foe.js 改动：populate 第 3 参数 `{keep:true}` 不 clear()/不 evict；foe_ai2.js：`fo.skPool` 限定技能池（有 skPool 的 mage 也允许技能）。
 - 测试：tools/test/hunters2.html（桩测试，console RES 行）。真实出猎在无头 swiftshader 下 10 分钟加载不完，未做实机测试。
+### S3+S4 `elite_bosses` + `victory2`（新文件 js/elites.js，window.Elites，默认开）
+- 13 名精英（id）：circus 塞拉菲娜·万花 / pirate 薇丝珀·黑帆 / plague 塞西莉亚·鸦喙 / champion 凯丝·雷鸣 / sand 伊索德·沙暴 / clock 奥菲莉亚·千机 / alch 贝娅特丽丝·金秤 / thief 伊芙琳·千丝 / naga 娜迦·翠鳞 / valk 布伦希尔德·寒鸦 / pharaoh 纳芙蒂·永眠 / blade 玲·墨染 / giant 霍尔达·山心；最终 moon 塞勒涅·永夜「月之魔女」（13 精英全灭解锁）。推荐战力 90→3200，月之魔女 4200。
+- 解锁条件都绑定剧情（魂库首级数、击败某地区霸主、累计放倒/出猎/魂晶、猎手逃脱/斩杀、精英数），满足时横幅弹「传闻」。L 键面板：胜利进度 + 13 张卡（锁住显示传闻/条件；解锁显示推荐战力、血量、预估胜率、你几刀/她几下、词缀、挑战按钮）。
+- 挑战：洞里点挑战 → UI._startTrip(她的地区) → 首帧后新建 eliteArena 节点（同 hunters.js toArena 写法）并 goto；__forceRole/__forceAff 设定职业和词缀；包裹 Foe.populate 设 absRec/血量/skPool；包裹 Worlds.onKey 在她活着时封门。击杀 → S.el.dead[id]、魂晶 rec×15、（若有 Gear2.dropFor 则掉装备）。
+- 血量 = 130×FoeAbs.hpK(rec)×(1.2+0.1×词缀数)（月之魔女 ×1.6）。战力=推荐值时预估胜率约 50%。
+- victory2：包裹 Explore.checkVictory → 霸主≥7 且 精英 13 且 猎手 4（S.h2.L.*.dead）且月之魔女。ui.js 洞内“征服目标”一行改为显示四项进度（仅 victory2 开启时；否则原文）。
+- 测试：tools/test/elites.html（桩）。
