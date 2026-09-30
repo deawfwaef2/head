@@ -351,7 +351,7 @@ window.Foe = (() => {
           else f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.35 });
         }
       } else if (!SMART && fo.state === 'flee') {
-        turnTo = Math.atan2(-dx, -dz); spd = 3.2 + fo.rar * 0.2; f.play('Sprint_Loop', { fade: 0.2 });
+        turnTo = Math.atan2(-dx, -dz); spd = 2.9 + fo.rar * 0.12; f.play('Sprint_Loop', { fade: 0.2 });
         const pr = Math.hypot(fo.pos.x, fo.pos.z);
         if (pr > ctx.R - 3) { const tx = -fo.pos.z / pr, tz = fo.pos.x / pr, sg = (tx * -dx + tz * -dz) > 0 ? 1 : -1; turnTo = Math.atan2(tx * sg * 0.9 - fo.pos.x / pr * 0.3, tz * sg * 0.9 - fo.pos.z / pr * 0.3); if (d < 2.2 && fo.cd <= 0) { fo.state = 'chase'; talk(fo, pickR(Math.random, SAY.fight)); } }
         else if (fo.sayT <= 0 && Math.random() < 0.006) sayP(fo, 'flee', SAY.flee);
@@ -397,7 +397,8 @@ window.Foe = (() => {
       } else if (fo.state === 'flee') { // 第二十一轮：逃向最近的门——跑到门口就真的逃掉了（首级也就没了）
         const doors = DOORESC ? ctx.doors || [] : []; let tg = null, best = 1e9;
         for (const dr of doors) { const ddx = dr.x - fo.pos.x, ddz = dr.z - fo.pos.z, dd = Math.hypot(ddx, ddz) || 1; const toward = -(ddx * dx + ddz * dz) / dd / d; const cost = dd * (1 + Math.max(0, -toward) * 1.6); if (cost < best) { best = cost; tg = dr; } }
-        spd = 3.9 + fo.rar * 0.25 + fo.iq * 0.4; f.play('Sprint_Loop', { fade: 0.2 });
+        spd = 3.0 + fo.rar * 0.12 + fo.iq * 0.3; f.play('Sprint_Loop', { fade: 0.2 }); // 第二十六轮（用户：打一下人就跑、永远追不上）：逃跑速度 3.0–3.6 < 玩家疾跑 6.2，走路 3.6 也能慢慢追上；
+        fo.fleeT = (fo.fleeT || 0) + dt; if (fo.fleeT > 6.5 && !(tg && Math.hypot(tg.x - fo.pos.x, tg.z - fo.pos.z) < 7)) { fo.fleeT = 0; fo.state = 'chase'; fo.brave = true; fo.retreated = true; sayP(fo, 'fight', SAY.fight); } // 跑了 6.5 秒没处可逃：困兽之斗
         if (tg) { const ddx = tg.x - fo.pos.x, ddz = tg.z - fo.pos.z, dd = Math.hypot(ddx, ddz); turnTo = Math.atan2(ddx, ddz); if (d > 3) goal = [tg.x, tg.z, 'D' + doors.indexOf(tg)];
           if (d < 3 && Math.abs(ang(Math.atan2(ddx, ddz) - face)) < 0.6) turnTo = Math.atan2(ddx, ddz) + (ang(face - Math.atan2(ddx, ddz)) > 0 ? -0.9 : 0.9); // 你挡在门前：绕开
           if (fo.flash > 0) fo.doorT = 0; // 开门时挨了一刀：被打断
@@ -680,7 +681,7 @@ window.Foe = (() => {
     { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp); fo.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退：0.16 秒内推完（以前是一帧内整段位移 = “瞬移”）
     ctx.event && ctx.event('hit', fo, { dealt, zone, brk, kind: info.kind, spd, charged: info.charged });
     if (!fo.seen) { fo.seen = true; fo.state = fo.brave ? 'chase' : 'flee'; if (fo.boss) ctx.bossMeet(fo); }
-    if (!fo.brave && Math.random() < 0.35) { fo.brave = true; fo.state = 'chase'; }
+    if (!fo.brave && Math.random() < 0.65) { fo.brave = true; fo.state = 'chase'; } // 第二十六轮：挨打后更容易回头拼命（0.35→0.65）
     if (fo.boss) ctx.bossHp(fo);
     // 斩首：够快的横砍砍中脖子，且这一刀后她剩不到一半血（霸主要剩不到 25%）
     if (slash && zone === 'neck' && spd > 4.5 && (brk || fo.hp <= fo.maxHp * (fo.boss ? 0.25 : 0.5))) { // 破绽中 = 处决，不看血量

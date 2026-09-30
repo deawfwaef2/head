@@ -13,7 +13,7 @@ window.FoeRoles2 = (() => {
   const T = () => window.THREE, FR = () => window.FoeRoles, F_ = () => window.Foe, cue = (fo, k) => { try { window.CombatFX && CombatFX.roleCue(fo, k); } catch (e) {} };
   const INFO = {
     duelist: { n: '决斗者', ic: '🤺', col: '#ffd0a0', hp: 0.9, spd: 1.1, dmg: 1.1, tint: [1, 0.92, 0.8], tip: '盯着你的刀——你一出刀她就格挡再反击。别连着同一方向砍：换方向、蓄力重斩破防，或等她收招' },
-    juggernaut: { n: '重甲卫', ic: '🛡️', col: '#b8c4d8', hp: 2.0, spd: 0.7, dmg: 1.3, tint: [0.6, 0.66, 0.8], tip: '正面轻击几乎无效（当啷）——绕到背后，用下劈终结或蓄力重斩；她很少被打断' },
+    juggernaut: { n: '重甲卫', ic: '🛡️', col: '#b8c4d8', hp: 1.5, spd: 0.75, dmg: 1.3, tint: [0.6, 0.66, 0.8], tip: '正面轻击只有六成威力（当啷）——绕到背后，用下劈终结或蓄力重斩；她很少被打断' },
     mage: { n: '术士', ic: '🔮', col: '#c890ff', hp: 0.7, spd: 1.0, dmg: 1.0, tint: [0.8, 0.7, 1], tip: '远处放魂火球：挥刀打散它 / 右键举刀挡 / Q 闪开。贴近她，她会瞬移拉开距离' },
     healer: { n: '疗愈者', ic: '✚', col: '#8fe8a0', hp: 0.6, spd: 1.05, dmg: 0.5, tint: [0.75, 1, 0.8], tip: '躲在同伴后面给受伤的人回血——优先杀她；打中她会打断吟唱' },
     warcaller: { n: '战旗手', ic: '🚩', col: '#ff8a70', hp: 1.1, spd: 0.95, dmg: 0.9, tint: [1, 0.72, 0.7], tip: '脚下红圈 9 米内的同伴更快更狠——先解决她，战吼会让所有人一起冲上来' }
@@ -38,7 +38,7 @@ window.FoeRoles2 = (() => {
     if (!on()) return null; { const fr = window.__forceRole; if (fr) { const k = Array.isArray(fr) ? fr[Foe.foes.length] : fr; if (INFO[k]) return k; if (Array.isArray(fr)) return null; } }
     if (cur && r() > 0.45) return null; // 已经抽到旧职业的，有 45% 改成新职业（新旧职业大致各半）
     const n = (window.Foe && Foe.foes ? Foe.foes.length : 0);
-    const pool = fo.armed ? [['duelist', 0.3], ['juggernaut', 0.26], ['warcaller', n >= 1 ? 0.2 : 0.06]] : [['mage', 0.5], ['healer', n >= 2 ? 0.3 : 0]];
+    const pool = fo.armed ? [['duelist', 0.3], ['juggernaut', 0.13], ['warcaller', n >= 1 ? 0.2 : 0.06]] : [['mage', 0.5], ['healer', n >= 2 ? 0.3 : 0]];
     const sum = pool.reduce((a, b) => a + b[1], 0); if (sum <= 0) return null; let x = r() * sum;
     for (const [k, p] of pool) { if ((x -= p) <= 0) return k; } return null;
   }
@@ -137,7 +137,7 @@ window.FoeRoles2 = (() => {
   function nearestAlly(fo) { let b = null, bd = 1e9; for (const a of allies(fo)) { const d = Math.hypot(a.pos.x - fo.pos.x, a.pos.z - fo.pos.z); if (d < bd) { bd = d; b = a; } } return b ? { fo: b, d: bd } : null; }
   function woundedNear(fo, R) { return allies(fo).some(a => a.hp < a.maxHp * 0.75 && Math.hypot(a.pos.x - fo.pos.x, a.pos.z - fo.pos.z) < R); }
   function heal(fo, ctx) {
-    let n = 0; for (const a of allies(fo)) { if (Math.hypot(a.pos.x - fo.pos.x, a.pos.z - fo.pos.z) > 10 || a.hp >= a.maxHp) continue; const h = Math.round(a.maxHp * 0.3); a.hp = Math.min(a.maxHp, a.hp + h); n++; ring(ctx, a.pos, 0x8fe8a0, 0.5, 0.8, 1.8); try { ctx.floatDmg(a.anchor ? a.anchor.pos : a.pos, `✚${h}`, false); } catch (e) {} }
+    let n = 0; for (const a of allies(fo)) { if (Math.hypot(a.pos.x - fo.pos.x, a.pos.z - fo.pos.z) > 10 || a.hp >= a.maxHp) continue; const h = Math.round(a.maxHp * 0.18); a.hp = Math.min(a.maxHp, a.hp + h); n++; ring(ctx, a.pos, 0x8fe8a0, 0.5, 0.8, 1.8); try { ctx.floatDmg(a.anchor ? a.anchor.pos : a.pos, `✚${h}`, false); } catch (e) {} }
     if (n) { cue(fo, 'heal'); if (ctx.toast) ctx.toast('✚ 疗愈者治好了同伴——优先杀她', '#8fe8a0', 1.4); }
   }
   function rally(fo, ctx) {
@@ -150,7 +150,7 @@ window.FoeRoles2 = (() => {
   function evade(fo, info) {
     if (fo.role === 'juggernaut' && !fo.dead) {
       const C = F_() && Foe.ctx && Foe.ctx(); let front = true; if (C && C.player) front = Math.abs(ang(Math.atan2(C.player.pos.x - fo.pos.x, C.player.pos.z - fo.pos.z) - fo.yaw)) < 1.35;
-      if (front && !info.charged && !(fo.broken > 0) && info.combo !== 2) { info.mult = (info.mult || 1) * 0.3; info.fmul = (info.fmul || 1) * 0.3; cue(fo, 'armor'); if (window.Foe && Foe.spark && info.point) Foe.spark(info.point, 8); if (!FR().tipped2) { FR().tipped2 = 1; if (C && C.toast) C.toast('🛡️ 重甲——正面轻击几乎无效：绕背，或用下劈终结 / 蓄力重斩', '#b8c4d8', 2.4); } }
+      if (front && !info.charged && !(fo.broken > 0) && info.combo !== 2) { info.mult = (info.mult || 1) * 0.6; info.fmul = (info.fmul || 1) * 0.6; cue(fo, 'armor'); if (window.Foe && Foe.spark && info.point) Foe.spark(info.point, 8); if (!FR().tipped2) { FR().tipped2 = 1; if (C && C.toast) C.toast('🛡️ 重甲——正面轻击威力大减：绕背，或用下劈终结 / 蓄力重斩', '#b8c4d8', 2.4); } }
     }
     return false;
   }

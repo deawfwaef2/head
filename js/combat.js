@@ -124,14 +124,15 @@ window.Combat = (() => {
     return best;
   }
   function chestOf(tg, fo, out) { if (fo && fo.f && fo.f.bones && fo.f.bones.chest) fo.f.bones.chest.getWorldPosition(out); else { out.copy(tg.pos); if (tg.kind === 'foe' || tg.kind === 'boss') out.y += 0.3; } return out; }
-  function mmDir(ms) { // 方向：最近 140ms 的鼠标趋势（≥7px）→ 8 向；否则按连击序列
-    const T = rhSum(ms, 140); if (T.m >= 7) { const [dx, dy] = snap8(T.x, T.y); return [dx, dy, M.combo >= 2 ? 'fin' : 'light']; }
+  function mmDir(ms, pre) { // 方向：最近的鼠标趋势 → 8 向吸附/连续角度；按下瞬间看按下前 120ms（≥9px），按住时 160ms 内 ≥5px 就算（轻微偏移也能控制方向）；否则按连击序列
+    const T = pre ? rhSum(ms, 120) : rhSum(ms, 160); if (T.m >= (pre ? 9 : 5)) { const [dx, dy] = snap8(T.x, T.y); return [dx, dy, M.combo >= 2 ? 'fin' : 'light']; }
     return COMBO[M.combo % 3];
   }
   function mmAttack(d, type) {
     if (!drawn || S.rmb || S.sw) return false; const heavy = type === 'heavy', fin = type === 'fin';
-    if (!mmSpend(heavy ? 16 : fin ? 9 : 6, heavy ? 'charged' : 'swing')) return false;
-    const dur = (heavy ? 0.3 : fin ? 0.3 : 0.21) * Math.sqrt(S.wt) * ((window.Stamina && Stamina.ex) ? 1.3 : 1), pw = heavy ? 1 : fin ? 0.95 : 0.85, as = mmPick();
+    const as = mmPick(); // 第二十六轮（用户：一直点就没力气、砍不动）：体力 6/9/16 → 4/6/12；范围内没有敌人时空挥只耗 35%（追人、试刀不会被掏空）
+    if (!mmSpend((heavy ? 12 : fin ? 6 : 4) * (as ? 1 : 0.35), heavy ? 'charged' : 'swing')) return false;
+    const dur = (heavy ? 0.3 : fin ? 0.3 : 0.21) * Math.sqrt(S.wt) * ((window.Stamina && Stamina.ex) ? 1.3 : 1), pw = heavy ? 1 : fin ? 0.95 : 0.85;
     S.sw = { t: 0, dur, dx: d[0], dy: d[1], pw, charged: heavy, v: new V3(d[0], d[1], 0), hit: false, h0: S.hand.clone(), as, lunged: 0, rk: 1, mm: true, type, step: M.combo, set: new Set(), sgn: -1, tid: as ? as.tid : null, hold: 0 };
     S.thrust = 0; S.thrustQ = 0; S.hitCd.clear(); S.charge = 0; S.charged = 0; M.buf = 0; M.bufType = null;
     M.combo = heavy ? 0 : (M.combo + 1) % 3; if (fin) M.combo = 0;
@@ -139,10 +140,10 @@ window.Combat = (() => {
     return true;
   }
   function mmDown() {
-    const ms = performance.now(); S.lmb = true; S.lmbT = ms; S.drag = 0; S.charge = 0; S.charged = 0; RH.length = 0;
+    const ms = performance.now(); S.lmb = true; S.lmbT = ms; S.drag = 0; S.charge = 0; S.charged = 0;
     if (S.rmb) return;
     if (S.sw || ms - M.endT < 40) { M.buf = ms; M.bufType = null; return; }
-    const d = mmDir(ms); mmAttack(d, d[2]);
+    const d = mmDir(ms, true); mmAttack(d, d[2]);
   }
   function mmUp() {
     const ms = performance.now(); S.lmb = false; const heavy = S.charged > 0 && !S.rmb; S.charge = 0;
@@ -153,7 +154,8 @@ window.Combat = (() => {
     const ms = performance.now(); if (!S.sw && M.combo && ms - M.endT > 1100) M.combo = 0;
     if (S.rmb) { M.buf = 0; S.charge = 0; return; }
     if (M.buf && !S.sw && ms - M.endT >= 35) { const ok = ms - M.buf < 320, ty = M.bufType; M.buf = 0; M.bufType = null; if (ok) { if (ty === 'heavy') mmAttack([M.bufD[0], M.bufD[1], 'heavy'], 'heavy'); else { const d = mmDir(ms); mmAttack(d, d[2]); } } }
-    if (S.lmb && !S.sw && ms - M.endT > 110 && ms - S.lmbT > 70) { const T = rhSum(ms, 100); if (T.m > 30) { const [dx, dy] = snap8(T.x, T.y); RH.length = 0; mmAttack([dx, dy, M.combo >= 2 ? 'fin' : 'light'], M.combo >= 2 ? 'fin' : 'light'); return; } }
+    if (S.lmb && !S.sw && ms - M.endT > 45 && ms - S.lmbT > 60) { const T = rhSum(ms, 150); if (T.m >= 5) { // 按住左键 + 鼠标有任何偏移 = 朝那个方向连续出刀（不用大幅甩动）
+         const [dx, dy] = snap8(T.x, T.y); RH.length = 0; mmAttack([dx, dy, M.combo >= 2 ? 'fin' : 'light'], M.combo >= 2 ? 'fin' : 'light'); return; } }
     if (S.lmb && !S.sw && ms - S.lmbT > 260 && ms - M.endT > 120 && rhSum(ms, 200).m < 26) { if (S.charged <= 0) { S.charge = Math.min(1, S.charge + dt / 0.6); if (S.charge >= 1) { S.charged = 9; try { SFX.play('draw', 0.6, 0.7); } catch (e) {} if (!M.toasted) { M.toasted = true; G.toast && G.toast('⚡ 蓄力完成：松开左键 = 重斩（破防）', '#ffd24a', 1.4); } } } }
     else if (!S.lmb) S.charge = 0;
     else if (S.sw) S.charge = 0;
@@ -304,7 +306,7 @@ window.Combat = (() => {
   // 返回镜头转动系数：挥砍/格挡时鼠标主要用于控制武器
   function onMove(dx, dy) {
     if (!drawn) return 1;
-    if (MM() && S.lmb) { RH.push([performance.now(), dx, -dy]); if (RH.length > 80) RH.shift(); return 1; } // 第二十六轮：按住左键视角 1:1 跟手，鼠标趋势只用来定斩击方向
+    if (MM()) { RH.push([performance.now(), dx, -dy]); if (RH.length > 80) RH.shift(); if (S.lmb) return 1; } // 第二十六轮：按住左键视角 1:1 跟手，鼠标趋势只用来定斩击方向
     if (S.lmb && XH() && RS()) { RH.push([performance.now(), dx, -dy]); if (RH.length > 80) RH.shift(); S.drag += Math.hypot(dx, dy) * 0.0062; return 1; }
     if (S.lmb && XH()) { S.mAcc.x += dx; S.mAcc.y -= dy; S.drag += Math.hypot(dx, dy) * 0.0062; return lookLmb(dx, dy); }
     if (S.lmb) { const k = 0.0062; S.ctrl.x += dx * k; S.ctrl.y -= dy * k; S.drag += Math.hypot(dx, dy) * k; const r = Math.hypot(S.ctrl.x, S.ctrl.y); if (r > 1.25) { S.ctrl.x *= 1.25 / r; S.ctrl.y *= 1.25 / r; } return lookLmb(dx, dy); } // 旧：鼠标控制武器轨迹 // 第十八轮：挥砍 = 刀尖锁在准星上，鼠标只转镜头
