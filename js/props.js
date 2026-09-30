@@ -27,6 +27,12 @@ window.Props = (() => {
   const P = {
     bonehand: { n: '遗骨堆', icon: '🦴', rar: 1, model: 'Bones', size: 0.6, aura: { r: 3.2, m: 1.15 }, stat: { ter: 1 }, need: { phal: 3, sinew: 1 }, coin: 120,
       desc: '一堆码得整整齐齐的白骨，像有人在这里守了很久。<b>半径 3.2 米内首级产出 ×1.15</b>，地魄 +1。放大/拉高它，范围跟着变大。' },
+    mhand: { n: '断手', icon: '🖐️', rar: 2, limbs: ['limb_hand_amber', 'limb_hand_avatar', 'limb_hand_jean', 'limb_hand_mona', 'limb_hand_shenhe'], size: 0.32, poke: { r: 3.5, m: 1.25 }, stat: { str: 1 }, need: { phal: 3, cloth: 2, ash: 1 }, coin: 180,
+      desc: '从角色原模型身上取下来的手（带着她的手套），断口还是红的。每次摆出来是随机的一只、随机左右。<b>半径 3.5 米内你亲手戳/按住的收益 ×1.25</b>，力量 +1。可任意旋转、缩放、拉长。' },
+    mfoot: { n: '断脚', icon: '🦶', rar: 2, limbs: ['limb_foot_amber', 'limb_foot_jean', 'limb_foot_mona'], size: 0.36, aura: { r: 2.6, m: 1.1 }, stat: { agi: 2 }, need: { phal: 3, cloth: 2, wax: 1 }, coin: 180,
+      desc: '角色原模型上的一只脚（连鞋），随机一只、随机左右。<b>半径 2.6 米内首级产出 ×1.1</b>，敏捷 +2。' },
+    gut: { n: '肠索', icon: '🪱', rar: 2, cord: true, rad: 0.032, wob: true, th0: 1.6, col: '#a02c36', glow: '#3a0006', aura: { r: 1.4, m: 1.4 }, need: { sinew: 4, herb: 2, hide: 1 }, coin: 170,
+      desc: '湿漉漉、软塌塌的一长条，<b>想拉多长拉多长（最长 14 米）</b>，两端随便拖，还能垂下来晃。<b>线两侧 1.4 米内首级产出 ×1.4</b>；线越粗，范围越宽。' },
     bonefoot: { n: '碎骨毯', icon: '🦴', rar: 1, model: 'Bones', size: 0.9, sl0: 0.4, aura: { r: 2.5, m: 1.08 }, stat: { agi: 2 }, need: { phal: 3, ash: 1 }, coin: 100,
       desc: '摊平铺在地上的碎骨，踩上去咯吱响。<b>半径 2.5 米内产出 ×1.08</b>，敏捷 +2。' },
     scroll: { n: '血契卷轴', icon: '📜', rar: 2, model: 'Scroll', size: 0.5, poke: { r: 4, m: 1.5 }, need: { cloth: 2, ash: 1, dust: 2 }, coin: 160,
@@ -81,10 +87,11 @@ window.Props = (() => {
   const cordMat = {}; const cmat = (c, glow) => cordMat[c + glow] || (cordMat[c + glow] = new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, emissive: glow || '#000', emissiveIntensity: glow ? 0.55 : 0 }));
   const pickMat = new THREE.MeshBasicMaterial({ visible: false });
 
-  function makeModel(d) {
+  function makeModel(d, p) {
     let m = null;
-    if (d.model && II() && II().make) { m = II().make(d.model === 'Gems' ? 'Gems#' + (Math.floor(Math.random() * 6)) : d.model, d.size); }
-    else if (d.asset && A && A.has(d.asset)) m = A.fit(d.asset, { h: d.size });
+    if (d.limbs && A) { const nm = d.limbs[((p && p.v) || 0) % d.limbs.length]; if (A.has(nm)) { m = A.fit(nm, { d: d.size }); if (m && p && p.fl) m.scale.x = -1; } }
+    if (!m && d.model && II() && II().make) { m = II().make(d.model === 'Gems' ? 'Gems#' + (Math.floor(Math.random() * 6)) : d.model, d.size); }
+    else if (!m && d.asset && A && A.has(d.asset)) m = A.fit(d.asset, { h: d.size });
     if (!m) { m = new THREE.Group(); const b = new THREE.Mesh(new THREE.BoxGeometry(d.size * 0.5, d.size, d.size * 0.5), cmat('#888', '')); b.position.y = d.size / 2; m.add(b); m.userData.fallback = true; m.userData.size = new V3(d.size * 0.5, d.size, d.size * 0.5); }
     const w = new THREE.Group(); w.add(m); w.rotation.set(d.rx0 || 0, 0, d.rz0 || 0); w.updateMatrixWorld(true);
     const bb = new THREE.Box3().setFromObject(w); w.position.y = -bb.min.y - (d.sink || 0);
@@ -98,16 +105,18 @@ window.Props = (() => {
   function layout0(it) {
     const p = it.p, d = it.d, g = it.g; disposeKids(g); it.pend = []; it.pick = null;
     if (!d.cord) {
-      const m = makeModel(d); g.add(m); it.ext = m.userData.ext; it.fb = m.userData.fallback;
+      const m = makeModel(d, p); g.add(m); it.ext = m.userData.ext; it.fb = m.userData.fallback;
       g.position.set(p.x, p.y, p.z); g.rotation.set(p.rx || 0, p.ry || 0, 0, 'YXZ'); g.scale.set(p.s, p.s * (p.sl || 1), p.s);
-      const ex = it.ext, rad = Math.max(ex.x, ex.y, ex.z) * 0.55 + 0.04, pk = new THREE.Mesh(new THREE.SphereGeometry(rad, 8, 6), pickMat); pk.position.y = ex.y / 2; g.add(pk); it.pick = pk;
+      const ex = it.ext, rad = Math.max(ex.x, ex.y, ex.z) * 0.6 + 0.05, pk = new THREE.Mesh(new THREE.SphereGeometry(rad, 8, 6), pickMat); pk.position.y = ex.y / 2; g.add(pk); it.pick = pk;
     } else {
       g.position.set(0, 0, 0); g.rotation.set(0, 0, 0); g.scale.set(1, 1, 1);
       const a = new V3(...p.a), b = new V3(...p.b), len = a.distanceTo(b); it.len = len; if (len < 0.04) return;
       const mid = a.clone().lerp(b, 0.5); mid.y -= (p.sag || 0.25) * Math.min(len, 6) * 0.35 + 0.02;
       const curve = new THREE.CatmullRomCurve3([a, a.clone().lerp(mid, 0.5).setY(a.y * 0.25 + mid.y * 0.75 + (b.y - a.y) * 0.02), mid, b.clone().lerp(mid, 0.5), b]); it.curve = curve;
-      const seg = clamp(Math.ceil(len * 10), 8, 140), tube = new THREE.Mesh(new THREE.TubeGeometry(curve, seg, 0.014 * (p.th || 1), 6, false), cmat(d.col, d.glow)); tube.userData.ownGeo = true; g.add(tube);
-      const pk = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.min(seg, 40), 0.1, 4, false), pickMat); pk.userData.ownGeo = true; g.add(pk); it.pick = pk;
+      const seg = clamp(Math.ceil(len * 10), 8, 140), rad = d.rad || 0.014, tg = new THREE.TubeGeometry(curve, seg, rad * (p.th || 1), d.wob ? 8 : 6, false);
+      if (d.wob) { const pa = tg.attributes.position, rs = 9, c0 = new V3(), v = new V3(); for (let r = 0; r <= seg; r++) { curve.getPointAt(r / seg, c0); const f = 1 + 0.28 * Math.sin(r * 0.85 + 1) + 0.12 * Math.sin(r * 2.3); for (let j = 0; j < rs; j++) { const i = r * rs + j; v.fromBufferAttribute(pa, i).sub(c0).multiplyScalar(f).add(c0); pa.setXYZ(i, v.x, v.y, v.z); } } tg.computeVertexNormals(); }
+      const tube = new THREE.Mesh(tg, cmat(d.col, d.glow)); tube.userData.ownGeo = true; g.add(tube);
+      const pk = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.min(seg, 40), 0.1 + rad * 2, 4, false), pickMat); pk.userData.ownGeo = true; g.add(pk); it.pick = pk;
       for (const e of [a, b]) { const k = new THREE.Mesh(new THREE.SphereGeometry(0.03 * (p.th || 1) + 0.012, 8, 6), cmat(d.col, d.glow)); k.userData.ownGeo = true; k.position.copy(e); g.add(k); }
       if (d.pend) {
         const n = Math.min(40, Math.floor(len / d.pend.gap));
@@ -239,7 +248,8 @@ window.Props = (() => {
     if (II() && !II().ready) II().onReady(() => { rebuildAll(); });
     closeUI();
     const yaw = Math.atan2(-(G.camera.getWorldDirection(new V3()).x), -(G.camera.getWorldDirection(new V3()).z)) + Math.PI;
-    const p = { t, x: 0, y: 0, z: 0, ry: yaw, rx: 0, s: 1, sl: d.sl0 || 1 }; if (d.cord) { p.a = [0, 0, 0]; p.b = [0, 0, 0]; p.th = 1; p.sag = 0.25; }
+    const p = { t, x: 0, y: 0, z: 0, ry: yaw, rx: 0, s: 1, sl: d.sl0 || 1 }; if (d.limbs) { p.v = Math.floor(Math.random() * 9); p.fl = Math.random() < 0.5 ? 1 : 0; }
+    if (d.cord) { p.a = [0, 0, 0]; p.b = [0, 0, 0]; p.th = d.th0 || 1; p.sag = d.wob ? 0.45 : 0.25; }
     const it = spawn(p, true); mode = { k: 'place', type: t, it, stage: 0, lift: 0, yaw };
     G.toast(`摆放 <b>${d.n}</b>：${d.cord ? '左键定第一个端点，再看向别处点第二下' : '准星指哪摆哪，滚轮旋转'}，右键取消`, '#cfb8ff', 3.4);
   }

@@ -914,3 +914,10 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - feel_heft：Feel.heftOf(h) = 0.75~1.7（名字哈希+稀有度，稳定）。拿起下沉弹簧、转身滞后摆动、走路颠、戳一下微沉。偏移在 pre 加上、下一帧 frame 开头撤掉，不与 game.js 的 held lerp 累积。
 - 调试：Feel._st、Feel.say(kind, vars, prio)。
 - 测试注意：无头测试要 add_init_script 把 requestPointerLock 设为 undefined（否则目标页崩溃）；master 档位只有 ultra/high/mid，?q=low 会报 msaa undefined（仅测试 URL 问题）。
+
+## 第二十二轮（续 5）· Arena Agent：断手 / 断脚 / 肠索（道具系统增补）
+- 用户要求：断手、断脚、可自由拉的肠子，且手脚要「直接从 VRM 人物里提取、好看、不要僵尸感」。
+- 手/脚：从 `big/body/*.js`（角色原 VRM 身体）按蒙皮权重提取——手 = `H_left/rightHand + 五指`，脚 = `H_*Foot + Toes` 权重 ≥0.5 的三角形，烘到绑定姿势、重定向成「手腕/脚踝在原点、手指/脚尖朝 -Z」，贴图按 UV 包围盒裁剪并缩到 ≤256px，断口用扇形红色肉面封口。产出 8 个 `assets/limb_{hand|foot}_{amber,avatar,jean,mona,shenhe}.js`（手 5 只：Amber/AvatarSample_A/Jean/Mona/Shenhe；脚 3 只：Amber/Jean/Mona；约 1.2MB，GLB 经 `Assets.init` 加载，`index.html` 已加 script 标签）。这些角色身体自带手套/鞋，所以提取出来就是「戴手套的手、穿鞋的脚」。提取工具在沙箱 /tmp 里（页面 `limb.html`：`ext1(mesh,kind,side)` + `GLTFExporter`），本轮没有放进仓库；需要再提别的角色（如 HikariCape 的裸手）请参考上述算法重做。
+- 道具：`mhand` 断手（戳击收益 ×1.25、力量 +1）、`mfoot` 断脚（半径 2.6 米产出 ×1.1、敏捷 +2）——每次摆出来随机一只、随机左右（存档 p.v / p.fl）；`gut` 肠索（绳索型，粗而带起伏的红色软管，可拉到 14 米，线两侧 1.4 米产出 ×1.4；粗细越大范围越宽）。
+- 仍未做：乳头、子宫等性器官类道具（内容基线，不会做）；断手/断脚/肠索保持为黑暗奇幻的血腥摆件，不做性化表现。
+- 工作区体积：当前约 121MB（上限 128MB），后续不要再往仓库里塞大资源。
