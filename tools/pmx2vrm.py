@@ -94,6 +94,12 @@ for m in P['mats']:
     f = P['faces'][m['f0']:m['f0'] + m['nf']][:, [0, 2, 1]].astype(np.uint32)
     mat = {'name': name, 'pbrMetallicRoughness': {'baseColorFactor': [1, 1, 1, float(m['color'][3])]}, 'doubleSided': bool(m['flag'] & 1)}
     t = tex(m['tex'])
+    if not t:  # 无贴图材质（あにまさ式等老模型）：颜色全靠材质漫反射色 → 生成 4×4 纯色贴图（×1.2 近似 MMD 环境光补亮），让游戏的贴图路径（亮度/肤色修正）一致
+        rgb = tuple(int(min(255, max(0, x * 1.2 * 255))) for x in m['color'][:3]); ck = ('solid',) + rgb
+        if ck not in tcache:
+            b = io.BytesIO(); Image.new('RGBA', (4, 4), rgb + (255,)).save(b, 'PNG')
+            G['images'].append({'bufferView': view(b.getvalue()), 'mimeType': 'image/png'}); G['textures'].append({'sampler': 0, 'source': len(G['images']) - 1}); tcache[ck] = (len(G['textures']) - 1, False)
+        t = tcache[ck]
     if t:
         mat['pbrMetallicRoughness']['baseColorTexture'] = {'index': t[0]}
         if t[1]: mat['alphaMode'] = 'BLEND' if 'Highlight' in c else 'MASK'; mat['alphaCutoff'] = 0.5

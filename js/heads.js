@@ -991,6 +991,16 @@ window.ModelHeads = (() => {
     return c[Math.abs(hsh) % c.length];
   }
 
+  function hairAvgCol(t) { // 发型贴图在其 UV 处的平均色（每个头模只算一次）
+    if (t._hairCol !== undefined) return t._hairCol; t._hairCol = null;
+    try { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const cx = cv.getContext('2d', { willReadFrequently: true }); let r = 0, g2 = 0, b = 0, n = 0;
+      for (const m of t.hairMeshes) { const mt = SRC.get(m) || m.material, img = mt.map && mt.map.image; const mc = mt.color || new THREE.Color(1, 1, 1); if (!img) continue;
+        cx.clearRect(0, 0, 64, 64); cx.drawImage(img, 0, 0, 64, 64); const D = cx.getImageData(0, 0, 64, 64).data, U = m.geometry.attributes.uv; if (!U) continue; const st = Math.max(1, Math.floor(U.count / 800));
+        for (let i = 0; i < U.count; i += st) { let u = U.getX(i) % 1, v = U.getY(i) % 1; if (u < 0) u += 1; if (v < 0) v += 1; const o = (Math.min(63, Math.floor(v * 64)) * 64 + Math.min(63, Math.floor(u * 64))) * 4; if (D[o + 3] < 128) continue;
+          r += D[o] / 255 * mc.r; g2 += D[o + 1] / 255 * mc.g; b += D[o + 2] / 255 * mc.b; n++; } }
+      if (n) t._hairCol = new THREE.Color(r / n, g2 / n, b / n).convertSRGBToLinear(); } catch (e) { }
+    return t._hairCol;
+  }
   function napeGeo(t) {
     if (t.napeGeo !== undefined) return t.napeGeo;
     const skins = t.faceMeshes.filter(m => m.userData.kind === 'skin'); t.napeGeo = null; if (!skins.length) return null;
@@ -1011,6 +1021,11 @@ window.ModelHeads = (() => {
       for (const [da, db] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const aa = a + da; if (aa < 0 || aa >= NT) continue; const kk = aa * NP + ((b + db + NP) % NP); if (R[kk] > 0) { s2 += R[kk]; n++; } }
       if (n) R[k] = s2 / n;
     }
+    // 壳必须在本头发最内层之内（あにまさ式等贴头皮的头发会被壳顶穿）：逐方向限到“头发最小半径 - 3mm”（最多缩到一半）
+    const HR = new Float32Array(NT * NP).fill(-1);
+    for (const m of t.hairMeshes || []) { const A2 = m.geometry.attributes.position; const st = Math.max(1, Math.floor(A2.count / 8000));
+      for (let i = 0; i < A2.count; i += st) { v.fromBufferAttribute(A2, i); if (v.y < bottom) continue; v.sub(c); const r = v.length(); if (r < 1e-5) continue; const k = binOf(v.x / r, v.y / r, v.z / r); if (HR[k] < 0 || r < HR[k]) HR[k] = r; } }
+    for (let k = 0; k < R.length; k++) if (HR[k] > 0 && R[k] > 0) R[k] = Math.max(R[k] * 0.5, Math.min(R[k], (HR[k] - 0.003) / 0.9));
     const S = { R }, geo = new THREE.SphereGeometry(1, 40, 24), A = geo.attributes.position;
     for (let i = 0; i < A.count; i++) { v.fromBufferAttribute(A, i).normalize(); const r = Math.max(0.02, radAt(S, v.x, v.y, v.z)), ky = v.y < 0 ? 0.99 : 0.9; // 下半只横向缩进：壳底接到断面，从下往上看不到脸的内侧
       A.setXYZ(i, c.x + v.x * r * 0.9, Math.max(bottom + 0.002, c.y + v.y * r * ky), c.z + v.z * r * 0.9); }
@@ -1077,6 +1092,13 @@ window.ModelHeads = (() => {
     if (F.meta.grp === 'mmd' && window.Mods && Mods.on('nape_fill')) try {
       const ng = napeGeo(F);
       if (ng) { const nm = new THREE.MeshToonMaterial({ color: new THREE.Color(look.skinHex || '#fbe6da').multiplyScalar(0.86), gradientMap: grad }); own.push(nm);
+        // 后脑部分涂发色（真 MMD 模型的头皮本就是发色；あにまさ式短后发+双马尾之间会露出这块），眼线以下渐变回肤色（后颈）
+        const hc = H.meta.grp === 'mmd' ? hairAvgCol(H) : new THREE.Color(look.hc1 || '#333333'); const ey = F.meta.eye ? F.meta.eye[1] : 0;
+        if (hc) nm.onBeforeCompile = sh => { sh.uniforms.uHairC = { value: hc.clone().multiplyScalar(0.8) }; sh.uniforms.uEyeY = { value: ey };
+          sh.vertexShader = sh.vertexShader.replace('void main() {', 'varying float vNy;\nvoid main() { vNy = position.y;');
+          sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'varying float vNy; uniform vec3 uHairC; uniform float uEyeY;\nvoid main() {')
+            .replace('#include <color_fragment>', '#include <color_fragment>\n diffuseColor.rgb = mix(diffuseColor.rgb, uHairC, smoothstep(uEyeY - 0.05, uEyeY - 0.01, vNy));'); };
+        nm.customProgramCacheKey = () => 'nape2';
         const nape = new THREE.Mesh(ng, nm); nape.name = '__NAPE__'; nape.userData.kind = 'nape'; g.add(nape); }
     } catch (e) { console.warn('nape_fill', F.meta.file, e); }
     // 表情：持有时可热切换，不眨眼、不重建模型。
