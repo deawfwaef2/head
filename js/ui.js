@@ -527,9 +527,10 @@ window.UI = (() => {
   function showIntro() { if (G.S.intro) return; introI = 0; introStep(); }
   function introStep() {
     if (introI >= INTRO.length) { G.S.intro = true; G.save(); close(); return; }
-    const [t, b] = INTRO[introI++];
+    const ix = window.I18NX && I18NX.intro(introI, introI + 1 >= INTRO.length); /* R40：日/英整段原生文案（语言纯净） */
+    const [t, b] = ix ? [ix.t, ix.b] : INTRO[introI]; introI++;
     SFX.page();
-    open('intro', `<div class="intro"><h2>${t}</h2><p>${b}</p><div class="btns"><button class="red" data-a="introNext">${introI >= INTRO.length ? '开始狩猎 ▶' : '继续 ▶'}</button></div><div class="dots">${INTRO.map((_, i) => `<i class="${i < introI ? 'on' : ''}"></i>`).join('')}</div></div>`, 'intro-m');
+    open('intro', `<div class="intro"${ix ? ' data-noi18n' : ''}><h2>${t}</h2><p>${b}</p><div class="btns"><button class="red" data-a="introNext">${ix ? ix.btn : introI >= INTRO.length ? '开始狩猎 ▶' : '继续 ▶'}</button></div><div class="dots">${INTRO.map((_, i) => `<i class="${i < introI ? 'on' : ''}"></i>`).join('')}</div></div>`, 'intro-m');
   }
 
   return { init, onKey, showIntro, needIntro: () => !G.S.intro, openMenu, openBounty, openCard, openTraining, openExpedition, close, get open() { return cur; }, get trip() { return trip; }, _startTrip: startTrip, _pick: pickChoice };

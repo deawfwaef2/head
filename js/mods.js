@@ -158,6 +158,10 @@ window.Mods = (() => {
     { id: 'unlocks', cat: 'play', icon: '🔒', n: '隐藏解锁', d: '未解锁建筑不显示，达成条件后弹窗说明。关闭则全部按层数解锁。', def: true }
   ];
   const BY = {}; LIST.forEach(m => BY[m.id] = m);
+  /* R40：名称/说明按语言取（js/mods_i18n.js 的 ModsI18N[id] = [nEn, dEn, nJa, dJa]；没有则回退中文）→ 日/英模式不再混入中文 */
+  const lgc = () => { const l = (window.I18N && I18N.lang) || 'zh'; return l === 'en' ? 0 : l === 'ja' ? 2 : -1; };
+  const nm = m => { const k = lgc(), t = window.ModsI18N && ModsI18N[m.id]; return k >= 0 && t && t[k] ? t[k] : m.n; };
+  const dm = m => { const k = lgc(), t = window.ModsI18N && ModsI18N[m.id]; return k >= 0 && t && t[k + 1] ? t[k + 1] : m.d; };
   const BUILDS = { forge: ['forge'], bowling: ['bowling'], dresser: ['dresser'], chess: ['chess'], rebirth: ['altar'] };
   let st = {};
   try { st = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
@@ -189,19 +193,19 @@ window.Mods = (() => {
   function set(id, v) {
     const m = BY[id]; if (!m) return [];
     const notes = [];
-    const off = (k, why) => { if (st[k]) { st[k] = false; notes.push(`已关闭「${BY[k].n}」（${why}）`); for (const o of LIST) if ((o.requires || []).includes(k)) off(o.id, `依赖「${BY[k].n}」`); } };
+    const off = (k, why) => { if (st[k]) { st[k] = false; notes.push(`已关闭「${nm(BY[k])}」（${why}）`); for (const o of LIST) if ((o.requires || []).includes(k)) off(o.id, `依赖「${nm(BY[k])}」`); } };
     if (v) {
       if (st[id]) return notes;
-      for (const r of m.requires || []) if (!st[r]) { notes.push(`已开启依赖「${BY[r].n}」`); notes.push(...set(r, true)); }
+      for (const r of m.requires || []) if (!st[r]) { notes.push(`已开启依赖「${nm(BY[r])}」`); notes.push(...set(r, true)); }
       if (m.group) for (const o of LIST) if (o.group === m.group && o.id !== id && st[o.id]) { st[o.id] = false; }
-      for (const c of m.conflicts || []) if (st[c]) { if (BY[c].group) { const fb = LIST.find(o => o.group === BY[c].group && !(m.conflicts || []).includes(o.id)); st[c] = false; if (fb) { st[fb.id] = true; notes.push(`画风切换为「${fb.n}」（与「${m.n}」冲突）`); } } else off(c, `与「${m.n}」冲突`); }
-      for (const o of LIST) if (st[o.id] && (o.conflicts || []).includes(id)) off(o.id, `与「${m.n}」冲突`);
+      for (const c of m.conflicts || []) if (st[c]) { if (BY[c].group) { const fb = LIST.find(o => o.group === BY[c].group && !(m.conflicts || []).includes(o.id)); st[c] = false; if (fb) { st[fb.id] = true; notes.push(`画风切换为「${nm(fb)}」（与「${nm(m)}」冲突）`); } } else off(c, `与「${nm(m)}」冲突`); }
+      for (const o of LIST) if (st[o.id] && (o.conflicts || []).includes(id)) off(o.id, `与「${nm(m)}」冲突`);
       st[id] = true;
     } else {
       if (!st[id]) return notes;
       if (m.group) { const fb = LIST.find(o => o.group === m.group && o.id === 'r_classic') || LIST.find(o => o.group === m.group && o.id !== id); return set(fb.id, true); }
       st[id] = false;
-      for (const o of LIST) if ((o.requires || []).includes(id)) off(o.id, `依赖「${m.n}」`);
+      for (const o of LIST) if ((o.requires || []).includes(id)) off(o.id, `依赖「${nm(m)}」`);
     }
     save(); return notes;
   }
@@ -269,19 +273,19 @@ window.Mods = (() => {
     document.head.appendChild(s);
   }
   const esc = t => String(t == null ? '' : t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-  const brief = d => { d = String(d || '').replace(/<[^>]+>/g, ''); const i = d.search(/[。！；]/); let t = i > 6 && i < 70 ? d.slice(0, i) : d.slice(0, 64); return t + (t.length < d.length ? '…' : ''); };
+  const brief = d => { d = String(d || '').replace(/<[^>]+>/g, ''); const i = d.search(/[。！；]|\.\s/); let t = i > 6 && i < 70 ? d.slice(0, i) : d.slice(0, 64); return t + (t.length < d.length ? '…' : ''); };
   const pending = () => LIST.filter(m => !!st[m.id] !== !!bootSt[m.id]);
   function match(m) {
     if (view.cat !== 'all' && m.cat !== view.cat) return false;
     if (view.f === 'on' && !st[m.id]) return false; if (view.f === 'off' && st[m.id]) return false;
     if (view.f === 'chg' && !(!!st[m.id] !== !!m.def)) return false; if (view.f === 'pend' && !(!!st[m.id] !== !!bootSt[m.id])) return false;
-    const q = view.q.trim().toLowerCase(); if (q && !(m.n + ' ' + m.d + ' ' + m.id).toLowerCase().includes(q)) return false; return true;
+    const q = view.q.trim().toLowerCase(); if (q && !(m.n + ' ' + m.d + ' ' + nm(m) + ' ' + dm(m) + ' ' + m.id).toLowerCase().includes(q)) return false; return true;
   }
   function rowHTML(m) {
     const pd = !!st[m.id] !== !!bootSt[m.id], ex = view.open === m.id;
-    const req = (m.requires || []).map(i => BY[i] && BY[i].n).filter(Boolean), cf = (m.conflicts || []).map(i => BY[i] && BY[i].n).filter(Boolean);
-    return `<div class="row ${st[m.id] ? 'on' : ''} ${pd ? 'pend' : ''} ${ex ? 'ex' : ''}" data-id="${m.id}"><div class="rh" data-a="ex"><div class="ic">${m.icon}</div><div class="tx"><b>${esc(m.n)}</b>${pd ? '<span class="tag pd">待应用</span>' : ''}${!!st[m.id] !== !!m.def && !pd ? '<span class="tag df">已改动</span>' : ''}${m.reload ? '<span class="tag nd">需重载</span>' : ''}<small>${esc(brief(m.d))}</small></div><div class="sw ${m.group ? 'rd' : ''}" data-a="tg" title="${m.group ? '选用这个画风' : '开 / 关'}"></div></div>`
-      + `<div class="dt">${esc(m.d)}<div class="m"><b>默认</b> ${m.def ? '开' : '关'}　<b>ID</b> ${m.id}${req.length ? `<br><b>依赖</b> ${esc(req.join('、'))}（开启时自动打开）` : ''}${cf.length ? `<br><b>冲突</b> ${esc(cf.join('、'))}（开启时自动关闭）` : ''}</div></div></div>`;
+    const req = (m.requires || []).map(i => BY[i] && nm(BY[i])).filter(Boolean), cf = (m.conflicts || []).map(i => BY[i] && nm(BY[i])).filter(Boolean);
+    return `<div class="row ${st[m.id] ? 'on' : ''} ${pd ? 'pend' : ''} ${ex ? 'ex' : ''}" data-id="${m.id}"><div class="rh" data-a="ex"><div class="ic">${m.icon}</div><div class="tx"><b>${esc(nm(m))}</b>${pd ? '<span class="tag pd">待应用</span>' : ''}${!!st[m.id] !== !!m.def && !pd ? '<span class="tag df">已改动</span>' : ''}${m.reload ? '<span class="tag nd">需重载</span>' : ''}<small>${esc(brief(dm(m)))}</small></div><div class="sw ${m.group ? 'rd' : ''}" data-a="tg" title="${m.group ? '选用这个画风' : '开 / 关'}"></div></div>`
+      + `<div class="dt">${esc(dm(m))}<div class="m"><b>默认</b> ${m.def ? '开' : '关'}　<b>ID</b> ${m.id}${req.length ? `<br><b>依赖</b> ${esc(req.join('、'))}（开启时自动打开）` : ''}${cf.length ? `<br><b>冲突</b> ${esc(cf.join('、'))}（开启时自动关闭）` : ''}</div></div></div>`;
   }
   function listHTML() {
     const out = []; const cats = view.cat === 'all' ? CATS : [view.cat];
@@ -296,7 +300,7 @@ window.Mods = (() => {
       + `<div class="fl">筛选</div>` + fl.map(([k, n]) => `<span class="chip ${view.f === k ? 'on' : ''}" data-f="${k}">${n}</span>`).join('');
   }
   function footHTML() {
-    const pd = pending(); return `<div class="nt ${pd.length && !view.note ? 'pd' : ''}">${esc(view.note) || (pd.length ? `待应用 ${pd.length} 项：` + esc(pd.slice(0, 5).map(m => (st[m.id] ? '＋' : '－') + m.n.replace(/（.*?）/g, '')).join('、') + (pd.length > 5 ? '…' : '')) : '点开关即可切换；点击条目展开详情。修改后需要“应用并重新载入”（会先自动存档）。')}</div>`
+    const pd = pending(); return `<div class="nt ${pd.length && !view.note ? 'pd' : ''}">${esc(view.note) || (pd.length ? `待应用 ${pd.length} 项：` + esc(pd.slice(0, 5).map(m => (st[m.id] ? '＋' : '－') + nm(m).replace(/（.*?）|\(.*?\)/g, '')).join('、') + (pd.length > 5 ? '…' : '')) : '点开关即可切换；点击条目展开详情。修改后需要“应用并重新载入”（会先自动存档）。')}</div>`
       + `<button class="bt" data-a="def">恢复默认</button><button class="bt" data-a="close">${pd.length ? '暂不应用' : '关闭'}</button><button class="bt pri" data-a="apply" ${pd.length ? '' : 'disabled'}>应用并重新载入${pd.length ? ' (' + pd.length + ')' : ''}</button>`;
   }
   function refresh(keepScroll = true) {

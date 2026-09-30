@@ -1,0 +1,67 @@
+# -*- coding: utf-8 -*-
+# R40（本 agent）：语言纯净补丁——标题 / HUD / 音量面板 / 死亡与开场 / 洞内菜单常用句 / 提示。
+D = [
+# 标题与 HUD
+("新的狩猎，从这里开始","A new hunt begins here","新たな狩りは、ここから始まる"),
+("音量","Volume","音量"),("🔊 音量","🔊 Volume","🔊 音量"),("操作提示","Controls","操作ヒント"),
+("按键一览","Key Guide","キー一覧"),("⌨ 按键一览","⌨ Key Guide","⌨ キー一覧"),
+("展厅","Gallery","展示室"),("🏛️ 展厅","🏛️ Gallery","🏛️ 展示室"),
+("洞内首级 $a/$b","Heads in cave $a/$b","洞内の首級 $a/$b"),("魂库 $n","Vault $n","魂庫 $n"),("麻袋 $n","Sack $n","麻袋 $n"),
+("继续游戏","Resume","ゲームに戻る"),
+# hint bar
+("移动","Move","移動"),("跑","Run","走る"),("下蹲","Crouch","しゃがむ"),("左键","LMB","左クリック"),("右键","RMB","右クリック"),("滚轮","Wheel","ホイール"),
+("把玩","Handle","弄ぶ"),("拔刀","Draw","抜刀"),("左键挥砍 · 连点刺 · 右键格挡","LMB slash · tap to thrust · RMB block","左クリック斬り · 連打で突き · 右クリックでガード"),
+("拿起/互动","Pick up / Interact","拾う/調べる"),("查看","Inspect","確認"),("转向","Rotate","向き"),("换表情","Expression","表情"),("投掷","Throw","投げる"),
+("放下麻袋","Drop sack","麻袋を置く"),("建造","Build","建築"),("菜单","Menu","メニュー"),("喝药","Potion","回復薬"),("成就","Achievements","実績"),("收藏","Collection","コレクション"),
+# 音量面板
+("🔊 音量调节","🔊 Volume Mixer","🔊 音量ミキサー"),("总音量","Master","全体音量"),("音乐 BGM","Music (BGM)","音楽 (BGM)"),("战斗 / 动作音效","Combat / action SFX","戦闘・アクション音"),
+("角色语音","Character voices","キャラボイス"),("环境音（风/鸟/滴水）","Ambience (wind / birds / drips)","環境音（風・鳥・水滴）"),("脚步声","Footsteps","足音"),("界面音效","UI sounds","UI音"),
+("🎵 BGM：开","🎵 BGM: On","🎵 BGM：オン"),("🔇 BGM：关","🔇 BGM: Off","🔇 BGM：オフ"),("恢复默认","Reset","初期値に戻す"),("完成","Done","完了"),
+("拖动即时生效，自动保存。M 键 = 开/关 BGM。","Changes apply instantly and are saved. M toggles BGM.","ドラッグで即反映・自動保存。MキーでBGMオン/オフ。"),
+("音量调节（M 键开关 BGM）","Volume mixer (M toggles BGM)","音量ミキサー（MでBGM切替）"),
+("关闭","Close","閉じる"),("✕ 关闭","✕ Close","✕ 閉じる"),
+# 死亡 / 开场
+("☠️ 你死了","☠️ You died","☠️ あなたは死んだ"),("重新开始","Start over","最初からやり直す"),("最后一次狩猎","The last hunt","最後の狩り"),
+("出猎次数","Hunts","出猎回数"),("斩首总数","Heads taken","斬首数"),("收藏首级","Heads collected","収集した首"),("累计魂晶","Soul crystals earned","累計魂晶"),("把玩次数","Times handled","弄んだ回数"),
+("食人魔格罗克倒在了$x。他的头被挂上了城门——猎人终成猎物。","The ogre Grok fell at $x. His head now hangs on the city gate — the hunter has become the hunted.","オーガのグロクは$xで倒れた。その首は城門に晒された——狩人は獲物となった。"),
+("🌑 很久以前……","🌑 Long ago…","🌑 遥か昔……"),("🌙 诅咒","🌙 The Curse","🌙 呪い"),("💀 残魂","💀 Lingering Souls","💀 残魂"),("🧌 斯尼克","🧌 Snik","🧌 スニック"),("⚔️ 你的洞窟","⚔️ Your Cave","⚔️ あなたの洞窟"),
+("继续 ▶","Continue ▶","続ける ▶"),("开始狩猎 ▶","Begin the Hunt ▶","狩りを始める ▶"),("格罗克","Grok","グロク"),
+# 洞内菜单常用
+("颗散落首级已存入魂库","scattered heads stored in the vault","個の散らばった首を魂庫に収納しました"),("没有散落在地上的首级","No heads lying on the ground","地面に散らばった首はありません"),
+("📤 从魂库取出：","📤 Take from vault:","📤 魂庫から取り出す："),("📖 身份图鉴","📖 Identity Codex","📖 身分図鑑"),("🏛️ 展厅评级","🏛️ Gallery Rating","🏛️ 展示室ランク"),
+("展出首级","Heads on display","展示中の首"),("📅 今日魂潮：","📅 Today's soul tide:","📅 今日の魂潮："),("📜 悬赏榜","📜 Bounty Board","📜 賞金掲示板"),
+("地精行商·斯尼克","Snik the Goblin Trader","ゴブリン行商人・スニック"),("消耗品","Consumables","消耗品"),("已是最强","Maxed out","最強です"),("持有","Owned","所持"),
+("闪避","Dodge","回避"),("背篓容量","Backpack capacity","背負い籠の容量"),("魂晶产出","Crystal output","魂晶産出"),("生命恢复","Life regen","生命回復"),("洞窟半径","Cave radius","洞窟の半径"),
+("快捷键 H 喝药","Hotkey H: drink potion","ホットキー H：回復薬"),("魂库","Vault","魂庫"),("推荐战力","Recommended power","推奨戦力"),("开始训练","Start training","訓練開始"),("离开","Leave","離れる"),
+("🌄 出洞狩猎","🌄 Go hunting","🌄 洞窟を出て狩りへ"),("✕ 留在洞里","✕ Stay in the cave","✕ 洞窟に残る"),("选择狩猎地点。","Choose a hunting ground.","狩り場を選ぼう。"),
+("洞里还没有首级。走到洞口（发光的出口）按 E，出去狩猎吧。","No heads in the cave yet. Walk to the glowing exit and press E to go hunting.","洞窟にはまだ首がありません。光る出口で E を押して狩りに出よう。"),
+("还没有狩猎记录。","No hunt records yet.","まだ狩りの記録がありません。"),("← 返回日志","← Back to logs","← ログに戻る"),
+("📥 一键收纳：散落在地上的首级全部存入魂库","📥 Quick store: put all loose heads into the vault","📥 一括収納：散らばった首をすべて魂庫へ"),
+("性格","Personality","性格"),("信仰","Belief","信仰"),("外貌","Appearance","外見"),("生平","Life story","生涯"),("回忆","Recall","回想"),("……记忆模糊了。","…The memory is hazy.","……記憶がかすんでいる。"),
+("🩸 回忆：我是怎么得到这颗头的","🩸 Recall: how I got this head","🩸 回想：この首の手に入れ方"),
+("模型来源 / 公开状态","Model source / release status","モデルの出典・公開状況"),
+("「嘿嘿，大块头，又带魂晶来了？」","“Heh heh, big fella — brought crystals again?”","「へへ、でかいの、また魂晶を持ってきたか？」"),
+("「魂晶，魂晶，嘿嘿嘿……」","“Crystals, crystals, heh heh heh…”","「魂晶、魂晶、へへへ……」"),
+("「斯尼克的货，童叟无欺——主要是没有童叟敢来。」","“Snik's wares — honest to all, mostly because no child or elder dares come.”","「スニックの品は公正だぜ——まあ、子供も老人も近寄らねえがな。」"),
+# 提示（ui3a）
+("才能把首级背回洞里——在外面，每一下都算数。","to carry the head back to the cave — out there, every click counts.","でようやく首を洞窟に持ち帰れる——外では一回一回が命取り。"),
+("完美格挡后，敌人的","After a perfect block, the enemy's","パーフェクトガードの後、敵の"),("脖子","neck","首筋"),("没有防备。","is unguarded.","は無防備になる。"),
+("异色首级的产出是普通的","A heterochrome head yields","異色の首の産出は通常の"),("三倍","triple","3倍"),("首级放在","Heads placed on a","首を置くと、"),("展示位","display slot","展示台"),
+("上，同族与同阶会产生共鸣。","resonate with the same race and tier.","同じ種族・同じ階位同士で共鳴する。"),
+("长按 E","Hold E","Eを長押し"),("进入精确摆放，绿色是可以放下的位置。","for precise placement; green means you can set it down.","で精密配置。緑は置ける場所。"),
+("在外面死掉，","Die outside and","外で死ねば、"),("一切归零","everything resets","すべてが無に帰す"),("——先喝药，再进门。","— drink first, then enter.","——先に薬を飲んでから入ろう。"),
+("洞窟越深，","The deeper the cave,","洞窟は深いほど"),("越暗","darker","暗く"),("，也越值钱。"," and the more valuable it gets.","、そして価値も上がる。"),
+
+# MOD 管理器界面
+("🧩 MOD 管理","🧩 MOD Manager","🧩 MOD管理"),("✕ 关闭 Esc","✕ Close Esc","✕ 閉じる Esc"),("关闭 Esc","Close Esc","閉じる Esc"),
+("画风渲染","Art style","画風・レンダリング"),("界面","Interface","インターフェース"),("性能","Performance","パフォーマンス"),("角色外观","Character look","キャラの外見"),("玩法","Gameplay","ゲームプレイ"),("模型与材质","Models & materials","モデルとマテリアル"),
+("画风只能选一个（单选）","Pick exactly one art style","画風は1つだけ選べます（単一選択）"),("低配模式会关掉后处理类 MOD","Low-spec mode turns off post-processing MODs","低スペックモードは後処理系MODをオフにします"),
+("没有匹配的 MOD","No matching MODs","一致するMODはありません"),("已开启","Enabled","オン"),("已关闭","Disabled","オフ"),("与默认不同","Differs from default","初期設定と異なる"),("待应用","Pending","適用待ち"),("筛选","Filter","絞り込み"),
+("全部","All","すべて"),("开 / 关","On / Off","オン / オフ"),("开","On","オン"),("关","Off","オフ"),("默认","Default","初期値"),("依赖","Requires","依存"),("冲突","Conflicts","競合"),("已改动","Changed","変更済み"),("需重载","Reload needed","要再読込"),
+("选用这个画风","Use this style","この画風を使う"),("应用并重新载入","Apply & reload","適用して再読込"),("暂不应用","Not now","今は適用しない"),("恢复默认","Reset to defaults","初期設定に戻す"),
+("（开启时自动打开）"," (auto-enabled when this is on)","（オンにすると自動でオン）"),("（开启时自动关闭）"," (auto-disabled when this is on)","（オンにすると自動でオフ）"),
+("点开关即可切换；点击条目展开详情。修改后需要“应用并重新载入”（会先自动存档）。","Flip a switch to toggle; click a row for details. Changes need “Apply & reload” (your save is written first).","スイッチで切替、行をクリックで詳細。変更後は「適用して再読込」が必要です（先に自動セーブ）。"),
+("已恢复默认设置（仍需应用并重新载入）","Defaults restored (still needs Apply & reload)","初期設定に戻しました（適用して再読込が必要です）"),
+("搜索名称 / 说明（按 / 聚焦）","Search name / description (press / to focus)","名前・説明を検索（/ でフォーカス）"),
+("需要重新载入","Reload required","再読込が必要"),
+]
