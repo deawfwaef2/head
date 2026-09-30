@@ -122,10 +122,59 @@ window.Recall = (() => {
     for (let y = G8 - 1; y >= -G8 + 3; y--) { let row = ''; for (let x = -G8 + 3; x <= G8 - 3; x++) { const mid = x === 0 && y === 0; row += `<i class="${mid ? 'me' : mv[x + ',' + y] ? 'on' : ''}">${mid ? '♟' : mv[x + ',' + y] ? '●' : ''}</i>`; } cells.push('<div>' + row + '</div>'); }
     return `<div class="rc-p-h">♟ 「${esc(p.style)}」</div><div class="rc-cb">${cells.join('')}</div><p>底子是<b>${p.baseN}</b>（魂阶决定），再叠加：${p.shapeNames.map(n => `<b>${esc(n)}</b>`).join('、')}——绿点是她额外能跳到的格子（向上为前方，可越子、可吃子）。</p><p class="rc-dim">${p.lines.map(esc).join('<br>')}</p>`;
   }
+  const KWI = { taunt: '🛡', charge: '⚡', drain: '🩸', stealth: '👁', shield: '🔰', frenzy: '🔥', venom: '☠', echo: '🔁', swift: '💨' };
   function cardHTML(rec) {
-    const k = HeadGame.profile(rec).card, c = rec.c;
-    return `<div class="rc-card" style="--c:${RC[c.rar]}"><div class="rc-cost">${k.cost}</div><div class="rc-cn">${esc(k.name)}</div><div class="rc-ca">${esc(c.raceN)} · ${esc(k.cls)}</div><div class="rc-ct">${k.kw.map(w => `<b>${w.n}</b>：${esc(w.d)}`).concat(k.text.map(esc)).join('<br>') || '（没有特殊效果）'}</div><div class="rc-cf">${esc(k.flavor)}</div><div class="rc-atk">${k.atk}</div><div class="rc-hp">${k.hp}</div></div>`;
+    const k = HeadGame.profile(rec).card, c = rec.c, col = RC[c.rar];
+    const tag = t => /^战吼/.test(t) ? ['战吼', '登场时触发'] : /^亡语/.test(t) ? ['亡语', '死亡时触发'] : ['被动', '一直生效'];
+    const fx = k.text.map(t => { const g = tag(t); return `<div class="rc-fx"><em>${g[0]}</em>${esc(t.replace(/^(战吼|亡语)[:：]?/, ''))}</div>`; }).join('');
+    const kws = k.kw.map(w => `<span class="rc-kc" title="${esc(w.d)}">${KWI[w.k] || '✦'} ${w.n}</span>`).join('');
+    const card = `<div class="rc-card foil r${c.rar}${c.shiny ? ' sh' : ''}" style="--c:${col}" onmousemove="RecallCard.tilt(event,this)" onmouseleave="RecallCard.leave(this)"><i class="rc-shine"></i>
+      <div class="rc-cost" title="费用">${k.cost}</div><div class="rc-cn">${esc(k.name)}</div><div class="rc-ca">${esc(c.raceN)} · ${esc(k.cls)} · ${RN[c.rar]}${c.shiny ? ' ✨' : ''}</div>
+      <div class="rc-kcs">${kws}</div><div class="rc-ct">${fx || '<div class="rc-fx" style="opacity:.6">（没有特殊效果，纯靠身板）</div>'}</div><div class="rc-cf">${esc(k.flavor)}</div>
+      <div class="rc-atk" title="攻击">${k.atk}</div><div class="rc-hp" title="生命">${k.hp}</div></div>`;
+    const read = `<div class="rc-rd"><div><b style="color:#7fb8ff">${k.cost}</b> 费用　打出它要花 ${k.cost} 点魂力（越强越贵）</div><div><b style="color:#ffd060">${k.atk}</b> 攻击　每次攻击对目标造成的伤害</div><div><b style="color:#ff7a8a">${k.hp}</b> 生命　扛到 0 就阵亡</div></div>`;
+    const kd = k.kw.length ? k.kw.map(w => `<div class="rc-kd"><b>${KWI[w.k] || '✦'} ${w.n}</b> ${esc(w.d)}</div>`).join('') : '<div class="rc-kd" style="opacity:.6">没有关键词</div>';
+    const cid = 'rcd' + Math.floor(Math.random() * 1e6);
+    return `<div class="rc-cw"><div class="rc-cl">${card}<div class="rc-cap">↑ 鼠标在牌上移动可以倾斜看反光</div></div><div class="rc-cr"><h5>怎么读这张牌</h5>${read}<h5>关键词</h5>${kd}
+      <h5>试打 <small>对着一只稻草人打一回合</small></h5>
+      <div class="rc-arena" id="${cid}" data-k="${esc(JSON.stringify({ n: k.name, cost: k.cost, atk: k.atk, hp: k.hp, kw: k.kw.map(w => w.k), fx: k.text, col }))}">
+        <div class="rc-u me"><div class="rc-ub">🂠</div><b class="rc-un"></b><div class="rc-hb"><i></i></div><span class="rc-hn"></span></div><div class="rc-vs">VS</div>
+        <div class="rc-u dm"><div class="rc-ub">🎃</div><b class="rc-un">稻草人</b><div class="rc-hb"><i></i></div><span class="rc-hn"></span></div></div>
+      <button class="rc-btn" onclick="RecallCard.duel('${cid}',this)">▶ 试打</button><div class="rc-dlog" id="${cid}l">点「试打」看看她在场上是什么样。</div></div></div>`;
   }
+  // 卡牌试打：一只稻草人（攻 2）对一回合——演示费用/战吼/关键词怎么起作用
+  window.RecallCard = {
+    tilt(e, el) { const r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height; el.style.setProperty('--rx', ((0.5 - y) * 16).toFixed(1) + 'deg'); el.style.setProperty('--ry', ((x - 0.5) * 20).toFixed(1) + 'deg'); el.style.setProperty('--mx', (x * 100).toFixed(0) + '%'); el.style.setProperty('--my', (y * 100).toFixed(0) + '%'); el.classList.add('hv'); },
+    leave(el) { el.style.setProperty('--rx', '0deg'); el.style.setProperty('--ry', '0deg'); el.classList.remove('hv'); },
+    duel(id, btn) {
+      const A = document.getElementById(id), L = document.getElementById(id + 'l'); if (!A || A._busy) return; A._busy = 1; btn.disabled = true; btn.textContent = '试打中…';
+      const k = JSON.parse(A.dataset.k), kw = k.kw, has = x => kw.includes(x), me = A.querySelector('.me'), dm = A.querySelector('.dm');
+      let mh = k.hp, ma = k.atk, dh = k.atk + 2, dmax = dh, shield = has('shield'); const dmg = 2;
+      const hpSet = (u, h, max) => { u.querySelector('.rc-hb i').style.width = Math.max(0, h / max * 100) + '%'; u.querySelector('.rc-hn').textContent = Math.max(0, h) + '/' + max; };
+      me.querySelector('.rc-un').textContent = k.n; me.querySelector('.rc-ub').style.color = k.col; hpSet(me, mh, k.hp); hpSet(dm, dh, dmax); L.innerHTML = '';
+      me.classList.remove('dead'); dm.classList.remove('dead'); me.style.opacity = 0; me.style.transform = 'translateY(-30px) scale(1.4)';
+      const log = (t, c) => { const d = document.createElement('div'); d.innerHTML = t; if (c) d.style.color = c; d.className = 'rc-dl'; L.appendChild(d); L.scrollTop = 1e5; try { window.SFX && SFX.click && SFX.click(); } catch (e) {} };
+      const fl = (u, t, c) => { const d = document.createElement('div'); d.className = 'rc-fl'; d.textContent = t; d.style.color = c; u.appendChild(d); setTimeout(() => d.remove(), 1100); };
+      const hit = (u, from) => { u.classList.add('hit'); setTimeout(() => u.classList.remove('hit'), 300); try { window.SFX && SFX.thud && SFX.thud(0.6, 1); } catch (e) {} };
+      const lunge = (u, dir) => { u.style.transform = `translateX(${dir * 54}px) scale(1.12)`; setTimeout(() => { u.style.transform = ''; }, 230); };
+      const Q = []; const q = (ms, f) => Q.push([ms, f]);
+      q(200, () => { me.style.opacity = 1; me.style.transform = ''; log(`① 花 <b>${k.cost}</b> 魂力打出「${k.n}」`, '#9fd0ff'); });
+      k.fx.forEach(t => q(650, () => { const b = /^战吼/.test(t), d = /^亡语/.test(t); log(b ? `② 战吼触发：${t.replace(/^战吼[:：]?/, '')}` : d ? `✦ 亡语（她倒下时才会触发）：${t.replace(/^亡语[:：]?/, '')}` : `✦ 被动：${t}`, '#ffd890'); if (b) fl(me, '战吼!', '#ffd060'); }));
+      if (has('taunt')) q(600, () => log('🛡 嘲讽：稻草人只能来打她', '#c8e0ff'));
+      if (has('stealth')) q(600, () => log('👁 潜行：攻击前不会被盯上', '#c8e0ff'));
+      const rounds = has('swift') ? 2 : 1;
+      for (let r = 0; r < rounds; r++) {
+        q(700, () => { if (dh <= 0) return; lunge(me, 1); const d = has('venom') ? dh : ma; setTimeout(() => { dh -= d; hpSet(dm, dh, dmax); hit(dm); fl(dm, '-' + (has('venom') ? '☠' : d), '#ff7070'); if (has('drain')) fl(me, '+' + ma + ' 英雄', '#7aff9a'); }, 160);
+          log(`⚔ ${r ? '疾风：第二次攻击！' : '她冲上去攻击稻草人'}${has('venom') ? '（剧毒：一击即死）' : '，造成 ' + ma + ' 点伤害'}${has('drain') ? '，吸魂为英雄回复 ' + ma : ''}`); });
+        q(800, () => { if (dh <= 0 || r === 1) return; lunge(dm, -1); setTimeout(() => { if (shield) { shield = false; fl(me, '魂盾!', '#7fd0ff'); log('🔰 魂盾破裂，抵挡了这次伤害', '#7fd0ff'); } else { mh -= dmg; hpSet(me, mh, k.hp); hit(me); fl(me, '-' + dmg, '#ff7070'); log(`稻草人反击，她受到 ${dmg} 点伤害`, '#ff9a9a'); if (has('frenzy') && mh > 0) { ma += 2; fl(me, '狂怒 +2', '#ff9a40'); log('🔥 狂怒：受伤后攻击 +2', '#ffb070'); } } }, 160); });
+      }
+      if (has('echo')) q(700, () => log('🔁 回响：回合结束，战吼再触发一次', '#ffd890'));
+      q(900, () => { const won = dh <= 0, dead = mh <= 0; if (dead) { me.classList.add('dead'); } if (won) dm.classList.add('dead');
+        log(won && !dead ? `🏆 稻草人倒下！她还剩 ${mh}/${k.hp} 生命。` : won ? '💥 同归于尽！' : dead ? '她倒下了……稻草人还剩 ' + dh + ' 点生命。' : `稻草人还剩 ${dh} 点生命，她剩 ${mh}/${k.hp}——下回合继续。`, won ? '#7aff9a' : '#ffb070');
+        if (dead && k.fx.some(t => /^亡语/.test(t))) log('✦ 亡语触发！', '#ffd890'); btn.disabled = false; btn.textContent = '↻ 再试一次'; A._busy = 0; });
+      let t = 0; Q.forEach(([ms, f]) => { t += ms; setTimeout(f, t); });
+    }
+  };
   // ================= 3D 场景 =================
   const S = { open: false, rec: null, dirty: 0, notes: [] };
   let el = null, R = null, scene, cam, rig, pivot, hb = null, raf = 0, handG = null, lights = {};
@@ -161,6 +210,25 @@ window.Recall = (() => {
 #recall .rc-cost{position:absolute;left:-12px;top:-12px;width:38px;height:38px;border-radius:50%;background:#2a5fb0;border:2px solid #9fd0ff;font:700 20px/34px serif;text-align:center}#recall .rc-cn{font:700 17px serif;text-align:center;color:var(--c);margin:6px 0 0}
 #recall .rc-ca{text-align:center;font-size:11px;color:#9d8a78;margin-bottom:8px}#recall .rc-ct{font-size:12.5px;line-height:1.6;min-height:70px;background:#0005;border-radius:8px;padding:8px 10px}#recall .rc-cf{font-style:italic;font-size:12px;color:#b9a898;margin-top:8px;text-align:center}
 #recall .rc-atk,#recall .rc-hp{position:absolute;bottom:-12px;width:38px;height:38px;border-radius:50%;font:700 20px/34px serif;text-align:center;border:2px solid #fff3}#recall .rc-atk{left:-12px;background:#b08a20}#recall .rc-hp{right:-12px;background:#a02a36}
+#recall .rc-panel:has(.rc-cw){width:min(820px,calc(100% - 640px));min-width:560px}
+#recall .rc-cw{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;align-items:flex-start}#recall .rc-cl{perspective:800px;flex:0 0 auto;padding:10px 14px}#recall .rc-cr{flex:1 1 280px;min-width:260px}
+#recall .rc-cr h5{margin:10px 0 5px;font:700 14px serif;letter-spacing:.2em;color:#e8c070}#recall .rc-cr h5 small{font:11px system-ui;letter-spacing:0;color:#9d8a78;margin-left:6px}#recall .rc-cr h5:first-child{margin-top:0}
+#recall .rc-cap{text-align:center;font-size:11px;color:#8d7a6a;margin-top:12px}
+#recall .rc-card.foil{width:250px;min-height:310px;margin:6px auto;padding:14px 16px 18px;transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transition:transform .25s ease-out,box-shadow .3s;transform-style:preserve-3d;overflow:visible;border-width:3px}
+#recall .rc-card.hv{transition:transform .05s;box-shadow:0 0 38px color-mix(in srgb,var(--c) 70%,transparent),0 18px 40px #000a}
+#recall .rc-shine{position:absolute;inset:0;border-radius:11px;pointer-events:none;background:radial-gradient(circle at var(--mx,50%) var(--my,30%),#ffffff55,transparent 45%);mix-blend-mode:overlay;opacity:.5;transition:opacity .3s}#recall .rc-card.hv .rc-shine{opacity:1}
+#recall .rc-card.r3::after,#recall .rc-card.r4::after,#recall .rc-card.sh::after{content:"";position:absolute;inset:0;border-radius:11px;pointer-events:none;background:linear-gradient(115deg,transparent 20%,#ff7ad055 35%,#7affd555 50%,#ffe07a55 65%,transparent 80%);background-size:250% 100%;animation:rcfoil 3.2s linear infinite;mix-blend-mode:screen}@keyframes rcfoil{from{background-position:120% 0}to{background-position:-120% 0}}
+#recall .rc-card .rc-cn{font-size:21px;margin-top:10px}#recall .rc-card .rc-ca{font-size:12px}
+#recall .rc-kcs{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-bottom:8px}#recall .rc-kc{padding:2px 9px;border-radius:12px;background:color-mix(in srgb,var(--c) 28%,#000);border:1px solid var(--c);font-size:12.5px;font-weight:700;cursor:help}
+#recall .rc-card .rc-ct{font-size:13.5px;min-height:96px;line-height:1.65}#recall .rc-fx{margin-bottom:5px}#recall .rc-fx em{font-style:normal;font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;background:#e8c070;color:#2a1a08;margin-right:6px}
+#recall .rc-card .rc-atk,#recall .rc-card .rc-hp,#recall .rc-card .rc-cost{width:44px;height:44px;font-size:24px;line-height:40px;box-shadow:0 3px 10px #000a}#recall .rc-card .rc-atk{bottom:-14px;left:-14px}#recall .rc-card .rc-hp{bottom:-14px;right:-14px}#recall .rc-card .rc-cost{left:-14px;top:-14px}
+#recall .rc-rd div{font-size:13px;margin:2px 0}#recall .rc-rd b{font:700 18px serif;margin-right:2px}#recall .rc-kd{font-size:13px;margin:3px 0;padding:4px 8px;background:#ffffff0c;border-radius:6px;border-left:3px solid #e8c070}#recall .rc-kd b{color:#ffd890;margin-right:6px}
+#recall .rc-arena{display:flex;align-items:center;justify-content:space-around;background:radial-gradient(ellipse at 50% 100%,#3a2a20,#16100e);border:1px solid #ffffff22;border-radius:10px;padding:12px 6px;margin-bottom:6px}#recall .rc-vs{font:700 18px serif;color:#8d7a6a}
+#recall .rc-u{position:relative;width:110px;text-align:center;transition:transform .2s,opacity .3s,filter .3s}#recall .rc-u.hit{filter:brightness(2.2) saturate(2);transform:translateX(3px)}#recall .rc-u.dead{opacity:.25;filter:grayscale(1);transform:rotate(-12deg) translateY(8px)}
+#recall .rc-ub{font-size:44px;line-height:1.1}#recall .rc-un{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#recall .rc-hb{height:7px;border-radius:4px;background:#0008;margin:3px 8px;overflow:hidden}#recall .rc-hb i{display:block;height:100%;background:linear-gradient(90deg,#d03a4a,#ff8a70);width:100%;transition:width .35s}#recall .rc-hn{font-size:11px;color:#c8b8a8}
+#recall .rc-fl{position:absolute;left:50%;top:0;font:900 22px serif;text-shadow:0 2px 0 #000,0 0 8px #000;pointer-events:none;white-space:nowrap;animation:rcfl 1.1s ease-out forwards}@keyframes rcfl{0%{transform:translate(-50%,0) scale(.4);opacity:0}20%{transform:translate(-50%,-14px) scale(1.3);opacity:1}100%{transform:translate(-50%,-56px) scale(1);opacity:0}}
+#recall .rc-dlog{min-height:60px;max-height:110px;margin-top:8px;overflow:auto;font-size:13px;line-height:1.6;background:#0006;border-radius:8px;padding:6px 10px;color:#b9a898}#recall .rc-dl{animation:rcin2 .3s}@keyframes rcin2{from{opacity:0;transform:translateX(-8px)}}
+#recall .rc-btn{margin-top:2px;width:100%;padding:9px;border-radius:10px;border:1px solid #e8c07088;background:linear-gradient(180deg,#6a3a1a,#3a1e0e);color:#ffe8c0;font:700 15px system-ui;cursor:pointer}#recall .rc-btn:hover:not(:disabled){filter:brightness(1.25)}#recall .rc-btn:disabled{opacity:.6;cursor:default}
 @media(max-width:1250px){#recall .rc-left{width:230px}#recall .rc-right{width:280px}#recall .rc-nar,#recall .rc-panel{width:calc(100% - 600px);min-width:300px}}`;
   function build() {
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
