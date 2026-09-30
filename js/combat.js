@@ -188,7 +188,7 @@ window.Combat = (() => {
     return omega;
   }
   // 瞄点：相机射线最近的身体部位（准星指哪打哪）；终结下劈把射线压低一点 = 更容易砍到脖子/头
-  const AIMZ = [['head', 0.9], ['neck', 1.0], ['upperChest', 0.95], ['chest', 0.85], ['spine', 0.95], ['hips', 1.0], ['leftUpperArm', 1.25], ['rightUpperArm', 1.25], ['leftUpperLeg', 1.05], ['rightUpperLeg', 1.05]];
+  const AIMZ = [['head', 0.78], ['neck', 0.8], ['upperChest', 0.95], ['chest', 0.85], ['spine', 0.95], ['hips', 1.0], ['leftUpperArm', 1.25], ['rightUpperArm', 1.25], ['leftUpperLeg', 1.05], ['rightUpperLeg', 1.05]];
   function aimPoint(fo, w, out) { // 返回部位名，点写进 out
     const B = fo.f && fo.f.bones; if (!B) return null; cam.getWorldPosition(_mo); _mf.set(0, 0, -1).transformDirection(cam.matrixWorld); if (w.type === 'fin') _mo.y -= 0.14;
     let best = null, bs = 0.8;

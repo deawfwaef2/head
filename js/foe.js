@@ -646,7 +646,7 @@ window.Foe = (() => {
     return n;
   }
   // ---- 被砍：部位判定 ----
-  const ZN = [['head', 0.13], ['neck', 0.075], ['upperChest', 0.2], ['chest', 0.2], ['spine', 0.19], ['hips', 0.2], ['leftUpperArm', 0.07], ['leftLowerArm', 0.06], ['rightUpperArm', 0.07], ['rightLowerArm', 0.06], ['leftUpperLeg', 0.1], ['leftLowerLeg', 0.08], ['rightUpperLeg', 0.1], ['rightLowerLeg', 0.08]];
+  const ZN = [['head', 0.13], ['neck', 0.1], ['upperChest', 0.2], ['chest', 0.2], ['spine', 0.19], ['hips', 0.2], ['leftUpperArm', 0.07], ['leftLowerArm', 0.06], ['rightUpperArm', 0.07], ['rightLowerArm', 0.06], ['leftUpperLeg', 0.1], ['leftLowerLeg', 0.08], ['rightUpperLeg', 0.1], ['rightLowerLeg', 0.08]];
   const CHILD = { leftUpperArm: 'leftLowerArm', leftLowerArm: 'leftHand', rightUpperArm: 'rightLowerArm', rightLowerArm: 'rightHand', leftUpperLeg: 'leftLowerLeg', leftLowerLeg: 'leftFoot', rightUpperLeg: 'rightLowerLeg', rightLowerLeg: 'rightFoot', neck: 'head', spine: 'chest', chest: 'neck', upperChest: 'neck', hips: 'spine' };
   function zoneOf(fo, point) { // 点到骨段的最近距离 / 半径，最小者为命中部位
     let best = null, bd = 1e9; const a = new V3(), b = new V3(), ab = new V3(), ap = new V3();
@@ -666,7 +666,7 @@ window.Foe = (() => {
     for (const [z, r] of ZN) { const bo = fo.f.bones[z]; if (!bo || (fo.gone && fo.gone.has(z)) || (z === 'head' && fo.decap)) continue;
       const a = bo.getWorldPosition(new V3()), cb = CHILD[z] && fo.f.bones[CHILD[z]]; const b = cb ? cb.getWorldPosition(new V3()) : a.clone().add(new V3(0, z === 'head' ? 0.18 : 0.1, 0));
       if (z === 'head') { const up = a.clone().sub(fo.f.bones.neck.getWorldPosition(new V3())).normalize(); a.addScaledVector(up, 0.06); b.copy(a).addScaledVector(up, 0.1); }
-      segs.push([z, a, b, r * (info.assist ? 1.4 : 1) + (z === 'neck' ? 0.06 : 0.035)]); } // 第二十二轮：辅助瞄准时身体判定略宽
+      segs.push([z, a, b, r * (info.assist ? 1.4 : 1) + (z === 'neck' ? 0.09 : z === 'head' ? 0.05 : 0.035)]); } // 第二十二轮：辅助瞄准时身体判定略宽
     let best = null, bd = 1, neckB = null, nd = 1;
     for (let i = 0; i <= 6; i++) { const u = i / 6; _s0.copy(sg.b0).lerp(sg.t0, u); _s1.copy(sg.b1).lerp(sg.t1, u);
       for (let j = 0; j <= 4; j++) { _sp.copy(_s0).lerp(_s1, j / 4);
@@ -695,7 +695,7 @@ window.Foe = (() => {
     info = Object.assign({}, info, { point: c.point, speed: spd });
     blood(c.point, slash ? 6 : 3, info.vel);
     if (fo.dead) { // 尸体：可以继续砍——斩首、断肢、腰斩
-      if (slash && zone === 'neck' && spd > 3 && !fo.decap) decapitate(fo, info);
+      if (slash && (zone === 'neck' || zone === 'head') && spd > 2 && !fo.decap) decapitate(fo, info);
       else if (slash && /Arm|Leg/.test(zone) && spd > 4) sever(fo, zone, info);
       else if (slash && (zone === 'spine' || zone === 'hips' || zone === 'chest' || zone === 'upperChest') && spd > 6.5 && !fo.halved) sever(fo, 'spine', info);
       else if (fo.rag) ragKick(fo, info, 0.6);
@@ -723,7 +723,7 @@ window.Foe = (() => {
     if (!fo.brave && Math.random() < 0.65) { fo.brave = true; fo.state = 'chase'; } // 第二十六轮：挨打后更容易回头拼命（0.35→0.65）
     if (fo.boss) ctx.bossHp(fo);
     // 斩首：够快的横砍砍中脖子，且这一刀后她剩不到一半血（霸主要剩不到 25%）
-    if (slash && zone === 'neck' && spd > 4.5 && ((brk && !(fo.boss || fo.hunter || fo.eliteId)) || fo.hp <= fo.maxHp * (fo.boss || fo.hunter || fo.eliteId ? 0.25 : 0.5))) { // 破绽中 = 处决，不看血量（R36b：霸主/精英/猎手除外，必须先打到 25% 以下）
+    if (slash && (zone === 'neck' || zone === 'head') && spd > 3 && ((brk && !(fo.boss || fo.hunter || fo.eliteId)) || fo.hp <= fo.maxHp * ((fo.boss || fo.hunter || fo.eliteId ? 0.4 : 0.75) + (info.charged ? 0.1 : 0)))) { /* R42 斩首放宽：头/脖子都算；刃速 4.5→3；血线 50%→75%（霸主/精英 25%→40%，蓄力刀再 +10%）；霸主仍不会一刀死 */ // 破绽中 = 处决，不看血量（R36b：霸主/精英/猎手除外，必须先打到 25% 以下）
       const one = first && !brk; fo.hp = 0; die(fo, info, true); decapitate(fo, info); ctx.event && ctx.event(brk ? 'execute' : one ? 'onecut' : 'decapAlive', fo); return true; }
     if (fo.hp <= 0) {
       die(fo, info, false); if (CTX && CTX.shake) CTX.shake(0.35); // 第十八轮：击杀不再慢放
@@ -731,7 +731,7 @@ window.Foe = (() => {
       else if (slash && (zone === 'spine' || zone === 'hips') && spd > 9) sever(fo, 'spine', info); // 致命的快刀砍在腰：腰斩
       return true;
     }
-    if (zone === 'neck' && slash && !fo.boss) ctx.toast && fo.hp > fo.maxHp * 0.5 && Math.random() < 0.5 && ctx.toast('脖子砍中了——再削弱她一些就能一刀斩首', '#ffc0a0', 1.6);
+    if ((zone === 'neck' || zone === 'head') && slash && !fo.boss) ctx.toast && fo.hp > fo.maxHp * 0.75 && Math.random() < 0.5 && ctx.toast('脖子砍中了——再削弱她一些就能一刀斩首', '#ffc0a0', 1.6);
     // 受击硬直（霸主不容易被打断）
     if (fo.boss) { fo.poise = (fo.poise || 0) + dealt; // 第十九轮：BOSS 韧性槽取代 25% 随机打断
       if (!fo.rage && fo.hp <= fo.maxHp * 0.5) { fo.rage = true; fo.poise = 0; fo.atk = null; fo.stag = 0.9; fo.f.play('Hit_Knockback', { once: true, fade: 0.05, restart: true }); ctx.shake && ctx.shake(0.5); ctx.toast && ctx.toast('👑 霸主被激怒了——出手更快更狠！', '#ff9a60', 2.4); sfx().roar && sfx().roar(1); if (fo.sayT <= 0) talk(fo, pickR(Math.random, ['……有意思。', '你惹怒我了。', '玩够了。']), '#ffb0a0'); } }
