@@ -146,6 +146,12 @@ assert face, 'no face primitives found'
 fskin = [p for p in face if 'SKIN' in p['mname'].upper()] or face
 FP = np.concatenate([up(p) for p in fskin])
 eyeP = [p for p in face if 'IRIS' in p['mname'].upper()] or [p for p in face if 'HIGHLIGHT' in p['mname'].upper()] or [p for p in face if 'EYEWHITE' in p['mname'].upper()]
+# R31：有的 MMD 模型把墨镜/头饰也命名成 EYE_Iris（HSR 卡芙卡），眼睛被定位到头顶 → 切口切到嘴。只保留与眼白高度重叠的虹膜图元
+_ew = [p for p in face if 'EYEWHITE' in p['mname'].upper() or 'WHITE' in p['mname'].upper()]
+if _ew and eyeP:
+    _W = np.concatenate([up(p) for p in _ew]); _lo, _hi = _W[:, 1].min() - 0.01, _W[:, 1].max() + 0.01
+    _ok = [p for p in eyeP if _lo <= up(p)[:, 1].mean() <= _hi]
+    if _ok and len(_ok) < len(eyeP): print('R31 eye filter: drop', [p['mname'] for p in eyeP if p not in _ok]); eyeP = _ok
 EP = np.concatenate([up(p) for p in eyeP]) if eyeP else FP
 cxm = (FP[:, 0].min() + FP[:, 0].max()) / 2
 eyeC = EP.mean(0)

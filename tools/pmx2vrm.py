@@ -11,6 +11,9 @@ def cls(n):
     if n.endswith('+') or 'spa' in n.lower() or 'sph' in n.lower() or n.lower().startswith('mmd_edge') or 'edge' in n.lower(): return None  # 描边外壳
     if any(k in n for k in ('面具', '仮面', 'マスク', 'mask', 'Mask')): return 'cloth'  # 面具≠脸（“面”字会误中）
     L = n.lower()
+    if __import__('re').fullmatch(r'mtl_chr_\d+', L): return 'FACE_SKIN'  # R31 プロセカ VBS：mtl_chr_00 = 脸
+    if 'mtl_chr_ehl' in L: return '_EYE_Highlight'
+    if L.strip() in ('head', 'head skin', 'headskin'): return 'FACE_SKIN'  # R31 原神女士（怪物版）脸皮材质名 head
     if any(k in L for k in ('eyebase', 'shirome', 'eye_white', 'eyewhite')): return '_EYE_EyeWhite'
     if any(k in L for k in ('kurome', 'hitomi')): return '_EYE_Iris'
     if any(k in L for k in ('matsuge', 'matuge', 'mabuta')): return '_FACE_Eyeline'
@@ -24,7 +27,7 @@ def cls(n):
     if any(k in n for k in ('睫', '二重', 'まつ', '眼线', 'lash')): return '_FACE_Eyeline'
     if any(k in n for k in ('目', '眼', '瞳', 'eye', 'Eye')): return '_EYE_Iris'
     if any(k in n for k in ('口', '齿', '齒', '歯', '舌', 'mouth', 'teeth')): return '_FACE_Mouth'
-    if any(k in n for k in ('颜', '顔', '脸', '臉', '面', 'face', 'Face', '表情')): return 'FACE_SKIN'
+    if any(k in n for k in ('颜', '顔', '顏', '脸', '臉', '面', 'face', 'Face', '表情')): return 'FACE_SKIN'
     if any(k in n for k in ('髮', '髪', '发', '頭髪', 'hair', 'Hair')): return '_HAIR'
     if any(k in n for k in ('肌', '皮肤', 'skin', 'Skin')): return 'Body_SKIN'
     return 'cloth'
@@ -106,11 +109,13 @@ TEXK = [(('eyesbase', 'white', 'shiro', 'eyewhite'), '白目'), (('matuge', 'las
         (('eye', 'hitomi', 'me_'), '目'), (('kao', 'face', 'head', 'kubi'), '顔'), (('kami', 'hair'), '髪'), (('mouth', 'kuchi', 'teeth', 'ha_'), '口'), (('skin', 'hada'), '肌')]
 def cls2(m):  # 材质名是“材質12 / mat3 / Material”这类通用名时，改看贴图文件名
     c = cls(m['name'])
+    if m['name'] in os.environ.get('FACE_MATS', '').split(','): return 'FACE_SKIN'  # R31：手动指定脸皮材质（秦始皇「新規」）
     if c != 'cloth' or not _re.fullmatch(r'(新規材質|材質|材质|mat|material|Material|Mat)[ _.]?\d*', m['name'].strip()) or not (0 <= m['tex'] < len(P['tex'])): return c
     tn = os.path.basename(P['tex'][m['tex']].replace('\\', '/')).lower()
     for ks, jp in TEXK:
         if any(k in tn for k in ks): return cls(jp)
-    return c
+    c3 = cls(os.path.splitext(tn)[0])  # R31：日文贴图名（顔.png / 眼球.bmp / 髪前3.png）
+    return c3 if c3 else c
 seen = {}
 # 脸皮并在身体皮肤材质里（结月缘 ver7「肌」、IA「skin」、秦始皇「body01」）：模型几乎没有独立脸皮时，按“三角形≥2个顶点主骨骼属于头”拆出脸皮
 _par = [b['parent'] for b in P['bones']]
