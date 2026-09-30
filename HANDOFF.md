@@ -1554,3 +1554,10 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   - 按键一览（`js/keyguide.js`）：顶部“先做这三件事”文字条换成三张**操作图**（WASD 十字键帽 + Shift/Space/C + 鼠标；战斗：鼠标左右键高亮“斩/挡”+ F/Q/E/H；首级·菜单：E/LMB/RMB/Tab/Esc/F1），一键一字；下面的详细列表保留并把字号提到 15px；按下的键会在大键帽上亮起（data-c）。
   - 装备页（`js/gear2.js dollHTML`、`js/hub.js kitBody`）：文字属性表换成血条 + 6 个图标数据块（零值变暗）；删掉说明段落，改成底部键帽图例条（LMB 取出/装备 · 拖动整理 · R 旋转 · H 喝药 · Tab 关闭；三语）。CSS 用 `.hk .sk-eq/.sk-foot/.g2note {display:none}` 隐藏了麻袋里的重复文字，非 hub 场景的旧面板不受影响。
   - 教训：`Hub.go('logs'|'codex')` 在测试页里不会渲染（harness 缺 UI 依赖，截图其实还是上一页）；这两页、首级收藏、MOD 列表、天赋页的“图形化”还没做，下一轮继续。
+
+## R45：技能栏 / 小键盘 / 技能特效（用户：“加了技能不知道怎么用；小键盘共通；要在屏幕下面别太小；用技能要有特效”）
+- **小键盘**：`talents.js` 的 `DIG` 加了 Numpad0-9，与主键盘 Digit0-9 共用同一排技能栏（Shift+数字=第二排）。`keyguide.js` 图示/列表同步（战斗卡片多一个“1–0 技能 · 小键盘也行”键帽；按小键盘时大键帽也会亮）。
+- **用法引导**：① 学会技能时字幕“✨ 学会「X」——已放进快捷栏，按 N 释放”；② 技能栏上方有一条发光提示“按 1–0（主键盘/小键盘都行）释放技能 · T 技能书”，第一次成功施放后消失（localStorage `tb_hint_done`）；没学技能时提示“按 T 学一个技能”；③ **洞里也显示技能栏**（变灰 + 底下一行“出洞后才能释放技能”），在洞里按数字会弹“技能只能在野外使用…”，不再没反应（原来 `#tbBar` 只在野外 `Worlds.active` 时显示，onKey 直接 return）。
+- **技能栏放大**（`talents_ui.js` CSS）：`--u` 由 clamp(46,4.4vw,68) 改为 clamp(60,5.4vw,88)；键位角标改成黑底大号徽章；魂能消耗数字 ≥13px。`body.tbcave` 时 `#hint/#propHint/#bkHeld` 抬到栏上方。
+- **技能特效**（新 MOD `skill_vfx`，`js/skillfx.js`，默认开）：`TalUI.cast` 成功后调 `SkillFX.cast(id)`：屏幕边缘门派色闪光（大招：冲击波环 + 速度线 + 屏震）、那一格爆光环 + 火花、大图标+技能名横幅（替代 `#tbCast`，`body.sfxon` 时隐藏旧的）；3D：面前迸发的加法火花、脚下双层冲击环、前方光柱，按门派（id 首字母 b/w/s/r/m/h）加新月刃光 / 护盾壳 / 魂火螺旋 / 残影线。**不碰各技能原有的环/弹道逻辑**。教训：光柱/护盾壳不能包住相机（DoubleSide 加法混合会糊屏），光柱放在前方 3.4m。
+- 测试：`tools/test/talents.html`（已加载 skillfx.js，背景改暗）；无头 Chromium + swiftshader 里加了 WebGLRenderer 看 3D 特效（见本轮脚本思路：往页面里 `new THREE.WebGLRenderer` 并把 `r.render(scene,camera)` 推进 `G.HOOK.frame`）。未在真机验证。

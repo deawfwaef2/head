@@ -52,7 +52,7 @@ window.Talents = (() => {
   }
   function alloc(id) {
     if (canRank(id)) return false; const t = tal(); t.n[id] = rank(id) + 1; t.hist.push(id); if (t.hist.length > 60) t.hist.shift(); bump();
-    const nd = D.ALL[id]; if (nd.type === 'a' && D.SK[id]) autoPlace(id); save(); return true;
+    const nd = D.ALL[id]; if (nd.type === 'a' && D.SK[id]) { const had = tal().bar.includes(id); autoPlace(id); const si = tal().bar.indexOf(id); if (!had && si >= 0) { const k = si < 10 ? (si + 1) % 10 : '⇧' + ((si - 9) % 10); toast(`✨ 学会「${D.SK[id].n}」——已放进快捷栏，按 ${k} 释放（野外）`, '#ffe29a', 3.2); } } save(); return true;
   }
   function undo() { // 撤销最近一次加点（本次打开面板内可无限撤销，关闭面板即“确认”）
     const t = tal(); while (t.hist.length) { const id = t.hist.pop(); if (id[0] === '@') { const k = id.slice(1); if (t.at[k] > 0) { t.at[k]--; bump(); save(); return true; } continue; } if (!rank(id)) continue; const nd = D.ALL[id];
@@ -393,10 +393,12 @@ window.Talents = (() => {
   function aimFoeLite() { const W = WW(); if (!W || !window.Foe || !Foe.foes.length) return null; try { return aimFoe(22, 0.12); } catch (e) { return null; } }
 
   // ================= 按键 =================
-  const DIG = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Digit6: 5, Digit7: 6, Digit8: 7, Digit9: 8, Digit0: 9 };
+  const DIG = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Digit6: 5, Digit7: 6, Digit8: 7, Digit9: 8, Digit0: 9, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3, Numpad5: 4, Numpad6: 5, Numpad7: 6, Numpad8: 7, Numpad9: 8, Numpad0: 9 }; // R45：小键盘与主键盘数字键共用同一排技能栏
   const LEGACY = { KeyR: 'r_roar', KeyG: 'b_whirl' };
   function onKey(e) {
-    if (!on() || !G0() || !G0().playing) return false; const W = WW(); if (!W || G0().uiOpen || W.busy || W.dead || W.mapOpen) return false;
+    if (!on() || !G0() || !G0().playing) return false; const W = WW();
+    if (!W && e.code in DIG && !e.repeat && !G0().uiOpen) { const i = DIG[e.code] + (e.shiftKey ? 10 : 0), id = tal().bar[i]; if (id) { toast(`🏞️ 技能只能在野外使用——出洞后按 ${e.code.replace('Digit', '').replace('Numpad', '')} 释放「${D.SK[id].n}」`, '#ffd27a', 2.2); return true; } return false; } // R45：洞里按数字给提示，不再“没反应”
+    if (!W || G0().uiOpen || W.busy || W.dead || W.mapOpen) return false;
     if (e.repeat) return e.code in DIG || e.code === 'KeyQ' || e.code in LEGACY;
     if (e.code in DIG) { const i = DIG[e.code] + (e.shiftKey ? 10 : 0); const id = tal().bar[i]; if (id) cast(id); else toast('这一格还是空的——按 T 打开技能书，把技能拖进来', '#aaa', 1); return true; }
     if (e.code === 'KeyQ') { cast('dodge'); return true; }

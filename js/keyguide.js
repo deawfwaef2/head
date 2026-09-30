@@ -22,7 +22,7 @@ window.KeyGuide = (() => {
       [['RMB'], { zh: '按住格挡（轻移鼠标切换上下左右）', ja: '押している間ガード（マウスを軽く動かして上下左右を切替）', en: 'Hold to block (nudge the mouse to pick the side)' }],
       [['Q'], { zh: '闪身（朝你按的方向）', ja: '回避（押している方向へ）', en: 'Dodge (toward your move keys)' }],
       [['E'], { zh: '敌人露出破绽时处决', ja: '敵が隙を見せたら処刑', en: 'Execute when an enemy is open' }],
-      [['1', '…', '0'], { zh: '技能快捷栏（Shift+1–0 为第二排）', ja: 'スキルバー（Shift+1–0 で2段目）', en: 'Skill hotbar (Shift+1–0 = second row)' }],
+      [['1', '…', '0'], { zh: '技能快捷栏（主键盘 / 小键盘 1–0 都行；Shift+1–0 为第二排）', ja: 'スキルバー（数字キー・テンキー1–0。Shift+1–0 で2段目）', en: 'Skill hotbar (number row or numpad 1–0; Shift+1–0 = second row)' }],
       [['H'], { zh: '喝药', ja: '回復薬を使う', en: 'Drink a potion' }],
     ] },
     { ic: '💀', t: { zh: '首级与麻袋', ja: '首級と麻袋', en: 'Heads & the sack' }, rows: [
@@ -67,7 +67,7 @@ window.KeyGuide = (() => {
     move: ['移动', '移動', 'MOVE'], combat: ['战斗', '戦闘', 'COMBAT'], loot: ['首级 · 菜单', '首級・メニュー', 'HEADS · MENU'],
     sprint: ['疾跑', 'ダッシュ', 'Sprint'], jump: ['跳', 'ジャンプ', 'Jump'], crouch: ['蹲', 'しゃがみ', 'Crouch'], look: ['视角', '視点', 'Look'],
     slash: ['斩', '斬る', 'Slash'], block: ['挡', 'ガード', 'Block'], draw: ['拔刀', '抜刀', 'Draw'], dodge: ['闪身', '回避', 'Dodge'], exec: ['处决', '処刑', 'Execute'], heal: ['喝药', '回復', 'Heal'],
-    grab: ['拾取', '拾う', 'Grab'], play: ['把玩', '弄ぶ', 'Play'], throw: ['投掷', '投げる', 'Throw'], menu: ['菜单', 'メニュー', 'Menu'], pause: ['暂停', '停止', 'Pause'], keys: ['按键表', 'キー表', 'Keys'], walk: ['走', '移動', 'Walk']
+    grab: ['拾取', '拾う', 'Grab'], play: ['把玩', '弄ぶ', 'Play'], throw: ['投掷', '投げる', 'Throw'], menu: ['菜单', 'メニュー', 'Menu'], pause: ['暂停', '停止', 'Pause'], keys: ['按键表', 'キー表', 'Keys'], walk: ['走', '移動', 'Walk'], skill: ['技能 · 小键盘也行', 'スキル（テンキー可）', 'Skills · numpad too']
   };
   const MOUSE = (l, r, L) => `<div class="ms"><svg viewBox="0 0 90 130"><path class="b${l ? ' on1' : ''}" d="M45 6 H30 Q8 6 8 30 V58 H45 Z"/><path class="b${r ? ' on2' : ''}" d="M45 6 H60 Q82 6 82 30 V58 H45 Z"/><path class="bd" d="M8 64 H82 V86 Q82 124 45 124 Q8 124 8 86 Z"/><rect class="w" x="40" y="18" width="10" height="24" rx="5"/></svg>${l ? `<b class="l1">${VW.slash[L]}</b>` : ''}${r ? `<b class="l2">${VW.block[L]}</b>` : ''}</div>`;
   function visual(L) {
@@ -78,7 +78,7 @@ window.KeyGuide = (() => {
     const wasd = `<div class="wasd"><span class="cap big" data-c="KeyW">W</span><span class="cap big" data-c="KeyA">A</span><span class="cap big" data-c="KeyS">S</span><span class="cap big" data-c="KeyD">D</span></div>`;
     return `<div class="vis">
       ${card('🚶', 'move', `<div class="vrow">${wasd}<div class="vcol">${K('Shift', 'sprint', 'wide')}${K('Space', 'jump', 'wide')}${K('C', 'crouch')}</div>${M(0, 0).replace('<div class="ms">', '<div class="ms"><em>' + esc(i('look')) + '</em>')}</div>`)}
-      ${card('⚔️', 'combat', `<div class="vrow">${M(1, 1)}<div class="vgrid">${K('F', 'draw')}${K('Q', 'dodge')}${K('E', 'exec')}${K('H', 'heal')}</div></div>`)}
+      ${card('⚔️', 'combat', `<div class="vrow">${M(1, 1)}<div class="vgrid">${K('F', 'draw')}${K('Q', 'dodge')}${K('E', 'exec')}${K('H', 'heal')}</div></div><div class="kk wide skl"><span class="cap big mini" data-c="Digit1">1 – 0</span><small>${esc(i('skill'))}</small></div>`)}
       ${card('💀', 'loot', `<div class="vgrid g3">${K('E', 'grab')}<div class="kk"><span class="cap big mini">LMB</span><small>${esc(i('play'))}</small></div><div class="kk"><span class="cap big mini">RMB</span><small>${esc(i('throw'))}</small></div>${K('Tab', 'menu')}${K('Esc', 'pause')}${K('F1', 'keys')}</div>`)}
     </div>`;
   }
@@ -170,7 +170,7 @@ ${visual(L)}
     if (isOpen) {
       e.stopImmediatePropagation(); e.preventDefault();
       if (e.code === 'Escape' || e.code === 'F1' || (e.key === '?' && !e.repeat)) { close(); return; }
-      root.querySelectorAll('.cap[data-c="' + e.code + '"]').forEach(c => c.classList.add('hit')); return;
+      { const cc = /^Numpad[0-9]$/.test(e.code) ? 'Digit' + e.code.slice(6) : e.code; root.querySelectorAll('.cap[data-c="' + cc + '"]').forEach(c => c.classList.add('hit')); } return;
     }
     if (e.repeat || typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
     const g = window.G; if (g && g.uiOpen) return;

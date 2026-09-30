@@ -10,7 +10,7 @@
 
   // ================= 样式 =================
   const CSS = `
-:root{--u:clamp(46px,4.4vw,68px)}
+:root{--u:clamp(60px,5.4vw,88px)} /* R45：技能栏放大（原 46~68px） */
 #tbBar{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:31;display:none;pointer-events:none;user-select:none}
 #tbBar.on{display:block}#tbBar.ptr{pointer-events:auto}
 .tbxp{height:8px;margin:0 6px 7px;border-radius:5px;background:#000a;border:1px solid #ffd27a55;overflow:hidden;position:relative}.tbxp i{display:block;height:100%;background:linear-gradient(90deg,#b8841c,#ffd86a);transition:width .3s}
@@ -19,8 +19,8 @@
 .tbs{--s:var(--u);position:relative;width:var(--s);height:var(--s);flex:none;border-radius:10px;background:linear-gradient(#2c2028,#130c13);border:2px solid #5e4c3a;box-shadow:inset 0 0 12px #000a;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#fff;cursor:pointer}
 .r2 .tbs{--s:calc(var(--u)*.78)}
 .tbs i{font-style:normal;font-size:calc(var(--s)*.56);filter:drop-shadow(0 2px 3px #000);line-height:1}
-.tbs b{position:absolute;left:4px;top:2px;font-size:calc(var(--s)*.23);color:#ffe9b0;text-shadow:0 1px 2px #000,0 0 3px #000;font-weight:800;line-height:1}
-.tbs u{position:absolute;right:4px;bottom:2px;text-decoration:none;font-size:calc(var(--s)*.23);color:#7ad8ff;font-weight:800;text-shadow:0 1px 2px #000;line-height:1}
+.tbs b{position:absolute;left:0;top:0;min-width:calc(var(--s)*.36);padding:1px 5px 2px;text-align:center;font-size:max(14px,calc(var(--s)*.3));color:#fff3cf;background:linear-gradient(#000c,#000a);border-right:1px solid #ffd27a66;border-bottom:1px solid #ffd27a66;border-radius:8px 0 8px 0;text-shadow:0 1px 2px #000;font-weight:900;line-height:1.1}
+.tbs u{position:absolute;right:4px;bottom:2px;text-decoration:none;font-size:max(13px,calc(var(--s)*.26));color:#7ad8ff;font-weight:800;text-shadow:0 1px 2px #000;line-height:1}
 .tbs s{position:absolute;inset:0;background:conic-gradient(rgba(0,0,0,.74) var(--p,0deg),transparent 0);pointer-events:none}
 .tbs em{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-style:normal;font-weight:900;font-size:calc(var(--s)*.4);color:#fff;text-shadow:0 0 6px #000,0 0 3px #000;pointer-events:none}
 .tbs.nom{filter:saturate(.35) brightness(.65)}.tbs.nom u{color:#ff6a6a}
@@ -34,6 +34,13 @@
 .tbt .dot{position:absolute;right:-6px;top:-8px;background:#e03030;color:#fff;border-radius:11px;min-width:22px;height:22px;font-size:13px;line-height:22px;text-align:center;border:2px solid #2a0a0a}
 #tbCast{position:fixed;left:50%;bottom:calc(var(--u)*2.15 + 86px);transform:translateX(-50%);z-index:31;pointer-events:none;color:#fff;font-weight:900;font-size:26px;letter-spacing:3px;text-shadow:0 2px 10px #000,0 0 18px var(--c,#ffd27a);opacity:0;transition:opacity .3s}
 #tbCast.on{opacity:1}
+#tbBar.cave .tbs,#tbBar.cave .tbt{filter:saturate(.45) brightness(.7)}
+#tbBar.cave::after{content:"🏞️ 出洞后才能释放技能 · 按 T 分配天赋";display:block;text-align:center;margin-top:6px;font-size:16px;font-weight:800;color:#ffe9b0;text-shadow:0 2px 6px #000}
+.tbhint{position:absolute;left:50%;bottom:calc(100% + 10px);transform:translateX(-50%);white-space:nowrap;padding:8px 18px;font-size:18px;font-weight:800;color:#fff3cf;background:linear-gradient(90deg,transparent,#140a10ee 12%,#140a10ee 88%,transparent);border-top:2px solid #ffd27a;letter-spacing:.06em;animation:tbhp 1.6s ease-in-out infinite alternate;pointer-events:none}
+@keyframes tbhp{to{border-top-color:#fff;text-shadow:0 0 12px #ffd27a}}
+.tbhint kbd{display:inline-block;min-width:26px;padding:1px 8px 3px;margin:0 3px;text-align:center;font:900 16px inherit;color:#ffe3a6;background:linear-gradient(#3a2a1c,#22160f);border:1px solid #8a6a3a;border-bottom-width:3px;border-radius:6px}
+#tbBar{overflow:visible}
+body.tbcave #hint,body.tbcave #propHint,body.tbcave #bkHeld{bottom:calc(var(--tbH,0px) + 14px)!important}
 #tbCol{position:fixed;left:14px;top:12px;z-index:31;display:none;flex-direction:column;gap:10px;width:clamp(280px,23vw,390px);pointer-events:none;user-select:none}
 #tbCol.on{display:flex}
 .pfc{display:flex;gap:12px;align-items:center;padding:10px 12px;background:linear-gradient(135deg,#1e141cee,#0c070bee);border:2px solid #6a5232;border-radius:18px;box-shadow:0 4px 18px #000a}
@@ -138,10 +145,12 @@ body.tbon .wskills{display:none!important}
   }
   const utilL = () => `<div class="tbs util" data-util="q" data-tip="u:dodge"><i>💨</i><b>Q</b><u>体</u><s></s><em></em></div><div class="tbs util" data-util="e" data-tip="u:e"><i>🗡️</i><b>E</b><s></s><em></em></div><div class="tbs util" data-util="h" data-tip="u:h"><i>🧪</i><b>H</b><u class="pc"></u><s></s><em></em></div><div style="width:10px"></div>`;
   const utilR = () => `<div style="width:10px"></div><div class="tbt" data-act="open" data-tip="u:t">天赋<small>T</small><span class="dot" style="display:none"></span></div>`;
+  const hintOn = () => { try { return !localStorage.getItem('tb_hint_done'); } catch (e) { return false; } };
+  function hintHTML() { if (!hintOn()) return ''; const n = T().tal().bar.filter(Boolean).length; return `<div class="tbhint">${n ? '按 <kbd>1</kbd>–<kbd>0</kbd>（主键盘 / 小键盘都行）释放技能 · <kbd>T</kbd> 技能书' : '还没有技能 — 按 <kbd>T</kbd> 打开天赋，学一个技能'}</div>`; }
   let barSig = '';
   function renderBar() {
-    if (!elBar) return; const t = T().tal(), sig = t.bar.join(',') + '|' + t.ver; if (sig === barSig) return; barSig = sig;
-    elBar.innerHTML = `<div class="tbxp"><i></i></div>` + barInner(true); if (ui.open) renderPanelBar();
+    if (!elBar) return; const t = T().tal(), sig = t.bar.join(',') + '|' + t.ver + '|' + hintOn(); if (sig === barSig) return; barSig = sig;
+    elBar.innerHTML = `<div class="tbxp"><i></i></div>` + barInner(true) + hintHTML(); if (ui.open) renderPanelBar();
   }
   function renderPanelBar() { const b = elPn && elPn.querySelector('.pnbar'); if (b) b.innerHTML = barInner(false); }
 
@@ -151,8 +160,9 @@ body.tbon .wskills{display:none!important}
   const setW = (el, v) => { if (!el) return; v = v.toFixed(1) + '%'; if (el._w !== v) { el._w = v; el.style.width = v; } };
   function frame(dt) {
     if (!uiOn() || !T() || !T().on() || !G0() || !G0().S) { hideAll(); return; }
-    build(); const W = WW(); const show = !!W && !W.busy && !W.dead; document.body.classList.toggle('tbon', show);
-    elBar.classList.toggle('on', show); elCol.classList.toggle('on', show); elBar.classList.toggle('ptr', !!G0().uiOpen);
+    build(); const W = WW(); const show = !!W && !W.busy && !W.dead; const g0 = G0(), cave = !W && !!g0.playing && !g0.uiOpen; document.body.classList.toggle('tbon', show); document.body.classList.toggle('tbcave', cave);
+    elBar.classList.toggle('on', show || cave); elBar.classList.toggle('cave', cave); elCol.classList.toggle('on', show); elBar.classList.toggle('ptr', !!g0.uiOpen);
+    if (cave) { acc += dt; if (acc >= 0.1) { acc = 0; renderBar(); } return; } // R45：洞里也显示技能栏（变灰，提示出洞可用）
     if (!show) { return; }
     acc += dt; if (acc < 0.05) return; acc = 0; renderBar();
     const g = G0(), s = g.st(), V = T().view(), now = performance.now() / 1000;
@@ -190,7 +200,7 @@ body.tbon .wskills{display:none!important}
     });
     const dot = elBar.querySelector('.tbt .dot'), tb2 = elBar.querySelector('.tbt'); if (dot) { const n = L.attr + L.skill; dot.style.display = n ? 'block' : 'none'; dot.textContent = n; tb2.classList.toggle('pulse', n > 0); }
   }
-  function hideAll() { if (!ui.built) return; elBar.classList.remove('on'); elCol.classList.remove('on'); document.body.classList.remove('tbon'); }
+  function hideAll() { if (!ui.built) return; elBar.classList.remove('on'); elCol.classList.remove('on'); document.body.classList.remove('tbon'); document.body.classList.remove('tbcave'); }
 
   // ================= 提示 =================
   const fmtD = (nd, k) => nd.d.replace(/\$([a-zA-Z]+)/g, (m, key) => { const v = (nd.m[key] || 0) * k; return String(+v.toFixed(2)); });
@@ -297,7 +307,7 @@ body.tbon .wskills{display:none!important}
 
   // ================= 施法提示 =================
   let castT = 0;
-  function cast(id) { if (!elCast) return; const sk = D.SK[id], nd = D.ALL[id], sc = nd && D.SCHOOLS.find(s => s.id === nd.school); elCast.style.setProperty('--c', sc ? sc.col : '#ffd27a'); elCast.textContent = `${sk.ic} ${sk.n}`; elCast.classList.add('on'); clearTimeout(castT); castT = setTimeout(() => elCast.classList.remove('on'), 650); }
+  function cast(id) { try { if (hintOn()) { localStorage.setItem('tb_hint_done', '1'); barSig = ''; } } catch (e) { } try { window.SkillFX && SkillFX.cast(id); } catch (e) { } if (!elCast) return; const sk = D.SK[id], nd = D.ALL[id], sc = nd && D.SCHOOLS.find(s => s.id === nd.school); elCast.style.setProperty('--c', sc ? sc.col : '#ffd27a'); elCast.textContent = `${sk.ic} ${sk.n}`; elCast.classList.add('on'); clearTimeout(castT); castT = setTimeout(() => elCast.classList.remove('on'), 650); }
 
   window.TalUI = { open, close, toggle, cast, pulse, render, frame, _ui: ui };
   const wait = setInterval(() => { if (window.G && G.HOOK && G.S && window.RPG && window.Talents) { clearInterval(wait); try { addCss(); G.HOOK.frame.push((dt) => { try { frame(dt); } catch (e) { console.warn('TalUI frame', e); } }); } catch (e) { console.warn('TalUI init', e); } } }, 200);
