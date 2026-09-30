@@ -92,8 +92,8 @@ window.Sack = (() => {
   const canAdd = (g, o) => addTo({ w: g.w, h: g.h, items: g.items.map(q => Object.assign({}, q)) }, Object.assign({}, o), false);
   const stashAdd = (o) => { const st = inv().stash, d = IT[o.id]; if (d.st > 1) for (const q of st) if (q.id === o.id && !q.plus) { q.n += o.n; return; } delete o.x; delete o.y; delete o.r; st.push(o); };
   const RN = ['凡魂', '灵魂', '英魂', '圣魂', '神魂'];
-  const nameOf = (o) => o.bk ? `《${o.bk.ti}》` : o.id === 'head' && o.h ? `【${RN[o.h.c.rar] || ''}】${o.h.c.name}` : (IT[o.id] ? IT[o.id].n : o.id) + (o.plus ? ` +${o.plus}` : '');
-  const rarOf = (o) => o.id === 'head' && o.h ? o.h.c.rar : (IT[o.id] ? IT[o.id].rar : 0);
+  const nameOf = (o) => o.og && window.Organs ? Organs.name(o) : o.bk ? `《${o.bk.ti}》` : o.id === 'head' && o.h ? `【${RN[o.h.c.rar] || ''}】${o.h.c.name}` : (IT[o.id] ? IT[o.id].n : o.id) + (o.plus ? ` +${o.plus}` : '');
+  const rarOf = (o) => o.og ? (o.og.rar | 0) : o.id === 'head' && o.h ? o.h.c.rar : (IT[o.id] ? IT[o.id].rar : 0);
 
   // ---- 掉落 ----
   function lvOf(node) { const L = window.Lore && Lore.LOCS; const i = L ? Math.max(0, L.findIndex(l => l.k === (node.loc && node.loc.k))) : 0; return i + (node.depth || 0) * 0.15; }
@@ -148,7 +148,7 @@ window.Sack = (() => {
   }
   function carcass(b, W) { // 第二十二轮：野兽尸骸（不掉首级，只有材料）
     if (!on() || !W || !W.B || !window.Beasts) return; const nd = W.graph.nodes[W.cur];
-    const L = { kind: 'corpse', name: `${b.T.n}的尸骸`, lv: lvOf(nd), seed: b.e.seed >>> 0, items: Beasts.dropsOf(b).map(([id, n]) => mk(id, n)).concat(window.Props && Props.carcassExtra ? Props.carcassExtra() : []), extra: {}, x: b.pos.x, z: b.pos.z };
+    const L = { kind: 'corpse', name: `${b.T.n}的尸骸`, bst: b.T.n, lv: lvOf(nd), seed: b.e.seed >>> 0, items: Beasts.dropsOf(b).map(([id, n]) => mk(id, n)).concat(window.Props && Props.carcassExtra ? Props.carcassExtra() : []), extra: {}, x: b.pos.x, z: b.pos.z };
     W.B.inter.push({ kind: 'loot', L, x: L.x, z: L.z, corpse: true });
   }
   const itemsOf = (L) => L.items || (L.items = L.kind === 'pile' ? [] : roll(L.kind, L.lv || 0, L.seed || 1, L.extra));
@@ -306,7 +306,7 @@ window.Sack = (() => {
   function render() {
     if (mode === 'wild' && panel) {
       const I = inv(), L = cont ? itemsOf(cont) : null;
-      panel.innerHTML = `<div class="sk-cols">${cont ? `<div class="sk-col"><h4>📦 ${esc(cont.name)} <small>${L.length ? '点击 = 装进麻袋' : '空了'}</small></h4><div class="sk-list" id="skCont">${L.map(o => tile(o, '')).join('')}</div></div>` : ''}${sackHtml(I)}</div>
+      panel.innerHTML = `<div class="sk-cols">${cont ? `<div class="sk-col"><h4>📦 ${esc(cont.name)} <small>${L.length ? '点击 = 装进麻袋' : '空了'}</small>${window.Organs && Organs.canDissect(cont) ? '<button class="sk-btn" data-act="dissect" title="取出整具身体的器官，每件带归属和属性">🔪 解剖</button>' : ''}</h4><div class="sk-list" id="skCont">${L.map(o => tile(o, '')).join('')}</div></div>` : ''}${sackHtml(I)}</div>
         <div class="sk-foot">${Q.length ? `翻找中：${Q.length} 件排队（受击会打断）· ` : ''}点击麻袋物品 = 取出/使用/装备· 拖动整理（拖动时 R 旋转）· Tab / B / Esc 关闭</div>`;
       bind(panel);
     }
@@ -344,6 +344,7 @@ window.Sack = (() => {
     root.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { caveTab = b.dataset.tab; SFX.page && SFX.page(); render(); });
     root.querySelectorAll('[data-ench]').forEach(b => b.onclick = () => { const k = b.dataset.ench; enchant(k === 'eq' ? 'eq' : inv().stash.find(o => o.u === +k)); });
     root.querySelectorAll('[data-craft]').forEach(b => b.onclick = () => craft(RECIPES[+b.dataset.craft]));
+    const dsb = root.querySelector('[data-act="dissect"]'); if (dsb) dsb.onclick = () => { if (!near(cont)) { toast('离尸体太远了', '#ccc'); return; } Organs.dissect(cont); render(); };
     const pour = root.querySelector('[data-act="pour"]'); if (pour) pour.onclick = () => pourWild();
     root.querySelectorAll('.sk-it').forEach(el => { el.onmousedown = (e) => itemDown(e, el); el.oncontextmenu = (e) => e.preventDefault(); });
   }
@@ -380,12 +381,13 @@ window.Sack = (() => {
       if (where === 'sack') { acts.push(['放回储物箱', () => { I.sack.items.splice(I.sack.items.indexOf(o), 1); stashAdd(o); render(); }]); if (d.kind === 'equip') acts.push(['装备', () => { I.sack.items.splice(I.sack.items.indexOf(o), 1); equip(o, stashAdd); render(); }]); }
       if (where === 'belt') acts.push(['放回储物箱', () => { I.belt[bi] = null; stashAdd(o); render(); }]);
     }
+    if (o.og && window.Organs) acts.unshift(...Organs.menu(o, wild, render).filter(() => where === 'stash' || where === 'sack'));
     if (d.kind === 'prop' && window.Props && (where === 'stash' || where === 'sack')) acts.unshift(['放置到洞里', () => Props.startPlace(d.ptype)]);
     if (d.kind === 'book' && o.bk && window.Books && (where === 'sack' || where === 'stash')) acts.unshift(...Books.menu(o, wild));
     if (!acts.length) return;
     closeMenu(); menuEl = document.createElement('div'); menuEl.className = 'sk-menu';
     const miu = window.ItemIcons && ItemIcons.url(o.id);
-    menuEl.innerHTML = (miu ? `<div class="mi"><img src="${miu}" alt=""></div>` : '') + `<div class="t" style="color:${RARC[rarOf(o)]}">${d.icon || ''} ${esc(nameOf(o))}${o.n > 1 ? ' ×' + o.n : ''}</div>${d.desc || o.h || o.bk ? `<div class="d">${esc(o.h ? `${RN[o.h.c.rar] || ''} · 回洞倒袋时滚出来` : o.bk ? `${o.bk.sub || ''}（${o.bk.names.length} 个名字）` : d.desc)}</div>` : ''}` + acts.map((a, i) => `<div data-i="${i}">${a[0]}</div>`).join('');
+    menuEl.innerHTML = (miu ? `<div class="mi"><img src="${miu}" alt=""></div>` : '') + `<div class="t" style="color:${RARC[rarOf(o)]}">${d.icon || ''} ${esc(nameOf(o))}${o.n > 1 ? ' ×' + o.n : ''}</div>${d.desc || o.h || o.bk || o.og ? `<div class="d" style="white-space:pre-line">${esc(o.og && window.Organs ? Organs.info(o) : o.h ? `${RN[o.h.c.rar] || ''} · 回洞倒袋时滚出来` : o.bk ? `${o.bk.sub || ''}（${o.bk.names.length} 个名字）` : d.desc)}</div>` : ''}` + acts.map((a, i) => `<div data-i="${i}">${a[0]}</div>`).join('');
     document.body.appendChild(menuEl); menuEl.style.left = Math.min(innerWidth - 180, e.clientX + 4) + 'px'; menuEl.style.top = Math.min(innerHeight - 40 - acts.length * 30, e.clientY + 4) + 'px';
     menuEl.querySelectorAll('[data-i]').forEach(el => el.onmousedown = (ev) => { ev.stopPropagation(); const a = acts[+el.dataset.i]; closeMenu(); a[1](); });
     setTimeout(() => addEventListener('mousedown', closeMenu, { once: true }), 0);

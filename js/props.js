@@ -57,6 +57,7 @@ window.Props = (() => {
       desc: '血玉和兽牙串成的链子。<b>两侧 1.5 米内产出 ×1.1，魂力 +2</b>。' }
   };
   const KEYS = Object.keys(P);
+  P.og = { n: '器官标本', icon: '🫀', rar: 2, size: 0.36, organ: true, need: {}, coin: 0, desc: '' };
 
   // Sack 物品定义（脚本加载时 Sack 已就绪；没就绪则等）
   function defs() {
@@ -82,13 +83,19 @@ window.Props = (() => {
   function starter(I) { if (I.propsStart || !defs()) return; I.propsStart = 1; const Sk = window.Sack; for (const [k, n] of [['phal', 4], ['sinew', 4], ['wax', 3], ['lock', 2], ['ash', 3]]) I.stash.push(Sk.mk(k, n)); }
 
   // ---------------------------------------------------------------- 场景对象
-  const pg = new THREE.Group(); pg.name = 'props'; const items = []; let dirty = true, bonusC = null, mode = null, hintEl = null, ringM = null;
+  const pg = new THREE.Group(); pg.name = 'props'; const items = []; let ver = 0, dirty = true, bonusC = null, mode = null, hintEl = null, ringM = null;
   const S_ = () => G.S.props || (G.S.props = []);
+  // ---- 器官标本：每件的效果按「品质/阶/同主套装」算，写进各自的 it.d（其余代码无需改动）
+  const ckey = it => it.p.t === 'og' && it.p.og ? 'og' + it.p.og.t : it.p.t;
+  const setN = (og) => items.filter(i => !i.ghost && i.p.t === 'og' && i.p.og && i.p.og.oid === og.oid).length;
+  const orgD = (p, n) => Object.assign({}, P.og, window.Organs ? Organs.effect(p.og, n || 1) : {});
+  function markDirty() { dirty = true; ver++; for (const it of items) if (it.p.t === 'og' && it.p.og) { const n = setN(it.p.og) + (it.ghost ? 1 : 0); it.d = orgD(it.p, n); it.setN = n; } }
   const cordMat = {}; const cmat = (c, glow) => cordMat[c + glow] || (cordMat[c + glow] = new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, emissive: glow || '#000', emissiveIntensity: glow ? 0.55 : 0 }));
   const pickMat = new THREE.MeshBasicMaterial({ visible: false });
 
   function makeModel(d, p) {
     let m = null;
+    if (d.organ && window.Organs && p && p.og) m = Organs.model(p.og);
     if (d.limbs && A) { const nm = d.limbs[((p && p.v) || 0) % d.limbs.length]; if (A.has(nm)) { m = A.fit(nm, { d: d.size }); if (m && p && p.fl) m.scale.x = -1; } }
     if (!m && d.model && II() && II().make) { m = II().make(d.model === 'Gems' ? 'Gems#' + (Math.floor(Math.random() * 6)) : d.model, d.size); }
     else if (!m && d.asset && A && A.has(d.asset)) m = A.fit(d.asset, { h: d.size });
@@ -129,10 +136,10 @@ window.Props = (() => {
     }
   }
   function spawn(p, ghost) {
-    const d = P[p.t]; if (!d) return null;
-    const it = { p, d, g: new THREE.Group(), ghost: !!ghost, tm: Math.random() * 10, pend: [] }; layout(it); it.g.userData.propIt = it; if (it.pick) it.pick.userData.propIt = it; pg.add(it.g); items.push(it); dirty = true; return it;
+    let d = P[p.t]; if (!d) return null; if (p.t === 'og') { if (!p.og) return null; d = orgD(p, 1); }
+    const it = { p, d, g: new THREE.Group(), ghost: !!ghost, tm: Math.random() * 10, pend: [] }; layout(it); it.g.userData.propIt = it; if (it.pick) it.pick.userData.propIt = it; pg.add(it.g); items.push(it); markDirty(); return it;
   }
-  function remove(it) { const i = items.indexOf(it); if (i >= 0) items.splice(i, 1); pg.remove(it.g); disposeKids(it.g); dirty = true; }
+  function remove(it) { const i = items.indexOf(it); if (i >= 0) items.splice(i, 1); pg.remove(it.g); disposeKids(it.g); markDirty(); }
   function rebuildAll() { for (const it of items) layout(it); }
   function load() {
     for (const it of items.slice()) remove(it);
@@ -152,13 +159,13 @@ window.Props = (() => {
   }
   function mulOf(key, pos) {
     if (!items.length) return 1; let m = 1; const cnt = {};
-    for (const it of items) { if (it.ghost) continue; const e = it.d[key]; if (!e) continue; if ((cnt[it.p.t] || 0) >= PER) continue; if (within(it, pos, e.r)) { cnt[it.p.t] = (cnt[it.p.t] || 0) + 1; m *= e.m; } }
+    for (const it of items) { if (it.ghost) continue; const e = it.d[key]; if (!e) continue; if ((cnt[ckey(it)] || 0) >= PER) continue; if (within(it, pos, e.r)) { cnt[ckey(it)] = (cnt[ckey(it)] || 0) + 1; m *= e.m; } }
     return Math.min(m, 3);
   }
   const auraMul = pos => mulOf('aura', pos), pokeMul = pos => mulOf('poke', pos);
   function bonus() {
     if (!dirty && bonusC !== undefined) return bonusC; dirty = false; const o = { str: 0, con: 0, agi: 0, ter: 0, soul: 0 }, cnt = {}; let any = false;
-    for (const it of items) { if (it.ghost || !it.d.stat) continue; if ((cnt[it.p.t] = (cnt[it.p.t] || 0) + 1) > PER) continue; for (const k in it.d.stat) { o[k] += it.d.stat[k]; any = true; } }
+    for (const it of items) { if (it.ghost || !it.d.stat) continue; if ((cnt[ckey(it)] = (cnt[ckey(it)] || 0) + 1) > PER) continue; for (const k in it.d.stat) { o[k] += it.d.stat[k]; any = true; } }
     return (bonusC = any ? o : null);
   }
   const inWild = () => !!(window.Worlds && Worlds.active);
@@ -237,20 +244,23 @@ window.Props = (() => {
     setHint(hudText());
   }
   function findIn(id) { const I = Sack.inv(); for (const L of [I.stash, I.sack.items]) { const o = L.find(q => q.id === id && q.n > 0); if (o) return [L, o]; } return null; }
+  function findU(u) { const I = window.Sack.inv(); for (const L of [I.stash, I.sack.items]) { const o = L.find(x => x && x.u === u); if (o) return [L, o]; } return null; }
+  function takeU(u) { const f = findU(u); if (!f) return false; f[0].splice(f[0].indexOf(f[1]), 1); return true; }
   function takeOne(id) { const f = findIn(id); if (!f) return false; const [L, o] = f; o.n--; if (o.n <= 0) L.splice(L.indexOf(o), 1); return true; }
   function closeUI() { try { if (window.UI && UI.close) UI.close(true); } catch (e) { } if (G.uiOpen && G.setUIOpen) G.setUIOpen(false); }
-  function startPlace(t) {
+  function startPlace(t, item) {
     const d = P[t]; if (!d || !window.Sack) return; if (mode) cancel(true);
+    if (t === 'og' && !(item && item.og && findU(item.u))) { G.toast('这件器官不在背包里。', '#f88'); return; }
     if (inWild()) { G.toast('回洞里才能布置道具。', '#f88'); return; }
-    if (!findIn('pr_' + t)) { G.toast('没有这件道具——先在「🧷 道具」页签里制作。', '#f88'); return; }
+    if (t !== 'og' && !findIn('pr_' + t)) { G.toast('没有这件道具——先在「🧷 道具」页签里制作。', '#f88'); return; }
     if (items.filter(i => !i.ghost).length >= MAXN) { G.toast(`洞里最多摆 ${MAXN} 件道具。`, '#f88'); return; }
     if (G.held || G.hplace) { G.toast('先放下手里的首级。', '#f88'); return; }
     if (II() && !II().ready) II().onReady(() => { rebuildAll(); });
     closeUI();
     const yaw = Math.atan2(-(G.camera.getWorldDirection(new V3()).x), -(G.camera.getWorldDirection(new V3()).z)) + Math.PI;
-    const p = { t, x: 0, y: 0, z: 0, ry: yaw, rx: 0, s: 1, sl: d.sl0 || 1 }; if (d.limbs) { p.v = Math.floor(Math.random() * 9); p.fl = Math.random() < 0.5 ? 1 : 0; }
+    const p = { t, x: 0, y: 0, z: 0, ry: yaw, rx: 0, s: 1, sl: d.sl0 || 1 }; if (t === 'og') p.og = JSON.parse(JSON.stringify(item.og)); if (d.limbs) { p.v = Math.floor(Math.random() * 9); p.fl = Math.random() < 0.5 ? 1 : 0; }
     if (d.cord) { p.a = [0, 0, 0]; p.b = [0, 0, 0]; p.th = d.th0 || 1; p.sag = d.wob ? 0.45 : 0.25; }
-    const it = spawn(p, true); mode = { k: 'place', type: t, it, stage: 0, lift: 0, yaw };
+    const it = spawn(p, true); mode = { k: 'place', type: t, item, it, stage: 0, lift: 0, yaw };
     G.toast(`摆放 <b>${d.n}</b>：${d.cord ? '左键定第一个端点，再看向别处点第二下' : '准星指哪摆哪，滚轮旋转'}，右键取消`, '#cfb8ff', 3.4);
   }
   function grab(hit) {
@@ -263,21 +273,21 @@ window.Props = (() => {
   function cancel(force) {
     if (!mode) return; const it = mode.it;
     if (mode.k === 'place') remove(it);
-    else { Object.assign(it.p, JSON.parse(JSON.stringify(mode.o))); it.sig = null; layout(it); dirty = true; }
+    else { Object.assign(it.p, JSON.parse(JSON.stringify(mode.o))); it.sig = null; layout(it); markDirty(); }
     endMode();
   }
   function commit() {
     const it = mode.it, d = it.d, p = it.p;
     if (mode.k === 'place') {
       if (d.cord) { if (mode.stage === 0) { mode.stage = 1; p.a = p.a.slice(); window.SFX && SFX.play && SFX.play('wood', 0.4, 1.2); return; } if ((it.len || 0) < 0.3) { G.toast('太短了，再拉远一点。', '#f88', 1.4); return; } }
-      if (!takeOne('pr_' + mode.type)) { G.toast('道具不够了。', '#f88'); cancel(); return; }
+      if (mode.type === 'og' ? !takeU(mode.item.u) : !takeOne('pr_' + mode.type)) { G.toast('道具不够了。', '#f88'); cancel(); return; }
       it.ghost = false; S_().push(p); window.SFX && SFX.play && SFX.play('wood', 0.5, 0.7); G.toast(`已摆放 <b>${d.n}</b>`, '#cfb8ff', 1.6);
     } else { if (d.cord && (it.len || 0) < 0.3) { G.toast('太短了。', '#f88', 1.4); return; } }
-    dirty = true; G.save && G.save(); endMode();
+    markDirty(); G.save && G.save(); endMode();
   }
   function stow() {
     const it = mode.it, Sk = window.Sack; if (mode.k === 'place') { cancel(); return; }
-    const i = S_().indexOf(it.p); if (i >= 0) S_().splice(i, 1); remove(it); Sk.stashAdd(Sk.mk('pr_' + it.p.t, 1)); G.toast(`收回 <b>${it.d.n}</b>（储物箱）`, '#cfb8ff', 1.6); dirty = true; G.save && G.save(); endMode();
+    const i = S_().indexOf(it.p); if (i >= 0) S_().splice(i, 1); remove(it); Sk.stashAdd(it.p.t === 'og' ? Organs.mkItem(it.p.og) : Sk.mk('pr_' + it.p.t, 1)); G.toast(`收回 <b>${it.d.n}</b>（储物箱）`, '#cfb8ff', 1.6); dirty = true; G.save && G.save(); endMode();
   }
 
   // 输入拦截：摆放模式里吃掉鼠标/滚轮/部分按键
@@ -306,6 +316,7 @@ window.Props = (() => {
   function onE(hit, held, pickup) { if (mode || held || pickup || !items.length) return false; const h = pickProp(); if (!h) return false; grab(h); return true; }
   function onTip(hit, held) {
     if (mode || held || !items.length) return null; if (hit && hit.head) return null; const h = pickProp(); if (!h) return null; const d = h.it.d;
+    if (d.organ && window.Organs && h.it.p.og) return Organs.tipHtml(h.it.p.og, h.it.setN || 1);
     const e = d.aura ? `范围 ${(d.aura.r * scaleOf(h.it.p)).toFixed(1)} 米 ×${d.aura.m}` : d.poke ? `戳击 ×${d.poke.m}` : d.tick ? '定时产出' : d.chimeR ? '风铃' : d.stat ? '属性加成' : '';
     return `<b>${d.icon} ${d.n}</b> · ${e} · <b>[E]</b> 拿起${d.cord ? '（靠近端点只拖一端）' : ''}`;
   }
@@ -332,7 +343,7 @@ window.Props = (() => {
       G.toast(`🧷 制作完成：${d.icon} <b>${d.n}</b>（在本页点「放置」）`, '#cfb8ff', 2.4); G.save && G.save(); rerender();
     });
     panel.querySelectorAll('[data-pplace]').forEach(b => b.onclick = () => startPlace(b.dataset.pplace));
-    panel.querySelectorAll('[data-precall]').forEach(b => b.onclick = () => { const Sk = window.Sack; for (const it of items.slice()) { if (it.ghost) continue; const i = S_().indexOf(it.p); if (i >= 0) S_().splice(i, 1); Sk.stashAdd(Sk.mk('pr_' + it.p.t, 1)); remove(it); } G.toast('道具已全部收回储物箱。', '#cfb8ff', 2); G.save && G.save(); rerender(); });
+    panel.querySelectorAll('[data-precall]').forEach(b => b.onclick = () => { const Sk = window.Sack; for (const it of items.slice()) { if (it.ghost) continue; const i = S_().indexOf(it.p); if (i >= 0) S_().splice(i, 1); Sk.stashAdd(it.p.t === 'og' ? Organs.mkItem(it.p.og) : Sk.mk('pr_' + it.p.t, 1)); remove(it); } G.toast('道具已全部收回储物箱。', '#cfb8ff', 2); G.save && G.save(); rerender(); });
   }
 
   const wait = setInterval(() => {
