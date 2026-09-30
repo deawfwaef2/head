@@ -46,6 +46,7 @@ window.Mods = (() => {
     { id: 'vroid_bodies', cat: 'look', icon: '👗', n: '新身体：VRoid 六套（第二十四轮）', d: '追加 5 具非原神身体（pixiv VRoid 官方 CC0 模型的原装衣服）：Vita 蓝色战斗装、Victoria Rubin 白色礼裙、Darkness Shibu 青花长裙、HairSample 白色连衣裙、AvatarSample B 街头夹克，外加 Iwashi 的浴衣少女（おさげちゃん）。按衣服风格分配给对应身份；皮肤可随首级染色（深肤色也能配）。关闭则只用旧身体。', def: true },
     { id: 'head_norm', cat: 'look', icon: '📏', n: '头模尺寸归一（第二十四轮）', d: 'MMD 管线的头比 VRoid 头小约两成，挂在身体上显得特别小。载入时按脸宽等比放大到标准尺寸（需重新载入）。', def: true },
     { id: 'head_norm2', cat: 'look', icon: '📐', n: '头身比例修正（R30，取代上一项）', d: '所有非 VRoid 头按脸宽+两眼间距双指标归一到 VRoid 标准，可缩可放：星铁/绝区零/异环/经典 MMD 不再是大头娃娃，测歪的头不再是小头怪。开启时上一项“头模尺寸归一”不生效。需重新载入。', def: true },
+    { id: 'body_headfit', cat: 'look', icon: '🧍', n: '原神身体头身比修正（R31）', d: '头挂到身体上的尺寸原本按 VRoid 身体标定，换到原神身体上头会小 3~18%（芙宁娜最明显）。按身高/头高、头宽/肩宽两个指标给每具原神身体单独校正，VRoid 身体不变。', def: true },
     { id: 'eye_white', cat: 'look', icon: '👁️', n: '眼白提亮（第二十四轮）', d: '洞窟火光很暗时眼白被压成灰黑。改为一半受光、一半自身亮度：暗处仍是白的，亮处不比脸亮。', def: true },
     { id: 'feel_bubble', cat: 'play', icon: '💬', n: '把玩旁白（第二十一轮）', d: '低频打字机小字卡：描述你正在怎么摆弄首级（拿起的分量、长传几米、弹了几下、叠罗汉……）。第三人称旁白，首级不说话。', def: true },
     { id: 'feel_impact', cat: 'play', icon: '💥', n: '落地手感（第二十一轮）', d: '首级落地按速度扬起尘土圈；按落点材质发声（石地闷响/木面/落在另一颗首级上的软声）；近处重摔镜头轻踢。', def: true },

@@ -65,8 +65,12 @@ window.Foe = (() => {
     return clone;
   }
   // 头的尺寸与位置（标定见 HANDOFF：VRoid 真实头骨高 ≈ 4.15×(眼高-头关节高)；首级模型头骨高 0.194、眼在原点下 0.0102、头骨中心在眼骨后 0.02×缩放）
+  // R31 MOD body_headfit：4.15×(眼高−头骨高) 是按 VRoid 身体标定的；原神身体骨架不同，算出的头小 3~18%（芙宁娜最明显）。
+  // 离线按两个独立指标（身高/头高、头宽/肩宽，对标 VRoid 身体中位 5.238 / 1.186）求每具非 VRoid 身体的修正（两者一致，取几何平均，夹 0.9~1.25）。
+  const BODY_HEADK = {"Amber":1.086,"Beidou":1.105,"Eula":1.074,"Furina":1.18,"Jean":1.067,"Kokomi":1.055,"Lisa":1.033,"Mona":1.098,"Ningguang":1.061,"Noelle":1.083,"Rosaria":1.134,"Shenhe":1.096,"Sucrose":1.088,"Xiangling":1.034,"YaeMiko":1.137};
   function headFit(E) {
-    const eyeY = E.eyeY != null ? E.eyeY : E.headY + 0.058, skull = Math.max(0.17, Math.min(0.3, 4.15 * (eyeY - E.headY)));
+    const bk = (window.Mods && Mods.on('body_headfit') && BODY_HEADK[E.file]) || 1;
+    const eyeY = E.eyeY != null ? E.eyeY : E.headY + 0.058, skull = Math.max(0.17, Math.min(0.3, 4.15 * (eyeY - E.headY))) * bk;
     const s = skull / 0.194;
     return { s, pos: new V3(E.headX || 0, eyeY + 0.0102 * s, (E.eyeZ != null ? E.eyeZ : (E.headZ || 0) + 0.03) - 0.02 * s) };
   }

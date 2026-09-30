@@ -1218,3 +1218,10 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   - 实拍：同一身体上 VRoid/GI/HSR/ZZZ/NTE/CLS 头大小一致；Vita/芙宁娜/北斗/光/样本B/Osage 六具身体上头身比例正常。
 - 工具：tools/headmetric.py（新增）。截图脚本 foeshot.py/js 备份在工作区 bak/tools（MODS / ZOOM 环境变量，截图时隐藏手持武器）。
 - 改动文件：js/heads.js（normSize 前新增 irisIPD / normK2）、js/mods.js（+1 MOD，紧跟 head_norm）、tools/headmetric.py、HANDOFF.md。
+
+## R31 — 用户再次：“只有 VRoid 的头和身体是适配的，其他都是大头娃娃或者小头怪物”
+- R30 修了“头模”一侧（head_norm2）。这轮修“身体”一侧：js/foe.js headFit 的 `skull = 4.15×(眼高−头骨高)` 是按 VRoid 身体标定的，原神身体骨架不同 → 头小 3~18%。
+- 离线统计 24 具身体：身高/头高（VRoid 5.18–5.33，原神 5.47–6.33）、头宽/肩宽（上臂骨间距；VRoid 1.18–1.23，原神 1.03–1.16；AvatarSample_A/B 上臂骨偏内，排除）。两指标对每具原神身体都一致。
+- **MOD `body_headfit`**（默认开，js/mods.js 紧跟 head_norm2）：foe.js 常量 `BODY_HEADK`（非 VRoid 身体的 skull 倍率，= √(kh·ks)，夹 0.9~1.25；Furina 1.18、YaeMiko 1.137、Rosaria 1.134 … Lisa 1.033、Xiangling 1.034），headFit 里乘上。VRoid 身体（Vita/AvatarSample_A/B/Darkness_Shibu/HairSample_Female/Osage/HikariCape/HikariScholar/Victoria_Rubin）不在表里 = 1。
+- 新增身体时：非 VRoid 身体要补 BODY_HEADK（方法见本节；未在表里 = 不修正）。
+- 改动文件：js/foe.js（headFit 前加 BODY_HEADK）、js/mods.js（+1）、HANDOFF.md。
