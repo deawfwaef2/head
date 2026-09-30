@@ -1314,3 +1314,17 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 没改：foe.js headFit/BODY_HEADK、FaceFill 的 floor 值、存档。若以后觉得头偏亮：调 `FaceFill.tune.pbr`；偏大：调 normK2 里的 0.95 / 0.316。
 - 测试台备忘：ModelHeads 全量 121 个 GLB 一起载会让 2GB 沙箱 Chromium 崩（~400s 后 Target crashed）；用 12 个头的子集页即可。`Mods.on` 读 bootSt（需重载才变），页内 `Mods.set` 不会改变本次渲染。
 - 改动文件：js/heads.js、js/headwear.js、js/mods.js（+head_pbr、head_norm3）、HANDOFF.md。
+---
+## R26l–n（用户：首级全部物理支撑/建筑描述太长/选地点重做+预览图/地区BOSS·小BOSS·人物/到达简介+任务+奖励/食人魔猎手）
+- **R26l `head_support`（js/headphys.js，默认开）**：包装所有带 `mount` 的 `BuildCat.C[*].make()`；模型载入后第一次 make 时对每个 slot 从颈部 +0.12 往下打射线（中心 + r0.035/0.065 两圈，**双面探测**——有些模型土面/桶内法线朝下）。落差 ≤12cm → 把 slot 下移贴合；12–70cm → 高度不变，在下面垫一个拉高的 CC0 `wooden_crate_01` 台座（`d.__plinth`，每次 make 都加）；透明液体 → 泡进去 0.08。`mount.selfSeat:true` 的建筑跳过（regecon 合成器自己算座位）。`HeadPhys.top(g,x,z,r,y0)` = 找模型真实顶点。审计页 `tools/test/head_physics.html#zoom,all,sz=300,only=a,b`（RES 行 + 缩略图；r≤3cm 的窄射线会误报"搁在瓶口/杯沿"的头，需目测）。
+- 描述：9 个合成器描述缩成一句；`.bp-desc` CSS 两行截断，完整文字在 title。
+- **R26m `region_pick` + `region_quest`（js/regionquest.js、js/regionart.js）**：
+  - regionart.js = 9 张地区预览图（从 big/world/sky_*.js 的 CC0 HDRI 背景裁地平线 + 调色，base64）。
+  - 选地点：ui.js `openExpedition` 里 `RegionQuest.pickHTML({power,danger})` 替换掉旧 `.locs` 列表（MOD 关回旧版）；出发按钮仍是 `data-a="loc"` → `startTrip`。
+  - `RegionQuest.DATA[k]`：tag / arrive（到达一句话）/ why（任务理由）/ minis（两名小BOSS：n,title,id(尽量用 foe.js ARMED 里带武器的身份),desc）。
+  - 任务：选地点界面预览的任务就是出发后拿到的（`pending[k]`）；种类 mini/decap/kill/boss；进度读 `Worlds._W.stats`；奖励魂晶 + 该区材料进储藏。
+  - 小BOSS：包装 `Foe.populate`，在 `node.rqMini` 的节点追加一名强化敌人（rar3、hp100、iq≥0.92、必追）；**不走霸主流程**（fo.boss 会触发 bossWin）。死亡记 `G.S.rq.minis[name]`，永久不再出现，选地点界面显示 ☠。
+  - 到达卡（#rqCard，非阻塞 8.5 秒）、左侧任务追踪（#rqTrack top:132px）、小BOSS 血条（#rqMini，霸主血条出现时下移）。
+  - 测试：`tools/test/region_pick.html#sel=abbey`、`tools/test/region_trip.html#ph=1|2`。
+- **R26n `ogre_hunters`（js/hunters.js）**：热度 = 放倒×1 + 斩首×1.5 + 分钟×0.8（洞口节点不计时），阈值 10+2·lv+4·本趟次数 → 15 秒红色预警"食人魔猎手正在猎杀你！" → 在 `W.graph.nodes` 追加一个 `huntArena` 节点（沿用当前 style、lay:'plain'、adj=[来处]、预置 prey=猎手）并 `Worlds._debug.goto`。猎手 = RPG.foe + 武装身份 + 称号，hp 70+14·lv。全灭前包装 `Worlds.onKey` 封门。胜利：`G.S.hunt.lv++`，魂晶 + 该区稀有材料×1。霸主战中不触发。测试：`tools/test/hunters.html#ph=2`。
+- 下一步（未做）：S5 地区种族外观差异加大；S6 精灵独有技能（魔法洞穴壁纸、地面施法特效更干净）——另开文件，spirits.js 归别的 agent。
