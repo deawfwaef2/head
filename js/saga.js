@@ -416,7 +416,7 @@ window.Saga = (() => {
 <div class="go"><button data-sgok>收下结算 ▶</button></div></div>`;
     setEl.classList.add('on'); try { G().setUI(true); SFX.open && SFX.open(); } catch (e) { }
   }
-  function closeSettle() { if (!setEl) return; setEl.classList.remove('on'); try { G().setUI(false); G().lockPointer && G().lockPointer(); } catch (e) { } }
+  function closeSettle() { if (!setEl) return; setEl.classList.remove('on'); try { G().setUI(false); G().lockPointer && G().lockPointer(); } catch (e) { } try { window.Memory && Memory.afterSettle(); } catch (e) { } }
   addEventListener('keydown', e => { if (setEl && setEl.classList.contains('on') && ['Space', 'Enter', 'Escape', 'KeyE'].includes(e.code)) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) closeSettle(); } }, true);
 
   // ================= 追踪 HUD =================

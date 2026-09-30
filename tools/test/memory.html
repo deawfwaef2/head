@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><title>memory harness</title><body style="margin:0;background:#222 url(../../promo/bg.jpg)">
+<script>
+// 独立测试页：真 talents_data + 桩 Talents/G，验证「回忆」三选一界面
+window.Mods = { on: () => true }; window.RPG = { lvOf: () => ({ lv: 6 }) };
+const S = { coins: 900, xp: 500 }; window.G = { S, builds: new URLSearchParams(location.search).get('altar') ? [{ type: 'memory' }] : [], setUI() {}, lockPointer() {}, toast(t) { console.log('TOAST', t); }, save() {}, addCoins(n) { S.coins += n; } };
+</script>
+<script src="../../js/talents_data.js"></script>
+<script>
+const t = { n: {}, pts: 7 }; const D = TalData;
+window.Talents = { rank: id => t.n[id] || 0, left: () => ({ skill: t.pts }), tal: () => t,
+  canRank(id) { const nd = D.ALL[id]; if (t.pts < nd.cost) return 'pts'; if ((t.n[id] || 0) >= nd.max) return 'max'; let sp = 0; for (const q in t.n) if (D.ALL[q].school === nd.school) sp += t.n[q] * D.ALL[q].cost; if (sp < D.TIER_REQ[nd.tier]) return 'tier'; for (const q of nd.need) if (!t.n[q]) return 'need'; return ''; },
+  alloc(id) { if (this.canRank(id)) return false; t.n[id] = (t.n[id] || 0) + 1; t.pts -= D.ALL[id].cost; return true; } };
+</script>
+<script src="../../js/memory.js"></script>
+<script>setTimeout(() => Memory.open(), 200)</script>
