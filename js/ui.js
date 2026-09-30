@@ -133,19 +133,28 @@ window.UI = (() => {
     if (cur !== 'menu') SFX.open();
     open('menu', head + '<div class="m-body">' + body + '</div>', 'big');
   }
-  function statsBody() {
-    const S = G.S, s = G.st(), e = RPG.eqSum(S), bb = G.buildBonus();
-    const rows = RPG.STATS.map(([k, n, ic, d]) => `<div class="st-row"><div class="st-ic">${ic}</div><div class="st-n">${n}<small>${d}</small></div><div class="st-v">${s[k]}</div>
-      <div class="st-br">基础 ${S.base[k] || 0} · 装备 +${e[k] || 0} · 建筑 +${bb[k] || 0}</div></div>`).join('');
-    const hpF = Math.max(0, S.hp / s.maxHp);
-    return `<div class="cols"><div class="col">
-      <div class="big-power">⚔️ 战力 <b>${fmt(s.power)}</b></div>
+  function statsBody() { // R44：图形化总览——雷达图 + 图标数据块，少文字
+    const S = G.S, s = G.st(), e = RPG.eqSum(S), bb = G.buildBonus(), lvI = RPG.lvOf(S.xp);
+    const st5 = RPG.STATS, mx = Math.max(20, Math.ceil(Math.max(...st5.map(([k]) => s[k])) * 1.3)), CX = 150, CY = 128, R = 92;
+    const pt = (i, f) => { const a = -Math.PI / 2 + i * 2 * Math.PI / st5.length; return [CX + Math.cos(a) * R * f, CY + Math.sin(a) * R * f]; };
+    const ring = f => st5.map((_, i) => pt(i, f).map(v => v.toFixed(1)).join(',')).join(' ');
+    const poly = st5.map(([k], i) => pt(i, Math.max(0.08, s[k] / mx)).map(v => v.toFixed(1)).join(',')).join(' ');
+    const axes = st5.map((_, i) => { const p = pt(i, 1); return `<line x1="${CX}" y1="${CY}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}"/>`; }).join('');
+    const dots = st5.map(([k], i) => { const p = pt(i, Math.max(0.08, s[k] / mx)); return `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4.5"/>`; }).join('');
+    const lab = st5.map(([k, n, ic, d], i) => { const p = pt(i, 1.27); return `<div class="ov-rl" style="left:${(p[0] / 300 * 100).toFixed(1)}%;top:${(p[1] / 270 * 100).toFixed(1)}%" title="${n}：${d}\n基础 ${S.base[k] || 0} · 装备 +${e[k] || 0} · 建筑 +${bb[k] || 0}"><i>${ic}</i><b>${s[k]}</b><small>${n}</small></div>`; }).join('');
+    const chip = (ic, v, n, cls, tip) => `<div class="ov-chip ${cls || ''}" title="${tip || n}"><i>${ic}</i><b>${v}</b><small>${n}</small></div>`;
+    const hpF = Math.max(0, Math.min(1, S.hp / s.maxHp)), xpF = lvI.need ? lvI.cur / lvI.need : 1, RR = 30, CC = 2 * Math.PI * RR;
+    return `<div class="ov"><div class="ov-l">
+      <div class="ov-top"><div class="ov-lv" title="经验 ${lvI.cur} / ${lvI.need || 'MAX'}"><svg viewBox="0 0 76 76"><circle cx="38" cy="38" r="${RR}" class="bg"/><circle cx="38" cy="38" r="${RR}" class="fg" stroke-dasharray="${(CC * xpF).toFixed(1)} ${CC.toFixed(1)}" transform="rotate(-90 38 38)"/></svg><div><small>Lv</small><b>${s.lv}</b></div></div>
+        <div class="ov-pw"><small>⚔️ 战力</small><b>${fmt(s.power)}</b></div>
+        <div class="ov-hp"><div class="ov-hpb"><span style="width:${hpF * 100}%"></span></div><em>❤️ ${Math.round(S.hp)}<u> / ${s.maxHp}</u></em></div></div>
       ${window.Balance && Balance.on() ? Balance.card(s.lv) : ''}
-      <div class="hpline"><div class="hpfill" style="width:${hpF * 100}%"></div><span>❤️ ${Math.round(S.hp)} / ${s.maxHp}</span></div>
-      <div class="kv"><span>攻击</span><b>${s.atk}</b><span>防御</span><b>${s.def}</b><span>闪避</span><b>${(s.dodge * 100).toFixed(1)}%</b><span>背篓容量</span><b>${s.cap} 颗</b><span>魂晶产出</span><b>×${s.yieldMul.toFixed(2)}</b><span>生命恢复</span><b>${(1 + (bb.regen || 0))}%/10秒</b></div>
-      <div class="items">${RPG.CONSUM.map(c => `<div class="item"><span class="ic">${c.icon}</span><b>${c.n}</b> ×${S.items[c.k] || 0}<button data-a="use" data-v="${c.k}" ${S.items[c.k] ? '' : 'disabled'}>使用</button></div>`).join('')}<small>快捷键 H 喝药</small></div>
-      <div class="kv small"><span>食人魔等级</span><b>Lv.${s.lv} <small style="opacity:.6">(${RPG.lvOf(S.xp).cur}/${RPG.lvOf(S.xp).need || 'MAX'})</small></b><span>出猎次数</span><b>${S.stats.trips}</b><span>斩首总数</span><b>${S.stats.kills}</b><span>累计魂晶</span><b>${fmt(S.stats.earned)}</b><span>把玩次数</span><b>${fmt(S.stats.pokes)}</b></div>
-    </div><div class="col">${rows}<p class="hint2">提升属性：在洞里建造<b>训练器械</b>（建造 → 训练）后对着它按 E 训练；购买<b>装备</b>；每一件<b>建筑/装饰</b>都会永久提升属性。</p></div></div>`;
+      <div class="ov-chips c4">${chip('🏹', S.stats.trips, '出猎', '', '出猎次数')}${chip('💀', S.stats.kills, '斩首', '', '斩首总数')}${chip('🔮', fmt(S.stats.earned), '累计魂晶', '', '累计魂晶')}${chip('✋', fmt(S.stats.pokes), '把玩', '', '把玩次数')}</div>
+    </div><div class="ov-r">
+      <div class="ov-radar"><svg viewBox="0 0 300 270"><g class="grid">${[0.25, 0.5, 0.75, 1].map(f => `<polygon points="${ring(f)}"/>`).join('')}${axes}</g><polygon class="val" points="${poly}"/><g class="dots">${dots}</g></svg>${lab}</div>
+      <div class="ov-chips c3">${chip('🗡️', s.atk, '攻击', 'atk')}${chip('🛡️', s.def, '防御', 'def')}${chip('💨', (s.dodge * 100).toFixed(1) + '%', '闪避', 'dod')}${chip('💎', '×' + s.yieldMul.toFixed(2), '魂晶产出', 'yld')}${chip('💚', (1 + (bb.regen || 0)) + '%', '每10秒回复', 'reg', '生命恢复：每 10 秒')}${chip('🎒', s.cap, '背篓', 'cap', '背篓容量（颗）')}</div>
+      <div class="ov-pots">${RPG.CONSUM.map(c => `<button class="ov-pot" data-a="use" data-v="${c.k}" ${S.items[c.k] ? '' : 'disabled'} title="${c.n}（H 喝药）"><i>${c.icon}</i><b>×${S.items[c.k] || 0}</b><small>${c.n}</small></button>`).join('')}<span class="ov-k" title="快捷键">H</span></div>
+    </div></div>`;
   }
   function equipBody() {
     const S = G.S;

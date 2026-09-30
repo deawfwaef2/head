@@ -60,3 +60,4 @@
   .ms-track { margin: 12px 0 4px; } .ms-bars { gap: 10px 24px; margin-top: 10px; }
   .ms-bn .n, .ms-tip { display: none; } .ms-bh em { font-size: 26px; }
 }
+@media (max-height: 860px) { .ms-bn { display: none; } .ms-bars { gap: 8px 24px; } .ms-bt { margin: 4px 0 0; } .ms-track { margin: 10px 0 2px; } .ms-card { margin-bottom: 10px; } }
