@@ -1,0 +1,28 @@
+<!doctype html><html><head><meta charset="utf-8"><title>world_master test</title>
+<style>body{margin:0;background:#111}canvas{display:block}</style></head><body>
+<!-- R46：地形 macro 着色器 + 空气粒子的编译/外观测试（左：关，右：开）。?r=swamp 换粒子地区 -->
+<script src="../../lib/three.min.js"></script><script src="../../lib/GLTFLoader.js"></script>
+<script src="../../js/assets.js"></script><script src="../../big/world/tex_leafy_grass.js"></script>
+<script src="../../js/worldmaster.js"></script>
+<script>
+(async () => {
+  const q = new URLSearchParams(location.search), dark = q.get('dark'), reg = q.get('r') || 'village', W = 640, H = 360;
+  await Assets.init(); const set = Assets.tex('leafy_grass');
+  const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(W, H); R.outputEncoding = THREE.sRGBEncoding; R.toneMapping = THREE.ACESFilmicToneMapping; R.shadowMap.enabled = true;
+  const out = document.createElement('canvas'); out.width = W * 2; out.height = H; document.body.appendChild(out); const c2 = out.getContext('2d');
+  const errs = []; const ce = console.error; console.error = (...a) => { errs.push(String(a[0]).slice(0, 400)); ce(...a); };
+  function build(macro, parts) {
+    const sc = new THREE.Scene(); sc.background = new THREE.Color(dark ? '#242a3a' : '#9fb4c8'); sc.fog = new THREE.FogExp2(dark ? '#242a3a' : '#a8b8c4', 0.02);
+    const g = new THREE.PlaneGeometry(160, 160, 160, 160); g.rotateX(-Math.PI / 2); const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); p.setY(i, Math.sin(x * 0.11) * Math.cos(z * 0.09) * 2.2 + Math.sin(x * 0.03 + z * 0.05) * 3); } g.computeVertexNormals();
+    const m = Assets.triplanar(set, { scale: 0.35, normal: 1.1, env: 0.35, ao: 0.9, macro }); const t = new THREE.Mesh(g, m); t.receiveShadow = true; sc.add(t);
+    const sun = new THREE.DirectionalLight('#fff1dc', dark ? 0.7 : 2.6); sun.position.set(30, 40, 20); sc.add(sun); sc.add(new THREE.HemisphereLight('#9fb4c8', '#443322', 0.6));
+    if (parts) for (const c of WorldMaster._lay[reg]) sc.add(WorldMaster._mk(c, 700));
+    return sc;
+  }
+  const cam = new THREE.PerspectiveCamera(65, W / H, 0.1, 400); cam.position.set(0, 4.2, 0); cam.lookAt(14, 2.6, 10);
+  const A = build(0, false), B = build(2, true);
+  for (let f = 0; f < 3; f++) { R.render(A, cam); c2.drawImage(R.domElement, 0, 0); R.render(B, cam); c2.drawImage(R.domElement, W, 0); await new Promise(r => setTimeout(r, 200)); }
+  window.__done = { errs, gl: R.info.programs.length };
+})();
+</script></body></html>

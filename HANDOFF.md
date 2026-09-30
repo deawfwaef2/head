@@ -1621,3 +1621,14 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **半身像**（`Overhear.portraitOf(c)`）：不是贴图资源，而是从场上那个活的 Foe（身体+头）实时渲染：主渲染器 + 离屏 RenderTarget，临时只留这个人（其余顶层物体 visible=false、去掉背景/雾、补一盏柔光），渲完立刻还原，结果缓存成透明 PNG。取不到 Foe（没生成/已离场）就退回显示名字首字的色块。脸朝向用头骨 +Z 取反（VRM 头骨朝向与 Foe 根相反）。
 - **斩首放宽**（`js/foe.js`）：头和脖子都算斩首部位；刃速门槛 4.5→3（尸体 3→2）；血线 50%→75%（霸主/精英/猎手 25%→40%，蓄力刀再 +10%，霸主仍不会一刀死）；脖子判定半径 0.075→0.1（扫刀判定额外 +0.09，头 +0.05）；`combat.js` 准星吸附里 head/neck 权重 0.9/1.0→0.78/0.8（更容易选中头颈）；提示「再削弱她一些就能一刀斩首」改为血量>75%时出现。
 - 测试台：`tools/test/overhear.html`（= fight.html + ranks + overhear）。沙箱重置后 `.cache/full` 会丢：用 `/tmp/srv.py` 思路（本地没有的文件回源 raw.githubusercontent.com 并缓存）即可。
+## R46 野外画质大师化（阶段 1）
+用户：“现在地图游戏整体画质太低级了……小作坊感，画质大师化”；澄清：最弱的是**场景环境**，显卡**高端独显**（高档位放手做）。
+沙箱 2GB 跑不动完整野外（swiftshader 内存抖动），只能用 `tools/test/worldmaster.html`（地形 macro 着色器 + 粒子的编译/外观测试）验证；真机观感待用户反馈。
+新增 MOD `world_master`（cat asset，默认开；`?wm=0` 临时关）——`js/worldmaster.js`（新，本轮所有者：本轮 agent）：
+- 地形：`assets.js` triplanar 新选项 `macro`（1=色块，2=+双尺度混合防平铺+陡坡去饱和），`worlds.js` 传 `WorldMaster.terr()`。
+- 植被：`worlds.js` 散布处乘 `WorldMaster.dens(kind)`（草/灌木 ultra×1.7 high×1.35；树 ×1.25/1.12）。
+- 阴影：进场重建太阳阴影（ultra 4096 + radius4 / high 2048 + radius2.5）。
+- 空气粒子：按 `node.region` 不同（草甸花粉/森林光尘+孢子/荒原沙尘/修道院微光/沼泽萤火/要塞灰烬+火星/王都金尘+火星/深渊紫红火星/雪峰飘雪），GPU 里环绕相机循环，加法混合（进 HDR 管线后被泛光点亮）。
+- 调色：`master.js` 每帧把 `P`（sat/contrast/shadowTint/highTint/vig/grain）同步进着色器；WorldMaster 按地区缓入目标值、离场恢复。
+- `game.js`：`G.postFx = post`、`G.renderer`（供读取档位）。
+注意：worlds.js 已有叶片/草的风（WIND）；不要重复做。下一步候选：远景雾层/地面薄雾、云影、水面、地标构图、草卡片 LOD。

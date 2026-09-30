@@ -1397,7 +1397,7 @@ window.startGame = function () {
     post, lod, get lodStat() { return lodStat; }, startHP, confirmHP, cancelHP, updateHP, get hplace() { return hplace; }, storeHead, takeOut, storeLoose, vaultCount, MAX_HEADS, VAULT_MAX, HOOK, rebuildHead, floatText, spawnBeam, gachaCard, lookHit, unmount, soulWisp, trigger, SAVE_KEY, get clock() { return clock; }, get held() { return held; }, set held(v) { held = v; }, get keys() { return keys; }, get cine() { return cine; }, setUIOpen: v => setUI(v),
     get playing() { return playing; }, get uiOpen() { return uiOpen; }, unstick, relockNeeded, vm, get weapon() { return weaponMesh; }, fist, get held() { return held; }, renderer, camera, scene, poke, mountHead, createHead, addBuild
   };
-  window.__game = G;
+  G.postFx = post; G.renderer = G.renderer || renderer; window.__game = G;
   if (window.Play) try { Play.init(); } catch (e) { console.warn('Play.init', e); }
   if (window.Combat) try { Combat.init(G); HOOK.frame.push((dt, now) => Combat.update(dt, now)); HOOK.pre.push(() => Combat.prerender()); } catch (e) { console.warn('Combat.init', e); }
   if (window.CFX3D) try { CFX3D.init(G); } catch (e) { console.warn('CFX3D.init', e); } // R41：3D 战斗特效（在 Combat.update 之后更新）

@@ -415,7 +415,7 @@ window.Worlds = (() => {
     const tg = new THREE.PlaneGeometry(ext * 2, ext * 2, seg, seg); tg.rotateX(-Math.PI / 2);
     const tp = tg.attributes.position; for (let i = 0; i < tp.count; i++) tp.setY(i, H(tp.getX(i), tp.getZ(i))); tg.computeVertexNormals(); if (g) WGen.paint(tg, { st, LP, R });
     const gset = TEX[st.ground]; let gm;
-    if (gset && window.Assets && Assets.triplanar) { gm = Assets.triplanar(gset, { scale: st.gs, normal: 1.1, env: 0.35, ao: 0.9, vertexColors: !!g }); gm.envMap = sky ? sky.env : null; }
+    if (gset && window.Assets && Assets.triplanar) { gm = Assets.triplanar(gset, { scale: st.gs, normal: 1.1, env: 0.35, ao: 0.9, vertexColors: !!g, macro: window.WorldMaster ? WorldMaster.terr() : 0 }); gm.envMap = sky ? sky.env : null; }
     else gm = new THREE.MeshStandardMaterial({ color: '#556644', roughness: 1, vertexColors: !!g });
     if (st.tint) gm.color = new THREE.Color(st.tint);
     const terr = new THREE.Mesh(tg, gm); terr.receiveShadow = true; sc.add(terr);
@@ -472,8 +472,9 @@ window.Worlds = (() => {
       if (kind === 'fire') { const n = Math.max(0, Math.round(dens * area * (0.6 + r() * 0.8))); for (let i = 0; i < n; i++) { const a = r() * 6.28, d = R * (0.2 + r() * 0.7), x = Math.cos(a) * d, z = Math.sin(a) * d; if (!free(x, z, 1.5)) continue; mark(x, z, 1.5); const y = H(x, z); if (window.Assets && Assets.has('stone_fire_pit')) { const f = Assets.fit('stone_fire_pit', { w: 0.9, x, y, z }); if (f) sc.add(f); const fl = Assets.flame(x, y + 0.12, z, 4); if (fl) sc.add(fl); const pl = new THREE.PointLight('#ff7a30', 1.6, 9, 2); pl.position.set(x, y + 0.8, z); sc.add(pl); } cols.push({ x, z, r: 0.6 }); } continue; }
       const vs = variants(list); if (!vs.length) continue;
       const LOV = {}; if (g && kind === 'tree') for (const v of vs) { const lo = templates(v.n + '_lo'); LOV[v.n] = lo && lo[0] || null; }
-      const cap = (kind === 'grass' ? (g ? 3200 : 2200) : kind === 'tree' ? (g ? 64 : 40) : 160) * (LP && LP.clump && kind !== 'grass' ? 1.5 : 1);
-      const n = Math.min(cap, Math.round(dens * area * (LP ? WLayout.densK(LP, kind) : 1) * (0.7 + r() * 0.6)));
+      const WMD = window.WorldMaster ? WorldMaster.dens(kind) : 1; // R46 world_master：高档位加密植被
+      const cap = (kind === 'grass' ? (g ? 3200 : 2200) : kind === 'tree' ? (g ? 64 : 40) : 160) * (LP && LP.clump && kind !== 'grass' ? 1.5 : 1) * WMD;
+      const n = Math.min(cap, Math.round(dens * WMD * area * (LP ? WLayout.densK(LP, kind) : 1) * (0.7 + r() * 0.6)));
       for (let i = 0; i < n; i++) {
         const a = r() * 6.28, d = RM * Math.sqrt(r()) * 0.97, x = Math.cos(a) * d, z = Math.sin(a) * d, v = pick(r, vs), s = s0 + r() * (s1 - s0);
         if (LP && (d > Rf(a) * 0.97 || !WLayout.keep(LP, x, z, kind, r))) continue;

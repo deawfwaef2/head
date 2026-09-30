@@ -53,17 +53,27 @@ window.Assets = (() => {
     opt = opt || {};
     const m = new THREE.MeshStandardMaterial({ map: set.diff, normalMap: set.nor, roughness: opt.roughness == null ? 1 : opt.roughness, metalness: 0, color: opt.color || '#ffffff', side: opt.side || THREE.FrontSide, vertexColors: !!opt.vertexColors, envMapIntensity: opt.env == null ? 0.3 : opt.env, envMap: envTex || null });
     m.normalScale = new THREE.Vector2(opt.normal || 1.2, opt.normal || 1.2);
-    const U = { uScale: { value: opt.scale || 0.4 }, uArm: { value: set.arm || set.diff }, uAO: { value: opt.ao == null ? 0.85 : opt.ao }, uFlat: { value: opt.flat || 0 } };
+    const U = { uScale: { value: opt.scale || 0.4 }, uArm: { value: set.arm || set.diff }, uAO: { value: opt.ao == null ? 0.85 : opt.ao }, uFlat: { value: opt.flat || 0 }, uMac: { value: opt.macro || 0 } };
     m.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, U);
       sh.vertexShader = sh.vertexShader.replace('void main() {', 'varying vec3 vTP; varying vec3 vTN;\nvoid main() {')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\n vTP = (modelMatrix * vec4(transformed, 1.0)).xyz; vTN = normalize(mat3(modelMatrix) * objectNormal);');
-      sh.fragmentShader = sh.fragmentShader.replace('void main() {', `varying vec3 vTP; varying vec3 vTN; uniform float uScale; uniform sampler2D uArm; uniform float uAO; uniform float uFlat;
+      sh.fragmentShader = sh.fragmentShader.replace('void main() {', `varying vec3 vTP; varying vec3 vTN; uniform float uScale; uniform sampler2D uArm; uniform float uAO; uniform float uFlat; uniform float uMac;
         vec3 triW(vec3 n){ vec3 b = pow(abs(n), vec3(5.0)); return b / (b.x + b.y + b.z); }
         vec4 tri(sampler2D t, vec3 p, vec3 w){ return texture2D(t, p.zy) * w.x + texture2D(t, p.xz) * w.y + texture2D(t, p.xy) * w.z; }
+        float mH(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float mN(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(mH(i), mH(i + vec2(1.0, 0.0)), f.x), mix(mH(i + vec2(0.0, 1.0)), mH(i + vec2(1.0, 1.0)), f.x), f.y); }
         void main() {`)
         .replace('#include <map_fragment>', `vec3 tN = normalize(vTN); if (uFlat > 0.5) tN = vec3(0.0, 1.0, 0.0); vec3 tW = triW(tN); vec3 tP = vTP * uScale;
-          vec4 tDiff = tri(map, tP, tW); diffuseColor *= tDiff; vec4 tArm = tri(uArm, tP, tW);`)
+          vec4 tDiff = tri(map, tP, tW);
+          if (uMac > 0.5) { // R46 world_master：大尺度色块 + 双尺度混合打散平铺感 + 陡坡去饱和
+            float m1 = mN(vTP.xz * 0.055), m2 = mN(vTP.xz * 0.21 + 7.3);
+            if (uMac > 1.5) { vec4 tD2 = tri(map, tP * 0.173 + vec3(0.41, 0.17, 0.63), tW); tDiff = mix(tDiff, tD2, 0.55 * smoothstep(0.25, 0.75, m1)); }
+            tDiff.rgb *= 0.76 + 0.48 * (m1 * 0.65 + m2 * 0.35);
+            float lum = dot(tDiff.rgb, vec3(0.3, 0.59, 0.11));
+            tDiff.rgb = mix(tDiff.rgb, vec3(lum) * 0.82, smoothstep(0.86, 0.55, tN.y) * 0.55);
+          }
+          diffuseColor *= tDiff; vec4 tArm = tri(uArm, tP, tW);`)
         .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = roughness * tArm.g;')
         .replace('#include <aomap_fragment>', '#include <aomap_fragment>\n reflectedLight.indirectDiffuse *= mix(1.0, tArm.r, uAO); reflectedLight.directDiffuse *= mix(1.0, tArm.r, uAO * 0.5);')
         .replace('#include <normal_fragment_maps>', `{
@@ -75,7 +85,7 @@ window.Assets = (() => {
           normal = normalize((viewMatrix * vec4(wn, 0.0)).xyz);
         }`);
     };
-    m.customProgramCacheKey = () => 'tri1' + (opt.flat ? 'f' : '');
+    m.customProgramCacheKey = () => 'tri1' + (opt.flat ? 'f' : '') + (opt.macro ? 'm' : '');
     return m;
   }
   // 序列帧火焰（建筑用：烛台/火把/火盆），onBeforeRender 自驱动，无需全局 tick

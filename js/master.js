@@ -244,6 +244,7 @@ window.Master = (() => {
         }
       }
       CU.tScene.value = T.scene.texture; CU.uT.value = t; CU.uExp.value = P.exposure;
+      CU.uSat.value = P.sat; CU.uCon.value = P.contrast; CU.uShT.value.set(P.shadowTint[0], P.shadowTint[1], P.shadowTint[2]); CU.uHiT.value.set(P.highTint[0], P.highTint[1], P.highTint[2]); CU.uVig.value = P.vig; CU.uGrain.value = P.grain; // R46：调色可被 WorldMaster 按地区实时调整
       if (q.fxaa) { pass(comp, T.ldr); fxaa.u.tSrc.value = T.ldr.texture; pass(fxaa, null); } else pass(comp, null);
       renderer.autoClear = ac;
     }
