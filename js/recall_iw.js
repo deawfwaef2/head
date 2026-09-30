@@ -255,9 +255,10 @@ body.riw-on #cross,body.riw-on #tip,body.riw-on #hint,body.riw-on #labels,body.r
   // ---------------- 输入 ----------------
   function onKey(e) {
     if (!S.active) return;
+    if (e.type !== 'keydown') { if (e.code === 'KeyE' || e.code === 'KeyF') e.stopImmediatePropagation(); return; } /* R33b：松开 F 不再关闭（之前按 F 打开、松手即关 → 看起来像没打开）；其余松开事件放行，避免移动键卡住 */
+    if (e.repeat || performance.now() - (S.openAt || 0) < 300) { e.stopImmediatePropagation(); e.preventDefault(); return; }
     if (e.code === 'Escape' || e.code === 'KeyF') { e.preventDefault(); e.stopImmediatePropagation(); close(); return; }
     e.stopImmediatePropagation();
-    if (e.type !== 'keydown') return;
     const m = /^Digit(\d)$/.exec(e.code); if (m) { const i = m[1] === '0' ? 10 : +m[1]; const a = ORD[i - 1]; if (a) { const x = PLAY[a] || Recall.ACT[a]; if (!x.need || Recall.hasB(x.need)) go(a); else snd('deny'); } }
   }
   function onDown(e) { if (!S.active || e.target.closest && e.target.closest('#riw .card,#riw .bar,#riw .pn,#riw .x')) return; S.drag = { x: e.clientX, y: e.clientY, acc: 0 }; e.preventDefault(); }
@@ -268,22 +269,25 @@ body.riw-on #cross,body.riw-on #tip,body.riw-on #hint,body.riw-on #labels,body.r
   function block(e) { if (S.active && !(e.target.closest && e.target.closest('#riw'))) { e.stopImmediatePropagation(); } }
 
   // ---------------- 开关 ----------------
-  function findHead(rec) { return G.heads.find(x => x.rec === rec) || null; }
+  function findHead(rec) { const h = G.heads.find(x => x.rec === rec || (x.rec && rec.id != null && x.rec.id === rec.id)) || null; return h && h.mount ? null : h; } /* 装在架子/身体上的不拔下来，用临时首级 */
+  function tempHead(rec) {
+    try { if (!window.ModelHeads || !rec.look) return null; const hb = ModelHeads.create(rec.look); const g = new THREE.Group(); hb.group.scale.setScalar(1.55); hb.group.position.y = -0.005; g.add(hb.group); G.scene.add(g); const cam = G.camera; g.position.copy(cam.position).add(new THREE.Vector3(0, -0.25, -0.7).applyQuaternion(cam.quaternion)); g.quaternion.copy(cam.quaternion);
+      return { rec, hb, g, temp: true, vel: new THREE.Vector3() }; } catch (e) { console.warn('RecallIW temp', e); return null; }
+  }
   function open(rec, cb) {
     G = window.G; if (!G || !rec || S.active) return false;
     if (window.Worlds && Worlds.active) return false;
     let h = findHead(rec);
-    if (!h && rec.vault && G.takeOut) h = G.takeOut(rec);
+    if (!h) h = tempHead(rec); /* R33b：头不在洞里（库房/装在角色身上/卡片里点「回忆」）→ 临时生成一颗捧在手上，关闭即消失，不改存档 */
     if (!h) return false;
     if (!el) build();
     if (!hooked) { G.HOOK.pre.push(pre); hooked = true; addEventListener('keydown', onKey, true); addEventListener('keyup', onKey, true); addEventListener('pointerdown', onDown, true); addEventListener('pointermove', onMove); addEventListener('pointerup', onUp); addEventListener('wheel', onWheel, { capture: true, passive: false }); addEventListener('mousedown', block, true); }
-    if (h.mount && G.unmount) G.unmount(h);
-    G.held = h; h.sleep = 0;
+    if (!h.temp) { if (h.mount && G.unmount) G.unmount(h); G.held = h; h.sleep = 0; }
     { /* 测量首级：包围盒中心（头局部坐标）与高度 → 姿势整体按 k 缩放（设计基准：头高 0.26m） */
       const q0 = h.g.quaternion.clone(); h.g.quaternion.identity(); h.g.updateMatrixWorld(true);
       const bb = new THREE.Box3().setFromObject(h.hb && h.hb.group ? h.hb.group : h.g), sz = bb.getSize(new THREE.Vector3()), ctr = bb.getCenter(new THREE.Vector3());
       S.hc = ctr.sub(h.g.position); S.k = Math.max(0.5, Math.min(3, (sz.y || 0.26) / 0.26)); h.g.quaternion.copy(q0); h.g.updateMatrixWorld(true); S.hsz = sz.toArray().map(v => +v.toFixed(3)); }
-    Object.assign(S, { active: true, h, rec, cb: cb || {}, act: '', t: 0, yaw: 0, pitch: 0, dist: 0, drag: null, play: 0, fov0: G.camera.fov, openT: 0, shake: 0, pend: null });
+    Object.assign(S, { openAt: performance.now(), active: true, h, rec, cb: cb || {}, act: '', t: 0, yaw: 0, pitch: 0, dist: 0, drag: null, play: 0, fov0: G.camera.fov, openT: 0, shake: 0, pend: null });
     cur = null; G.setUI(true); document.body.classList.add('riw-on');
     el.style.display = 'block'; requestAnimationFrame(() => el.classList.add('on')); panel(null); refresh();
     const c = rec.c; sub(Recall.nKnown(c) > 3 ? `你把<b>${esc(NM(c))}</b>捧到面前。她的眼睛半睁着，已经不会再眨了。` : `一颗陌生的头。你把她捧到面前——还想不起她是谁。<br><span class="d">试试下面的动作，一点点想起来。</span>`);
@@ -297,6 +301,7 @@ body.riw-on #cross,body.riw-on #tip,body.riw-on #hint,body.riw-on #labels,body.r
     document.body.classList.remove('riw-on'); if (S.h && S.h.hb && S.h.hb.setSway) S.h.hb.setSway(_v.set(0, 0, 0));
     if (!silent) snd('close');
     G.setUI(false); G.save && G.save(); if (window.UI && UI.refresh) UI.refresh(); G.lockPointer && G.lockPointer();
+    if (S.h && S.h.temp) { S.h.g.parent && S.h.g.parent.remove(S.h.g); try { S.h.hb.dispose && S.h.hb.dispose(); } catch (e) { } }
     S.cb && S.cb.onClose && S.cb.onClose(); S.h = null; S.act = '';
   }
   // 接管 Recall.open：头在洞里 → 原场景回忆；否则旧界面兜底

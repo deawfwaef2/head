@@ -1335,3 +1335,11 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - foe.js 新增钩子：FoeAI2.init/tune/after/evade/preHit/onDie/update/tick/clear，fo.yOff（跃斩高度），tokenOK 计入 fo.sk。worlds.js ctx 新增 rec(fo)；hitPlayer 里 h.unblock 跳过格挡。
 - 测试覆盖变量：window.__foeThreat/__foeTier/__forceSkill/__skillP/__forceAff/__foeAffixP（tools/test/fight.html 已加载 foe_ai2.js）。
 - 教训：在 foe.js 这种长行代码里插 `//` 注释会吃掉同一行后面的代码，要用 /* */。
+
+---
+## R33c（回忆按 F 修复 + 开发者模式 dev_mode）
+- **Bug 修复（`js/recall_iw.js`）**：之前按 F 打开原场景回忆后，**松开 F（keyup）就立即关闭**，玩家看起来“没有新界面”。现在只在 keydown 关闭、打开后 300ms 内和长按重复都忽略；keyup 放行给游戏（避免移动键卡住），只拦截 E/F 的 keyup。
+- 头不在洞里（魂库 / 装在架子或身体上 / 卡片里点「回忆」）→ 生成**临时首级**捧在手上，关闭即移除，不改存档、不再从架子上拔头或从魂库 takeOut。
+- **新 MOD `dev_mode`（默认开）/ 新文件 `js/devmode.js`（`window.DevMode`）**：资源无限（魂晶≥999999、Sack 所有 mat/use 物品补满 999、药剂 99）、全解锁（包裹 `Unlocks.has`，并写入 `S.unl`）、无敌（hp 自动回满）、体力无限（包裹 `Stamina.spend/drain`）、`RegEcon.can` 放行。F8 / 右下角「🛠 DEV」按钮打开面板：刷首级（随机×10/×3 放面前/×50、按稀有度×5）、装备满阶、等级拉满、+100 万魂晶、材料补满、立即全解锁、全部首级回忆全开。面板开关存 `localStorage.hs_dev_opts`。
+- 改动他人文件：`index.html` 在 recall_iw.js 后加 `<script src="js/devmode.js">`；`js/mods.js` 在 recall_iw 后加 `dev_mode` 条目。game.js/sack.js/unlocks.js 未改（全部外部包裹）。
+- 测试：`bak/tools/flow.py`（真实流程：`G.lockPointer()` 开局 → DEV 刷头 → 准星对准首级按 F → 数字键 → F 关 → 魂库临时首级 → F8 面板）。
