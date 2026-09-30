@@ -1540,3 +1540,11 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 新的公开接口：`UI.tab`、`UI.quiet()`、`R35UI.avail(id)`、`Mods.isOpen`、`Spirits.panelOpen/closePanel`、`Sack.mountWild/unmount`、`Gear2.dollHTML…`。ui.js `openMenu('equip')` 在 Hub 开时走 `Hub.kitBody/kitMount`。
 - 测试：`tools/test/hub.html`（真实 ui/sack/gear2/r35ui/keyguide/talents_ui/mods + 假 G）；Tab → 总览、go:kit（洞里 + 野外两种）、天赋、按键、MOD 都截图验证过。整机仍未在沙箱跑；请用户实机确认：Tab 打开/关闭、野外 Tab、装备页穿脱、Esc 行为（UI 菜单 Esc 仍是原来的 close(false)）。
 - 还没做：总览页仍是原「属性」页；图鉴/首级/建造各页内容没改版，只是被统一进了导航。
+
+## R43：武技熟练度（新手→高手的阶梯）
+- 用户：看不到 R41 的平衡效果；要求新手慢（出刀慢、前摇长、收招慢、武器弱），高手明显更强。R41 的 ×1.5→1.0 太隐蔽，已替换。
+- `js/balance.js` 重写：`Balance.m(lv)` 返回 {wu,sw,cd,st,dmg}；阶段 生疏(1)/入门(5)/熟练(10)/精通(18)/宗师(27)；`stage()/label()` 供 UI；升阶时弹字幕；`tempo()/earlyDmg()` 仅为兼容（earlyDmg 现在按等级，不再按战力）。数值见文件头注释与 `TUNE`。
+- `js/combat.js`：`TK()` 已移除，新增 `MT()`；mm 攻击的前摇/出刀/收招/体力用各自倍率，自由挥砍的 `dur`/`omega` 用出刀倍率（刀慢 → 速度伤害也低）。`WK` 不再含节奏。
+- `js/wpnspec.js`：武器属性页用同一倍率；`js/ui.js` 总览加「武技熟练」行；F 拔刀提示带【阶段】；`js/mods.js` / `mods_i18n.js` 改名为「武技熟练 / 前期平衡（R43）」（id 仍为 balance_r41，存档的开关不变）。
+- `tools/balance/sim.js`：TUNES.new 同步；新增 ③ 熟练度阶梯表。结果：Lv1 平均出刀间隔 831ms → Lv27 403ms → Lv30 353ms；仅熟练度就使 DPS 约 ×5.2（伤害 45%→100%）。Lv1 对 rar1 TTK 5.8s，早期 Lv2–5 有少量死亡（罚 10% 金币）。
+- 与 R35 不冲突：仍是绝对数值，无百分比伤害、无保底刀数。未在真机验证。

@@ -15,13 +15,11 @@ const RPG = win.RPG, EQ = RPG.EQUIP;
 const TUNES = {
   // needA/needB：升级经验曲线 need(lv)=A+B*lv^1.6；coinK：金币收入系数
 
-  base: { // 现状（R37/R35）
-    CDB: { light: 380, fin: 560, heavy: 800 }, tempo: [1, 1], tempoLv: 1, dmgBase: 12, earlyDmg: [1, 1], earlyDmgP: [55, 150],
-    foeDmgEarly: 0, xpRec: 0, needA: 28, needB: 9, coinK: 3, WEIGHT: [0.85, 0.95, 0.8, 1.2, 1.25, 0.9, 1.0]
+  base: { // 现状（R37/R35）：没有熟练度
+    CDB: { light: 380, fin: 560, heavy: 800 }, mLv: 30, wu: [1, 1], sw: [1, 1], cd: [1, 1], st: [1, 1], dmg: [1, 1], dmgLv: 25, dmgBase: 12, foeDmgEarly: 0, xpRec: 0, needA: 28, needB: 9, coinK: 3, WEIGHT: [0.85, 0.95, 0.8, 1.2, 1.25, 0.9, 1.0]
   },
-  new: { // R41
-    CDB: { light: 380, fin: 560, heavy: 800 }, tempo: [1.5, 1.0], tempoLv: 26, dmgBase: 12, earlyDmg: [0.5, 1], earlyDmgP: [55, 170], foeDmgEarly: 1.0, xpRec: 0.3, needA: 40, needB: 11, coinK: 2,
-    WEIGHT: [0.85, 0.95, 0.8, 1.2, 1.25, 0.9, 1.0]
+  new: { // R43 武技熟练度（与 js/balance.js 的 TUNE 同值）
+    CDB: { light: 380, fin: 560, heavy: 800 }, mLv: 30, wu: [2.2, 0.9], sw: [1.6, 0.9], cd: [2.0, 0.85], st: [1.5, 1.0], dmg: [0.45, 1.0], dmgLv: 25, dmgBase: 12, foeDmgEarly: 1.0, xpRec: 0.3, needA: 40, needB: 11, coinK: 2, WEIGHT: [0.85, 0.95, 0.8, 1.2, 1.25, 0.9, 1.0]
   }
 };
 const which = process.argv[2] || 'new', T = TUNES[which]; let seed = +process.argv[3] || 7;
@@ -33,8 +31,10 @@ const WK = w => Math.pow(Math.max(0.6, w || 1), 0.35);
 const hpK = rec => Math.pow(Math.max(0.5, rec / 40), 0.8);
 const REF = rec => 140 * Math.pow(Math.max(0.5, rec / 40), 0.65);
 const RAR = [0.7, 0.9, 1.15, 1.5, 2.1];
-const tempoK = lv => lerp(T.tempo[0], T.tempo[1], clamp((lv - 1) / Math.max(1, T.tempoLv - 1), 0, 1));
-const earlyDmg = P => { const t = clamp((P - T.earlyDmgP[0]) / (T.earlyDmgP[1] - T.earlyDmgP[0]), 0, 1); return lerp(T.earlyDmg[0], T.earlyDmg[1], t * t * (3 - 2 * t)); };
+const tOf = (lv, n) => clamp((lv - 1) / Math.max(1, n - 1), 0, 1);
+const M = lv => { const t = tOf(lv, T.mLv); return { wu: lerp(T.wu[0], T.wu[1], t), sw: lerp(T.sw[0], T.sw[1], t), cd: lerp(T.cd[0], T.cd[1], t), st: lerp(T.st[0], T.st[1], t) }; };
+const tempoK = lv => M(lv).cd;
+const earlyDmg = lv => lerp(T.dmg[0], T.dmg[1], tOf(lv, T.dmgLv)); // 按等级（熟练度）
 const foeDmgK = rec => 1 + T.foeDmgEarly * clamp(1 - (rec - 40) / 160, 0, 1);
 const LV = xp => { let lv = 1, x = xp; while (lv < 60 && x >= win.Talents.need(lv)) { x -= win.Talents.need(lv); lv++; } return lv; };
 
@@ -43,15 +43,15 @@ function st(S) { const lv = LV(S.xp), n = lv - 1; S.__at = { str: Math.round(n *
 
 // 玩家一刀的平均伤害与出手节奏（light,light,fin 循环）
 function playerDps(S, s, rec, rar) {
-  const tier = S.eq.weapon, wt = T.WEIGHT[tier] || 1, kk = WK(wt) * tempoK(s.lv);
-  const q = Math.pow(Math.max(5, s.power) / 40, 0.8) * earlyDmg(s.power), b = T.dmgBase * q;
+  const tier = S.eq.weapon, wt = T.WEIGHT[tier] || 1, kk = WK(wt);
+  const q = Math.pow(Math.max(5, s.power) / 40, 0.8) * earlyDmg(s.lv), b = T.dmgBase * q;
   const cyc = [['light', 1, 8.2], ['light', 1, 8.2], ['fin', 1.3, 8.8]];
   return { b, kk, cyc };
 }
 // 模拟一场 1vN 战斗；返回 {win,t,hpLoss}
 function fight(S, s, foes, opt) {
-  const up = opt.uptime, tier = S.eq.weapon, wt = T.WEIGHT[tier] || 1, kk = WK(wt) * tempoK(s.lv);
-  const q = Math.pow(Math.max(5, s.power) / 40, 0.8) * earlyDmg(s.power), b = T.dmgBase * q;
+  const up = opt.uptime, tier = S.eq.weapon, wt = T.WEIGHT[tier] || 1, kk = WK(wt);
+  const q = Math.pow(Math.max(5, s.power) / 40, 0.8) * earlyDmg(s.lv), b = T.dmgBase * q;
   let t = 0, hp = S.hp, ci = 0, nextAtk = 0.25, tgt = 0;
   for (const f of foes) { f.cdT = 0.6 + rnd() * 1.0; }
   const dmgK = (1 - s.def / (s.def + 300)) * (1 - s.dodge * 0.5);
@@ -60,7 +60,7 @@ function fight(S, s, foes, opt) {
     if (t >= nextAtk) {
       const f = foes.find(x => x.hp > 0); if (!f) return { win: true, t, hpLoss: S.hp - hp };
       const [ty, mk, spd] = [['light', 1, 8.2], ['light', 1, 8.2], ['fin', 1.3, 8.8]][ci % 3]; ci++;
-      const cd = T[ty === 'fin' ? 'CDB' : 'CDB'][ty] / 1000 * kk;
+      const mm = M(s.lv), cd = Math.max(T.CDB[ty] / 1000 * kk * mm.cd, (({ light: 0.06, fin: 0.08 })[ty] * mm.wu + ({ light: 0.14, fin: 0.2 })[ty] * mm.sw) * kk); const wuD = ({ light: 0.06, fin: 0.08 })[ty] * kk * mm.wu;
       if (rnd() < opt.acc) {
         const z = rnd(), zm = z < 0.15 ? 1.6 : z < 0.25 ? 1.8 : z < 0.4 ? 0.7 : 1, neck = z >= 0.15 && z < 0.25;
         const sp = clamp(spd / 8, 0.5, 1.8), d = Math.max(1, Math.round(b * sp * zm * mk * (0.85 + rnd() * 0.3)));
@@ -94,7 +94,8 @@ function tableStart() {
   console.log(`\n[${which}] ① Lv1 起手（粗木棒 / 无防具）对 雾溪村 各稀有度：平均 TTK(秒) / 需要砍几刀 / 敌人几刀打死你`);
   const S = mkPlayer(), s = st(S);
   const kk = WK(T.WEIGHT[0]) * tempoK(1), cd = (2 * T.CDB.light + T.CDB.fin) / 3000 * kk;
-  console.log(`   面板：战力 ${s.power}  生命 ${s.maxHp}  平均出刀间隔 ${(cd * 1000).toFixed(0)}ms（轻击 ${(T.CDB.light * kk).toFixed(0)} / 收招 ${(T.CDB.fin * kk).toFixed(0)}）  单刀基础伤害 ${(T.dmgBase * Math.pow(s.power / 40, 0.8) * earlyDmg(s.power)).toFixed(1)}`);
+  const m1 = M(1);
+  console.log(`   面板：战力 ${s.power}  生命 ${s.maxHp}  平均出刀间隔 ${(cd * 1000).toFixed(0)}ms（轻击 ${(T.CDB.light * kk).toFixed(0)} / 收招 ${(T.CDB.fin * kk).toFixed(0)}）  单刀基础伤害 ${(T.dmgBase * Math.pow(s.power / 40, 0.8) * earlyDmg(s.lv)).toFixed(1)}`);
   for (let rar = 0; rar < 4; rar++) {
     let tt = 0, n = 200, w = 0, hits = 0;
     for (let i = 0; i < n; i++) { S.hp = s.maxHp; const f = mkFoe(40, rar); const r = fight(S, s, [f], { uptime: 0.75, acc: 0.85, pHit: 0.6 }); tt += r.t; w += r.win ? 1 : 0; hits += 0; }
@@ -123,4 +124,14 @@ function timeline() {
   console.log('   Lv   分钟  击杀  死亡  战力  地区        武器      本级均TTK  均掉血%  胜率%');
   for (const r of rows) console.log(`   ${String(r.lv).padStart(2)}  ${String(r.t).padStart(5)} ${String(r.kills).padStart(5)} ${String(r.deaths).padStart(5)} ${String(r.power).padStart(5)}  ${r.reg.padEnd(6, '　')}  ${r.wp.padEnd(6, '　')}  ${String(r.ttk).padStart(6)}s  ${String(r.loss).padStart(6)}  ${String(r.win).padStart(6)}`);
 }
-tableStart(); timeline();
+function mastery() { // ③ 熟练度阶梯（同一把武器，仅看等级带来的出刀节奏 / 伤害倍率）
+  console.log('\n[' + which + '] ③ 武技熟练度阶梯（粗木棒，轻击×2+终结×1 的循环；DPS 相对 Lv1 = 1.00，仅含熟练度，不含属性成长）');
+  const kk = WK(T.WEIGHT[0]); let ref = 0; const rows = [];
+  for (const [lv, nm] of [[1, '生疏'], [5, '入门'], [10, '熟练'], [18, '精通'], [27, '宗师'], [30, '宗师+']]) {
+    const m = M(lv), one = (ty, dmgK) => { const w = ({ light: 0.06, fin: 0.08 })[ty] * kk * m.wu, sw = ({ light: 0.14, fin: 0.2 })[ty] * kk * m.sw; return Math.max(T.CDB[ty] / 1000 * kk * m.cd, w + sw); };
+    const cyc = (2 * one('light') + one('fin')) / 3, dps = earlyDmg(lv) / cyc; if (!ref) ref = dps; rows.push([lv, nm, m, cyc, dps]);
+  }
+  console.log('   Lv  阶段    前摇×  出刀×  收招×  体力×  平均出刀间隔  伤害%   DPS倍数');
+  for (const [lv, nm, m, cyc, dps] of rows) console.log(`   ${String(lv).padStart(2)}  ${nm.padEnd(5)}  ${m.wu.toFixed(2)}  ${m.sw.toFixed(2)}  ${m.cd.toFixed(2)}  ${m.st.toFixed(2)}   ${String(Math.round(cyc * 1000)).padStart(6)}ms   ${String(Math.round(earlyDmg(lv) * 100)).padStart(4)}   ${(dps / ref).toFixed(2)}`);
+}
+tableStart(); timeline(); mastery();

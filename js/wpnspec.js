@@ -29,9 +29,10 @@ window.WpnSpec = (() => {
     const q = Math.pow(Math.max(5, st.power || 50) / 40, 0.8) * (window.Sack && Sack.dmgMul ? Sack.dmgMul() : 1) * (window.Balance && Balance.on() ? Balance.earlyDmg(st.power || 50) : 1); // R41：与 foe_abs.power() 一致
     const base = 12 * q, cdk = CT().WK(wt) * ex, C = CT(), sp = v => clamp(v / 8, 0.5, 1.8);
     const mk = (wu, swing, cd, stam, spd, mult, reach) => ({ wu: Math.round(wu * 1000), swing: Math.round((wu + swing) * 1000), cd: Math.round(cd), stam, reach: +reach.toFixed(2), dmg: Math.round(base * sp(spd) * mult) });
-    const L = mk(C.WU.light * kk, C.SW.light * kk, C.CDB.light * cdk, 4, 8.2, 1, 1.5 + len * 0.8);
-    const F = mk(C.WU.fin * kk, C.SW.fin * kk, C.CDB.fin * cdk, 6, 8.8, 1.3, 1.5 + len * 0.8);
-    const H = mk(C.WU.heavy * kk, C.SW.heavy * kk, C.CDB.heavy * cdk, 12, 12.5, 2.2, 1.5 + len * 0.8 + 0.3);
+    const M = window.Balance && Balance.on() ? Balance.m() : { wu: 1, sw: 1, cd: 1, st: 1 }; // R43：熟练度倍率
+    const L = mk(C.WU.light * kk * M.wu, C.SW.light * kk * M.sw, C.CDB.light * cdk * M.cd, 4 * M.st, 8.2, 1, 1.5 + len * 0.8);
+    const F = mk(C.WU.fin * kk * M.wu, C.SW.fin * kk * M.sw, C.CDB.fin * cdk * M.cd, 6 * M.st, 8.8, 1.3, 1.5 + len * 0.8);
+    const H = mk(C.WU.heavy * kk * M.wu, C.SW.heavy * kk * M.sw, C.CDB.heavy * cdk * M.cd, 12 * M.st, 12.5, 2.2, 1.5 + len * 0.8 + 0.3);
     const cyc = cdOn() ? 2 * L.cd + F.cd : 2 * L.swing + F.swing, dps = Math.round((2 * L.dmg + F.dmg) / (cyc / 1000));
     const crit = Math.max(0, st.crit || 0), critD = st.critD || 150;
     return { tier, plus, name: T.n, atk: st.atk, power: Math.round(st.power || 0), wt, len, kind: KIND[tier], feel: FEEL[tier], L, F, H, dps, cyc: Math.round(cyc), crit, critD, ter: T.ter || 0, soul: T.soul || 0, base: Math.round(base), charge: 0.26 + 0.6, cdOn: cdOn(), ex: ex > 1, stat: st };

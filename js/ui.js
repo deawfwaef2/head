@@ -140,6 +140,7 @@ window.UI = (() => {
     const hpF = Math.max(0, S.hp / s.maxHp);
     return `<div class="cols"><div class="col">
       <div class="big-power">⚔️ 战力 <b>${fmt(s.power)}</b></div>
+      ${window.Balance && Balance.on() ? `<div class="mastery" data-noi18n style="margin:-2px 0 10px;padding:6px 10px;font-size:13px;line-height:1.5;color:#ffd98a;background:rgba(231,194,122,.08);border-left:3px solid #e7c27a">⚔️ ${esc(Balance.label(s.lv))}<br><small style="color:#b9a98a">${({ zh: '练级 → 出刀更快、前摇更短、收招更短、伤害更高', ja: 'レベルが上がると、振りが速く・予備動作と硬直が短く・ダメージが増える', en: 'Level up → faster swings, shorter windup & recovery, more damage' })[(window.I18N && I18N.lang) || localStorage.getItem('soulhead_lang') || 'zh'] || ''}</small></div>` : ''}
       <div class="hpline"><div class="hpfill" style="width:${hpF * 100}%"></div><span>❤️ ${Math.round(S.hp)} / ${s.maxHp}</span></div>
       <div class="kv"><span>攻击</span><b>${s.atk}</b><span>防御</span><b>${s.def}</b><span>闪避</span><b>${(s.dodge * 100).toFixed(1)}%</b><span>背篓容量</span><b>${s.cap} 颗</b><span>魂晶产出</span><b>×${s.yieldMul.toFixed(2)}</b><span>生命恢复</span><b>${(1 + (bb.regen || 0))}%/10秒</b></div>
       <div class="items">${RPG.CONSUM.map(c => `<div class="item"><span class="ic">${c.icon}</span><b>${c.n}</b> ×${S.items[c.k] || 0}<button data-a="use" data-v="${c.k}" ${S.items[c.k] ? '' : 'disabled'}>使用</button></div>`).join('')}<small>快捷键 H 喝药</small></div>
