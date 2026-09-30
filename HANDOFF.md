@@ -1391,3 +1391,15 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - elites.js / hunters2.js / gear2.js 的旧面板（#elPn/#h2Pn/#g2Pn）已删除，改为注册到 R35UI；按键不变（C/U/Z），ui.js 自己的窗口打开时不响应。
 - **探索地图（出洞狩猎的选地点界面）**：regionquest.js 改 2 行——`detHTML` 在小BOSS 后插入 `Elites.regionHTML(k)`（该地区精英卡片：锁住显示传闻和条件，解锁显示胜率和“发起挑战”按钮），`itemHTML` 地区名后加 `Elites.regionBadge(k)`（👑 已斩杀/总数）。挑战按钮由 elites.js 在 document 捕获阶段处理（关闭 UI 后调用 challenge）。
 - **新 js/arrival2.js（MOD arrival2，默认开）**：进入地点的大窗口，取代 #rqCard（body.arr2 时隐藏）。内容：地区插图大图、逐字打出的 4 段剧情（场景 / 往事 / 当地人怎么看你——按来访次数、霸主是否已死、猎手仇恨生成 / 传闻）、主线（RegionQuest.T.q）、2 条随机支线（搜刮容器 / 搜尸 / 深入第 N 层 / 麻袋里 N 颗首级 / 英魂以上首级）、威胁一览（霸主、小BOSS、最强猎手及胜率、可挑战精英）。空格/E/回车关闭；打开时拦截其他按键。支线追踪 #arTrack 放在 #rqTrack 下方，并把 #h2Sense 往下推；完成给魂晶，40% 附带一件饰品。精英决斗场的出猎不弹这个窗口。存档：`S.arr.v[k]` 来访次数。
+
+## R36-talent（角色成长重做：属性点 + 天赋树 + 魔兽式界面）
+用户原话：技能树太少，要大师级重做升级系统：属性点、技能树、套路很多的不同流派、快捷键像魔兽世界、UI 大一点、操作性好。
+- **新文件**（都是 MOD，默认开；关掉即回到旧的自动加点 / Q R G 三技能）：
+  - `js/talents_data.js`（`window.TalData`）：5 属性（力量/体魄/敏捷/凶威/魂力）、6 大流派（刃舞·铁壁·影袭·狂血·魂术·猎首）各 13 节点、共 78 节点 / 31 个主动技能 + 通用闪身 `dodge`、6 套推荐流派（`BUILDS`，含加点顺序，一键加点会把剩余点数按主系补满）、层门槛 `TIER_REQ`。
+  - `js/talents.js`（`window.Talents`）：引擎。点数（每级 3 属性点 + 1 技能点，每 10 级 +1，首杀霸主/精英各 +1）、分配/撤销/洗点（首次免费，之后按等级收魂晶）、技能实现 `S_[id]`（投射物/区域/冲刺/光环 Buff，全用加色发光网格，无模型）、魂能(mana)、Buff/DoT/印记、`outDmg/inDmg/avoid/rewardMul/moveMul` 钩子、自己的 `keydown` 捕获（1-0 / Shift+1-0 施法；Q 闪身；R/G 旧键映射到 战吼/旋风斩，需学会）。自带每帧：等 `G.HOOK` 就绪后 push 到 `G.HOOK.frame`。
+  - `js/talents_ui.js`（`window.TalUI`）：底部 2×10 快捷栏（冷却转圈、魂能不足变暗、HTML5 拖拽换位、右键清空）+ Q/E/H 常用位 + T 按钮；左上玩家框（生命/魂能/体力/经验/Buff）、目标框（血量/词缀/流血中毒）；**T** 打开大面板 4 页：属性 / 天赋树 / 技能书 / 推荐流派。Esc 或 T 关闭。
+- **改动的别人文件（都很小，行尾 `// R36`）**：`foe.js`（`hit()` 调 `Talents.outDmg`；`fo.slowK` 减速；导出 `Foe.dot`）、`worlds.js`（`foeEvent0` 调 `Talents.onEvent`；奖励 ×`rewardMul`；`hitPlayer` 调 `avoid/inDmg`；`gainXp` 调 `onLevel`；移速 ×`moveMul`）、`rpg.js`（升级曲线 `Talents.need`；`lvBonus` 在天赋系统下不再自动给属性；`stats()` 前后钩子 `Talents.bonus/post`）、`mods.js`（MOD `talent_tree` / `talent_ui`）、`index.html`（3 个 script 标签在 `foe_abs.js` 后）。
+- **数值**：玩家伤害仍走 R35 `FoeAbs`（`12×(power/40)^0.8`），力量每点 +3 战力；属性点是手动的，所以老存档升级后的属性会按“每级 3 点”重新分配（点数按等级自动补发，不丢）。
+- **按键占用**：T 天赋面板，数字键 1-0 / Shift+1-0 快捷栏，Q 闪身，E 处决（旧），H 药水，R/G 旧技能映射。不与 C/U/Z（R35UI）、B/Tab/I/K、M、N、Y、O、J 冲突；`W` 不在 3D 探索里时（旧文字出猎/洞穴菜单）Talents 不拦截按键。
+- **坑**：worlds.js / foe.js 很多是一行长语句，**不要在行中间插 `//` 注释**（我第一次就把 Recall/CombatFX 调用注释掉了，已修，见 R36-talent fix）。
+- **测试**：`tools/test/talents.html`（假 G/Worlds/Foe 的 UI+引擎台，`VW=1600 VH=900 drive.py` 截图各页）；`tools/test/fight.html` 已加载 foe_abs + talents_data + talents，可用真 `foe.js` 逐个施放 31 个技能（需自己塞 `Worlds._W`/`G.HOOK`/`G.st=()=>RPG.stats(G.S,{})`，见本轮提交记录）。`drive.py` 支持 `VW/VH` 环境变量。完整 index.html 在 2GB 沙箱里跑不起来，**未做整包实机测试**，要看用户反馈（尤其 #wStat/#wHint 位置、`.wskills` 旧条已在 tbon 下隐藏）。

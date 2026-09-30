@@ -111,6 +111,7 @@
 body.tbon #wHint{bottom:calc(var(--u)*2.2 + 92px)!important}
 body.tbon #wRun{bottom:calc(var(--u)*2.2 + 80px)!important}
 body.tbon #wStat .hp{display:none}
+body.tbon .wskills{display:none!important}
 `;
   function addCss() { if (document.getElementById('tbCss')) return; const st = document.createElement('style'); st.id = 'tbCss'; st.textContent = CSS; document.head.appendChild(st); }
 
