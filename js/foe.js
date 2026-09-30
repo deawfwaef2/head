@@ -71,7 +71,7 @@ window.Foe = (() => {
   function headFit(E) {
     const bk = (window.Mods && Mods.on('body_headfit') && BODY_HEADK[E.file]) || 1;
     const eyeY = E.eyeY != null ? E.eyeY : E.headY + 0.058, skull = Math.max(0.17, Math.min(0.3, 4.15 * (eyeY - E.headY))) * bk;
-    const s = skull / 0.194;
+    const s = skull / 0.194 * ((window.Mods && Mods.on('head_natural')) ? 0.9 : 1); // R43 head_natural：头占身高 ~1:5.8 像大头娃娃，缩到 ~1:6.5
     return { s, pos: new V3(E.headX || 0, eyeY + 0.0102 * s, (E.eyeZ != null ? E.eyeZ : (E.headZ || 0) + 0.03) - 0.02 * s) };
   }
   // 组装一个活人：身体 + 组合头
@@ -206,7 +206,17 @@ window.Foe = (() => {
       T.root.traverse(o => { if (o.isMesh) { o.geometry.dispose(); [].concat(o.material).forEach(m => { for (const k in m) if (m[k] && m[k].isTexture) m[k].dispose(); m.dispose(); }); } });
       delete TMPL[n]; delete LOADED[n]; if (window.BODY_MODELS) delete BODY_MODELS[n]; document.querySelectorAll('script[src="big/body/' + n + '.js"]').forEach(e => e.remove()); }
   }
-  function bodyFor(h, r, bossK, used) { const b = bodyFor0(h, r, bossK, used); return window.CC0 ? CC0.body(b, (h && h.look && h.look.seed) || 0) : b; } /* R38 CC0 模式：只用 CC0 身体 */
+  // R43 MOD id_outfit：CC0 模式只有 4 具身体，以前按哈希乱分——修女穿魔女裙、骑士穿公主裙。现在按“身份 → 衣服风格”固定分：
+  //   Vita = 冒险/战斗装（青黑短裙+绑带）  Victoria_Rubin = 贵族/圣职礼裙（粉白荷叶边）  Darkness_Shibu = 暗色/神秘长裙（深蓝）  HairSample_Female = 平民/素净白裙
+  const OUTFIT = { Vita: ['huntress', 'ranger', 'archer', 'falconer', 'catthief', 'wolfwarrior', 'chieftess', 'smithgirl', 'engineer', 'merc', 'crossbow', 'assassin', 'shadow', 'guard', 'knight', 'paladin', 'general', 'dragonknight', 'dragonslayer', 'inquisitor', 'fallen', 'bard'],
+    Victoria_Rubin: ['princess', 'lady', 'queen', 'countess', 'duchess', 'elfprincess', 'singer', 'musician', 'choir', 'saint', 'archangel', 'moonpriest', 'abbess', 'avatar', 'dragonmiko', 'foxmiko', 'dragonprincess'],
+    Darkness_Shibu: ['witch', 'hexer', 'covenlady', 'bogwitch', 'courtmage', 'abyssqueen', 'alchemist', 'succubus', 'shaman'],
+    HairSample_Female: ['villager', 'shepherd', 'barmaid', 'herbalist', 'novice', 'medic', 'druid', 'nun'] };
+  const OUTFIT_ID = {}; for (const b in OUTFIT) for (const id of OUTFIT[b]) OUTFIT_ID[id] = b;
+  const OUTFIT_BOSS = { village: 'HairSample_Female', forest: 'Vita', wilds: 'Vita', abbey: 'Victoria_Rubin', swamp: 'Darkness_Shibu', fortress: 'Vita', capital: 'Victoria_Rubin', abyss: 'Darkness_Shibu', peak: 'Victoria_Rubin' };
+  function bodyFor(h, r, bossK, used) {
+    if (window.CC0 && CC0.on() && window.Mods && Mods.on('id_outfit')) { const o = bossK ? OUTFIT_BOSS[bossK] : OUTFIT_ID[h && h.c && h.c.id]; if (o && (!window.BODY_LIST || BODY_LIST.includes(o))) return o; }
+    const b = bodyFor0(h, r, bossK, used); return window.CC0 ? CC0.body(b, (h && h.look && h.look.seed) || 0) : b; } /* R38 CC0 模式：只用 CC0 身体 */
   function bodyFor0(h, r, bossK, used) {
     if (bossK) return BOSS_BODY[bossK] || 'Jean';
     let list = IDENT[h.c.id] || ['Jean', 'Noelle', 'HikariCape'];
@@ -575,6 +585,7 @@ window.Foe = (() => {
   // 当前这一刀还要多久（真实秒）
   function atkLeft(A) { const h = A.hits[A.hi]; if (!h) return 0; const ct = A.act.time, w = A.hi ? A.ws2 : A.ws, hold = A.hold > 0;
     return (hold ? A.hold + Math.max(0, A.holdAt - ct) / w : 0) + Math.max(0, h.t - 0.06 - Math.max(ct, hold ? A.holdAt : 0)) / w + Math.min(0.06, Math.max(0, h.t - ct)); }
+  const PRESS = () => !window.Mods || Mods.on('foe_press') !== false;
   function atkStep(fo, dt, d, face) {
     const A = fo.atk, act = A.act, ct = act.time, h = A.hits[A.hi]; let sc = 0.9, turnTo = null, spd = 0;
     if (h) {
@@ -582,15 +593,16 @@ window.Foe = (() => {
       else sc = ct < h.t - 0.06 ? (A.hi ? A.ws2 : A.ws) : 1;
       if (ct < h.t - 0.14) turnTo = face; // 出手前最后一瞬不再转身：侧闪有效
       if (A.lunge && ct < h.t && d > 1.1 && sc > 0) spd = A.lunge;
+      if (PRESS() && !A.ranged && ct < h.t && sc > 0 && d > A.reach * 0.75) spd = Math.max(spd, (h.heavy ? 3.0 : 1.9) * (fo.boss ? 1.15 : 1)); // R43 foe_press：出招时边打边逼近（重击迈得更多）——不能靠无限后撤躲开
       const left = atkLeft(A); if (left > A.tot) A.tot = left;
       if (ct >= h.t) { A.hi++; A.tot = 0;
         if (window.CombatFX) CombatFX.enemySwing(fo, h);
         if (A.ranged) FoeRoles.fire(fo, h, d);
-        else if (d < A.reach && Math.abs(ang(face - fo.yaw)) < 0.9) { CTX.hitPlayer(fo, Math.round(A.dmg * (h.heavy ? 1.6 : 1)), h); if (window.Persona && fo.sayT <= 0 && Math.random() < 0.35) { sayP(fo, 'hit'); if (Math.random() < 0.5) Persona.gesture(fo); } }
+        else if (d < A.reach + (PRESS() ? (h.heavy ? 0.55 : 0.3) : 0) && Math.abs(ang(face - fo.yaw)) < 0.9) { A.landed = 1; CTX.hitPlayer(fo, Math.round(A.dmg * (h.heavy ? 1.6 : 1)), h); if (window.Persona && fo.sayT <= 0 && Math.random() < 0.35) { sayP(fo, 'hit'); if (Math.random() < 0.5) Persona.gesture(fo); } }
         else if (fo.sayT <= 0 && Math.random() < 0.3) talk(fo, '……躲开了？'); }
     }
     act.timeScale = sc;
-    if (!A.hits[A.hi] && (ct >= A.end - 1e-3 || ct >= act.getClip().duration - 1e-3)) { fo.atk = null; fo.cd = (fo.boss ? (fo.rage ? 1.0 : 1.5) : 1.15) + Math.random() * (fo.boss ? Math.max(0.6, 2.4 - fo.iq) : Math.max(0.5, 1.6 - fo.iq)); fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); if (fo.role && window.FoeRoles) FoeRoles.after(fo); if (window.FoeAI2) FoeAI2.after(fo); }
+    if (!A.hits[A.hi] && (ct >= A.end - 1e-3 || ct >= act.getClip().duration - 1e-3)) { fo.atk = null; fo.cd = (fo.boss ? (fo.rage ? 1.0 : 1.5) : 1.15) + Math.random() * (fo.boss ? Math.max(0.6, 2.4 - fo.iq) : Math.max(0.5, 1.6 - fo.iq)); if (PRESS() && !A.ranged && !A.landed && d < 3.2 && fo.iq > 0.45 && (fo.chain | 0) < 2) { fo.cd = 0.3 + Math.random() * 0.3; fo.chain = (fo.chain | 0) + 1; } else fo.chain = 0; /* R43：落空后你还在附近就立刻补一刀（最多连 2 次） */ fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); if (fo.role && window.FoeRoles) FoeRoles.after(fo); if (window.FoeAI2) FoeAI2.after(fo); }
     return { turnTo, spd };
   }
   // 给 HUD：正在蓄力/出手的敌人 → 来刀方向 + 进度（1 = 命中那一刻）

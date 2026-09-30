@@ -1698,3 +1698,12 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   - 背包悬浮提示增加一行属性和 7 条属性条（`WpnX.bars`），FEEL 文案也改成和属性一致。
 - `worlds.js foeEvent0` 调用 `WpnX.onEvent`。
 - 测试页 `tools/test/wpn.html`：talents 测试台加上 balance、wpnx、mastery.css。已核对：委托生效、单武器涨经验、晋升，以及面板、提示、卡片的截图。
+
+## R47（第四十三轮，agent 侧：身份服饰 / 后退变慢 / 敌人逼近）
+用户诉求：战斗逻辑总有 BUG；战斗中后退应变慢、敌人重击可边打边前进（否则能无限后撤，想逃得转身跑）；单位还是弱智；大头娃娃；角色形象不符合身份。
+- **MOD `id_outfit`（默认开）**：`foe.js bodyFor` 在 CC0 模式下按身份固定选身体（`OUTFIT`/`OUTFIT_BOSS` 表）：Vita=战斗/冒险装，Victoria_Rubin=贵族/圣职礼裙，Darkness_Shibu=女巫/暗系长裙，HairSample_Female=平民素裙；霸主按地区。以前是哈希乱分（修女穿魔女裙）。**CC0 模式只有 4 具身体，衣服款式受限，要更贴身份只能增加 CC0 身体（放 big/body/ 后加进 cc0mode.js BODIES 与 OUTFIT 表）。**
+- **MOD `head_natural`（默认开）**：`headFit` 头缩 10%（实测脸部高 ~0.29m / 身高 1.7m ≈ 1:5.8，偏大头娃娃 → ~1:6.5）。各头模型的脸高实测一致（0.29–0.31），`tools/test/heads_fit.html` 是加载 11 个 CC0 头的对比台。
+- **MOD `back_slow`（默认开）**：`worlds.js` 玩家移动：14m 内有已发现你且没逃跑的敌人时，倒着走速度 ×0.55；首次提示 toast。
+- **MOD `foe_press`（默认开）**：`foe.js atkStep`：出招（非远程、非定格蓄力帧）时朝玩家迈步，普通 1.9m/s、重击 3.0m/s（霸主 ×1.15）；命中距离 +0.3（重击 +0.55）；落空且玩家仍在 3.2m 内、iq>0.45 → cd 缩到 0.3–0.6s 立刻补刀，最多连 2 次（`fo.chain`）。已有的“预判走位 lead”保持。bench：玩家以 2m/s 倒退 8 秒，开启时被追上打中，关闭时永远追不上。
+- 补了 R41/R43 MOD 的英日文（mods_i18n.js）。
+- 待用户确认：“大头娃娃有时候还有-”后半句没发全；“单位弱智”具体表现。

@@ -855,6 +855,7 @@ window.Worlds = (() => {
       runBar();
       fw.set(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)); rt.set(Math.cos(P.yaw), 0, -Math.sin(P.yaw));
       want.copy(fw).multiplyScalar(f).addScaledVector(rt, s); if (want.lengthSq() > 0) want.normalize().multiplyScalar(sp * (window.Talents ? Talents.moveMul() : 1) * (window.FoeRoles3 ? FoeRoles3.moveK() : 1)); // R37 被网/夹住=定身；R36 移速天赋/增益
+      if (f < 0 && want.lengthSq() > 0 && (!window.Mods || Mods.on('back_slow'))) { let fight = false; for (const fo of Foe.foes) { if (fo.dead || !fo.seen || fo.state === 'flee' || fo.state === 'idle') continue; if (Math.hypot(fo.pos.x - W.pos.x, fo.pos.z - W.pos.z) < 14) { fight = true; break; } } const bk = -want.dot(fw); if (fight && bk > 0) { want.addScaledVector(fw, bk * 0.45); if (!W._bkHint) { W._bkHint = 1; G.toast && G.toast('🐢 战斗中后退很慢——想逃就转身跑', '#ffd9a0', 2.2); } } } // R43 MOD back_slow：有敌人盯着你时倒着走只有 55% 速度（不能无限后撤；转身跑才快）
       if (W.dashT > 0) { W.dashT -= dt; W.vel.x = W.dashV.x; W.vel.z = W.dashV.z; } else { W.vel.x += (want.x - W.vel.x) * Math.min(1, dt * 10); W.vel.z += (want.z - W.vel.z) * Math.min(1, dt * 10); }
       if (K.Space && W.onGround && P.crouch < 0.3 && (!window.Stamina || Stamina.canJump())) { W.vel.y = 4.4; W.onGround = false; }
     } else { W.vel.x *= 0.8; W.vel.z *= 0.8; }
