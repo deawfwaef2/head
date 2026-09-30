@@ -1876,4 +1876,4 @@ User: cave was pitch dark + sealed → brain reads it as unsafe/disgusting. Fix 
 - cave.js: dome apex triangles removed → ~1.5m oculus directly over the fire (smoke hole), bright HDR sky disc above, daylight SpotLight onto floor, faint additive light shaft (fades near camera to avoid wash-out), 70 drifting dust motes; brighter wall/floor vertex colours, less burn/edge darkening.
 - game.js (`CZ` flag): hemi 1.0 warm cream/brown, moon .32, exitLight 2.6, fog #3a2c21 density ~half, fire colour #ffb468, slower/smoother flicker (no random jitter), bigger light distance.
 - cavecozy.js: post grade only in cave (exposure 1.42, vig .17, contrast 1.0, lifted shadow tint); original values restored when a world is active.
-- NOT yet verified visually in the real game (sandbox renderer tooling reset). Toggle off via Mods `cave_cozy` to compare.
+- Verified with stub harness `tools/test/cave.html` (?cz=0 old, default new; shots via /var/work/pw/cave_shots.js): skylight + soft shaft + dust + warm floor patch read well; old = near-black. Full-game run (post grade, real lights) still unverified.

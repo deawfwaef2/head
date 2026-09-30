@@ -110,7 +110,7 @@ window.Cave = (() => {
       for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); p.setY(i, floorAt(x, z));
         // 宏观明暗变化：打破贴图平铺感；火坑周围焦黑，墙根更暗
         const n = fbm(x * 0.35 + 3, 0.5, z * 0.35 - 7), d = Math.hypot(x, z); const burn = Math.max(0, 1 - d / 1.8);
-        const c = (cz ? 0.8 + n * 0.45 : 0.62 + n * 0.55) * (1 - burn * (cz ? 0.3 : 0.55)) * (1 - Math.max(0, d / R - 0.7) * (cz ? 0.5 : 0.9));
+        const c = (cz ? 0.7 + n * 0.45 : 0.62 + n * 0.55) * (1 - burn * (cz ? 0.3 : 0.55)) * (1 - Math.max(0, d / R - 0.7) * (cz ? 0.5 : 0.9));
         col[i * 3] = c; col[i * 3 + 1] = c * 0.95; col[i * 3 + 2] = c * 0.9; }
       fg.setAttribute('color', new THREE.BufferAttribute(col, 3)); fg.computeVertexNormals();
       const uv = fg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, p.getX(i) / 3, p.getZ(i) / 3); }
@@ -223,17 +223,17 @@ window.Cave = (() => {
     if (window.Mods && Mods.on('cave_detail')) scatterSmallProps(stal, R, floorAt, rand, merchant.position);
     let cozyUpd = null;
     if (cz) {
-      const sk = new THREE.Mesh(new THREE.CircleGeometry(8, 28), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.75, 3.3), fog: false, side: THREE.DoubleSide })); sk.rotation.x = Math.PI / 2; sk.position.y = Ytop + 2.4; sk.userData.noShadow = true; g.add(sk);
+      const sk = new THREE.Mesh(new THREE.CircleGeometry(8, 28), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.5, 1.85, 2.4), fog: false, side: THREE.DoubleSide })); sk.rotation.x = Math.PI / 2; sk.position.y = Ytop + 2.4; sk.userData.noShadow = true; g.add(sk);
       const sp = new THREE.SpotLight(0xfff0d8, 3.2, 0, Math.min(0.6, Math.atan((hr + 1.4) / (Ytop + 1.8))), 0.9, 1.0); sp.position.set(0, Ytop + 1.8, 0); sp.target.position.set(0, 0, 0); g.add(sp, sp.target);
-      const cg2 = new THREE.CylinderGeometry(hr * 0.95, hr * 1.9, Ytop + 0.2, 28, 1, true); cg2.translate(0, (Ytop + 0.2) / 2 - 0.1, 0);
-      const shaft = new THREE.Mesh(cg2, new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.9, 0.7), transparent: true, opacity: 0.06, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); shaft.userData.noShadow = true; g.add(shaft);
+      const cg2 = new THREE.CylinderGeometry(hr * 0.95, hr * 1.9, Ytop + 0.2, 28, 1, true); cg2.translate(0, (Ytop + 0.2) / 2 - 0.1, 0); { const pa = cg2.attributes.position, cc = new Float32Array(pa.count * 3); for (let i = 0; i < pa.count; i++) { const t = Math.max(0, Math.min(1, pa.getY(i) / Ytop)); const v = 0.15 + 0.85 * t * t; cc[i * 3] = v; cc[i * 3 + 1] = v * 0.93; cc[i * 3 + 2] = v * 0.8; } cg2.setAttribute('color', new THREE.BufferAttribute(cc, 3)); }
+      const shaft = new THREE.Mesh(cg2, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.045, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); shaft.userData.noShadow = true; g.add(shaft);
       // 灰尘微粒（柱内缓慢飘，给静止空间一点“活着”的信号）
       const N = 70, pos = new Float32Array(N * 3), ph = []; for (let i = 0; i < N; i++) { const a = Math.random() * 6.28, r0 = Math.sqrt(Math.random()) * hr * 1.5; pos[i * 3] = Math.cos(a) * r0; pos[i * 3 + 1] = Math.random() * Ytop; pos[i * 3 + 2] = Math.sin(a) * r0; ph.push(Math.random() * 6.28); }
       const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
       const dc = document.createElement('canvas'); dc.width = dc.height = 32; const dx = dc.getContext('2d'), gr = dx.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, 'rgba(255,240,210,1)'); gr.addColorStop(1, 'rgba(255,240,210,0)'); dx.fillStyle = gr; dx.fillRect(0, 0, 32, 32);
       const pts = new THREE.Points(pg, new THREE.PointsMaterial({ map: new THREE.CanvasTexture(dc), size: 0.07, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, sizeAttenuation: true })); pts.frustumCulled = false; g.add(pts);
       cozyUpd = (now) => {
-        const cam = window.G && G.camera; if (cam) { const dxx = cam.position.x, dzz = cam.position.z, d = Math.hypot(dxx, dzz); const k = Math.max(0, Math.min(1, (d - hr * 1.0) / (hr * 1.6))); shaft.material.opacity = 0.06 * k * k * (3 - 2 * k); pts.material.opacity = 0.2 + 0.4 * k; }
+        const cam = window.G && G.camera; if (cam) { const dxx = cam.position.x, dzz = cam.position.z, d = Math.hypot(dxx, dzz); const k = Math.max(0, Math.min(1, (d - hr * 1.0) / (hr * 1.6))); shaft.material.opacity = 0.045 * k * k * (3 - 2 * k); pts.material.opacity = 0.2 + 0.4 * k; }
         const a = pg.attributes.position; for (let i = 0; i < N; i++) { let y = a.getY(i) - 0.02 * 0.016 * 60 * 0.12 - 0.0006; if (y < 0) y += Ytop; a.setY(i, y); a.setX(i, a.getX(i) + Math.sin(now * 0.4 + ph[i]) * 0.0007); a.setZ(i, a.getZ(i) + Math.cos(now * 0.35 + ph[i]) * 0.0007); } a.needsUpdate = true;
       };
     }
