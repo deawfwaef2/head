@@ -50,7 +50,7 @@ window.Mods = (() => {
     { id: 'char_unify', cat: 'look', icon: '🌗', n: '人物统一光影 · 逆光不恐怖谷（R47）', d: '头和身体用同一套“随环境变化”的二次元明暗：暗面=此处满受光的 60%（不会比环境更亮、不再像自发光纸片人），亮面平涂；逆光时轮廓出一圈太阳色边缘光。开启时自动旁路二次元光影/次表面散射/面部补光下限，避免叠加。', def: true },
     { id: 'anime_shade', cat: 'look', icon: '🎎', n: '二次元光影（R36）', d: '角色（头、头发、身体）的光照改成二次元风格：亮面平涂、暗面统一抬到约 80% 并染暖粉阴影色、中间软过渡，去掉塑料感的高光与环境镜面反射，加一圈淡淡边缘光。天空/太阳/篝火/阴影照常响应，极暗环境仍然是暗的。需重新载入。（R36b：用户要 3D 着色器风格，默认改为关；想要平涂二次元可在这里打开。）关闭=R33 的真实 PBR 受光。', def: false },
     { id: 'head_native', cat: 'look', icon: '🧷', n: '头保持原样：不混搭发型/饰品（R36b）', d: '每颗头就是它自己：脸、发型、头饰来自同一个模型，不再把别的头的发型/饰品拼上去（原神等 MMD 头拼起来很违和）；MMD 头也不再额外叠程序化头饰。这个 MOD 会在读档时把“跨头发型 hair_mix2 / 跨头饰品库 acc_mix”关掉；想要混搭就关本 MOD 并手动打开那两项。需重新载入。', def: false },
-    { id: 'cc0_only', cat: 'look', icon: '🆓', n: 'CC0 模式：只用 CC0 模型（R38）', d: '游戏里只出现 CC0（公有领域）授权的人物：9 个 pixiv 官方 CC0 头 + 4 具 CC0 身体；旧存档里的其他头也按种子换成 CC0 头显示（存档不改）。关掉 = 使用全部模型（含仅限私人使用的原神/MMD/VRoid Hub 模型）。动作/场景/道具本来就是 CC0。', def: true },
+    { id: 'cc0_only', cat: 'look', icon: '🆓', n: 'CC0 模式：只用 CC0 模型（R38，默认已关）', d: '游戏里只出现 CC0（公有领域）授权的人物：9 个 pixiv 官方 CC0 头 + 4 具 CC0 身体；旧存档里的其他头也按种子换成 CC0 头显示（存档不改）。关掉 = 使用全部模型（含仅限私人使用的原神/MMD/VRoid Hub 模型）。动作/场景/道具本来就是 CC0。', def: false },
     { id: 'head_collage', cat: 'look', icon: '🧩', n: '拼图混搭：原神/MMD 头不戴自己的头发（R38）', d: '每颗 MMD/原神脸都换上另一个头的发型（发饰跟着发型走），还常拼上第三个头的饰品——看不出是哪个原作角色。只在关闭「CC0 模式」时有效果（CC0 模式下没有这些头）。', def: true, conflicts: ['head_native'] },
     { id: 'skin_sss', cat: 'look', icon: '🫧', n: '皮肤次表面散射 · 3D 真人质感（R36b）', d: '在 PBR 上只对肤色像素加：明暗交界带的血红色散射、背光侧暖色填充、掠射角的红色透光边（耳朵/鼻翼）、压低塑料硬高光并加一圈极淡的油脂光泽。头发和衣服不受影响，极暗环境不抬亮。需重新载入。', def: true },
     { id: 'head_pbr', cat: 'look', icon: '💡', n: '头部真实受光（R33）', d: '头/头发/眼睛/饰品从“卡通材质”（只有 4 级色阶、不吃天空环境光、不响应光照方向）改为与身体相同的 PBR 材质：同一套灯光、同一张环境图、同一条曲线。阳光/篝火/阴影下头会像身体一样亮暗变化，不再在所有环境里都暗沉发灰。需重新载入。关闭=旧的卡通头。', def: true },
@@ -154,6 +154,7 @@ window.Mods = (() => {
     { id: 'foe_door_escape', cat: 'play', icon: '🚪', n: '猎物会从门逃走（第二十一轮）', d: '逃跑的猎物会冲向最近的门，跑到门口就真的逃掉了（这次拿不到她的首级）。', def: true },
     { id: 'ranks', cat: 'play', icon: '🎖️', n: '阶位系统 · 12 系 36 流派（第二十七轮）', d: '名字与魂阶始终显示；每个角色另有「阶位」：按身份分成战阵/狩猎/圣职/自然/奥术/咒影/匠医/艺者/王权/深渊/龙脉/民间 12 大系，每系 3 个流派、10 阶（共 288 个头衔），同一身份也可能走上别的流派；魂阶越高阶位越高。档案卡里有完整的阶位谱。', def: true },
     { id: 'overhear', cat: 'play', icon: '🎧', n: '进场偷听对话（第二十七轮）', d: '进入有人的地点时，屏幕中上方弹出一条长框（带说话人的半身像，不挡视野、不冻结、自动消失）：她们按性格和关系（同系/上下阶/同行）聊天——工作、愿望、信仰、对你的传闻、小习惯；话里会透露她们的信息（直接算作已回忆），内容也记进行程日志。', def: true },
+    { id: 'overhear_old', cat: 'play', icon: '🎧', n: '偷听弹框：老版样式（第四十三轮）', d: '用户觉得新的顶部长条“还不如老版”：默认恢复第二十八轮的样式——屏幕中下方的对话框，带气泡尖角，列出每个说话人的名牌（魂阶/阶位/口头禅），对白逐句弹出。关掉 = 顶部长条 + 半身像。需要「进场偷听对话」。', def: true },
     { id: 'recall', cat: 'play', icon: '🧠', n: '回忆 / 无名首级（第二十五轮）', d: '新砍下的首级只知道稀有度和产地；按 F 把她捧到眼前“回忆”：对视、抚摸、嗅闻、贴耳、回忆那一战……一点点想起性格、外貌、身份、信仰、名字、生平。有祭坛/梳妆台/锻造台/棋盘等建筑还能解锁更多动作。关闭后所有首级都显示完整信息。', def: true },
     { id: 'stamina_all', cat: 'play', icon: '💢', n: '统一体力系统（第二十五轮）', d: '攻击、格挡、奔跑、跳跃、闪身共用一条体力；耗尽后力竭——什么都做不了，只能慢走，刀垂下、屏幕发红，歇一会儿才恢复。', def: true },
     { id: 'sprint_stamina', cat: 'play', icon: '😮‍💨', n: '疾跑耗体力（第二十一轮）', d: 'Shift 疾跑每秒消耗体力，耗尽后要缓一缓才能再跑——敌人追得上你了。', def: true },
@@ -197,6 +198,7 @@ window.Mods = (() => {
   if (st.__v < 8) { st.anime_shade = false; st.__v = 8; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R36b：用户要 3D shader 风格，二次元光影默认关（旧存档迁移一次）
   if (st.__v < 9) { st.hair_mix2 = false; st.acc_mix = false; st.__v = 9; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R36b：用户不要头发/头/饰品混搭绑定（原神头搭配很违和）
   if (st.__v < 10) { st.cc0_only = true; st.head_collage = true; st.head_native = false; st.hair_mix2 = true; st.acc_mix = true; st.__v = 10; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R38：用户要 CC0 模式默认开；不要“头发-头-饰品”原样绑定，要拼图混搭
+  if (st.__v < 11) { st.cc0_only = false; st.__v = 11; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R43：用户“不限制 CC0 了”——默认关闭 CC0 模式（旧存档迁移一次；仍可在 O 面板重新打开）
   for (const m of LIST) if (st[m.id] === undefined) st[m.id] = !!m.def;
   // 修正非法状态（互斥组恰好一个；冲突；依赖）
   function normalize() {

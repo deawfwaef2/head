@@ -1724,3 +1724,8 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **CC0 调研结论**：ToxSam open-source-avatars（100Avatars 等）是 CC0 VRM，但全是梗图/卡通风（玉米、土豆……），不适合；CC0 的成年女性带幻想服饰的 VRoid 身体已经用完（Vivi 偏幼、Sendagaya 是学生制服已排除）。想要骑士甲/法袍等真实服装，只能关 `cc0_only`（IDENT 表本来就按原神身体设计）或再找新的 CC0 身体。
 - **猎手感应条（`hunters2.js`）**：① 猎手穿越到场的瞬间 `T.m=0`（以前要等她死/逃/撤退才归零，所以条一直满着）；② 条移到顶部居中（top:88px，宽 460px，16px 粗体，13px 高的条，满时红色脉冲），猎手在场/首领战/擂台/洞口时隐藏，避免和顶部血条重叠。
 - 测试台：`tools/test/heads_fit.html` 加了 `idlook.js`。
+
+## R47c（第四十三轮续：取消 CC0 限制 / 偷听恢复老版）
+- 用户：“不限制 CC0 了”“偷听 UI 你目前这个还不如老版那个”。
+- **`cc0_only` 默认改为关**（`mods.js` def:false + 迁移 `__v 11`：旧存档也一次性关掉；O 面板仍可重新打开）。关掉后走原来的 IDENT/VB 身体表（原神等身体的服饰本来就贴身份）；`id_outfit` 只在 CC0 模式生效；`id_look` 在关 CC0 时只改 VRoid(CC0) 头，原神/MMD 头保留自带发型/头饰，`dress()` 只给 4 具 CC0 裙装身体换色。已验证：关 CC0 时 knight→Eula、ranger→Amber、witch→Darkness_Shibu。head_collage/head_native 等 R38 的联动开关未动（想恢复 R36b 的“头保持原样”需用户另说）。
+- **`overhear.js`**：新增 MOD `overhear_old`（默认开）= 第二十八轮老版弹框（`showOld`，`#ohold`：屏幕中下方、气泡尖角、每个说话人一块名牌含魂阶/阶位/口头禅、对白逐句弹出）；关掉 = R42 顶部长条 + 半身像。

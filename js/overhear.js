@@ -153,7 +153,8 @@
     if (el) return; const s = document.createElement('style'); s.textContent = CSS; document.head.appendChild(s);
     el = document.createElement('div'); el.id = 'ohear'; el.innerHTML = '<div class="oh-box"><div class="oh-p"><img alt=""><i></i></div><div class="oh-m"><div class="oh-h"><span><em>🎧 偷听</em></span><span></span></div><div class="oh-n"></div><div class="oh-t"></div><div class="oh-f"></div></div></div>'; document.body.appendChild(el);
   }
-  const clear = () => { timers.forEach(clearTimeout); timers = []; if (el) el.classList.remove('on'); };
+  const clear0 = () => { timers.forEach(clearTimeout); timers = []; if (el) el.classList.remove('on'); };
+  const clear = () => { clear0(); try { clearOld(); } catch (e) { } };
   function show(conv, node, ctx) {
     build(); clear(); const q = s => el.querySelector(s), cs = conv.who;
     const pics = cs.map(c => { try { return portraitOf(c); } catch (e) { return null; } });
@@ -175,10 +176,39 @@
     if (ctx && ctx.log) ctx.log(`🎧 你在「${node.name}」偷听到：` + conv.lines.map(l => sh(cs[l.i]) + '：「' + l.t + '」').join(' ') + (conv.facts.length ? `（听出了${conv.facts.join('、')}）` : ''));
     hist.push({ node: node.name, who: cs.map(c => c.name), lines: conv.lines.map(l => [sh(cs[l.i]), l.t]), facts: conv.facts }); if (hist.length > 30) hist.shift();
   }
+  // ---------- R43：老版弹框（第二十八轮：屏幕中下方、带气泡尖角、名牌弹出；用户说新长条“还不如老版”→ MOD overhear_old 默认用它）----------
+  const CSS0 = '#ohold{position:fixed;left:50%;bottom:17vh;width:min(780px,88vw);z-index:66;pointer-events:none;opacity:0;transform:translate(-50%,24px) scale(.96);transition:opacity .45s,transform .45s cubic-bezier(.2,.9,.25,1.2);font-family:"Noto Serif SC","Songti SC",serif;color:#f3e8d2}#ohold.on{opacity:1;transform:translate(-50%,0) scale(1)}'
+    + '#ohold .oh-box{background:linear-gradient(160deg,#241710f5,#0c0807f5);border:2px solid #e0ad5a;border-radius:14px;box-shadow:0 0 0 1px #000,0 14px 60px #000c,0 0 40px #e0ad5a30;padding:14px 20px 16px;position:relative}'
+    + '#ohold .oh-box::before{content:"";position:absolute;left:50%;bottom:-11px;width:20px;height:20px;background:#0c0807;border-right:2px solid #e0ad5a;border-bottom:2px solid #e0ad5a;transform:translateX(-50%) rotate(45deg)}'
+    + '#ohold .oh-h{display:flex;justify-content:space-between;align-items:baseline;font-size:19px;font-weight:700;color:#ffd890;letter-spacing:3px;border-bottom:1px solid #ffffff22;padding-bottom:8px;margin-bottom:10px;text-shadow:0 2px 8px #000}#ohold .oh-h small{opacity:.75;font-size:14px;font-weight:400;letter-spacing:1px}'
+    + '#ohold .oh-who{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}#ohold .oh-w{flex:1 1 180px;padding:7px 12px;border-left:5px solid var(--c);background:#00000070;border-radius:6px;font-size:14px;line-height:1.55;animation:ohpop .5s cubic-bezier(.2,1.4,.3,1) backwards}#ohold .oh-w:nth-child(2){animation-delay:.12s}#ohold .oh-w:nth-child(3){animation-delay:.24s}#ohold .oh-w b{color:var(--c);font-size:18px;text-shadow:0 0 10px var(--c)}#ohold .oh-w i{font-style:normal;opacity:.8;display:block;font-size:13px}@keyframes ohpop{from{transform:scale(.6) translateY(10px);opacity:0}}'
+    + '#ohold .oh-l{max-height:min(34vh,300px);overflow:hidden;display:flex;flex-direction:column;gap:9px}#ohold .oh-ln{font-size:clamp(17px,1.5vw,21px);line-height:1.6;opacity:0;animation:ohin .4s forwards;padding:2px 0}#ohold .oh-ln b{color:var(--c);margin-right:10px;font-size:.92em;text-shadow:0 0 8px var(--c)}@keyframes ohin{from{transform:translateY(8px)}to{opacity:1;transform:none}}'
+    + '#ohold .oh-f{margin-top:10px;font-size:14px;color:#ffd27a;opacity:0;transition:opacity .5s}#ohold .oh-f.on{opacity:1}';
+  let elO = null, timersO = [];
+  function buildOld() {
+    if (elO) return; const s = document.createElement('style'); s.textContent = CSS0; document.head.appendChild(s);
+    elO = document.createElement('div'); elO.id = 'ohold'; elO.innerHTML = '<div class="oh-box"><div class="oh-h"><span>🎧 偷听</span><small></small></div><div class="oh-who"></div><div class="oh-l"></div><div class="oh-f"></div></div>'; document.body.appendChild(elO);
+  }
+  const clearOld = () => { timersO.forEach(clearTimeout); timersO = []; if (elO) elO.classList.remove('on'); };
+  function showOld(conv, node, ctx) {
+    buildOld(); clearOld(); const q = s => elO.querySelector(s), cs = conv.who;
+    q('.oh-h small').textContent = `「${node.name}」 · ${conv.rel}`;
+    q('.oh-who').innerHTML = cs.map(c => { const r = window.Ranks ? Ranks.of(c) : null, b = bio(c); return `<div class="oh-w" style="--c:${RCOL[c.rar]}"><b>${esc(c.name)}</b> <small>【${RN[c.rar]}】</small><i>${r ? esc(r.S.ic + ' ' + r.S.n + '·' + r.B.n + ' ' + r.tn + '「' + r.name + '」') : ''}</i><i>口头禅：「${esc(b.catch)}」</i></div>`; }).join('');
+    q('.oh-l').innerHTML = ''; q('.oh-f').className = 'oh-f'; q('.oh-f').textContent = '';
+    requestAnimationFrame(() => elO.classList.add('on'));
+    let t = 900; conv.lines.forEach((ln, n) => {
+      timersO.push(setTimeout(() => { const c = cs[ln.i], d = document.createElement('div'); d.className = 'oh-ln'; d.style.setProperty('--c', RCOL[c.rar]); d.innerHTML = `<b>${esc(sh(c))}</b>「${esc(ln.t)}」`; q('.oh-l').appendChild(d); if (window.SFX && SFX.play) try { SFX.play('click', 0.12, 1.4 + ln.i * 0.25); } catch (e) { } }, t));
+      t += 1500 + ln.t.length * 70;
+    });
+    if (conv.facts.length) timersO.push(setTimeout(() => { const f = q('.oh-f'); f.textContent = '📝 你从她们的话里听出了：' + conv.facts.join('、'); f.classList.add('on'); }, t));
+    t += 3800; timersO.push(setTimeout(() => clearOld(), t));
+    if (ctx && ctx.log) ctx.log(`🎧 你在「${node.name}」偷听到：` + conv.lines.map(l => sh(cs[l.i]) + '：「' + l.t + '」').join(' ') + (conv.facts.length ? `（听出了${conv.facts.join('、')}）` : ''));
+    hist.push({ node: node.name, who: cs.map(c => c.name), lines: conv.lines.map(l => [sh(cs[l.i]), l.t]), facts: conv.facts }); if (hist.length > 30) hist.shift();
+  }
   // 进入地点（worlds.js goto 结束时调用）
   function enter(node, ctx) {
     if (!on() || !node || node._heard) return; const cs = (node.prey || []).map(h => h && h.c).filter(Boolean); if (!cs.length) return; node._heard = 1;
-    setTimeout(() => { try { show(compose(cs, node), node, ctx); } catch (e) { console.warn('Overhear', e); } }, 1600);
+    setTimeout(() => { try { (window.Mods && Mods.on('overhear_old') === false ? show : showOld)(compose(cs, node), node, ctx); } catch (e) { console.warn('Overhear', e); } }, 1600);
   }
   window.Overhear = { portraitOf, enter, compose, bio, bioHTML, hist: () => hist, clear, AN, arche, T, MONO };
 })();

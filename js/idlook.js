@@ -83,7 +83,9 @@ window.IdLook = (() => {
   // 改 look（一次；头被砍下后是同一个 look，所以头也一致）
   function apply(h) {
     if (!on() || !h || !h.c || !h.look || h.look._idl) return;
-    const sp = S[h.c.id]; if (!sp) return; const L = h.look; L._idl = 1;
+    const sp = S[h.c.id]; if (!sp) return; const L = h.look;
+    if (window.CC0 && !CC0.on() && !CC0.HEADS.includes(L.f)) return; // 关掉 CC0 后，原神/MMD 头保留自带发型和头饰；只改 VRoid 头
+    L._idl = 1;
     const r = rng((L.seed || 1) * 7919 + 13);
     if (L.hn !== '原色' && sp.hair && window.ModelHeads && ModelHeads.HAIR) {
       const n = pick(r, sp.hair), hh = ModelHeads.HAIR.find(x => x[0] === n);
@@ -107,7 +109,8 @@ window.IdLook = (() => {
   // 衣服着色（身体 build 之后调用）
   const toLin = (c) => new THREE.Color(c).convertSRGBToLinear();
   function dress(f, id, seed) {
-    if (!on() || !f || !f.root) return; const sp = S[id], T = sp && TINT[sp.tint]; if (!T) return;
+    if (!on() || !f || !f.root || (window.CC0 && !CC0.BODIES.includes(f.bodyName))) return; // 只给 4 具 CC0/VRoid 裙装身体换色；原神等身体的衣服本来就贴身份
+    const sp = S[id], T = sp && TINT[sp.tint]; if (!T) return;
     const c = toLin(T[0]), tg = new THREE.Vector3(c.r * T[2] * 1.15, c.g * T[2] * 1.15, c.b * T[2] * 1.15), U = { uIdT: { value: tg }, uIdK: { value: T[1] } };
     const cache = new Map();
     f.root.traverse(o => {
