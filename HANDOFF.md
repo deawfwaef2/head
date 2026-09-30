@@ -1569,3 +1569,48 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **重要接线**：出猎世界（`Worlds.frame`）不走 `G.HOOK`，所以在 `js/worlds.js` 的渲染前加了一行直接调 `CFX3D.frame` / `FPV.frame` / `FPV.pre`（洞窟里仍走 HOOK）。以后新增每帧系统要注意两条循环。
 - 按键一览（`js/keyguide.js`）已加 V；i18n：`tools/i18n/d_r41.py`。
 - 测试：`tools/test/fight.html`（已加载 ogre_body）、`tools/test/ogre.html`（哥布林骨骼/动作查看）。真实游戏冒烟：`_tools/mk_t.py 3` 生成 `_t.html`；启动要先选语言（按 1 + Enter），`G.S.intro=true` 跳过序章，F9 关教程。
+
+---
+
+## R41（主管）地区野怪 / 地图修正 / 特殊地点
+
+> 另一个 agent 的提交也叫 "R41"，我的都标 "R41(主管)"。基调仍是第三轮规定：黑暗奇幻、偏重，但不过度猎奇。
+
+**新 MOD（都可在 MOD 面板关闭，默认开启）**
+- `region_beasts`：每个地区有自己的野怪。30 种来自 Quaternius Ultimate Monsters（CC0），打包在 `beasts/m_*.js`，名单和各地区权重在 `js/beasts_reg.js`，AI 和动画别名在 `js/beasts.js`。打包工具：`tools/beast_pack.py`。
+- `wfix41`：地图修正。
+  - 入口门的视线锥内不再有土丘挡视线，土丘也改为偏离入口。
+  - 天空和雾的颜色、地平线衔接好了。
+  - 去掉了现代街道 HDRI。
+  - 光束在近距离或斜视时会淡出。
+- `wsites`（`js/wsites.js`）：特殊地点，约 30% 的中型节点会变成其中一种。
+  - 共 7 种：篝火夜会、集市、朝圣集会、魔宴、难民营、角斗场、伐木场。
+  - 每个地区的权重不同，地点名也会随地区变化，例如"丰收篝火"、"晨祷集会"。
+  - 场地会先整平并整块占用，随机地标和宝箱不会落进场地中间。
+  - 人会坐在凳子、长椅或箱子上，蹲着烤火，或者砍柴、施法、叫卖，动作都在各自位置上循环（foe.js 的 idle 分支）。
+  - 门牌、横幅和顶部 HUD 会显示图标加地点名，到达约 2.8 秒后弹出提示；同时会有更多敌人和额外宝箱。
+
+**我改动的文件和位置**
+- `js/worlds.js`：
+  - buildNode 里的视线锥、平整通道和土丘偏置。
+  - 天空 fogC/hz，以及 `toneMapping()` 外包 `#ifdef TONE_MAPPING`。之前在 NoToneMapping 下（master.js 的后处理管线）会报 shader 错。
+  - 新增 `_debug` 和 `stylesOfN`。
+  - `wsites` 的接入点：LAYOUTS 注册、layOf、layPlan、layPlace、populate、goto 站位、doorName、横幅和 HUD（2 处）、到达提示。另外 site 节点跳过 placeMark 随机地标。
+  - buildNode 的返回值加了 `site`。
+- `js/foe.js`：idle 分支里 `fo.slot && WSites.idle` 时保持站位和朝向。
+- `js/mods.js`、`js/mods_i18n.js`：加了 3 个 MOD 条目。
+- `index.html`：加了 `<script>` 标签：beasts_reg、beasts/m_*、wsites（放在 worlds.js 之前）。
+- 其他：`js/wgen.js`、`js/wlayout.js`、`js/hithud.js`（小改）、CREDITS（Quaternius CC0）。
+- 测试工具：`tools/test/world.html` 是世界渲染测试台。
+  - 例：`?reg=village&seed=11` 加 `__node` 任务，任务参数可带 `lay:'site_bonfire', crowd:1, view:'site'`。
+  - 只加载 1 个头、裁剪过的 ASSETS，否则沙箱会爆内存。
+
+**地图 bug 审计剩余项**
+- B2 地平线色带：部分修好。
+- 还没修：
+  - D：边缘漂浮的岩壁。
+  - E：capital2 的灰色板块。
+  - F：地面或雪接近纯白。
+  - G：溪流是一块平的浅色矩形。
+  - H：陡坡上铺了鹅卵石。
+  - I：标签和营地重复。
