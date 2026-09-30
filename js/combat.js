@@ -13,6 +13,8 @@ window.Combat = (() => {
   const WEIGHT = [0.85, 0.95, 0.8, 1.2, 1.25, 0.9, 1.0]; /* R37：废铁武器减重（以前钉头棒1.3/流星锤1.5，前摇+冷却太长，只能按住左键晃鼠标才出刀） */
   const MT = () => (window.Balance && Balance.on()) ? Balance.m() : { wu: 1, sw: 1, cd: 1, st: 1, dmg: 1 }; /* R43：武技熟练度——新手前摇 / 出刀 / 收招都更慢、体力更费，见 js/balance.js */
   const WK = (w) => Math.pow(Math.max(0.6, w || 1), 0.35); /* R37：重量对节奏的影响（以前 sqrt） */
+  const PF = () => window.WpnX ? WpnX.pf() : null; /* R41主管 MOD wpn_stats：每把武器自己的前摇/出刀/后摇/体力倍率（替代单一自重 WK） */
+  const KW = (k) => { const p = PF(); return p ? p[k] : WK(S.wt); };
   const CDB = { light: 380, fin: 560, heavy: 800 }; /* R37：冷却基数（以前 500/750/950） */
   window.CombatTune = { WEIGHT, WK, CDB, WU: { light: 0.06, fin: 0.08, heavy: 0.05 }, SW: { light: 0.14, fin: 0.2, heavy: 0.24 } };
   // 相机空间：x 右，y 上，-z 前
@@ -149,12 +151,12 @@ window.Combat = (() => {
     if (!drawn || S.rmb || S.sw) return false; const heavy = type === 'heavy', fin = type === 'fin';
     if (CDM() && performance.now() < (M.cdUntil || 0)) { M.buf = performance.now(); M.bufType = heavy ? 'heavy' : null; if (heavy) M.bufD = [d[0], d[1]]; return false; } // CD 中：缓冲
     const as = mmPick(); // 第二十六轮（用户：一直点就没力气、砍不动）：体力 6/9/16 → 4/6/12；范围内没有敌人时空挥只耗 35%（追人、试刀不会被掏空）
-    const mt = MT(); if (!mmSpend((heavy ? 12 : fin ? 6 : 4) * (as ? 1 : 0.35) * mt.st, heavy ? 'charged' : 'swing')) return false;
-    const kk = WK(S.wt) * ((window.Stamina && Stamina.ex) ? 1.3 : 1), wu = (heavy ? 0.05 : fin ? 0.08 : 0.06) * kk * mt.wu, dur = wu + (heavy ? 0.24 : fin ? 0.2 : 0.14) * kk * mt.sw, pw = heavy ? 1 : fin ? 0.95 : 0.85;
+    const mt = MT(), pf = PF(); if (!mmSpend((heavy ? 12 : fin ? 6 : 4) * (as ? 1 : 0.35) * mt.st * (pf ? pf.st : 1), heavy ? 'charged' : 'swing')) return false;
+    const ex = ((window.Stamina && Stamina.ex) ? 1.3 : 1), kk = WK(S.wt) * ex, wu = (heavy ? 0.05 : fin ? 0.08 : 0.06) * (pf ? pf.wu * ex : kk) * mt.wu, dur = wu + (heavy ? 0.24 : fin ? 0.2 : 0.14) * (pf ? pf.sw * ex : kk) * mt.sw, pw = heavy ? 1 : fin ? 0.95 : 0.85;
     S.sw = { t: 0, dur, dx: d[0], dy: d[1], pw, charged: heavy, v: new V3(d[0], d[1], 0), hit: false, h0: S.hand.clone(), as, lunged: 0, rk: 1, mm: true, wu, ms0: performance.now(), type, step: M.combo, set: new Set(), sgn: -1, tid: as ? as.tid : null, hold: 0 };
     S.thrust = 0; S.thrustQ = 0; S.hitCd.clear(); S.charge = 0; S.charged = 0; M.buf = 0; M.bufType = null;
     M.combo = heavy ? 0 : (M.combo + 1) % 3; if (fin) M.combo = 0;
-    if (CDM()) { M.cdLen = (heavy ? CDB.heavy : fin ? CDB.fin : CDB.light) * WK(S.wt) * ((window.Stamina && Stamina.ex) ? 1.3 : 1) * mt.cd; M.cdUntil = performance.now() + M.cdLen; }
+    if (CDM()) { M.cdLen = (heavy ? CDB.heavy : fin ? CDB.fin : CDB.light) * KW('cd') * ((window.Stamina && Stamina.ex) ? 1.3 : 1) * mt.cd; M.cdUntil = performance.now() + M.cdLen; }
     if (window.CombatFX && CombatFX.on) CombatFX.swing(d[0], d[1], pw, heavy); else SFX.play('draw', 0.4, heavy ? 0.9 : 1.3);
     return true;
   }
@@ -217,7 +219,7 @@ window.Combat = (() => {
   function mmResolve(w) { // 每帧（swingStep 之后）：刃扫到的目标结算
     if (w.t < w.wu + 0.02) return; cam.updateMatrixWorld(); const center = G.player.pos; let list = [];
     for (const p of providers) { try { list = list.concat(p(center) || []); } catch (e) {} }
-    const foes = (window.Foe && Foe.foes) || [], heavy = w.type === 'heavy', half = heavy ? 0.95 : 0.8, reach = 1.5 + S.len * 0.8 + (heavy ? 0.3 : 0) + (w.lt || 0), amp = 0.62 * (S.len / 0.8);
+    const foes = (window.Foe && Foe.foes) || [], heavy = w.type === 'heavy', half = heavy ? 0.95 : 0.8, reach = 1.5 + S.len * 0.8 + (heavy ? 0.3 : 0) + (w.lt || 0) + ((PF() || {}).reach || 0), amp = 0.62 * (S.len / 0.8);
     let px = 0, py = 0; const prim = w.tid != null ? list.find(t => t.id === w.tid) : null; if (prim) { const pf = foes.find(f => f.id2 === prim.id); chestOf(prim, pf, _ml); cam.worldToLocal(_ml); px = _ml.x; py = _ml.y; }
     let n = 0;
     for (const tg of list) {
@@ -286,7 +288,7 @@ window.Combat = (() => {
   function startSwing(dx, dy, hold, charged, mag) {
     if (window.Stamina && Stamina.on && !Stamina.spend(charged ? 18 : 11, 'swing')) return; // 第二十五轮：体力不够就挥不出去
     const pw = 0.7 + 0.3 * Math.min(1, hold / 450), tired = S.stam <= 0 || (window.Stamina && Stamina.ex) ? 0.6 : 1;
-    S.sw = { t: 0, dur: 0.15 * WK(S.wt) * MT().sw / (charged ? 1.0 : 1) / tired, dx, dy, pw: pw * tired, charged, v: new V3(dx, dy, 0), hit: false, h0: S.hand.clone(), as: assistPick(), lunged: 0, rk: 1 };
+    S.sw = { t: 0, dur: 0.15 * KW('sw') * MT().sw / (charged ? 1.0 : 1) / tired, dx, dy, pw: pw * tired, charged, v: new V3(dx, dy, 0), hit: false, h0: S.hand.clone(), as: assistPick(), lunged: 0, rk: 1 };
     if (!(window.Stamina && Stamina.on)) S.stam = Math.max(0, S.stam - (charged ? 16 : 10)); S.thrust = 0; S.thrustQ = 0; S.hitCd.clear();
     if (window.CombatFX && CombatFX.on) CombatFX.swing(dx, dy, pw, charged); else SFX.play('draw', Math.min(0.65, 0.3 + pw * 0.3), charged ? 0.9 : 1.25 + Math.random() * 0.2);
   }
@@ -386,7 +388,7 @@ window.Combat = (() => {
     if (MM()) { mmCamFx(dt); mmCdUi(); if (!S.sw || !S.sw.mm) mmTick(dt); else if (S.lmb) { /* 出刀中：只缓冲 */ } }
     if (S.stop > 0) { S.stop -= dt; S.shake *= 0.85; placeWeapon(); return; }
     const tired = S.stam <= 0 || (window.Stamina && Stamina.ex) ? 0.5 : 1;
-    let omega = 22 / (WK(S.wt) * MT().sw) * tired; // 第十六轮：整体节奏放慢一点
+    let omega = 22 / (KW('sw') * MT().sw) * tired; // 第十六轮：整体节奏放慢一点
     if (!S.lmb && S.charged > 0) { S.charged -= dt; if (S.charged <= 0) S.charged = 0; }
     if (!S.rmb) S.gHist.length = 0;
     // 目标姿态

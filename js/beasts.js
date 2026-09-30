@@ -200,8 +200,9 @@ window.Beasts = (() => {
     let dealt = Math.max(1, Math.round(12 * q * sp * mult * (slash ? 1 : 0.8) * rnd(0.85, 1.15)));
     if (!(window.FoeAbs && FoeAbs.on)) dealt = Math.max(dealt, Math.round(b.maxHp * (b.T.floor || (b.T.ai === 'charger' ? 0.15 : b.T.ai === 'skittish' ? 0.2 : 0.25)) * (info.fmul || 1) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：狼/狐约 4 刀、鹿 5 刀、野牛 7 刀（以前野牛要 20+ 刀）
     if (!(window.FoeAbs && FoeAbs.on)) { b.nHit = (b.nHit || 0) + 1; const cap = b.T.cap || (b.T.ai === 'charger' ? 8 : 6); if (b.nHit >= cap - 2) dealt = Math.max(dealt, Math.ceil(b.hp / (cap + 1 - Math.min(b.nHit, cap)))); } // 保险：第 6 刀（野牛 8 刀）必死
-    b.hp -= dealt; b.flash = 0.12; b.provoked = true; const fp = b.pos.clone(); fp.y += b.T.h * 0.8 + (b.T.fly || 0); C.floatDmg(fp, dealt, sp > 1.2 || b.broken > 0);
-    { const kv = (info.vel || new V3()).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((b.T.ai === 'charger' ? 0.1 : 0.28) * sp); b.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退分 0.16 秒推完（以前一帧瞬移）
+    const WP = !info.skill && !info.spell && window.WpnX ? WpnX.pf() : null; if (WP && Math.random() * 100 < WP.crit) { info.crit = true; dealt = Math.round(dealt * WP.critD / 100); } // R41主管：武器暴击
+    b.hp -= dealt; b.flash = 0.12; b.provoked = true; const fp = b.pos.clone(); fp.y += b.T.h * 0.8 + (b.T.fly || 0); C.floatDmg(fp, dealt, sp > 1.2 || b.broken > 0 || !!info.crit);
+    { const kv = (info.vel || new V3()).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((b.T.ai === 'charger' ? 0.1 : 0.28) * sp * (WP ? WP.kb : 1)); b.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退分 0.16 秒推完（以前一帧瞬移）
     C.event && C.event('hit', b.stub, { dealt, zone: 'body', brk: b.broken > 0 });
     window.SFX && (SFX.chop && SFX.chop(), SFX.squish && SFX.squish(0.5)); window.Foe && Foe.spark && Foe.spark(info.point || fp, 5, 'red');
     if (b.hp <= 0) { die(b, info); return true; }

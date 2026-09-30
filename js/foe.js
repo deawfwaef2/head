@@ -702,7 +702,8 @@ window.Foe = (() => {
       sfx().chop && sfx().chop(); return true;
     }
     // 活人：格挡 / 伤害
-    let side = 1;
+    let side = 1; const WP = !info.skill && !info.spell && !info.proc && window.WpnX ? WpnX.pf() : null; // R41主管 MOD wpn_stats：本次是你挥武器打的 → 用这把武器的破防/暴击/切割/击退
+    if (WP && !info.charged && fo.block > 0 && Math.random() < WP.pb) info.charged = info.gb = true; // 破防率：普通一击也可能直接砸开格挡
     if (fo.block > 0 && Math.abs(ang(Math.atan2(ctx.player.pos.x - fo.pos.x, ctx.player.pos.z - fo.pos.z) - fo.yaw)) < 1.2) {
       const diff = Math.abs(ang((info.from || 0) - (fo.gAng || 0)));
       if (info.charged) { fo.block = 0; fo.atk = null; fo.stag = fo.boss ? 0.9 : 1.4; fo.broken = fo.stag + 0.2; fo.f.play('Hit_Knockback', { once: true, fade: 0.05, restart: true }); ctx.clang && ctx.clang(c.point, 'break'); ctx.event && ctx.event('guardbreak', fo); talk(fo, pickR(Math.random, ['挡、挡不住……！', '什么力气……', '呜——！']), '#ffe0a0'); }
@@ -711,13 +712,15 @@ window.Foe = (() => {
       } else { fo.block = 0; side = 1.35; ctx.event && ctx.event('outflank', fo); } // 绕开格挡：破绽伤害
     }
     if (window.FoeAI2 && FoeAI2.preHit(fo, info, c, zone, slash)) return true; // R34：词缀（护盾等）吸收
-    const q = ctx.power(fo), brk = fo.broken > 0, mult = (zone === 'head' ? 1.6 : zone === 'neck' ? 1.8 : /Arm|Leg/.test(zone) ? 0.7 : 1) * (brk ? 2 : 1) * side * (info.charged ? 2.2 : 1) * (info.mult || 1);
+    if (info.gb) { info.charged = false; info.gb = false; } // 破防只影响格挡判定，不当成蓄力重击算伤害
+    const q = ctx.power(fo), brk = fo.broken > 0, mult = (zone === 'head' ? 1.6 : zone === 'neck' ? 1.8 * (1 + (WP ? WP.cut : 0)) : /Arm|Leg/.test(zone) ? 0.7 : 1) * (brk ? 2 : 1) * side * (info.charged ? 2.2 : 1) * (info.mult || 1);
     let dealt = Math.max(1, Math.round((fo.boss ? 11 : 12) * q * sp * mult * (slash ? 1 : 0.8) * (0.85 + Math.random() * 0.3)));
     if (!(window.FoeAbs && FoeAbs.on)) dealt = Math.max(dealt, Math.round(fo.maxHp * (fo.boss ? 0.09 : 0.17) * (fo.floorK || 1) * (info.fmul || 1) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：一记正常的砍至少削掉 ~17% 血（≈6 刀），霸主 ~9%（≈11 刀）——实力差距再大也不会出现“砍 20 刀不死”
     if (!(window.FoeAbs && FoeAbs.on)) { fo.nHit = (fo.nHit || 0) + 1; const cap = Math.round((fo.boss ? 12 : 6) * (fo.capK || 1)); /* R34：区域强度大时保险刀数按比例增加 */ if (fo.nHit >= cap - 2) dealt = Math.max(dealt, Math.ceil(fo.hp / (cap + 1 - Math.min(fo.nHit, cap)))); } // 第二十六轮保险（用户：永远打不死）：不管护甲/角色/回血，普通敌人第 6 刀必死、霸主第 12 刀必死
+    if (WP && !info.crit && Math.random() * 100 < WP.crit) { info.crit = true; dealt = Math.round(dealt * WP.critD / 100); } // 武器暴击
     if (window.Talents) { const d2 = Talents.outDmg(fo, info, dealt, zone, brk); if (isFinite(d2)) dealt = d2; } /* R36b：霸主/精英/猎手单刀上限 = 最大血量 10%，不可能再被一击秒杀 */ if (fo.boss || fo.hunter || fo.eliteId) dealt = Math.min(dealt, Math.max(1, Math.ceil(fo.maxHp * 0.1))); // R36：属性/天赋/暴击/背刺/印记
     const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.12; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk || !!info.crit);
-    { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp); fo.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退：0.16 秒内推完（以前是一帧内整段位移 = “瞬移”）
+    { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp * (WP ? WP.kb : 1)); fo.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退：0.16 秒内推完（以前是一帧内整段位移 = “瞬移”）
     ctx.event && ctx.event('hit', fo, { dealt, zone, brk, kind: info.kind, spd, charged: info.charged, crit: info.crit, skill: info.skill, spell: info.spell, proc: info.proc });
     if (!fo.seen) { fo.seen = true; fo.state = fo.brave ? 'chase' : 'flee'; if (fo.boss) ctx.bossMeet(fo); }
     if (!fo.brave && Math.random() < 0.65) { fo.brave = true; fo.state = 'chase'; } // 第二十六轮：挨打后更容易回头拼命（0.35→0.65）

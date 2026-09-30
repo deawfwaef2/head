@@ -19,12 +19,13 @@ window.Balance = (() => {
   function curLv() { const now = performance.now(); if (now - lvT < 400) return lvC; lvT = now; try { lvC = window.RPG && window.G && G.S ? RPG.lvOf(G.S.xp).lv : 1; } catch (e) { lvC = 1; } return lvC; }
   const tOf = (lv, n) => clamp(((lv || curLv()) - 1) / Math.max(1, n - 1), 0, 1);
   // 当前等级的倍率（lv 省略 = 当前玩家）
-  function m(lv) { const t = tOf(lv, TUNE.mLv); return { wu: lerp(TUNE.wu[0], TUNE.wu[1], t), sw: lerp(TUNE.sw[0], TUNE.sw[1], t), cd: lerp(TUNE.cd[0], TUNE.cd[1], t), st: lerp(TUNE.st[0], TUNE.st[1], t), dmg: dmgK(lv) }; }
-  const dmgK = lv => lerp(TUNE.dmg[0], TUNE.dmg[1], tOf(lv, TUNE.dmgLv));
+  const WX = () => window.WpnX && WpnX.onM(); // R41主管：MOD wpn_mastery 开启时，熟练度按“每把武器”算（js/wpnx.js）
+  function m(lv) { if (lv == null && WX()) return WpnX.m(); const t = tOf(lv, TUNE.mLv); return { wu: lerp(TUNE.wu[0], TUNE.wu[1], t), sw: lerp(TUNE.sw[0], TUNE.sw[1], t), cd: lerp(TUNE.cd[0], TUNE.cd[1], t), st: lerp(TUNE.st[0], TUNE.st[1], t), dmg: dmgK(lv) }; }
+  const dmgK = lv => (lv == null && WX()) ? WpnX.m().dmg : lerp(TUNE.dmg[0], TUNE.dmg[1], tOf(lv, TUNE.dmgLv));
   const tempo = lv => m(lv).cd; // 兼容旧调用
   const earlyDmg = P => dmgK(); // 兼容旧调用（foe_abs.power / wpnspec）：现在按熟练度（等级）而不是战力
   function stage(lv) { lv = lv || curLv(); let k = 0; for (let i = 0; i < STAGES.length; i++) if (lv >= STAGES[i][0]) k = i; const L = lang(); return { i: k, name: STAGES[k][1][L], names: STAGES[k][1], next: STAGES[k + 1] ? STAGES[k + 1][0] : 0 }; }
-  function label(lv) { const a = m(lv), L = lang(), s = stage(lv), p = x => (x >= 1 ? '×' + x.toFixed(1) : '×' + x.toFixed(2)); const T = { zh: `武技熟练：${s.name}　前摇 ${p(a.wu)} · 收招 ${p(a.cd)} · 伤害 ${Math.round(a.dmg * 100)}%`, ja: `武技熟練：${s.name}　予備動作 ${p(a.wu)} · 硬直 ${p(a.cd)} · ダメージ ${Math.round(a.dmg * 100)}%`, en: `Weapon mastery: ${s.name}  windup ${p(a.wu)} · recovery ${p(a.cd)} · damage ${Math.round(a.dmg * 100)}%` }; return T[L]; }
+  function label(lv) { if (lv == null && WX()) return WpnX.label(); const a = m(lv), L = lang(), s = stage(lv), p = x => (x >= 1 ? '×' + x.toFixed(1) : '×' + x.toFixed(2)); const T = { zh: `武技熟练：${s.name}　前摇 ${p(a.wu)} · 收招 ${p(a.cd)} · 伤害 ${Math.round(a.dmg * 100)}%`, ja: `武技熟練：${s.name}　予備動作 ${p(a.wu)} · 硬直 ${p(a.cd)} · ダメージ ${Math.round(a.dmg * 100)}%`, en: `Weapon mastery: ${s.name}  windup ${p(a.wu)} · recovery ${p(a.cd)} · damage ${Math.round(a.dmg * 100)}%` }; return T[L]; }
 
   // ===== 武技熟练度卡片（Tab → 总览 顶部）：大印章 + 五境界路线 + 四条大进度条。样式见 css/mastery.css =====
   const COLS = ['#a79a86', '#86d07f', '#6fb8ff', '#c08cff', '#ffcf6a'];
@@ -35,6 +36,7 @@ window.Balance = (() => {
     en: { t: 'WEAPON MASTERY', lv: 'Lv', nx: n => `Reach Lv.${n} for the next rank`, top: 'Master rank · full mastery at Lv.30', bars: ['Windup speed', 'Recovery speed', 'Stamina economy', 'Damage dealt'], note: ['Shorter wind-up = faster strikes', 'Recover faster after each swing', 'Each swing costs less stamina', 'Versus full mastery'], tip: 'Level up to get faster swings, shorter windup & recovery, and more damage.', of: 'full mastery' }
   };
   function card(lv) {
+    if (lv == null && WX()) return WpnX.card();
     lv = lv || curLv(); const L = lang(), X = TXT[L], a = m(lv), s = stage(lv), c = COLS[s.i], cur = STAGES[s.i][0], nxt = s.next, prog = nxt ? clamp((lv - cur) / (nxt - cur), 0, 1) : 1;
     const M0 = m(TUNE.mLv), ratings = [M0.wu / a.wu, M0.cd / a.cd, M0.st / a.st, a.dmg / M0.dmg].map(v => clamp(v, 0, 1));
     const vals = [a.wu, a.cd, a.st, a.dmg], mv = [M0.wu, M0.cd, M0.st, M0.dmg];
@@ -66,10 +68,10 @@ window.Balance = (() => {
   }
   let lastStage = -1;
   function frame() {
-    const S = window.G && G.S; if (!S) return; if (S.balV !== 41 && on()) migrate(S); if (!on()) return;
+    const S = window.G && G.S; if (!S) return; if (S.balV !== 41 && on()) migrate(S); if (!on() || WX()) return; /* R41主管：单武器熟练度的晋升横幅由 wpnx.js 发 */
     const st = stage(RPG.lvOf(S.xp).lv); if (lastStage < 0) { lastStage = st.i; return; }
     if (st.i > lastStage) { lastStage = st.i; const L = lang(); try { banner(st, L); } catch (e) { } } else lastStage = st.i;
   }
   const wait = setInterval(() => { if (window.G && G.HOOK && G.S) { clearInterval(wait); G.HOOK.frame.push(frame); } }, 500);
-  return { card, TUNE, STAGES, on, m, dmgK, tempo, earlyDmg, stage, label, foeDmgK, need, xpK, migrate };
+  return { banner, card, TUNE, STAGES, on, m, dmgK, tempo, earlyDmg, stage, label, foeDmgK, need, xpK, migrate };
 })();

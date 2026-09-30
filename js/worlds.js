@@ -584,12 +584,12 @@ window.Worlds = (() => {
         if (CS && CS.rmb && !h.unblock && guardFacing(fo.pos)) { // R34：h.unblock = 破防技，格挡无效（只能闪身/躲开）
           const gA = CS.gAng, diff = h.thrust ? 0 : Math.abs(Math.atan2(Math.sin(gA - h.ang), Math.cos(gA - h.ang)));
           const aligned = diff < 0.7, partial = diff < 1.25;
-          const pressed = CS.guardT && now - CS.guardT < 0.3, swung = aligned && !h.thrust && Combat.guardWas(0.25, h.ang) > 1.0; // 刚按下 / 最后一刻转对方向
+          const WPb = window.WpnX ? WpnX.pf() : null, pressed = CS.guardT && now - CS.guardT < 0.3 * (WPb ? WPb.par : 1), swung = aligned && !h.thrust && Combat.guardWas(0.25, h.ang) > 1.0; // 刚按下 / 最后一刻转对方向
           if (aligned && (pressed || swung)) { // 完美格挡（重击也能弹）
             G.toast && G.toast('⚔️ 完美格挡！她露出了破绽——砍脖子或按 E 处决', '#ffe070', 1.8); SFX.play && SFX.play('bell', 0.6, 1.8); SFX.thud && SFX.thud(1); W.shake = Math.max(W.shake || 0, 0.3);
             Foe.spark(tip, 30); G.flash && G.flash('#fff6c0', 0.35, 160); Foe.parried(fo); foeEvent('parry', fo); return; }
           if (h.heavy) { n = Math.round(n * 0.75); CS.stam = 0; G.toast && G.toast('🟧 重击挡不住！要么完美格挡，要么按 Q 闪开', '#ffb060', 1.6); SFX.thud && SFX.thud(1); W.shake = Math.max(W.shake || 0, 0.45); }
-          else if (aligned && CS.stam > 0) { n = Math.round(n * (h.thrust ? 0.35 : 0.1)); CS.stam = Math.max(0, CS.stam - 14); Foe.spark(tip, 14); SFX.play && SFX.play('bell', 0.3, 2.3); SFX.thud && SFX.thud(0.8); fo.stag = fo.boss ? 0.3 : 0.45; foeEvent('guard', fo); }
+          else if (aligned && CS.stam > 0) { n = Math.round(n * (h.thrust ? 0.35 : 0.1)); CS.stam = Math.max(0, CS.stam - 14 * (WPb ? WPb.bst : 1)); Foe.spark(tip, 14); SFX.play && SFX.play('bell', 0.3, 2.3); SFX.thud && SFX.thud(0.8); fo.stag = fo.boss ? 0.3 : 0.45; foeEvent('guard', fo); }
           else if (partial) { n = Math.round(n * 0.5); Foe.spark(tip, 5); G.toast && G.toast('🛡️ 格挡偏了', '#cfe0ff', 0.7); }
           else { G.toast && G.toast('❌ 格挡方向错了！', '#ff9080', 0.8); G.flash && G.flash('#a00000', 0.4, 280); W.shake = Math.max(W.shake || 0, 0.25); }
         } else { G.flash && G.flash('#a00000', 0.4, 280); W.shake = Math.max(W.shake || 0, fo.boss ? 0.5 : 0.25); }
@@ -631,7 +631,7 @@ window.Worlds = (() => {
   //   现在：声明单独成行；整个事件处理包 try/catch——音效/日志/成就里的任何 bug 都不能再打断伤害结算。
   function foeEvent(t, fo, d) { try { foeEvent0(t, fo, d); } catch (e) { console.warn('foeEvent', t, e); } }
   function foeEvent0(t, fo, d) {
-    if (!W) return; if (window.Talents) { try { Talents.onEvent(t, fo, d); } catch (e) { console.warn('Talents', e); } } /* R36 天赋事件（吸血/魂能/暴击联动） */ if (window.Recall) { try { Recall.log(fo, t, d); } catch (e) { console.warn(e); } } if (window.CombatFX) { try { CombatFX.event(t, fo, d); } catch (e) { console.warn(e); } } // 第二十二轮（续 9）：命中/击杀/格挡音效 + 命中准星
+    if (!W) return; if (window.WpnX) { try { WpnX.onEvent(t, fo, d); } catch (e) { } } /* R41主管：单武器熟练度经验 */ if (window.Talents) { try { Talents.onEvent(t, fo, d); } catch (e) { console.warn('Talents', e); } } /* R36 天赋事件（吸血/魂能/暴击联动） */ if (window.Recall) { try { Recall.log(fo, t, d); } catch (e) { console.warn(e); } } if (window.CombatFX) { try { CombatFX.event(t, fo, d); } catch (e) { console.warn(e); } } // 第二十二轮（续 9）：命中/击杀/格挡音效 + 命中准星
     const now = performance.now() / 1000, st = W.stats = W.stats || { kill: 0, decap: 0, execute: 0, onecut: 0, sever: 0, halve: 0, parry: 0, combo: 0, maxCombo: 0, lastHit: 0, kills: [] };
     if (t === 'hit') { st.combo = now - st.lastHit < 2.5 ? st.combo + 1 : 1; st.lastHit = now; st.maxCombo = Math.max(st.maxCombo, st.combo); showCombo(st.combo, d && d.brk); if (st.combo >= 10) achAdd('combo', st.combo, true); return; }
     const rw = REW[t]; if (rw) { const tm = window.Talents ? Talents.rewardMul(fo) : { c: 1, x: 1 }, mul = 1 + (fo.rar || 0) * 0.5 + (fo.boss ? 3 : 0), c = Math.round(rw[0] * mul * (1 + Math.min(1, st.combo / 20)) * tm.c); G.addCoins(c); W.trip.coins += c; gainXp(Math.max(1, Math.round(rw[0] * mul * 0.8 * tm.x)));
