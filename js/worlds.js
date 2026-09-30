@@ -547,7 +547,7 @@ window.Worlds = (() => {
         if (type === 'block' && window.Combat) { Combat.recoil(1); G.toast && G.toast('🛡️ 被她挡住了——换个方向砍，或蓄力重斩破防', '#9fd0ff', 1.1); } if (type === 'break') { W.shake = Math.max(W.shake || 0, 0.35); G.toast && G.toast('💥 破防！', '#9fd0ff', 1.1); } },
       power: (fo) => { const q = G.st().power / ((fo.boss ? node.loc.rec * (fo.boss.pow || 2) : node.loc.rec * [0.7, 0.9, 1.15, 1.5, 2.1][fo.rar])); return Math.pow(clamp(q, 0.25, 3), 0.7) * (window.Sack ? Sack.dmgMul() : 1); },
       hitPlayer: (fo, n, h = {}) => { const s = G.st(); n = Math.max(1, Math.round(n * (1 - s.dodge * 0.5) * (1 - Math.min(0.5, s.def / (s.def + 300)))));
-        const now = performance.now() / 1000, CS = window.Combat && Combat.drawn && Combat.state;
+        const now = performance.now() / 1000, CS = window.Combat && Combat.drawn && !(window.Stamina && Stamina.ex) && Combat.state; // 力竭：格挡失效
         // 闪身无敌帧
         if (W.dodgeT > now) { const perfect = now - W.dodgeAt < 0.22; if (perfect) { W.shake = Math.max(W.shake || 0, 0.25); fo.broken = Math.max(fo.broken || 0, 1.1); fo.stag = Math.max(fo.stag || 0, 0.9); G.toast && G.toast('💨 完美闪避！她露出了破绽', '#c8f0ff', 1.4); foeEvent('perfectdodge', fo); } else foeEvent('dodge', fo); return; }
         const tip = CS && CS.lastTip ? CS.lastTip.clone() : W.pos.clone().add(new V3(0, 1.3, 0));
@@ -807,12 +807,16 @@ window.Worlds = (() => {
       // 第二十一轮：疾跑消耗体力（14/秒），耗尽后要恢复到 35 才能再跑 —— 敌人因此追得上
       if (W.run == null) W.run = 100; const wantRun = (K.ShiftLeft || K.ShiftRight) && P.crouch < 0.5 && (f || s); if (!(!window.Mods || Mods.on('sprint_stamina'))) { W.run = 100; W.runTired = false; }
       if (wantRun && !W.runTired) { W.run -= dt * ((!window.Mods || Mods.on('sprint_stamina')) ? 14 : 0); if (W.run <= 0) { W.run = 0; W.runTired = true; G.toast && G.toast('😮‍💨 跑不动了……', '#ffcf9a', 1.2); } } else { W.run = Math.min(100, W.run + dt * (wantRun ? 6 : 18)); if (W.runTired && W.run > 35) W.runTired = false; }
-      const sp = (wantRun && !W.runTired ? 6.2 : W.runTired ? 3.1 : 3.6) * (1 - 0.55 * P.crouch);
+      let sp = (wantRun && !W.runTired ? 6.2 : W.runTired ? 3.1 : 3.6) * (1 - 0.55 * P.crouch);
+      if (window.Stamina && Stamina.on) { // 第二十五轮：统一体力（攻击/防御/移动/奔跑/跳跃/闪避共用一条）
+        const alert = Foe.foes.some(fo => fo.seen && !fo.dead && Math.hypot(fo.pos.x - W.pos.x, fo.pos.z - W.pos.z) < 16);
+        const ex = Stamina.tick(dt, { moving: !!(f || s), run: wantRun, crouch: P.crouch, alert }); W.run = Stamina.val(); W.runTired = Stamina.ex;
+        sp = ex ? ex : (wantRun ? 6.2 : 3.6) * (1 - 0.55 * P.crouch); }
       runBar();
       fw.set(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)); rt.set(Math.cos(P.yaw), 0, -Math.sin(P.yaw));
       want.copy(fw).multiplyScalar(f).addScaledVector(rt, s); if (want.lengthSq() > 0) want.normalize().multiplyScalar(sp);
       if (W.dashT > 0) { W.dashT -= dt; W.vel.x = W.dashV.x; W.vel.z = W.dashV.z; } else { W.vel.x += (want.x - W.vel.x) * Math.min(1, dt * 10); W.vel.z += (want.z - W.vel.z) * Math.min(1, dt * 10); }
-      if (K.Space && W.onGround && P.crouch < 0.3) { W.vel.y = 4.4; W.onGround = false; }
+      if (K.Space && W.onGround && P.crouch < 0.3 && (!window.Stamina || Stamina.canJump())) { W.vel.y = 4.4; W.onGround = false; }
     } else { W.vel.x *= 0.8; W.vel.z *= 0.8; }
     W.vel.y -= 14 * dt; W.pos.addScaledVector(W.vel, dt);
     // 碰撞：边界圆 + 物体圆
@@ -1044,7 +1048,7 @@ window.Worlds = (() => {
     const bo = W.boss; if (bo) DOM.boss.querySelector('.bn').innerHTML = `👑 ${esc(bo.B.title)} · ${esc(bo.B.n)}`; DOM.boss.style.display = 'none';
   }
   function runBar() { let b = document.getElementById('wRun'); if (!b) { b = document.createElement('div'); b.id = 'wRun'; b.style.cssText = 'position:fixed;left:50%;bottom:74px;transform:translateX(-50%);width:180px;height:4px;border-radius:2px;background:rgba(0,0,0,.5);z-index:20;pointer-events:none;transition:opacity .3s'; b.innerHTML = '<i style="display:block;height:100%;border-radius:2px;background:#8fe08a"></i>'; document.body.appendChild(b); }
-    const w = Math.round(W.run); if (w !== W.runW) { W.runW = w; b.firstChild.style.width = w + '%'; b.firstChild.style.background = W.runTired ? '#e07a5a' : '#8fe08a'; b.style.opacity = w >= 100 ? 0 : 1; } }
+    const w = Math.round(W.run); if (w !== W.runW) { W.runW = w; b.firstChild.style.width = w + '%'; b.firstChild.style.background = W.runTired ? '#e07a5a' : '#8fe08a'; b.style.opacity = w >= 100 || (window.Combat && Combat.drawn) ? 0 : 1; } }
   function hud() {
     if (!W || !W.B || !DOM) return; const node = W.graph.nodes[W.cur], st = STYLES[node.style], s = G.st();
     setT(DOM.tn || (DOM.tn = DOM.top.querySelector('.n')), node.name); setT(DOM.ts || (DOM.ts = DOM.top.querySelector('.s')), `${node.loc.icon} ${node.loc.n} · ${st.n}${LAYOUTS[layOf(node)] ? ' · ' + LAYOUTS[layOf(node)].n : ''} · ${SIZES[node.size].n} · 已探索 ${W.graph.nodes.filter(n => n.visited).length}/${W.graph.nodes.length}`);

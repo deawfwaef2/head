@@ -1060,3 +1060,11 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 未做：SKIN_FIX 精调（新身体用默认 LIFT）；古铜肤色时手部略偏橙，可用 calib 流程补。
 - 追加 big/body/Osage.js（おさげちゃん_mate2 浴衣，Iwashi，VRoid Hub 许可全允许，源 josephrocca/ChatVRM-js）。材质被合并成 FACE+SKIN 两个（头发、衣服在 SKIN 图集里）→ 不进 TINT；头模也不收（vrm2head 拿不到头发，脸是通用 VRoid 脸）。同仓库另一个 Whingles 禁止改造，已排除。
 - 已排查不收的来源：VIPE Heroes（Q 版大头街头风，与黑暗奇幻不搭）、AITuberKit 的 nikechan（有另行的二创规约）、openSizebox（LFS 指针/受限）。
+
+## 第二十五轮（Arena UI Agent）：统一体力系统（MOD `stamina_all`，默认开）
+用户原话：“战斗时体力系统就是你攻击防御移动跑步什么都要体力，体力耗光反正反馈然后什么事情也做不了。”
+- 新文件 `js/stamina.js`（`window.Stamina`）：体力池仍是 `Combat.state.stam`（不另建）。`Stamina.spend(n,kind)` 够（≥需要的 30%）就扣，不够 → **力竭**；`Stamina.tick(dt,{moving,run,crouch,alert})` 由 `worlds.js` frame 每帧调用（奔跑 15/s，举盾格挡 5/s，战斗中走位 0.9/s；停手 0.45s 后回复，站定 28/s、走动 9~17/s）。
+- 花费：挥砍 11（蓄力 18）、刺击 9、跳跃 13、闪身 22（`Combat.useStam` 已统一）、战吼/旋风斩走 `useStam`；挡刀仍扣 14。
+- **力竭**：挥砍/刺击/格挡（`worlds.js hitPlayer` 里 CS=null → 完全不能挡）/奔跑/跳跃/闪身/战吼全部失效，只能 1.5 m/s 慢走；刀垂下；全屏红黑暗角脉动 + “力 竭”字 + 喘息声（`CombatFX.stamina`）+ 屏震；歇 0.8s 后开始恢复，回到 30 才解除（约 2.8s）。
+- 原来的两条池子（`W.run` 疾跑、`S.stam` 战斗）合并：`W.run` 现在只是 `Stamina.val()` 的镜像，拔刀时隐藏底部疾跑条（用战斗条）。原来的“握刀 +28/s、举盾 +6/s 回体力”在 MOD 开启时关闭。
+- 关掉 MOD 即回到旧行为（`Mods.on('stamina_all')===false`）。node 测试：连挥 9 下力竭，冲刺 6.7s 力竭，力竭后 2.8s 恢复。
