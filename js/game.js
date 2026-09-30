@@ -379,6 +379,25 @@ window.startGame = function () {
   });
   document.addEventListener('pointerlockerror', () => lockFailed());
   function setUI(open) { uiOpen = open; if (open) { if (document.pointerLockElement) document.exitPointerLock(); } }
+  // R37（用户：“有时候鼠标出现之后点不回去游戏了，没法按 ESC 也没法锁定鼠标”）——鼠标找回：
+  //  1) 游戏中（playing 且没开 UI）鼠标没被锁定 → 屏幕下方常驻提示“点击画面回到游戏”，任意位置按下（不是按钮/输入框）就重新锁定；
+  //  2) 某个面板异常退出导致 uiOpen 卡死：按 ESC（250ms 后屏幕中心是画面而不是面板）或连点画面 3 次 → 强制复位 uiOpen 并重新锁定；
+  //  3) Esc 被浏览器吞掉、Chrome 要求“用户手势”才能再次 requestPointerLock：所以一律用 mousedown 手势重试。
+  const relockNeeded = () => playing && !uiOpen && !noLock && !locked && !document.pointerLockElement && !film;
+  { const hint = document.createElement('div'); hint.id = 'relockHint'; hint.textContent = '🖱️ 鼠标已释放 — 点击画面回到游戏';
+    hint.style.cssText = 'position:fixed;left:50%;bottom:9vh;transform:translateX(-50%);z-index:99999;padding:10px 22px;border-radius:999px;background:rgba(20,10,10,.82);border:1px solid #ffcf80;color:#ffe2a8;font:600 16px/1.2 system-ui,sans-serif;pointer-events:none;display:none;box-shadow:0 4px 24px #000a';
+    document.body.appendChild(hint); setInterval(() => { const d = relockNeeded() ? 'block' : 'none'; if (hint.style.display !== d) hint.style.display = d; }, 250); }
+  let stuckClicks = [];
+  const unstick = (why) => { if (!uiOpen) return false; uiOpen = false; lockRetry = true; try { toast('🖱️ ' + (why || '界面已复位') + ' — 点一下画面锁定鼠标'); } catch (e) {} return true; };
+  document.addEventListener('mousedown', e => {
+    if (e.target === canvas && uiOpen && playing) { const n = performance.now(); stuckClicks = stuckClicks.filter(t => n - t < 2500); stuckClicks.push(n); if (stuckClicks.length >= 3) { stuckClicks = []; unstick('检测到界面卡住'); } return; }
+    if (!relockNeeded()) return; const t = e.target; if (t && t.closest && t.closest('button,a,input,select,textarea,label,[data-act],[contenteditable]')) return;
+    lockRetry = true; if (e.target !== canvas) { try { lockPointer(); } catch (err) {} }
+  }, true);
+  document.addEventListener('keydown', e => {
+    if (e.code !== 'Escape' || !uiOpen || !playing) return;
+    setTimeout(() => { if (!uiOpen) return; const top = (document.elementsFromPoint ? document.elementsFromPoint(innerWidth / 2, innerHeight / 2) : [])[0]; if (!top || top === canvas || top === document.body || top === document.documentElement || top.id === 'relockHint') unstick('界面已复位'); }, 250);
+  }, false);
   let dragLook = false, dragMoved = 0, mouseDown = false;
   document.addEventListener('mousemove', e => {
     if (!playing || uiOpen) return;
@@ -1376,7 +1395,7 @@ window.startGame = function () {
     hasAff, yieldOf, xpMul, headBonus, exhibit, codexInfo, daily, DAILY, bounties, rerollBounties, EX_T, fmtN, S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
     save, wipe, setUI, lockPointer, spawnReturnHeads, addHeadRecs, createReturnBag, usedSig, usedNames, headOf, removeHead, refreshWeapon, burst, get cave() { return cave; },
     post, lod, get lodStat() { return lodStat; }, startHP, confirmHP, cancelHP, updateHP, get hplace() { return hplace; }, storeHead, takeOut, storeLoose, vaultCount, MAX_HEADS, VAULT_MAX, HOOK, rebuildHead, floatText, spawnBeam, gachaCard, lookHit, unmount, soulWisp, trigger, SAVE_KEY, get clock() { return clock; }, get held() { return held; }, set held(v) { held = v; }, get keys() { return keys; }, get cine() { return cine; }, setUIOpen: v => setUI(v),
-    get playing() { return playing; }, get uiOpen() { return uiOpen; }, vm, get weapon() { return weaponMesh; }, fist, get held() { return held; }, renderer, camera, scene, poke, mountHead, createHead, addBuild
+    get playing() { return playing; }, get uiOpen() { return uiOpen; }, unstick, relockNeeded, vm, get weapon() { return weaponMesh; }, fist, get held() { return held; }, renderer, camera, scene, poke, mountHead, createHead, addBuild
   };
   window.__game = G;
   if (window.Play) try { Play.init(); } catch (e) { console.warn('Play.init', e); }
