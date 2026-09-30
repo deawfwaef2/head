@@ -717,9 +717,9 @@ window.ModelHeads = (() => {
     return { t: T.n, ew: q(u(T.ew)), eh: q(u(T.eh)), tilt: q(u(T.tilt)), sp: q(u(T.sp)), dy: q(u(T.dy)), bs: q(u(T.bs)), bt: q(u(T.bt)), bdy: q(u(T.bdy)), fx: q(u(T.fx)), fy: q(u(T.fy)), fz: q(u(T.fz)) };
   }
   /* R31 MOD head_qc：逐个目检后仍然怪异、暂不能修的头模（八云紫 PMD 脸皮与全身同一材质→发白发光；黑鸟 帽子整个盖住脸），不进随机池/混发池；已存档的头照常显示 */
-  const QC_BAD = ['CLS_YakumoYukari', 'NTE_Blackbird'];
+  const QC_BAD = ['CLS_YakumoYukari', 'NTE_Blackbird', 'HairSample_Male', 'Sakurada_Fumiriya']; // R43b：男头（敌人/猎物都是女性设定，男头接女身体像大头娃娃）一并屏蔽
   const qcBad = (i) => !!(T[i] && QC_BAD.includes(T[i].meta.file) && window.Mods && Mods.on('head_qc'));
-  const OK = (i) => !!T[i] && (!window.CC0 || CC0.okHead(T[i].meta.file)); // R38 CC0 模式：只用 CC0 模型
+  const OK = (i) => !!T[i] && !qcBad(i) && (!window.CC0 || CC0.okHead(T[i].meta.file)); // R38 CC0 模式：只用 CC0 模型
   const okList = () => { const a = T.map((t, i) => i).filter(OK); return a.length ? a : T.map((t, i) => i); };
   function randomLook(r, race = {}, rarity = 0) {
     let faceIdx = race.faces ? Math.max(0, idxOf(pick(r, race.faces))) : tierFace(r(), rarity); // 第二十五轮 MOD tier_look：按魂阶加权挑脸模

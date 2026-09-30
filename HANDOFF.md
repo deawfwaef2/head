@@ -1749,3 +1749,13 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 新 MOD `world_cel`（默认关）：全局 ShaderChunk.lights_fragment_end 追加块，只作用于非角色 MeshStandardMaterial：阴影边缘收硬、阴影染天空色、亮面略平。
 - heads.js：inject 多传 head 参数、cache key 用 `CharLight.key()`。mods.js / mods_i18n.js：6 个新条目。
 - world.html 测试：`?cldbg=1` 着色调试（R=太阳受光 G=明暗带 B=点光占比）、`nopt:1` 关点光、`sa`/`se` 太阳方位/仰角（相对相机方向）、`fi` 选人。
+
+## R48（CC0 默认重新打开 / 男头全部屏蔽 / Quaternius 职业服身体）
+用户原话：「算了还是得CC0」「真有大头娃娃，一些男性角色模型」「动用一切手段在网上找合适的模型，不限于 CC0」。ask_user 结论：① CC0 模式默认**开**，在线找模型不限 CC0，非 CC0 的放进“非 CC0 包”（只在关 CC0 时出现）；② 随机头池**删光所有男头**（不许男头接女身体）。
+- **CC0 默认开**：`mods.js` `cc0_only` def true + 迁移 `__v<12`（把 R47c 的 false 改回 true，一次性）。名称/说明（zh/en/ja）同步。**非 CC0 包 = 原有 24 具 remote 身体 + MMD 头包**：关 CC0 时走 R47c 的 IDENT/VB 逻辑（未改）；本轮新增的 Q_* 身体目前只在 CC0 开时按身份指派（`id_outfit`）。
+- **男头**：`heads.js` `QC_BAD` += `HairSample_Male`、`Sakurada_Fumiriya`（MOD `head_qc`），并且 `OK(i)` 现在也排除 `qcBad`，所以**旧存档里的男头也会按种子换成女头**。300 次随机 look 抽样：0 个男头。另：`foe.js` `head_natural` 下把头的皮肤包围盒高度夹到 ≤0.272m（Vivi/Vita/Victoria 脸比别的高 ~8%）。
+- **新身体（CC0，Quaternius，remote-only `big/body/Q_*.js`，共 ~7MB）**：`Q_Witch / Q_Medieval / Q_Adventurer / Q_Formal / Q_Soldier`（Ultimate Modular Women，低多边形纯色）+ `Q_Ranger / Q_Peasant`（Modular Character Outfits Fantasy 免费版，带贴图，质量最好）。`tools/glb2body.py`：注入 VRMC_vrm.humanoid 后调 `vrm2body.py`（删头、封颈、H_ 骨名）；Modular Women 是 IK 骨架（大腿在 Body 下、脚在 Root 下）→ 转换时把 UpperLeg 重挂到 Hips、Foot 重挂到 LowerLeg（保持静止世界矩阵），否则 UAL 动画下腿会拉成“面条”；`PT*` 是极向量目标，不是脚趾，别映射。
+- **身份→身体（`foe.js` `OUTFIT`，仅 CC0 开）**：Q_Witch=witch/hexer/covenlady/bogwitch/alchemist；Q_Ranger=huntress/ranger/archer/falconer；Q_Adventurer=merc/dragonslayer/catthief；Q_Medieval（黑甲+肩甲+背剑）=knight/paladin/general/dragonknight/inquisitor/fallen/assassin/shadow；Q_Soldier=guard；Q_Peasant=villager/shepherd/herbalist；Q_Formal（绿裙）=barmaid；Vita / Victoria_Rubin / Darkness_Shibu / HairSample_Female 留给其余身份（贵族、圣职、宫廷法师、修女…）。Boss：forest→Q_Ranger，wilds→Q_Adventurer，swamp→Q_Witch，fortress→Q_Medieval。`cc0mode.js` 新增 `QB`（只进 `okBody`，不进随机后备池 `BODIES`）。`foe.js`：`Q_` 纯色身体的皮肤材质直接染成头肤色。
+- **否决**（见 CREDITS.md）：Ultimate Animated Characters 女性（~1.35m Q 版）、AvatarSample_E（1.17m 幼态）/F/G（同 Vita 款）、Kenney 迷你、Quaternius RPG Characters（Q 版）。Modular Fantasy 的 Noble/Wizard/Knight 在付费版（$20），免费版只有 Ranger/Peasant。
+- **没找到**：合适的 骑士/修女/公主/女王 CC0 身体（骑士暂用 Q_Medieval 黑甲风，其余仍用 pixiv 裙装）。非 CC0 方向（VRoid Hub/Booth/Sketchfab）要登录或付费，未下载。
+- 风格提醒：Q_* 低模（尤其 Modular Women）与动漫头有画风差，这是用户要“职业服贴身份”的取舍；`Q_Ranger/Q_Peasant` 较协调。未验证：真实游戏里的帧率/全流程（只在 fight/heads_fit 台里看过静态与 UAL 动画姿态）。

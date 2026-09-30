@@ -132,3 +132,10 @@ models/CLS_*.js，由 js/headpacks.js 按 MOD pack_voc / pack_touhou / pack_cls 
 |---|---|---|---|
 | `models/Sakurada_Fumiriya.js` | Sakurada Fumiriya（櫻田文里弥） | pixiv Inc.，CC0（VRM 内嵌 licenseName=CC0；源 madjin/vrm-samples vroid/beta） | 可公开分发 |
 | `models/HairSample_Male.js` | HairSample_Male | pixiv Inc.，CC0（pixiv 官方 FAQ 列为 CC0；源同上） | 可公开分发 |
+
+## R43b（R48 轮）：Quaternius CC0 职业服身体（big/body/Q_*.js，仅远程）
+| 文件 | 来源 | 作者 / 许可 | 备注 |
+|---|---|---|---|
+| `big/body/Q_Witch / Q_Medieval / Q_Adventurer / Q_Formal / Q_Soldier` | Ultimate Modular Women Pack（quaternius.com，经 Cinevva 镜像 cdn.cinevva.com/assets/packs/quaternius/ultimate-modular-women/） | Quaternius，CC0 | 自带头已删，换动漫头；`tools/glb2body.py` 转换（IK 骨架重挂到 FK） |
+| `big/body/Q_Ranger / Q_Peasant` | Modular Character Outfits – Fantasy [Standard]（quaternius.itch.io，免费版 Female_Ranger / Female_Peasant） | Quaternius，CC0（License_Standard.txt） | 只取 baseColor 贴图（1024 WebP）；兜帽随头删除 |
+- 尝试并否决：Ultimate Animated Characters 的 *_Female（Knight_Golden/Viking/Pirate/Soldier/BlueSoldier/Cowboy，身高 ~1.35m、Q 版粗短，像大头娃娃）；pixiv AvatarSample_E（身高 1.17m 幼态）/F/G（与已有 Vita 系同款）；Kenney 迷你角色（Q 版）；Quaternius RPG Characters（Q 版）。

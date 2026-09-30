@@ -7,7 +7,8 @@
 window.CC0 = (() => {
   const HEADS = ['Sendagaya_Shino', 'Sendagaya_Shibu', 'Darkness_Shibu', 'Vivi', 'Vita', 'Victoria_Rubin', 'HairSample_Female', 'AvatarSample_D_Darkness', 'Base_Female', 'Sakurada_Fumiriya', 'HairSample_Male']; // R40：+2 个 pixiv CC0 男性头（身体未接入，见 HANDOFF R40）
   const BODIES = ['Vita', 'Victoria_Rubin', 'Darkness_Shibu', 'HairSample_Female'];
-  const HS = new Set(HEADS), BS = new Set(BODIES);
+  const QB = ['Q_Ranger', 'Q_Peasant', 'Q_Witch', 'Q_Medieval', 'Q_Adventurer', 'Q_Formal', 'Q_Soldier']; // R43b：Quaternius「Ultimate Modular Women」（CC0）低多边形身体，头换成动漫头；只按身份(OUTFIT)指定，不进随机后备池
+  const HS = new Set(HEADS), BS = new Set(BODIES.concat(QB));
   const on = () => { try { return !window.Mods || !Mods.on || Mods.on('cc0_only') !== false; } catch (e) { return true; } };
   const hash = (s) => { let h = 2166136261; s = String(s); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
   function okHead(file) { return !on() || HS.has(file); }
@@ -17,5 +18,5 @@ window.CC0 = (() => {
     const have = BODIES.filter(b => !window.BODY_LIST || BODY_LIST.includes(b)); const L = have.length ? have : BODIES;
     return L[hash(name + '|' + (seed || 0)) % L.length];
   }
-  return { on, okHead, okBody, body, hash, HEADS, BODIES };
+  return { on, okHead, okBody, body, hash, HEADS, BODIES, QB };
 })();

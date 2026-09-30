@@ -93,9 +93,14 @@ window.Foe = (() => {
       const k = bc ? [hc.r / bc.r, hc.g / bc.g, hc.b / bc.b] : (sk ? [sk.x, sk.y, sk.z] : [1, 1, 1]);
       root.traverse(o => { if (o.isMesh && o.material && o.material.userData && o.material.userData.skin) o.material.color.setRGB(Math.min(1.6, k[0]) * (T.gain || 1), Math.min(1.6, k[1]) * (T.gain || 1), Math.min(1.6, k[2]) * (T.gain || 1)); });
     }
+    if (/^Q_/.test(bodyName) && look.skinHex) { // R43b：Quaternius 纯色材质身体——皮肤材质直接染成头的肤色（脖子/手/腿与脸一致）
+      const hc = new THREE.Color(look.skinHex).convertSRGBToLinear();
+      root.traverse(o => { if (o.isMesh && o.material && o.material.userData && o.material.userData.skin) o.material.color.copy(hc); });
+    }
     // 挂头：静止姿势下算好相对 H_head 的偏移
     root.updateMatrixWorld(true);
     const fit = headFit(E), headBone = bones.head;
+    if (window.Mods && Mods.on('head_natural')) { try { const bb = new THREE.Box3(); hb.group.updateMatrixWorld(true); hb.group.traverse(o => { if (o.isMesh && o.userData.kind === 'skin') bb.expandByObject(o); }); const hH = bb.max.y - bb.min.y; if (hH > 0.05 && hH < 1) fit.s = Math.min(fit.s, 0.272 / hH); } catch (e) {} } // R43b：个别头模（Vivi/Vita/Victoria）脸比别的高 8%，再压到同一上限，避免偶发大头娃娃
     const holder = new THREE.Group(); holder.name = 'headHolder';
     const want = new M4().compose(fit.pos, new Q(), new V3(1, 1, 1));
     const inv = new M4().copy(root.matrixWorld).invert().multiply(headBone.matrixWorld).invert(); // 身体根空间 → 头骨局部
@@ -209,12 +214,20 @@ window.Foe = (() => {
   }
   // R43 MOD id_outfit：CC0 模式只有 4 具身体，以前按哈希乱分——修女穿魔女裙、骑士穿公主裙。现在按“身份 → 衣服风格”固定分：
   //   Vita = 冒险/战斗装（青黑短裙+绑带）  Victoria_Rubin = 贵族/圣职礼裙（粉白荷叶边）  Darkness_Shibu = 暗色/神秘长裙（深蓝）  HairSample_Female = 平民/素净白裙
-  const OUTFIT = { Vita: ['huntress', 'ranger', 'archer', 'falconer', 'catthief', 'wolfwarrior', 'chieftess', 'smithgirl', 'engineer', 'merc', 'crossbow', 'assassin', 'shadow', 'guard', 'knight', 'paladin', 'general', 'dragonknight', 'dragonslayer', 'inquisitor', 'fallen', 'bard'],
+  const OUTFIT = { Vita: ['smithgirl', 'engineer', 'bard', 'crossbow', 'chieftess', 'wolfwarrior'],
     Victoria_Rubin: ['princess', 'lady', 'queen', 'countess', 'duchess', 'elfprincess', 'singer', 'musician', 'choir', 'saint', 'archangel', 'moonpriest', 'abbess', 'avatar', 'dragonmiko', 'foxmiko', 'dragonprincess'],
-    Darkness_Shibu: ['witch', 'hexer', 'covenlady', 'bogwitch', 'courtmage', 'abyssqueen', 'alchemist', 'succubus', 'shaman'],
-    HairSample_Female: ['villager', 'shepherd', 'barmaid', 'herbalist', 'novice', 'medic', 'druid', 'nun'] };
+    Darkness_Shibu: ['courtmage', 'abyssqueen', 'succubus', 'shaman'],
+    HairSample_Female: ['novice', 'medic', 'druid', 'nun'],
+    // R43b：Quaternius CC0 低模身体（头换成动漫头），按身份穿真正的职业服
+    Q_Witch: ['witch', 'hexer', 'covenlady', 'bogwitch', 'alchemist'],
+    Q_Ranger: ['huntress', 'ranger', 'archer', 'falconer'],
+    Q_Adventurer: ['merc', 'dragonslayer', 'catthief'],
+    Q_Medieval: ['knight', 'paladin', 'general', 'dragonknight', 'inquisitor', 'fallen', 'assassin', 'shadow'],
+    Q_Soldier: ['guard'],
+    Q_Peasant: ['villager', 'shepherd', 'herbalist'],
+    Q_Formal: ['barmaid'] };
   const OUTFIT_ID = {}; for (const b in OUTFIT) for (const id of OUTFIT[b]) OUTFIT_ID[id] = b;
-  const OUTFIT_BOSS = { village: 'HairSample_Female', forest: 'Vita', wilds: 'Vita', abbey: 'Victoria_Rubin', swamp: 'Darkness_Shibu', fortress: 'Vita', capital: 'Victoria_Rubin', abyss: 'Darkness_Shibu', peak: 'Victoria_Rubin' };
+  const OUTFIT_BOSS = { village: 'HairSample_Female', forest: 'Q_Ranger', wilds: 'Q_Adventurer', abbey: 'Victoria_Rubin', swamp: 'Q_Witch', fortress: 'Q_Medieval', capital: 'Victoria_Rubin', abyss: 'Darkness_Shibu', peak: 'Victoria_Rubin' };
   function bodyFor(h, r, bossK, used) {
     if (window.CC0 && CC0.on() && window.Mods && Mods.on('id_outfit')) { const o = bossK ? OUTFIT_BOSS[bossK] : OUTFIT_ID[h && h.c && h.c.id]; if (o && (!window.BODY_LIST || BODY_LIST.includes(o))) return o; }
     const b = bodyFor0(h, r, bossK, used); return window.CC0 ? CC0.body(b, (h && h.look && h.look.seed) || 0) : b; } /* R38 CC0 模式：只用 CC0 身体 */
