@@ -171,28 +171,41 @@ window.Elites = (() => {
     const S = S_(), b = nB(S), el = nEl(S), h = huDead(S), m = !!(S.el && S.el.dead && S.el.dead.moon);
     return { b, el, h, m, all: b >= 7 && el >= 13 && h >= 4 && m };
   }
-  function card(d) {
-    const s = SS(), dead = !!s.dead[d.id], un = unlocked(d), o = odds(d), mp = G_().st().power;
-    const cls = ['elp-c', dead ? 'dead' : '', !un ? 'lock' : '', d.final ? 'final' : ''].join(' ');
-    if (!un) return `<div class="${cls}" style="--c:${d.col}"><div class="elp-n">🔒 ？？？ ${d.final ? '· 最终' : ''}</div><div class="elp-t">「${esc(d.t)}」 · 推荐战力 ${d.rec}</div><p class="elp-r">传闻：${esc(d.rumor)}</p><div class="elp-need">解锁条件：${esc(d.need)}</div></div>`;
-    return `<div class="${cls}" style="--c:${d.col}"><div class="elp-n">${d.ic} ${esc(d.n)}${dead ? ' ☠ 已斩杀' : ''}</div><div class="elp-t">「${esc(d.t)}」 · 决斗场：${esc((Lore.LOCS.find(l => l.k === d.loc) || {}).n || d.loc)}</div>
-<div class="elp-s"><span>推荐战力 <b>${d.rec}</b></span><span>你 <b style="color:${mp >= d.rec ? '#9fe89f' : '#ff8a7a'}">${mp}</b></span><span>血量 ${o.hp}</span></div>
-${dead ? '' : `<div class="elp-o"><div class="bar"><i style="width:${Math.round(o.p * 100)}%"></i></div>预估胜率 <b>${Math.round(o.p * 100)}%</b> · 你约 ${o.my} 刀 · 她约 ${o.her} 下打倒你</div>`}
-<p>${esc(d.bio)}</p><div class="elp-need ok">✔ ${esc(d.need)}</div><div class="elp-t">词缀：${d.aff.map(k => window.FoeAI2 && FoeAI2.AFF[k] ? FoeAI2.AFF[k].ic + FoeAI2.AFF[k].n : k).join(' · ')}${s.tries[d.id] ? ' · 挑战 ' + s.tries[d.id] + ' 次' : ''}</div>
-${dead ? '' : `<button data-ch="${d.id}" ${window.Worlds && Worlds.active ? 'disabled' : ''}>⚔ 挑战${window.Worlds && Worlds.active ? '（回洞后）' : ''}</button>`}</div>`;
+  const affH = k => { const A = window.FoeAI2 && FoeAI2.AFF[k]; return `<span class="r3-aff">${A ? A.ic + ' ' + A.n : k}</span>`; };
+  const oc = p => p >= 0.6 ? '#9fe89f' : p >= 0.35 ? '#ffd060' : '#ff7a6a';
+  const locN = k => (Lore.LOCS.find(l => l.k === k) || {}).n || k;
+  function card(d, compact) {
+    const s = SS(), dead = !!s.dead[d.id], un = unlocked(d), mp = G_().st().power, wild = window.Worlds && Worlds.active;
+    const cls = 'r3-card' + (dead ? ' dead' : '') + (!un ? ' lock' : '') + (d.final && !compact ? ' final' : '');
+    if (!un) return `<div class="${cls}"><div class="r3-top"><div class="r3-pt">？</div><div class="r3-nm"><div class="tt">${esc(d.t)}</div><div class="n">？？？</div></div><div class="r3-tag">推荐战力 ${d.rec}</div></div>
+<div class="r3-lore">传闻 —— ${esc(d.rumor)}</div><div class="r3-meta"><span class="no">🔒 解锁条件：${esc(d.need)}</span><span>决斗场：${esc(locN(d.loc))}</span></div></div>`;
+    const o = odds(d), U = window.Gear2 && Gear2.UNQ && Gear2.UNQ[d.id];
+    return `<div class="${cls}" style="--c:${d.col}"><div class="r3-top"><div class="r3-pt">${d.ic}</div><div class="r3-nm"><div class="tt">${esc(d.t)}</div><div class="n">${esc(d.n)}${dead ? '<em>☠ 已斩杀</em>' : ''}</div></div><div class="r3-tag">${d.final ? '最终' : '精英'} · ${esc(locN(d.loc))}</div></div>
+<div class="r3-st"><div><div class="k">推荐战力</div><div class="v">${d.rec}</div></div><div><div class="k">你的战力</div><div class="v" style="color:${mp >= d.rec ? '#9fe89f' : '#ff8a7a'}">${mp}</div></div><div><div class="k">她的生命</div><div class="v">${o.hp}</div></div></div>
+${dead ? '' : `<div class="r3-odds" style="--oc:${oc(o.p)}"><div class="row"><span>预估胜率 <b>${Math.round(o.p * 100)}%</b></span><span>你约 ${o.my} 刀砍倒她 · 她约 ${o.her} 下打倒你</span></div><div class="r3-meter"><i style="width:${Math.round(o.p * 100)}%"></i></div></div>`}
+${compact ? '' : `<div class="r3-bio">${esc(d.bio)}</div>`}<div class="r3-meta" style="margin-bottom:4px">${d.aff.map(affH).join('')}</div>
+<div class="r3-meta"><span class="ok">✔ ${esc(d.need)}</span>${U ? `<span>掉落：<b style="color:#ff7a5a">【神话】${esc(U[1])}</b></span>` : ''}${s.tries[d.id] ? `<span>挑战 ${s.tries[d.id]} 次</span>` : ''}</div>
+${dead ? '' : `<div class="r3-act"><button class="red" data-ch="${d.id}" ${wild ? 'disabled' : ''}>${wild ? '回洞后才能挑战' : '⚔ 发起挑战'}</button></div>`}</div>`;
+  }
+  function goalHTML() {
+    const v = victoryState(), g = (k, n, a, b, t) => `<div class="${a >= b ? 'ok' : ''}"><div class="k">${k}</div><div class="v">${n}</div><div class="bar"><i style="width:${Math.min(100, a / b * 100)}%"></i></div>${t ? `<div class="k" style="margin-top:3px">${t}</div>` : ''}</div>`;
+    return `<div class="r3-goal">${g('地区霸主', `${v.b}<small>/7</small>`, v.b, 7, '任意 7 个地区')}${g('精英', `${v.el}<small>/13</small>`, v.el, 13)}${g('食人魔猎手', `${v.h}<small>/4</small>`, v.h, 4, '猎手页')}${g('月之魔女', v.m ? '✔' : '—', v.m ? 1 : 0, 1, '最终')}
+<div><div class="t">${v.all ? '<b>🎉 全部达成</b><br>回到洞里，你就是魂首窟之主。' : '<b>胜利目标</b><br>斩下 7 名霸主、13 名精英、4 名食人魔猎手与月之魔女，把她们的首级带回洞里。'}</div></div></div>`;
   }
   function panelHTML() {
-    const v = victoryState(), S = S_();
-    return `<div class="elp-h"><b>👑 精英挑战 · 征服之路</b><span>满足条件解锁精英；挑战 = 出猎到她的地区并进入决斗场（门封锁到分出胜负）。胜率按你当前战力/生命预估。</span><i data-x>✕</i></div>
-<div class="elp-v"><div>🏰 地区霸主 <b class="${v.b >= 7 ? 'ok' : ''}">${v.b}/7</b><small>任意 7 个地区</small></div><div>👑 精英 <b class="${v.el >= 13 ? 'ok' : ''}">${v.el}/13</b><small>本面板</small></div><div>🏹 食人魔猎手 <b class="${v.h >= 4 ? 'ok' : ''}">${v.h}/4</b><small>U 查看</small></div><div>🌙 月之魔女 <b class="${v.m ? 'ok' : ''}">${v.m ? '✔' : '✘'}</b><small>最终</small></div><div style="flex:1;min-width:200px"><b>${v.all ? '🎉 全部达成！回到洞里即胜利' : '胜利目标'}</b><small>斩下 7 名霸主、13 名精英、4 名猎手与月之魔女——带回她们的首级。</small></div></div>
-<div class="elp-g">${D.map(card).join('')}${card(MOON)}</div>`;
+    return `<div class="r3-sub">满足条件就能听到她的<b>传闻</b>。挑战 = 出猎到她所在的地区，进入<b>封门决斗场</b>：她倒下，或者你倒下。胜率按你当前的战力、生命、装备预估。</div>${goalHTML()}
+<div class="r3-grid">${D.map(d => card(d)).join('')}${card(MOON)}</div>`;
   }
-  function toggle(v) {
-    css(); if (!pn) { pn = document.createElement('div'); pn.id = 'elPn'; document.body.appendChild(pn); pn.addEventListener('click', e => { if (e.target.closest('[data-x]')) toggle(false); const b = e.target.closest('[data-ch]'); if (b && !b.disabled) challenge(b.dataset.ch); }); ['mousedown', 'pointerdown', 'wheel'].forEach(ev => pn.addEventListener(ev, e => e.stopPropagation())); }
-    const open = v == null ? !pn.classList.contains('on') : v; if (open) pn.innerHTML = panelHTML(); pn.classList.toggle('on', open);
-    try { if (open) G.setUI(true); else { G.setUI(false); if (!(window.Worlds && Worlds.active)) G.lockPointer && G.lockPointer(); } } catch (e) { }
+  function regionHTML(k) { // 探索地图（选地点）里的「精英」栏
+    if (!on()) return ''; const L = ALL.filter(d => d.loc === k); if (!L.length) return '';
+    return `<div class="rq-sec"><h4>👑 精英挑战 · 这片土地上的强者</h4><div class="r3-grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">${L.map(d => card(d, true)).join('')}</div></div>`;
   }
-  addEventListener('keydown', e => { if (!on() || !window.G || !G.S) return; if (e.code === 'KeyC' && !e.repeat) { e.preventDefault(); toggle(); } else if (e.code === 'Escape' && pn && pn.classList.contains('on')) { e.stopImmediatePropagation(); toggle(false); } }, true);
+  const regionBadge = k => { if (!on()) return ''; const L = ALL.filter(d => d.loc === k), s = SS(); if (!L.length) return ''; const dn = L.filter(d => s.dead[d.id]).length, un = L.filter(d => !s.dead[d.id] && unlocked(d)).length; return `<span title="精英 ${L.length} 名 · 可挑战 ${un} · 已斩杀 ${dn}" style="margin-left:6px;font-size:11px;padding:0 5px;border:1px solid ${un ? '#ff9a6a' : '#ffffff40'};color:${un ? '#ffb08a' : '#bbb'};font-weight:700">👑 ${dn}/${L.length}</span>`; };
+  function toggle(v) { if (!window.R35UI) return; if (v === false) { if (R35UI.isOpen('elite')) R35UI.close(); } else if (v === true) R35UI.open('elite'); else R35UI.toggle('elite'); }
+  if (window.R35UI) R35UI.reg('elite', { n: '👑 精英挑战', title: '征服之路', on, html: panelHTML, click: e => { const b = e.target.closest('[data-ch]'); if (b && !b.disabled) challenge(b.dataset.ch); } });
+  // 探索地图（出洞狩猎窗口）里的挑战按钮
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('.rq-det [data-ch]'); if (!b || b.disabled) return; e.stopPropagation(); e.preventDefault(); try { UI.close(false); } catch (e2) { } challenge(b.dataset.ch); }, true);
+  addEventListener('keydown', e => { if (!on() || !window.G || !G.S) return; if (e.code === 'KeyC' && !e.repeat && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) { if (window.UI && UI.open) return; e.preventDefault(); toggle(); } }, true);
   // 新解锁提示（剧情传闻）
   let known = null;
   setInterval(() => {
@@ -202,5 +215,5 @@ ${dead ? '' : `<button data-ch="${d.id}" ${window.Worlds && Worlds.active ? 'dis
 
   wrap(); setTimeout(wrap, 0); addEventListener('load', wrap);
   setInterval(() => { try { wrap(); tick(); } catch (e) { console.warn('Elite tick', e); } }, 150);
-  return { on, D, MOON, ALL, BY, SS, odds, unlocked, challenge, toggle, victoryState, get E() { return E; }, _toArena: toArena };
+  return { on, D, MOON, ALL, BY, SS, odds, unlocked, challenge, toggle, victoryState, regionHTML, regionBadge, get E() { return E; }, _toArena: toArena };
 })();

@@ -1385,3 +1385,9 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   - 参数集中在 `ANIME_GLSL`：亮面电平 `max(1.04, min(lr*1.05,1.28))`、暗面 0.80、阴影色、过渡 0.50/0.74、边缘光 0.22。头偏暗先调 `FaceFill.tune.pbr`（0.62）。
 - **测试台**：新增 `tools/test/shade.html`（真实 foe.js 身体 + ModelHeads 头 + 天空 PMREM + 太阳/篝火），`window.__shade({yaw, target:'face'|'body', sun, fire, amb, sky, bg})`；`?off=1` = 关 anime_shade 对比。截图用 canvas.toDataURL（`preserveDrawingBuffer`），不要用 page.screenshot（headless 下 WebGL 画布为空）。实拍：左（关）头发满是三角面反光，右（开）平滑成块；篝火-only 场景仍然暗、脸有受光面；全身像衣服渐变干净。
 - 没做：描边（inverted hull）、头发“天使环”高光条。若用户还想更二次元，下一步做这两项。
+---
+## R35b（用户反馈：BOSS 也要出现在探索地图；R35 的 UI 太难看、边缘不清；进入地点的窗口要更大、剧情更详细、任务更多）
+- **新 js/r35ui.js（window.R35UI）**：精英（C）/ 猎手（U）/ 装备（Z）合并成一个带页签的窗口。外壳 = 遮罩 `#r35root` + 游戏原生 `.modal big`（body.ui3a 下自动套用 UI Agent 的金色角框、描边、衬线标题、按钮），页签用原有的 `.m-tab`，关闭用 `.m-close`。共用卡片样式 `.r3-*` 使用 `--u-*` 配色变量。模块用 `R35UI.reg(id,{n,title,on,html,click,move,leave})` 注册。横幅 #elBan/#h2Ban、HUD #elHud/#h2Bar/#h2Sense 的覆盖样式也写在这个文件里。
+- elites.js / hunters2.js / gear2.js 的旧面板（#elPn/#h2Pn/#g2Pn）已删除，改为注册到 R35UI；按键不变（C/U/Z），ui.js 自己的窗口打开时不响应。
+- **探索地图（出洞狩猎的选地点界面）**：regionquest.js 改 2 行——`detHTML` 在小BOSS 后插入 `Elites.regionHTML(k)`（该地区精英卡片：锁住显示传闻和条件，解锁显示胜率和“发起挑战”按钮），`itemHTML` 地区名后加 `Elites.regionBadge(k)`（👑 已斩杀/总数）。挑战按钮由 elites.js 在 document 捕获阶段处理（关闭 UI 后调用 challenge）。
+- **新 js/arrival2.js（MOD arrival2，默认开）**：进入地点的大窗口，取代 #rqCard（body.arr2 时隐藏）。内容：地区插图大图、逐字打出的 4 段剧情（场景 / 往事 / 当地人怎么看你——按来访次数、霸主是否已死、猎手仇恨生成 / 传闻）、主线（RegionQuest.T.q）、2 条随机支线（搜刮容器 / 搜尸 / 深入第 N 层 / 麻袋里 N 颗首级 / 英魂以上首级）、威胁一览（霸主、小BOSS、最强猎手及胜率、可挑战精英）。空格/E/回车关闭；打开时拦截其他按键。支线追踪 #arTrack 放在 #rqTrack 下方，并把 #h2Sense 往下推；完成给魂晶，40% 附带一件饰品。精英决斗场的出猎不弹这个窗口。存档：`S.arr.v[k]` 来访次数。

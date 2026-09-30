@@ -172,36 +172,29 @@ window.Hunters2 = (() => {
     } else h.bar.style.display = 'none';
   }
 
-  // ================= 档案面板（U）=================
-  let pn = null;
+  // ================= 档案面板（U）— R35b：并入 R35UI 统一窗口 =================
+  const oc = p => p >= 0.6 ? '#9fe89f' : p >= 0.35 ? '#ffd060' : '#ff7a6a';
   function panelHTML() {
-    const s = SS(), mp = myPow();
-    return `<div class="h2p-h"><b>🏹 食人魔猎手</b><span>仇恨 ${Math.floor(s.hate)} · 每 ${HATE_STEP} 点仇恨四人全部 +1 级 · 逃走一次该人 +1 级 · 你的战力 <b>${mp}</b></span><i data-x>✕</i></div>
-<div class="h2p-g">${D.map(d => { const L = s.L[d.id], lv = lvOf(d.id), pw = powOf(lv), o = odds(d.id), gap = pw - mp, dead = !!L.dead;
-      return `<div class="h2p-c ${dead ? 'dead' : ''}" style="--c:${d.col}"><div class="h2p-n">${d.ic} ${esc(d.n)}${dead ? ' <em>☠ 已斩杀</em>' : ''}</div><div class="h2p-t">「${esc(d.t)}」</div>
-<div class="h2p-s"><span>等级 <b>Lv.${lv}</b></span><span>战力 <b>${pw}</b></span><span>差距 <b style="color:${gap > 0 ? '#ff8a7a' : '#9fe89f'}">${gap > 0 ? '她强 ' + gap : '你强 ' + (-gap)}</b></span></div>
-${dead ? '' : `<div class="h2p-o"><div class="bar"><i style="width:${Math.round(o.p * 100)}%"></i></div>预估胜率 <b>${Math.round(o.p * 100)}%</b> · 你约 ${o.my} 刀砍倒她 · 她约 ${o.her} 下打倒你</div>`}
-<div class="h2p-f">等级 = 基础 ${d.base} + 仇恨 ${Math.floor(s.hate / HATE_STEP)} + 逃脱 ${L.esc}　·　遭遇 ${L.meet} 次</div>
-<p>${esc(d.bio)}</p><p class="h2p-st">⚔ ${esc(d.style)}</p></div>`; }).join('')}</div>
-<div class="h2p-foot">出猎时「猎手感应」满了就可能有人穿越过来（洞穴和洞口不会）。她在场时门全部封锁。血量掉到 30% 她会逃跑——3.2 秒内打死她才算真正斩杀。</div>`;
+    const s = SS(), mp = myPow(), W = window.Worlds && Worlds.active && Worlds._W, al = alive().length;
+    const aff = k => { const A = window.FoeAI2 && FoeAI2.AFF[k]; return `<span class="r3-aff">${A ? A.ic + ' ' + A.n : k}</span>`; };
+    const top = `<div class="r3-goal" style="grid-template-columns:repeat(3,1fr) 2fr"><div><div class="k">仇恨</div><div class="v">${Math.floor(s.hate)}</div><div class="bar"><i style="width:${(s.hate % HATE_STEP) / HATE_STEP * 100}%"></i></div><div class="k" style="margin-top:3px">再 ${Math.ceil(HATE_STEP - s.hate % HATE_STEP)} 点 → 四人全部 +1 级</div></div>
+<div><div class="k">本趟感应</div><div class="v">${W ? Math.floor(T.m) + '<small>%</small>' : '—'}</div><div class="bar"><i style="width:${W ? T.m : 0}%;background:linear-gradient(90deg,#6a1a2a,#ff5070)"></i></div><div class="k" style="margin-top:3px">${W ? (T.m >= 100 ? '随时会来' : '满了就可能出现') : '出猎时累积'}</div></div>
+<div class="${al ? '' : 'ok'}"><div class="k">已斩杀</div><div class="v">${4 - al}<small>/4</small></div><div class="bar"><i style="width:${(4 - al) * 25}%"></i></div><div class="k" style="margin-top:3px">你的战力 ${mp}</div></div>
+<div><div class="t"><b>规则</b><br>放倒 +1 仇恨、斩首 +0.5。每 ${HATE_STEP} 点仇恨四人全部 +1 级；谁从你手里逃走，谁就再 +1 级。等级完全确定——看清差距再动手。</div></div></div>`;
+    const cards = D.map(d => {
+      const L = s.L[d.id], lv = lvOf(d.id), pw = powOf(lv), o = odds(d.id), gap = pw - mp, dead = !!L.dead;
+      return `<div class="r3-card${dead ? ' dead' : ''}" style="--c:${d.col}"><div class="r3-top"><div class="r3-pt">${d.ic}</div><div class="r3-nm"><div class="tt">${esc(d.t)}</div><div class="n">${esc(d.n)}${dead ? '<em>☠ 已斩杀</em>' : ''}</div></div><div class="r3-tag">Lv.${lv}</div></div>
+<div class="r3-st"><div><div class="k">她的战力</div><div class="v">${pw}</div></div><div><div class="k">你的战力</div><div class="v">${mp}</div></div><div><div class="k">差距</div><div class="v" style="color:${gap > 0 ? '#ff8a7a' : '#9fe89f'}">${gap > 0 ? '她强 ' + gap : '你强 ' + (-gap)}</div></div></div>
+${dead ? '' : `<div class="r3-odds" style="--oc:${oc(o.p)}"><div class="row"><span>预估胜率 <b>${Math.round(o.p * 100)}%</b></span><span>你约 ${o.my} 刀砍倒她 · 她约 ${o.her} 下打倒你</span></div><div class="r3-meter"><i style="width:${Math.round(o.p * 100)}%"></i></div></div>`}
+<div class="r3-bio">${esc(d.bio)}</div><div class="r3-lore">⚔ ${esc(d.style)}</div>
+<div class="r3-meta" style="margin-bottom:4px">${d.aff.concat(L.esc >= 2 ? ['frenzy'] : []).map(aff).join('')}</div>
+<div class="r3-meta"><span>等级 = 基础 ${d.base} + 仇恨 ${Math.floor(s.hate / HATE_STEP)} + 逃脱 ${L.esc}</span><span>遭遇 ${L.meet} 次</span>${L.wd ? `<span>撤退 ${L.wd} 次</span>` : ''}</div></div>`; }).join('');
+    return `<div class="r3-sub">四名被选中的<b>正义女主角</b>。你砍的人越多，她们越强；「猎手感应」满了，她们就会<b>穿越到你所在的地图</b>（洞穴和洞口不会）。</div>${top}<div class="r3-grid">${cards}</div>
+<div class="r3-foot">她在场时所有的门都会封锁，你无法撤离。血量掉到 30% 她会逃跑——3.2 秒内打死她才算真正斩杀，否则她会带着更高的等级回来。150 秒分不出胜负她会自行撤退。</div>`;
   }
-  function toggle(v) {
-    if (!pn) {
-      const s = document.createElement('style'); s.textContent = `
-#h2Pn{position:fixed;inset:5% 6%;z-index:66;background:rgba(14,8,10,.96);border:1px solid #a0606a88;border-radius:14px;color:#eee;font:13px/1.55 inherit;overflow:auto;padding:14px 18px;display:none}
-#h2Pn.on{display:block}.h2p-h{display:flex;gap:12px;align-items:baseline;margin-bottom:10px}.h2p-h b{font-size:18px;color:#ffb0a0}.h2p-h span{opacity:.8;flex:1}.h2p-h i{cursor:pointer;font-style:normal;font-size:18px}
-.h2p-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.h2p-c{border:1px solid var(--c);border-radius:10px;padding:10px 12px;background:linear-gradient(160deg,#ffffff0a,#0000)}
-.h2p-c.dead{opacity:.55;filter:grayscale(.7)}.h2p-n{font-size:16px;font-weight:800;color:var(--c)}.h2p-n em{font-style:normal;color:#ff8a7a;font-size:12px}.h2p-t{opacity:.8;margin-bottom:4px}
-.h2p-s{display:flex;gap:12px;flex-wrap:wrap}.h2p-o{margin:5px 0}.h2p-o .bar{height:6px;background:#0008;border-radius:3px;overflow:hidden;margin-bottom:2px}.h2p-o .bar i{display:block;height:100%;background:linear-gradient(90deg,#c04040,#e0c040,#60c060)}
-.h2p-f{font-size:11.5px;color:#c8b0a8}.h2p-c p{margin:5px 0;font-size:12.5px;color:#ddd}.h2p-st{color:#ffd0a0!important}.h2p-foot{margin-top:10px;font-size:12px;opacity:.75}`;
-      document.head.appendChild(s); pn = document.createElement('div'); pn.id = 'h2Pn'; document.body.appendChild(pn);
-      pn.addEventListener('click', e => { if (e.target.closest('[data-x]')) toggle(false); });
-      ['mousedown', 'pointerdown', 'wheel'].forEach(ev => pn.addEventListener(ev, e => e.stopPropagation()));
-    }
-    const open = v == null ? !pn.classList.contains('on') : v; if (open) pn.innerHTML = panelHTML(); pn.classList.toggle('on', open);
-    try { if (open) G.setUI(true); else if (!(window.Worlds && Worlds.active)) { G.setUI(false); G.lockPointer && G.lockPointer(); } else G.setUI(false); } catch (e) { }
-  }
-  addEventListener('keydown', e => { if (!on() || !window.G || !G.S) return; if (e.code === 'KeyU' && !e.repeat && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) { e.preventDefault(); toggle(); } else if (e.code === 'Escape' && pn && pn.classList.contains('on')) { e.stopImmediatePropagation(); toggle(false); } }, true);
+  function toggle(v) { if (!window.R35UI) return; if (v === false) { if (R35UI.isOpen('hunt')) R35UI.close(); } else if (v === true) R35UI.open('hunt'); else R35UI.toggle('hunt'); }
+  if (window.R35UI) R35UI.reg('hunt', { n: '🏹 食人魔猎手', title: '猎手档案', on, html: panelHTML });
+  addEventListener('keydown', e => { if (!on() || !window.G || !G.S) return; if (e.code === 'KeyU' && !e.repeat && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) { if (window.UI && UI.open) return; e.preventDefault(); toggle(); } }, true);
 
   wrap(); setTimeout(wrap, 0); addEventListener('load', wrap);
   setInterval(() => { try { tick(); } catch (e) { console.warn('Hunters2 tick', e); } }, 100);

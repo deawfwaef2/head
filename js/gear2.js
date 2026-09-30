@@ -99,7 +99,7 @@ window.Gear2 = (() => {
     const opts = POS.filter(p => p[1] === s).map(p => p[0]); const at = pos && opts.includes(pos) ? pos : (opts.find(p => !eq[p]) || opts[0]);
     const old = eq[at]; eq[at] = o; if (old) putOld(old);
     try { SFX.metal && SFX.metal(); SFX.levelup && o.g2.rar >= 4 && SFX.levelup(); } catch (e) { }
-    G.toast(`${SL[s].ic} 穿上【${RARN[o.g2.rar]}】${name(o)}`, RARC[o.g2.rar], 1.6); try { G.save(); } catch (e) { } if (pn && pn.classList.contains('on')) render();
+    G.toast(`${SL[s].ic} 穿上【${RARN[o.g2.rar]}】${name(o)}`, RARC[o.g2.rar], 1.6); try { G.save(); } catch (e) { } render();
     return true;
   }
   function unequip(at) { const eq = SS().eq, o = eq[at]; if (!o) return; delete eq[at]; const w = give(o); G.toast(`卸下 ${name(o)}${w === 'stash' ? '（储物箱）' : '（麻袋）'}`, '#ccc', 1.3); try { G.save(); } catch (e) { } render(); }
@@ -161,73 +161,79 @@ window.Gear2 = (() => {
     h += `<div style="color:#a99;font-style:italic;margin-top:4px">${esc(g.lore || '')}</div>`;
     return h;
   }
-  function tipFull(o) { return `<div style="font-weight:800;color:${RARC[o.g2.rar]}">${SL[o.g2.s].ic} ${esc(name(o))}</div><div style="color:${RARC[o.g2.rar]};font-size:11px">${RARN[o.g2.rar]}${o.g2.un ? ' · 专属' : ''}</div>${tipBody(o)}`; }
-  function oldTip(sl) {
-    const E = RPG.EQUIP[sl], t = E.tiers[G.S.eq[sl] || 0], p = (G.S.eqPlus && G.S.eqPlus[sl]) || 0, NM = { atk: '攻击', def: '防御', hp: '生命', str: '力量', con: '体魄', agi: '敏捷', ter: '凶威', soul: '魂力', cap: '可装首级' };
-    return `<div style="font-weight:800;color:${RARC[Math.min(5, G.S.eq[sl] || 0)]}">${E.icon} ${esc(t.n)}${p ? ' +' + p : ''}</div><div style="color:#bbb">${E.n}</div>${Object.keys(NM).filter(k => t[k]).map(k => `<div>${NM[k]} ${t[k]}</div>`).join('')}<div style="color:#a99;font-style:italic">${esc(t.desc || '')}</div>`;
+  function tipFull(o) { return `<div class="tn" style="color:${RARC[o.g2.rar]}">${SL[o.g2.s].ic} ${esc(name(o))}</div><div style="color:${RARC[o.g2.rar]};font-size:11px">${RARN[o.g2.rar]}${o.g2.un ? ' · 专属' : ''}</div>${tipBody(o)}`; }
+  function oldTip(sl, it) {
+    const E = RPG.EQUIP[sl], t = E.tiers[it ? Sack.IT[it.id].tier : (G.S.eq[sl] || 0)], p = it ? (it.plus || 0) : ((G.S.eqPlus && G.S.eqPlus[sl]) || 0), NM = { atk: '攻击', def: '防御', hp: '生命', str: '力量', con: '体魄', agi: '敏捷', ter: '凶威', soul: '魂力', cap: '可装首级' };
+    const tr = it ? Sack.IT[it.id].tier : (G.S.eq[sl] || 0);
+    return `<div class="tn" style="color:${RARC[Math.min(5, tr)]}">${E.icon} ${esc(t.n)}${p ? ' +' + p : ''}</div><div style="color:#bbb">${E.n}</div>${Object.keys(NM).filter(k => t[k]).map(k => `<div>${NM[k]} ${t[k]}</div>`).join('')}<div style="color:#a99;font-style:italic">${esc(t.desc || '')}</div>`;
   }
 
-  // ---------- 面板（传奇风纸娃娃） ----------
-  let pn = null, tipEl = null;
+  // ---------- 面板（传奇风纸娃娃）— R35b：并入 R35UI 统一窗口 ----------
+  let tipEl = null, LIST = [];
   function css() {
     if (css.done) return; css.done = 1; const s = document.createElement('style'); s.textContent = `
-#g2Pn{position:fixed;inset:4% 6%;overflow:hidden!important;z-index:66;display:none;color:#e8dcc0;font:13px/1.5 inherit;background:linear-gradient(#1c140c,#0e0a06);border:2px solid #8a6a3a;border-radius:6px;box-shadow:0 0 0 1px #000,inset 0 0 40px #0008;overflow:auto}
-#g2Pn.on{display:flex}#g2Pn .col{padding:12px 14px;overflow:auto;max-height:100%;box-sizing:border-box}#g2Pn .doll{flex:0 0 430px;border-right:1px solid #5a4424;position:relative}
-#g2Pn h3{margin:0 0 8px;font-size:17px;color:#ffd890;letter-spacing:3px;text-align:center;text-shadow:0 0 8px #a06010}
-.g2grid{display:grid;grid-template-columns:repeat(4,96px);grid-auto-rows:clamp(56px,10.5vh,80px);gap:7px;justify-content:center;position:relative}
-.g2s{border:1px solid #6a5030;background:radial-gradient(#2a2014,#140e08);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;text-align:center;padding:2px}
-.g2s:hover{border-color:#ffd890;box-shadow:0 0 8px #ffb04088}.g2s .i{font-size:26px;line-height:1}.g2s .n{font-size:11px;line-height:1.2;margin-top:3px;max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.g2s .l{position:absolute;top:1px;left:4px;font-size:10px;color:#8a7250}
-.g2s.empty .i{opacity:.18;filter:grayscale(1)}.g2s.empty .n{color:#6a5a40}.g2body{grid-column:2/4;grid-row:2/5;border:1px dashed #4a3820;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:90px;opacity:.5;background:radial-gradient(#3a2a1422,#0000)}
-.g2st{flex:1;min-width:250px}.g2st table{width:100%;border-collapse:collapse;columns:2}.g2st .tb{display:grid;grid-template-columns:1fr 1fr;column-gap:14px}.g2st td{padding:1px 4px;border-bottom:1px solid #3a2a16}.g2st td:last-child{text-align:right;color:#fff;font-weight:700}.g2st .sp td:last-child{color:#8fc8ff}
-.g2inv{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.g2it{width:70px;height:62px;border:1px solid;border-radius:4px;background:#140e08;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10.5px;text-align:center;line-height:1.15;padding:2px}.g2it .i{font-size:22px}.g2it:hover{background:#2a1e10}
-.g2x{position:absolute;top:6px;right:10px;cursor:pointer;font-size:18px;color:#c9a870}.g2h{color:#9a8a6a;font-size:11.5px;margin-top:6px}
-#g2Tip{position:fixed;z-index:80;pointer-events:none;background:#0c0804f4;border:1px solid #a0804a;border-radius:4px;padding:7px 10px;font:12.5px/1.5 inherit;color:#e8dcc0;max-width:280px;display:none;box-shadow:0 4px 16px #000}`;
+.g2w{display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:start}
+.g2doll{position:relative;padding:14px;background:radial-gradient(ellipse 70% 60% at 50% 45%,rgba(120,70,30,.18),transparent 70%),linear-gradient(180deg,rgba(0,0,0,.25),rgba(0,0,0,.45));box-shadow:inset 0 0 0 1px var(--u-line,rgba(231,194,122,.28))}
+.g2grid{display:grid;grid-template-columns:repeat(4,92px);grid-auto-rows:84px;gap:8px}
+.g2s{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4px;cursor:pointer;background:radial-gradient(circle at 50% 40%,#2a1d16,#0d0909 80%);clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);box-shadow:inset 0 0 0 1px var(--rc,rgba(231,194,122,.3)),inset 0 0 18px color-mix(in srgb,var(--rc,#000) 25%,transparent);transition:filter .12s,transform .12s}
+.g2s:hover{filter:brightness(1.35);transform:translateY(-1px)}.g2s .i{font-size:30px;line-height:1}.g2s .n{font-size:11.5px;line-height:1.2;margin-top:5px;max-width:86px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.g2s .l{position:absolute;top:3px;left:8px;font-size:10px;letter-spacing:.15em;color:var(--u-dim,#a8977c)}.g2s.empty .i{opacity:.16;filter:grayscale(1)}.g2s.empty .n{color:#6a5a48;font-weight:400}
+.g2body{grid-column:2/4;grid-row:2/5;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 55%,rgba(194,20,31,.16),transparent 65%)}
+.g2body .o{font-size:96px;line-height:1;filter:drop-shadow(0 6px 16px #000) sepia(.3)}.g2body .pw{font-family:var(--u-serif,serif);font-size:13px;letter-spacing:.3em;color:var(--u-dim,#a8977c);margin-top:6px}.g2body .pw b{display:block;font-size:30px;letter-spacing:.05em;color:var(--u-gold,#e7c27a);text-align:center}
+.g2h4{font-family:var(--u-serif,serif);color:var(--u-gold,#e7c27a);letter-spacing:.2em;font-size:15px;margin:0 0 8px;padding-bottom:6px;background:linear-gradient(90deg,rgba(231,194,122,.5),transparent 70%) 0 100%/100% 1px no-repeat}
+.g2tb{display:grid;grid-template-columns:1fr 1fr;column-gap:22px}.g2tb div{display:flex;justify-content:space-between;padding:3px 2px;border-bottom:1px solid rgba(231,194,122,.1);font-size:13px;color:#cdbfa6}.g2tb b{color:#fff;font-family:var(--u-serif,serif)}.g2tb .sp b{color:#9ccaff}.g2tb .z b{color:#6a5e50}
+.g2inv{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:7px;margin-top:4px}
+.g2it{height:74px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-size:11px;line-height:1.2;padding:3px;background:radial-gradient(circle at 50% 35%,color-mix(in srgb,var(--rc) 18%,#1a120e),#0c0808 80%);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rc) 60%,transparent);color:var(--rc);transition:filter .12s,transform .12s}
+.g2it:hover{filter:brightness(1.3);transform:translateY(-1px)}.g2it .i{font-size:24px;margin-bottom:3px}.g2it.no{opacity:.55}
+.g2note{margin-top:10px;font-size:12px;color:var(--u-dim,#a8977c);line-height:1.65}
+#g2Tip{position:fixed;z-index:90;pointer-events:none;display:none;max-width:300px;padding:10px 13px;font-size:12.5px;line-height:1.6;color:#e8dcc0;background:linear-gradient(180deg,rgba(28,19,22,.98),rgba(10,7,9,.98));box-shadow:0 0 0 1px var(--tc,rgba(231,194,122,.5)),0 0 0 4px rgba(0,0,0,.8),0 10px 30px #000}
+#g2Tip .tn{font-family:var(--u-serif,serif);font-size:16px;font-weight:900}
+@media (max-width:980px){.g2w{grid-template-columns:1fr}}`;
     document.head.appendChild(s);
   }
   const OLD = [['helm', '头盔'], ['weapon', '武器'], ['armor', '护甲'], ['charm', '护符'], ['bag', '背篓']];
   function slotHtml(key, label, it, old) {
-    if (old) { const t = RPG.EQUIP[key].tiers[G.S.eq[key] || 0], em = !G.S.eq[key] && key !== 'weapon' && key !== 'armor', p = (G.S.eqPlus && G.S.eqPlus[key]) || 0; return `<div class="g2s ${em ? 'empty' : ''}" data-old="${key}"><span class="l">${label}</span><span class="i">${RPG.EQUIP[key].icon}</span><span class="n" style="color:${RARC[Math.min(5, G.S.eq[key] || 0)]}">${em ? '空' : esc(t.n) + (p ? ' +' + p : '')}</span></div>`; }
-    return `<div class="g2s ${it ? '' : 'empty'}" data-pos="${key}"><span class="l">${label}</span><span class="i">${SL[POS.find(p => p[0] === key)[1]].ic}</span><span class="n" style="color:${it ? RARC[it.g2.rar] : ''}">${it ? esc(name(it)) : '空'}</span></div>`;
+    if (old) { const t = RPG.EQUIP[key].tiers[G.S.eq[key] || 0], em = !G.S.eq[key] && key !== 'weapon' && key !== 'armor', p = (G.S.eqPlus && G.S.eqPlus[key]) || 0, c = RARC[Math.min(5, G.S.eq[key] || 0)]; return `<div class="g2s ${em ? 'empty' : ''}" data-old="${key}" style="--rc:${em ? '' : c}"><span class="l">${label}</span><span class="i">${RPG.EQUIP[key].icon}</span><span class="n" style="color:${c}">${em ? '空' : esc(t.n) + (p ? ' +' + p : '')}</span></div>`; }
+    return `<div class="g2s ${it ? '' : 'empty'}" data-pos="${key}" style="--rc:${it ? RARC[it.g2.rar] : ''}"><span class="l">${label}</span><span class="i">${SL[POS.find(p => p[0] === key)[1]].ic}</span><span class="n" style="color:${it ? RARC[it.g2.rar] : ''}">${it ? esc(name(it)) : '空'}</span></div>`;
   }
-  function invList() { const I = Sack.inv(), wild = window.Worlds && Worlds.active, out = []; for (const o of I.sack.items) if (o.g2 || (Sack.IT[o.id] && Sack.IT[o.id].kind === 'equip')) out.push([o, 'sack']); if (!wild) for (const o of I.stash) if (o.g2 || (Sack.IT[o.id] && Sack.IT[o.id].kind === 'equip')) out.push([o, 'stash']); return out.sort((a, b) => ((b[0].g2 ? b[0].g2.rar : Sack.IT[b[0].id].rar) - (a[0].g2 ? a[0].g2.rar : Sack.IT[a[0].id].rar))); }
-  function render() {
-    if (!pn) return; bust(); const eq = SS().eq, st = G.st(), a = sum(), e = x => eq[x] || null;
+  function invList() { const I = Sack.inv(), wild = window.Worlds && Worlds.active, out = [], isEq = o => o.g2 || (Sack.IT[o.id] && Sack.IT[o.id].kind === 'equip'); for (const o of I.sack.items) if (isEq(o)) out.push([o, 'sack']); if (!wild) for (const o of I.stash) if (isEq(o)) out.push([o, 'stash']); const rr = o => o.g2 ? o.g2.rar : Math.min(5, Sack.IT[o.id].rar); return out.sort((a, b) => rr(b[0]) - rr(a[0])); }
+  function panelHTML() {
+    defs(); css(); bust(); const eq = SS().eq, st = G.st(), a = sum(), e = x => eq[x] || null, lv = lvNow();
     const cells = [slotHtml('helm', '头盔', 0, 1), slotHtml('neck', '项链', e('neck')), slotHtml('medal', '勋章', e('medal')), slotHtml('charm', '护符', 0, 1),
-      slotHtml('weapon', '武器', 0, 1), '<div class="g2body">🧌</div>', slotHtml('armor', '护甲', 0, 1),
-      slotHtml('brace1', '左镯', e('brace1')), slotHtml('brace2', '右镯', e('brace2')),
-      slotHtml('ring1', '左戒', e('ring1')), slotHtml('ring2', '右戒', e('ring2')),
+      slotHtml('weapon', '武器', 0, 1), `<div class="g2body"><div class="o">🧌</div><div class="pw">战 力<b>${st.power}</b></div></div>`, slotHtml('armor', '护甲', 0, 1),
+      slotHtml('brace1', '左镯', e('brace1')), slotHtml('brace2', '右镯', e('brace2')), slotHtml('ring1', '左戒', e('ring1')), slotHtml('ring2', '右戒', e('ring2')),
       slotHtml('belt', '腰带', e('belt')), slotHtml('boots', '靴子', e('boots')), slotHtml('bag', '背篓', 0, 1)];
-    const row = (n, v, sp) => `<tr class="${sp ? 'sp' : ''}"><td>${n}</td><td>${v}</td></tr>`;
-    const stats = row('等级', 'Lv.' + (st.lv || 1)) + row('战力', st.power) + row('生命', `${Math.round(G.S.hp)} / ${st.maxHp}`) + row('攻击', st.atk) + row('防御', st.def) + row('力量', st.str) + row('体魄', st.con) + row('敏捷', st.agi) + row('凶威', st.ter) + row('魂力', st.soul) + row('闪避', Math.round(st.dodge * 100) + '%')
-      + row('伤害加成', '+' + a.dmg + '%', 1) + row('暴击率（×1.8）', a.crit + '%', 1) + row('受到伤害', '-' + a.dr + '%', 1) + row('每秒回复', a.regen.toFixed(1), 1) + row('放倒回复', a.kheal + '%', 1) + row('魂晶获取', '+' + a.coin + '%', 1) + row('魂力产出', '+' + a.yield + '%', 1) + row('猎手仇恨', '-' + a.hate + '%', 1) + row('猎手感应', '-' + a.sense + '%', 1);
-    const L = invList(), rows = stats.split('</tr>').filter(Boolean).map(x => x + '</tr>'), stA = rows.slice(0, 11).join(''), stB = rows.slice(11).join('');
-    pn.innerHTML = `<i class="g2x" data-x>✕</i><div class="col doll"><h3>⚔ 装 备 ⚔</h3><div class="g2grid">${cells.join('')}</div><div class="g2h">左键格子：查看 / 卸下饰品。饰品只能在野外找到（宝箱·武器架·尸体·霸主·精英·猎手），找到后点下方物品穿上。武器/护甲/头盔/护符也只能找到（强化 +N 仍在铁匠处）。</div></div>
-<div class="col g2st"><h3>属 性</h3><div class="tb"><table>${stA}</table><table>${stB}</table></div><h3 style="margin-top:10px">${window.Worlds && Worlds.active ? '麻袋里的装备' : '麻袋 + 储物箱里的装备'}（${L.length}）</h3><div class="g2inv">${L.map(([o, w], i) => { const g = o.g2, d = Sack.IT[o.id], r = g ? g.rar : Math.min(5, d.rar); return `<div class="g2it" data-inv="${i}" style="border-color:${RARC[r]};color:${RARC[r]}"><span class="i">${g ? SL[g.s].ic : d.icon}</span>${esc(g ? name(o) : Sack.nameOf(o))}</div>`; }).join('') || '<span class="g2h">还没有找到装备——去野外翻宝箱吧。</span>'}</div></div>`;
-    pn._L = L;
+    const r = (n, v, sp, z) => `<div class="${sp ? 'sp' : ''}${z ? ' z' : ''}"><span>${n}</span><b>${v}</b></div>`;
+    const base = r('等级', 'Lv.' + (st.lv || 1)) + r('生命', `${Math.round(G.S.hp)} / ${st.maxHp}`) + r('攻击', st.atk) + r('防御', st.def) + r('力量', st.str) + r('体魄', st.con) + r('敏捷', st.agi) + r('凶威', st.ter) + r('魂力', st.soul) + r('闪避', Math.round(st.dodge * 100) + '%');
+    const sp = r('伤害加成', '+' + a.dmg + '%', 1, !a.dmg) + r('暴击率 ×1.8', a.crit + '%', 1, !a.crit) + r('受到伤害', '-' + a.dr + '%', 1, !a.dr) + r('每秒回复', a.regen.toFixed(1), 1, !a.regen) + r('放倒回复', a.kheal + '%', 1, !a.kheal) + r('魂晶获取', '+' + a.coin + '%', 1, !a.coin) + r('魂力产出', '+' + a.yield + '%', 1, !a.yield) + r('猎手仇恨', '-' + a.hate + '%', 1, !a.hate) + r('猎手感应', '-' + a.sense + '%', 1, !a.sense);
+    LIST = invList(); const wild = window.Worlds && Worlds.active;
+    const inv = LIST.map(([o], i) => { const g = o.g2, d = Sack.IT[o.id], rr = g ? g.rar : Math.min(5, d.rar), no = g && (g.req || 1) > lv; return `<div class="g2it${no ? ' no' : ''}" data-inv="${i}" style="--rc:${RARC[rr]}"><span class="i">${g ? SL[g.s].ic : d.icon}</span>${esc(g ? name(o) : Sack.nameOf(o))}${no ? `<small style="color:#ff8a7a">需 Lv.${g.req}</small>` : ''}</div>`; }).join('');
+    return `<div class="r3-sub">饰品和装备<b>只能在野外找到</b>：宝箱、武器架、木箱、尸体、霸主、精英、猎手。点下方物品穿上，点格子卸下。悬停查看全部词条。</div>
+<div class="g2w"><div class="g2doll"><div class="g2grid">${cells.join('')}</div></div>
+<div><div class="g2h4">属 性</div><div class="g2tb">${base}${sp}</div>
+<div class="g2h4" style="margin-top:16px">${wild ? '麻袋里的装备' : '麻袋 + 储物箱里的装备'} · ${LIST.length}</div><div class="g2inv">${inv || '<span class="g2note">还没有找到装备——去野外翻翻宝箱和尸体吧。</span>'}</div>
+<div class="g2note">稀有度：${RARN.map((n, i) => `<span style="color:${RARC[i]}">${n}</span>`).join(' · ')}。词条数 = 稀有度。武器/护甲/头盔/护符的强化（+N）仍在铁匠处。</div></div></div>`;
   }
-  function showTip(html, e) { if (!tipEl) { tipEl = document.createElement('div'); tipEl.id = 'g2Tip'; document.body.appendChild(tipEl); } if (!html) { tipEl.style.display = 'none'; return; } tipEl.innerHTML = html; tipEl.style.display = 'block'; const x = Math.min(innerWidth - 290, e.clientX + 14), y = Math.min(innerHeight - tipEl.offsetHeight - 8, e.clientY + 10); tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px'; }
-  function toggle(v) {
-    css(); defs();
-    if (!pn) {
-      pn = document.createElement('div'); pn.id = 'g2Pn'; document.body.appendChild(pn);
-      ['mousedown', 'pointerdown', 'wheel'].forEach(ev => pn.addEventListener(ev, e => e.stopPropagation()));
-      pn.addEventListener('mousemove', e => { const s = e.target.closest('[data-pos],[data-old],[data-inv]'); if (!s) return showTip(null); if (s.dataset.pos) { const it = SS().eq[s.dataset.pos]; showTip(it ? tipFull(it) : `<b>${POS.find(p => p[0] === s.dataset.pos)[2]}</b><div style="color:#999">空——野外找到${SL[POS.find(p => p[0] === s.dataset.pos)[1]].n}后穿上</div>`, e); } else if (s.dataset.old) showTip(oldTip(s.dataset.old), e); else { const o = pn._L[+s.dataset.inv][0]; showTip(o.g2 ? tipFull(o) + '<div style="color:#ffd890;margin-top:4px">左键：穿上</div>' : oldTip(Sack.IT[o.id].slot).replace(/^[\s\S]*?<\/div>/, `<div style="font-weight:800">${esc(Sack.nameOf(o))}</div>`) + '<div style="color:#ffd890">左键：装备（替换当前）</div>', e); } });
-      pn.addEventListener('mouseleave', () => showTip(null));
-      pn.addEventListener('click', e => {
-        if (e.target.closest('[data-x]')) return toggle(false);
-        const s = e.target.closest('[data-pos],[data-inv]'); if (!s) return; showTip(null);
-        if (s.dataset.pos) return unequip(s.dataset.pos);
-        const [o, w] = pn._L[+s.dataset.inv], I = Sack.inv();
-        const back = w === 'sack' ? (x => { if (!Sack.addTo(I.sack, x)) Sack.stashAdd(x); }) : (x => Sack.stashAdd(x));
-        if (w === 'sack') I.sack.items.splice(I.sack.items.indexOf(o), 1); else I.stash.splice(I.stash.indexOf(o), 1);
-        if (o.g2) equip(o, back); else Sack.equip(o, back);
-        bust(); render();
-      });
-    }
-    const open = v == null ? !pn.classList.contains('on') : v; if (open) render(); else showTip(null); pn.classList.toggle('on', open);
-    try { if (open) G.setUI(true); else { G.setUI(false); G.lockPointer && G.lockPointer(); } } catch (e) { }
+  function render() { if (window.R35UI && R35UI.isOpen('gear')) R35UI.render(); }
+  function showTip(html, e, col) { if (!tipEl) { tipEl = document.createElement('div'); tipEl.id = 'g2Tip'; document.body.appendChild(tipEl); } if (!html) { tipEl.style.display = 'none'; return; } tipEl.innerHTML = html; tipEl.style.setProperty('--tc', col || 'rgba(231,194,122,.5)'); tipEl.style.display = 'block'; const x = Math.min(innerWidth - tipEl.offsetWidth - 8, e.clientX + 16), y = Math.min(innerHeight - tipEl.offsetHeight - 8, e.clientY + 12); tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px'; }
+  function onMove(e) {
+    const s = e.target.closest('[data-pos],[data-old],[data-inv]'); if (!s) return showTip(null);
+    if (s.dataset.pos) { const it = SS().eq[s.dataset.pos], P = POS.find(p => p[0] === s.dataset.pos); showTip(it ? tipFull(it) + '<div style="color:#ffd890;margin-top:5px">左键：卸下</div>' : `<div class="tn">${P[2]}</div><div style="color:#999">空 —— 野外找到${SL[P[1]].n}后穿上</div>`, e, it ? RARC[it.g2.rar] : null); }
+    else if (s.dataset.old) showTip(oldTip(s.dataset.old), e);
+    else { const o = LIST[+s.dataset.inv][0]; showTip(o.g2 ? tipFull(o) + '<div style="color:#ffd890;margin-top:5px">左键：穿上</div>' : oldTip(Sack.IT[o.id].slot, o) + '<div style="color:#ffd890;margin-top:5px">左键：装备（替换当前）</div>', e, o.g2 ? RARC[o.g2.rar] : null); }
   }
-  addEventListener('keydown', e => { if (!on() || !window.G || !G.S) return; if (e.code === 'KeyZ' && !e.repeat && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) { e.preventDefault(); toggle(); } else if (e.code === 'Escape' && pn && pn.classList.contains('on')) { e.stopImmediatePropagation(); toggle(false); } }, true);
+  function onClick(e) {
+    const s = e.target.closest('[data-pos],[data-inv]'); if (!s) return; showTip(null);
+    if (s.dataset.pos) return unequip(s.dataset.pos);
+    const [o, w] = LIST[+s.dataset.inv], I = Sack.inv();
+    const back = w === 'sack' ? (x => { if (!Sack.addTo(I.sack, x)) Sack.stashAdd(x); }) : (x => Sack.stashAdd(x));
+    if (w === 'sack') I.sack.items.splice(I.sack.items.indexOf(o), 1); else I.stash.splice(I.stash.indexOf(o), 1);
+    if (o.g2) equip(o, back); else Sack.equip(o, back);
+    bust(); render();
+  }
+  function toggle(v) { if (!window.R35UI) return; if (v === false) { if (R35UI.isOpen('gear')) R35UI.close(); } else if (v === true) R35UI.open('gear'); else R35UI.toggle('gear'); }
+  if (window.R35UI) R35UI.reg('gear', { n: '💍 装备', title: '装 备', on, html: panelHTML, click: onClick, move: onMove, leave: () => showTip(null) });
+  addEventListener('keydown', e => { if (!on() || !window.G || !G.S) return; if (e.code === 'KeyZ' && !e.repeat && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) { if (window.UI && UI.open) return; e.preventDefault(); toggle(); } }, true);
   hook(); setTimeout(hook, 0); addEventListener('load', hook);
   return { on, SL, POS, AF, UNQ, make, name, rollLoot, dropFor, equip, unequip, sum, hitMul, avgMul, hateMul, senseMul, tipBody, tipFull, toggle, owns: o => !!(o && o.g2), get lastCrit() { return lastCrit; }, _bust: bust };
 })();
