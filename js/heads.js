@@ -120,8 +120,30 @@ window.ModelHeads = (() => {
     const k = (w && w > 0.09) ? NORM_W / w : 1.2;
     return Math.max(1, Math.min(1.4, k));
   }
+  // R30 MOD head_norm2：以前只放大不缩小（1~1.4）且只看脸宽 → 星铁/绝区零/异环/经典 MMD（脸宽≈0.20）成了大头娃娃，脸宽测歪的成了小头/大头怪。
+  // 现在：脸宽对标 0.16（VRoid），两眼间距对标 0.16×0.46（MMD 画风眼距/脸宽中位）；两者一致取几何平均，不一致信更接近 1 的那个（面具/狐耳撑大脸宽时信眼距）；可缩可放 0.5~1.5；分歧时用包围盒高裁决。
+  function irisIPD(meshes) {
+    const v = new THREE.Vector3(); let lx = 0, ln = 0, rx = 0, rn = 0;
+    for (const m of meshes) { const mt = [].concat(m.material)[0]; if (!mt || !/Iris/i.test(mt.name || '')) continue;
+      m.updateWorldMatrix(true, false); const p = m.geometry.attributes.position; if (!p) continue; const st = Math.max(1, Math.floor(p.count / 400));
+      for (let i = 0; i < p.count; i += st) { v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld); if (v.x > 0) { lx += v.x; ln++; } else { rx += v.x; rn++; } } }
+    if (ln < 3 || rn < 3) return 0; const d = lx / ln - rx / rn; return d > 0.02 && d < 0.3 ? d : 0;
+  }
+  function normK2(entry, meshes) {
+    if (entry.grp !== 'mmd') return 1;
+    const w = entry.skinW, ipd = irisIPD(meshes);
+    const kw = w && w > 0.06 && w < 0.5 ? 0.16 / w : 0, ki = ipd ? 0.16 * 0.46 / ipd : 0;
+    // 第三指标（只做裁决）：整颗头含头发的包围盒高，对标 VRoid 中位 0.316——发量会让它偏，但足够在前两者之间二选一
+    const bh = Array.isArray(entry.box) ? entry.box[1][1] - entry.box[0][1] : 0, kb = bh > 0.05 ? 0.316 / bh : 0;
+    const near = (a, b) => !kb ? (Math.abs(Math.log(a)) < Math.abs(Math.log(b)) ? a : b) : (Math.abs(Math.log(a / kb)) < Math.abs(Math.log(b / kb)) ? a : b);
+    let k;
+    if (kw && ki) k = Math.abs(Math.log(kw / ki)) < 0.25 ? Math.sqrt(kw * ki) : near(kw, ki);
+    else { k = kw || ki || kb || 1; if (kb && Math.abs(Math.log(k / kb)) > 0.5) k = kb; }
+    entry._normW = w; entry._normIPD = ipd; entry._normKB = kb;
+    return Math.max(0.5, Math.min(1.5, k));
+  }
   function normSize(entry, meshes) {
-    const k = normK(entry); entry._normK = k; if (k === 1) return;
+    const k = (window.Mods && Mods.on('head_norm2')) ? normK2(entry, meshes) : normK(entry); entry._normK = k; if (Math.abs(k - 1) < 0.01) return;
     const done = new Set();
     for (const m of meshes) {
       const g = m.geometry; if (!g || done.has(g)) continue; done.add(g);

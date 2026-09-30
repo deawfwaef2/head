@@ -1207,3 +1207,14 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **MOD `audio_mixer`（js/sfx.js + js/mixer.js，默认开）**：sfx.js 新增分通道 `SFX.bus(k)`：`sfx`（= `SFX.out`，老代码默认进这里）/`ui`/`voice`/`amb`/`steps`/`music`，全部 → master(0.8×总音量) → 压缩器。`SFX.VOL / VDEF / setVol(k,v)`，存 `localStorage.soulhead_vol`。HTMLAudio BGM 音量 = 0.45 × music × master（**默认 music 0.5 = 以前的一半**）；`duck()` 尊重当前音量。已改接：ambience→amb、steps→steps、persona 语音→voice、seance 八音盒→music、ui3a 合成界面音→ui、`SFX.play` 的 click/select/confirm/error/open/close/page/book → ui。面板：右上角 `#musicCorner` 改为「🔊 音量」，`#menu` 里 BGM 按钮后插「🔊 音量」；M 键仍开关 BGM。**新增音效请接 `SFX.bus('对应通道')`，不要直接接 `ctx.destination`。**
 - **MOD `hit_impact`（js/impact.js，默认开）**：包一层 `CombatFX.event`（原函数先执行）。hit：受害者 `mixer.timeScale=0` 60ms（重斩/破绽 115ms），击杀 150ms（只延长不缩短）；沿 `Combat.state.sw.v` 方向在命中处画刃光（DOM，重斩/击杀更宽更红，格挡/弹刀黄色火花）；叠加 115→40Hz 闷响 + 带通噪声（sfx 通道）；击杀红色屏幕边缘脉冲、重斩白色。玩家镜头与操作不冻结（用户以前把慢动作视为卡顿）。
 - 测试：桩页（真 three.js/mods.js/sfx.js + 假 Worlds/Foe/Beasts/Combat）Playwright：数字合并 `54×3`、血条宽度/白条延迟/击杀、面板 7 行滑块实时改 GainNode、顿帧恢复、刃光方向（向右下 = 左上→右下）。**完整 index.html / _t.html 在本沙箱仍 OOM（/tmp 在内存里），未整机测试**——请用户试玩反馈数值（顿帧时长、刃光粗细、血条大小）。
+## R30 — 用户：“只有 VRoid 的头和身体是适配的，其他都是大头娃娃或者小头怪物”
+- **根因**：第二十四轮 `head_norm` 只处理 mmd 组、**只放大不缩小**（k∈[1,1.4]）、只看脸宽 skinW（对标 0.155）。星铁/绝区零/异环/R27 经典 MMD 的 skinW≈0.19–0.30 → 从不缩小 → 大头娃娃（あにまさ式 0.28–0.30 最夸张）；skinW 被狐耳/帽子/面具撑大或测歪的头（HSR_Hysilens 1.287、GI_LaSignora 0.033 等）→ 大/小头怪。
+- **MOD `head_norm2`**（默认开，开启时旧 head_norm 不生效；js/heads.js normK2/irisIPD，normSize 里切换）：
+  1. 脸宽 kw = 0.16 / skinW（VRoid 中位 0.160）。
+  2. 两眼间距 ki = 0.16×0.46 / ipd（解析时从材质名含 Iris 的网格左右均值实时算；0.46 = MMD 画风 眼距/脸宽 中位，VRoid 是 0.39）。
+  3. 两者 |ln(kw/ki)|<0.25 → 几何平均；否则用第三指标 kb = 0.316 / 包围盒高（VRoid 中位，含头发）裁决取更接近的那个。只有一个指标时与 kb 差太大（|ln|>0.5）改用 kb。
+  4. 可缩可放，夹 [0.5, 1.5]；只作用于 grp==='mmd'，VRoid 不动。
+  - 离线核对（tools/headmetric.py 统计 121 个头：ipd / skinW / 眼→下巴[不可靠，未用]）：あにまさ四人 ≈0.56、HSR/ZZZ/NTE ≈0.75–0.9、GI ≈1.2–1.36（与旧值一致）、Castorice/Hysilens/八云/三笠/八重/久岐/优菈 这些分歧头都被 kb 裁到正确一侧。
+  - 实拍：同一身体上 VRoid/GI/HSR/ZZZ/NTE/CLS 头大小一致；Vita/芙宁娜/北斗/光/样本B/Osage 六具身体上头身比例正常。
+- 工具：tools/headmetric.py（新增）。截图脚本 foeshot.py/js 备份在工作区 bak/tools（MODS / ZOOM 环境变量，截图时隐藏手持武器）。
+- 改动文件：js/heads.js（normSize 前新增 irisIPD / normK2）、js/mods.js（+1 MOD，紧跟 head_norm）、tools/headmetric.py、HANDOFF.md。
