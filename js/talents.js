@@ -11,8 +11,9 @@ window.Talents = (() => {
   const toast = (t, c, s) => { try { G0().toast && G0().toast(t, c || '#ffd27a', s || 1.4); } catch (e) { } };
 
   // ================= 存档状态 =================
+  let LAST = null; // 最近一次 RPG.stats(S) 传进来的存档（游戏启动早期 window.G 还没建好时 RPG.stats 就会被调用，G0().S 会炸）
   function tal(S) {
-    S = S || G0().S; let t = S.tal;
+    S = S || (G0() && G0().S) || LAST; if (!S) return { at: {}, n: {}, bar: new Array(20).fill(null), ver: 0, free: 0, hist: [], seen: 0 }; let t = S.tal;
     if (!t) t = S.tal = { at: {}, n: {}, bar: new Array(20).fill(null), ver: 1, free: 0, hist: [], seen: 0 };
     if (!t.bar || t.bar.length < 20) t.bar = (t.bar || []).concat(new Array(20 - (t.bar || []).length).fill(null));
     return t;
@@ -21,7 +22,7 @@ window.Talents = (() => {
 
   // ================= 等级 / 点数 =================
   const need = lv => Math.round(28 + 9 * Math.pow(lv, 1.6)); // 升到下一级所需经验（比旧曲线后期平缓，保证 Lv 30+ 也练得到）
-  const lv = () => (window.RPG ? RPG.lvOf(G0().S.xp).lv : 1);
+  const lv = () => (window.RPG && G0() && G0().S ? RPG.lvOf(G0().S.xp).lv : 1);
   function pts() {
     const S = G0().S, l = lv(), b = Math.min(10, Object.keys(S.bosses || {}).length), el = Math.min(6, S.el && S.el.dead ? Object.keys(S.el.dead).length : 0);
     return { attr: 3 * (l - 1), skill: l + 1 + Math.floor(l / 10) + b + el, boss: b, elite: el };
@@ -84,9 +85,9 @@ window.Talents = (() => {
   function save() { try { G0().save && G0().save(); } catch (e) { } }
 
   // ================= 属性接入（rpg.stats 钩子）=================
-  function bonus(S, bb) { if (!on()) return bb; const t = tal(S), o = Object.assign({}, bb); for (const k in t.at) o[k] = (o[k] || 0) + (t.at[k] || 0); return o; }
+  function bonus(S, bb) { if (!on()) return bb; LAST = S; const t = tal(S), o = Object.assign({}, bb); for (const k in t.at) o[k] = (o[k] || 0) + (t.at[k] || 0); return o; }
   function post(S, o) {
-    if (!on()) return; const a = agg(); tal(S);
+    if (!on()) return; LAST = S; const a = agg(); tal(S);
     if (a.hpP) o.maxHp = Math.round(o.maxHp * (1 + a.hpP / 100));
     o.crit = 5 + (a.crit || 0) + o.agi * 0.25; o.critD = 150 + (a.critD || 0) + o.ter * 1.5;
     o.manaMax = Math.round(60 + o.soul * 3 + (a.mana || 0)); o.manaReg = 2 + o.soul * 0.08 + (a.manaReg || 0);
