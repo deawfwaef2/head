@@ -1078,3 +1078,16 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 入口：game.js `KeyF`（手里/看着首级 → `Recall.open`，否则仍是 Combat.toggle；I 键同），档案卡新增「🧠 回忆她」按钮并遮罩未想起的项。回忆界面期间主场景暂停渲染（`Recall.active`）。
 - 手模型：`limb_hand_avatar` 染色 + 前臂圆柱 + 护腕（无专用主角模型，未新增资源）。
 - 未做/待做：世界内（Worlds）F 仍是战斗姿态，回忆只在洞内；棋盘/卡牌里实际使用她的 profile 只做了展示（chess 的 XS 由 `HeadGame.chessExtra` 提供，棋局接入需 chess.js 里调用 `place`）。
+
+---
+## 第二十六轮（Arena Agent）· 用户反馈（原话要点，长期有效）
+- 沿用约束：每次编程前读 HANDOFF；**只追加不覆盖**；**阶段性频繁 commit+push**（不要做完再存，网站可能中断/回退）；**任何时刻根目录 `index.html` 双击可玩**；工作区 < 128MB；优先打包 HTML。
+- **装备系统**：基地里**不能用资源（魂晶/材料）换装备**；资源**只能升级（强化/附魔）现有装备**；**要装备必须去野外搜刮**。（第二十二轮续 8 的 `forge.js` MOD `forge_buy` 允许花魂晶直接买阶 = 违反此规则，本轮关闭。）
+- **打不死人**：攻击野怪和人都打不死 → 查根因并修。
+- **战斗手感**“一坨屎”→ 要**大师级**调整强化战斗系统，操作要非常爽、玩家体验好。
+- **敌人类型要更多**。
+
+### 本轮工作区处理（重要）
+- 仓库 ~426MB（含 `big/` 122MB + `.git` 155MB），远超 128MB。本轮把完整克隆放在 **`/var/work/head`**（根盘，不在 `/home/user` 快照里），`/home/user` 保持为空；token 只在 `/var/work/head/.git/config`（不进快照）。**会话重置后 /var/work 会丢：一切以 GitHub 为准，所以必须频繁 push。**
+- 测试工具入库在 `tools/test/`：`mk_t.py`（生成轻量 `_t.html`，只留 3 个头模）、`run.py <page> <script.js> [wait] [png]`（playwright headless，需 `PLAYWRIGHT_BROWSERS_PATH=/var/work/pw`、`python3 -m http.server 8080` 在仓库根目录）。完整 `index.html` 在 2GB 沙箱里仍会 OOM，测试只用 `_t.html`。
+- PAT 由用户在聊天里给出：不写入仓库；请用户用完后撤销/轮换。
