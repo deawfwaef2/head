@@ -135,12 +135,27 @@ window.Memory = (() => {
       },
       cols: () => [[-0.45, 0, -0.12, 0.45, 1.8, 0.12]]
     };
+    C.wartable = {
+      cat: 'func', n: '征途沙盘', icon: '🗺️', base: 260, grow: 2.0, max: 1, fp: [1.4, 0.9], stat: { ter: 2, agi: 1 }, depth: 1,
+      desc: '洞里的出征台：按 E 在沙盘上三选一决定下一站（地点卡片、预览图、风险和使者线索都在这里）。摆了沙盘，整个洞穴就有了“出发”的仪式感',
+      make() {
+        const g = new THREE.Group(); const A = Assets;
+        const tb = ['chinese_console_table', 'WoodenTable_01', 'round_wooden_table_02'].find(n => A.has(n));
+        if (tb) g.add(A.fit(tb, { w: 1.3 })); else g.add(BC.box(1.3, 0.8, 0.8, BC.M.dark, 0, 0.4, 0));
+        const ln = ['Lantern_01', 'wooden_lantern_01'].find(n => A.has(n));
+        if (ln) { const h = A.fit(ln, { h: 0.4, x: -0.42, y: 0.8 }); if (h) { g.add(h); g.add(BC.flame(-0.42, 0.98, 0, 0.5, '#ffb04a')); } }
+        return g;
+      },
+      cols: () => [[-0.65, 0, -0.4, 0.65, 0.9, 0.4]]
+    };
     if (window.Unlocks && Unlocks.R && !Unlocks.R.memory) Unlocks.R.memory = [S => ((S.stats && S.stats.trips) || 0) >= 1, '第一次出猎归来，你开始频繁想起那些不属于你的记忆——洞里需要一面能回答的镜子。'];
   }
   function initHooks() {
     const w = setInterval(() => {
       if (!window.G || !G.HOOK || !window.BuildCat) return; clearInterval(w); registerBuild();
       G.HOOK.e.push((hit, held, pickup) => { const b = hit && hit.build; if (!b || held || pickup || b.type !== 'memory' || !on()) return false; open({ altar: 1 }); return true; });
+      G.HOOK.e.push((hit, held, pickup) => { const b = hit && hit.build; if (!b || held || pickup || b.type !== 'wartable' || !on()) return false; try { if (window.SFX && SFX.open) SFX.open(); UI.openExpedition(); } catch (e) { } return true; });
+      G.HOOK.tip.push((hit, held) => { const b = hit && hit.build; if (!b || held || b.type !== 'wartable' || !on()) return null; let h = ''; try { if (window.Saga && Saga.on()) h = ' · ' + Saga.hint(Elites.victoryState()); } catch (e) { } return `<b>🗺️ 征途沙盘</b> · <b>[E]</b> 三选一决定下一站${h}`; });
       G.HOOK.tip.push((hit, held) => { const b = hit && hit.build; if (!b || held || b.type !== 'memory' || !on()) return null; return `<b>🪞 回忆之镜</b>（可用技能点 ${left()}） · <b>[E]</b> 唤醒回忆（4 选 1 · 首次重抽免费）`; });
     }, 400);
   }
