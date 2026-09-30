@@ -48,6 +48,7 @@ window.Mods = (() => {
     { id: 'head_norm', cat: 'look', icon: '📏', n: '头模尺寸归一（第二十四轮）', d: 'MMD 管线的头比 VRoid 头小约两成，挂在身体上显得特别小。载入时按脸宽等比放大到标准尺寸（需重新载入）。', def: true },
     { id: 'head_norm2', cat: 'look', icon: '📐', n: '头身比例修正（R30，取代上一项）', d: '所有非 VRoid 头按脸宽+两眼间距双指标归一到 VRoid 标准，可缩可放：星铁/绝区零/异环/经典 MMD 不再是大头娃娃，测歪的头不再是小头怪。开启时上一项“头模尺寸归一”不生效。需重新载入。', def: true },
     { id: 'anime_shade', cat: 'look', icon: '🎎', n: '二次元光影（R36）', d: '角色（头、头发、身体）的光照改成二次元风格：亮面平涂、暗面统一抬到约 80% 并染暖粉阴影色、中间软过渡，去掉塑料感的高光与环境镜面反射，加一圈淡淡边缘光。天空/太阳/篝火/阴影照常响应，极暗环境仍然是暗的。需重新载入。（R36b：用户要 3D 着色器风格，默认改为关；想要平涂二次元可在这里打开。）关闭=R33 的真实 PBR 受光。', def: false },
+    { id: 'head_native', cat: 'look', icon: '🧷', n: '头保持原样：不混搭发型/饰品（R36b）', d: '每颗头就是它自己：脸、发型、头饰来自同一个模型，不再把别的头的发型/饰品拼上去（原神等 MMD 头拼起来很违和）；MMD 头也不再额外叠程序化头饰。这个 MOD 会在读档时把“跨头发型 hair_mix2 / 跨头饰品库 acc_mix”关掉；想要混搭就关本 MOD 并手动打开那两项。需重新载入。', def: true },
     { id: 'skin_sss', cat: 'look', icon: '🫧', n: '皮肤次表面散射 · 3D 真人质感（R36b）', d: '在 PBR 上只对肤色像素加：明暗交界带的血红色散射、背光侧暖色填充、掠射角的红色透光边（耳朵/鼻翼）、压低塑料硬高光并加一圈极淡的油脂光泽。头发和衣服不受影响，极暗环境不抬亮。需重新载入。', def: true },
     { id: 'head_pbr', cat: 'look', icon: '💡', n: '头部真实受光（R33）', d: '头/头发/眼睛/饰品从“卡通材质”（只有 4 级色阶、不吃天空环境光、不响应光照方向）改为与身体相同的 PBR 材质：同一套灯光、同一张环境图、同一条曲线。阳光/篝火/阴影下头会像身体一样亮暗变化，不再在所有环境里都暗沉发灰。需重新载入。关闭=旧的卡通头。', def: true },
     { id: 'head_norm3', cat: 'look', icon: '📏', n: '头型再收一圈（R33）', d: '在脸宽/眼距对齐 VRoid 之后，非 VRoid 头整体再缩 5%，并且发量/发饰/兽耳撑大整颗头轮廓的（含头发包围盒高超过 VRoid 中位）按比例再收，最多到 82%。需重新载入。', def: true },
@@ -161,6 +162,7 @@ window.Mods = (() => {
   if (st.__v < 6) { st.ogre_hunters = false; st.hunters2 = true; st.__v = 6; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R35：旧食人魔猎手 → 四名主角式猎手
   if (st.__v < 7) { st.dev_mode = false; st.__v = 7; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R37：开发者模式默认关闭（用户要求），旧存档迁移一次
   if (st.__v < 8) { st.anime_shade = false; st.__v = 8; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R36b：用户要 3D shader 风格，二次元光影默认关（旧存档迁移一次）
+  if (st.__v < 9) { st.hair_mix2 = false; st.acc_mix = false; st.__v = 9; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R36b：用户不要头发/头/饰品混搭绑定（原神头搭配很违和）
   for (const m of LIST) if (st[m.id] === undefined) st[m.id] = !!m.def;
   // 修正非法状态（互斥组恰好一个；冲突；依赖）
   function normalize() {

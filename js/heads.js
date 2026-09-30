@@ -1290,7 +1290,7 @@ window.ModelHeads = (() => {
         const geo = fitAcc(F, S, a, F.meta.file + '|' + H.meta.file + '|' + e.f + '|' + e.n); if (!geo) continue;
         const c = new THREE.Mesh(geo, getMat(a.m, a.t)); c.name = '__AX__' + e.n; c.renderOrder = 2; g.add(c); }
     } catch (err) { console.warn('acc_mix', err); }
-    if (window.HeadWear && look.hw && look.hw.length && (!window.Mods || Mods.on('headwear'))) try { HeadWear.build({ g, look, S, onShell, grad, disp: disposables }); } catch (e) { console.warn('headwear', e); }
+    if (window.HeadWear && look.hw && look.hw.length && (!window.Mods || Mods.on('headwear')) && !(window.Mods && Mods.on('head_native') && (() => { const fi = idxOf(look.f); return fi >= 0 && T[fi].meta.grp === 'mmd'; })())) try { /* R36b head_native：MMD/原神头自带发型和头饰，不再额外叠程序化头饰 */ HeadWear.build({ g, look, S, onShell, grad, disp: disposables }); } catch (e) { console.warn('headwear', e); }
     const radius = 0.1;
     return {
       group: g, U, radius, meta: F.meta, hl: hlMeshes, presets,
