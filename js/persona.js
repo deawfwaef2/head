@@ -37,7 +37,8 @@ window.Persona = (() => {
     if (!on() || !fo || fo.boss) return;
     if (voiceOn()) loadVoice(); // 进场就开始异步加载语音（~1.4MB，不阻塞）
     const c = fo.h && fo.h.c; const k = archOf(c), P = A[k], h = hash((c && c.name) || fo.id2 || '');
-    fo.per = { k, P, pitch: P.rate * (0.95 + h * 0.1), lastV: -1e9, title: `【${P.n}${ROLE_N[fo.role] ? '·' + ROLE_N[fo.role] : ''}】${(c && c.name) || ''}` };
+    const h2 = hash(((c && c.name) || fo.id2 || '') + '#v'), vk = (PL().p[k + '2'] && h2 < 0.5) ? k + '2' : k; // 第二十四轮(6)：同性格有两套声线/台词时按名字哈希分配
+    fo.per = { k, vk, P, pitch: P.rate * (0.95 + h * 0.1), lastV: -1e9, title: `【${P.n}${ROLE_N[fo.role] ? '·' + ROLE_N[fo.role] : ''}】${(c && c.name) || ''}` };
     fo.iq = Math.max(0.2, Math.min(1.3, fo.iq + P.iq));
     if (fo.role !== 'berserk') { const rr = r ? r() : Math.random(); fo.brave = fo.armed ? rr < Math.max(P.brave, 0.35) : rr < P.brave * 0.8; }
     if (P.noRetreat) fo.retreated = true;
@@ -57,9 +58,9 @@ window.Persona = (() => {
   // key → 台词文字（同时播语音）；voiceOnly=true 时只播语音不返回文字（喝声/痛呼）
   function line(fo, key, voiceOnly) {
     if (!on() || !fo || !fo.per) return null;
-    const d = PL().p[fo.per.k]; if (!d) return null; const ii = idx(key); if (!ii.length) return null;
+    const vk = fo.per.vk || fo.per.k, d = PL().p[vk]; if (!d) return null; const ii = idx(key); if (!ii.length) return null;
     let i = ii[Math.floor(Math.random() * ii.length)]; if (ii.length > 1 && i === fo.per.lastI) i = ii[(ii.indexOf(i) + 1) % ii.length]; fo.per.lastI = i;
-    voice(fo, fo.per.k, i, key);
+    voice(fo, vk, i, key);
     return voiceOnly ? null : d.l[i];
   }
   // 语音：按需加载 voice/voice.js → 单条解码缓存 → 立体声方位 + 距离衰减；同时最多 2 条，同一人 ≥1.2s 间隔
