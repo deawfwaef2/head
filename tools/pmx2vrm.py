@@ -8,7 +8,7 @@ P = read(src); S = 0.08
 pos = P['pos'] * S; pos[:, 2] *= -1
 nrm = P['nrm'].copy(); nrm[:, 2] *= -1
 def cls(n):
-    if n.endswith('+') or 'spa' in n.lower() or 'sph' in n.lower(): return None
+    if n.endswith('+') or 'spa' in n.lower() or 'sph' in n.lower() or n.lower().startswith('mmd_edge') or 'edge' in n.lower(): return None  # 描边外壳
     if any(k in n for k in ('白目', '眼白', 'eyewhite', 'EyeWhite')): return '_EYE_EyeWhite'
     if any(k in n for k in ('星', 'ハイライト', '高光', 'highlight', 'Highlight', 'hl')): return '_EYE_Highlight'
     if any(k in n for k in ('脸红', '頬', '照れ', '红晕', 'cheek', '黑', '影', 'shadow')): return '_FACE_Cheek'

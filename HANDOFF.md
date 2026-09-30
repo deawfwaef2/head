@@ -1091,3 +1091,11 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 仓库 ~426MB（含 `big/` 122MB + `.git` 155MB），远超 128MB。本轮把完整克隆放在 **`/var/work/head`**（根盘，不在 `/home/user` 快照里），`/home/user` 保持为空；token 只在 `/var/work/head/.git/config`（不进快照）。**会话重置后 /var/work 会丢：一切以 GitHub 为准，所以必须频繁 push。**
 - 测试工具入库在 `tools/test/`：`mk_t.py`（生成轻量 `_t.html`，只留 3 个头模）、`run.py <page> <script.js> [wait] [png]`（playwright headless，需 `PLAYWRIGHT_BROWSERS_PATH=/var/work/pw`、`python3 -m http.server 8080` 在仓库根目录）。完整 `index.html` 在 2GB 沙箱里仍会 OOM，测试只用 `_t.html`。
 - PAT 由用户在聊天里给出：不写入仓库；请用户用完后撤销/轮换。
+
+## 第二十五轮（续）：MMD 头模包 + 魂阶外貌差异 + 后脑补全
+- **js/headpacks.js（新）**：按 MOD `pack_hsr / pack_zzz / pack_nte` 用 document.write 同步插入 `models/<包>_<名>.js`（file:// 可玩；关掉的包完全不加载，启动不变慢；文件缺失只 404）。index.html 在 `models/GI_LaSignora.js` 后加了一行 `<script src="js/headpacks.js">`。
+  - 头模来源：phoshco.github.io 镜像的官方 MMD（星穹铁道 12、绝区零 11、异环 9，共 32 个，全部成年外观）。**原规约禁止二次配布/猎奇 → 仅限私人仓库**。仓库仍公开时这些 .js 不提交（本地 .git/info/exclude 已排除）。
+  - 管线：`tools/pmx2vrm.py`（修：跳过 `mmd_edge.*` 描边外壳材质，否则月城柳整个头被白壳罩住）→ `tools/vrm2head.py --grp mmd --noflip --hair-drop 0.04 --sc 1.25`。穗鸟（vrm2head OOM）、塞西莉亚（无头骨）跳过。鸣潮是 .bpmx，暂未写解析器。
+- **MOD nape_fill（heads.js，默认开）**：MMD 脸模只是前面具，后脑/后颈空（从后下方看到脸的内侧、眼睛透过头发）。`napeGeo(t)` 用本头脸部皮肤顶点（取每个方向最内侧）+ 耳平面镜像 + 断面圆，建径向壳（横向 ×0.9，下半竖向 ×0.99），皮肤色卡通材质，名 `__NAPE__`，每模板缓存一次。仅 grp mmd。
+- **MOD tier_look（heads.js + headwear.js，默认开）**：`tierFace()` 按魂阶加权挑脸（MMD 权重 0.15→3.5，其它 1.5→0.45）；`tierLook()` 用 look.seed 独立随机（不打乱原有抽签）：凡魂朴素发色 90%、无挑染/异色瞳、acc 清空、更苍白；灵魂 acc 减半；圣魂 50% 额饰；神魂 75% 王冠/冠冕/额饰（MMD 头只加细额饰）、挑染/异色瞳/25% 发光瞳。headwear.roll 概率 ×[0.35,0.7,1,1.25,1.45]。只影响新生成的首级（look 已存档的不变）。
+- 测试工具（不在仓库）：hb2.py/hb3.py + headback.js/tier.js 渲染背面/魂阶对比。

@@ -40,8 +40,9 @@ window.HeadWear = (() => {
     const tryAdd = (k) => { const g = GROUP[k]; if (out.length >= 2 || used.has(g) || blocked.has(g) || blocked.has(k)) return; if ((g === 'hat' && used.has('band')) || (g === 'band' && used.has('hat'))) return; used.add(g); out.push(mk(k, r)); };
     if (acc.includes('flowers')) tryAdd('flowercrown');
     const T = BY_ID[c && c.id] || {};
-    for (const k of Object.keys(T)) if (r() < T[k]) tryAdd(k);
-    for (const k of Object.keys(EXTRA)) if (r() < EXTRA[k] * (out.length ? 0.4 : 1)) tryAdd(k);
+    const tf = (window.Mods && Mods.on('tier_look') && c) ? [0.35, 0.7, 1, 1.25, 1.45][Math.max(0, Math.min(4, c.rar | 0))] : 1; // 第二十五轮 MOD tier_look：低魂阶少头饰、高魂阶多
+    for (const k of Object.keys(T)) if (r() < T[k] * tf) tryAdd(k);
+    for (const k of Object.keys(EXTRA)) if (r() < EXTRA[k] * tf * (out.length ? 0.4 : 1)) tryAdd(k);
     return out;
   }
   function mk(k, r) {

@@ -582,7 +582,7 @@ window.ModelHeads = (() => {
     return { t: T.n, ew: q(u(T.ew)), eh: q(u(T.eh)), tilt: q(u(T.tilt)), sp: q(u(T.sp)), dy: q(u(T.dy)), bs: q(u(T.bs)), bt: q(u(T.bt)), bdy: q(u(T.bdy)), fx: q(u(T.fx)), fy: q(u(T.fy)), fz: q(u(T.fz)) };
   }
   function randomLook(r, race = {}, rarity = 0) {
-    const faceIdx = race.faces ? Math.max(0, idxOf(pick(r, race.faces))) : Math.floor(r() * T.length);
+    const faceIdx = race.faces ? Math.max(0, idxOf(pick(r, race.faces))) : tierFace(r(), rarity); // 第二十五轮 MOD tier_look：按魂阶加权挑脸模
     const face = T[faceIdx];
     const grp = face.meta.grp || 'vroid';
     const allHair = T.map((t, i) => i).filter(i => T[i].hairMeshes.length && !T[i].meta.noHair);
@@ -645,7 +645,37 @@ window.ModelHeads = (() => {
       delete LOOK.hx; delete LOOK.hn3; LOOK.skinHex = '#fbe6da'; LOOK.pale = 0.04;
       if (ra < 0.5) LOOK.acc = LOOK.acc.filter(a => a !== 'witchhat' && a !== 'crown'); else LOOK.acc = [];
     }
+    if (window.Mods && Mods.on('tier_look')) tierLook(LOOK, race, rarity, grp);
     return LOOK;
+  }
+  // ---------- 第二十五轮 MOD tier_look：魂阶外貌差异 ----------
+  // 权重：凡魂偏普通脸模，神魂偏大师级 MMD 头（自带原作头饰）
+  const TIER_MMD = [0.15, 0.45, 1, 2.2, 3.5], TIER_STD = [1.5, 1.2, 1, 0.7, 0.45];
+  const tierOf = rar => Math.max(0, Math.min(4, Math.round(+rar || 0)));
+  function tierFace(u, rarity) {
+    if (!(window.Mods && Mods.on('tier_look'))) return Math.floor(u * T.length);
+    const k = tierOf(rarity); let sum = 0; const w = T.map(t => { const x = t.meta.grp === 'mmd' ? TIER_MMD[k] : TIER_STD[k]; sum += x; return x; });
+    let t = u * sum; for (let i = 0; i < w.length; i++) { if ((t -= w[i]) <= 0) return i; } return T.length - 1;
+  }
+  const PLAIN_HAIR = ['乌黑', '深褐', '栗棕', '灰烬', '焦糖', '青灰', '奶茶', '亚麻金', '墨蓝'];
+  function tierLook(L, race, rarity, grp) {
+    const k = tierOf(rarity); let s = ((L.seed || 1) * 7919 + k * 104729) % 2147483647 || 1; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    const setHair = n => { const h = HAIR.find(x => x[0] === n); if (h) { L.hn = h[0]; L.hc1 = h[1]; } };
+    const noClash = () => !L.acc.some(a => a === 'crown' || a === 'witchhat' || a === 'tiara' || a === 'circlet' || a === 'circletS');
+    L.tier = k;
+    if (k === 0) { // 凡魂：朴素、灰扑扑
+      L.acc = []; if (!race.hair && r() < 0.9) setHair(pick(r, PLAIN_HAIR));
+      L.hn2 = L.hn; L.hc2 = L.hc1; L.en2 = L.en; L.ec2 = L.ec1; L.pale = +Math.min(0.6, L.pale + 0.1).toFixed(2);
+      if (L.hx && L.hx.s && r() < 0.6) { delete L.hx; delete L.hn3; }
+    } else if (k === 1) { L.acc = L.acc.filter(() => r() < 0.5); }
+    else if (k === 3) { // 圣魂：珠宝额饰
+      if (noClash() && r() < (grp === 'mmd' ? 0.2 : 0.5)) L.acc.push(pick(r, ['circletS', 'circlet', 'tiara']));
+    } else if (k === 4) { // 神魂：王冠 / 异色瞳 / 挑染 / 偶有发光瞳
+      if (noClash() && r() < (grp === 'mmd' ? 0.25 : 0.75)) L.acc.push(grp === 'mmd' ? 'circletS' : pick(r, ['crown', 'tiara', 'circlet']));
+      if (L.ec2 === L.ec1 && r() < 0.25) { const e = pick(r, EYE); L.en2 = e[0]; L.ec2 = e[1]; }
+      if (L.hc2 === L.hc1 && r() < 0.3) { const h = pick(r, HAIR); L.hn2 = h[0]; L.hc2 = h[1]; }
+      if (r() < 0.25) L.glowEye = 1;
+    }
   }
 
   function makeUniforms(look, faceMeta, hairMeta, hairT) {
@@ -865,6 +895,32 @@ window.ModelHeads = (() => {
     return c[Math.abs(hsh) % c.length];
   }
 
+  function napeGeo(t) {
+    if (t.napeGeo !== undefined) return t.napeGeo;
+    const skins = t.faceMeshes.filter(m => m.userData.kind === 'skin'); t.napeGeo = null; if (!skins.length) return null;
+    const bottom = t.meta.bottom != null ? t.meta.bottom : -0.1, P = [], v = new V3();
+    let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, y1 = -1e9;
+    for (const m of skins) { const A = m.geometry.attributes.position; for (let i = 0; i < A.count; i++) { v.fromBufferAttribute(A, i); if (v.y < bottom) continue; P.push(v.x, v.y, v.z);
+      x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); z0 = Math.min(z0, v.z); z1 = Math.max(z1, v.z); y1 = Math.max(y1, v.y); } }
+    if (P.length < 90) return null;
+    const eyeY = (t.meta.eye && t.meta.eye[1] != null) ? t.meta.eye[1] : (bottom + y1) / 2;
+    const zm = z0 + (z1 - z0) * 0.3, c = new V3((x0 + x1) / 2, eyeY, zm);
+    const n0 = P.length; for (let i = 0; i < n0; i += 3) { const z = P[i + 2]; if (z > zm) P.push(P[i], P[i + 1], 2 * zm - z); } // 后半：镜像
+    const cut = t.meta.cut || {}, cr = (cut.r || 0.035) * 0.95, cx = cut.x || c.x, cz = cut.z != null ? cut.z : c.z;
+    for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2; P.push(cx + Math.cos(a) * cr, bottom, cz + Math.sin(a) * cr); } // 底部：接到断面圆
+    const R = new Float32Array(NT * NP).fill(-1);
+    for (let i = 0; i < P.length; i += 3) { v.set(P[i] - c.x, P[i + 1] - c.y, P[i + 2] - c.z); const r = v.length(); if (r < 1e-5) continue; const k = binOf(v.x / r, v.y / r, v.z / r); if (R[k] < 0 || r < R[k]) R[k] = r; } // 取最内侧：壳永远在脸皮下面（眼窝不被盖住）
+    for (let pass = 0; pass < 12; pass++) for (let a = 0; a < NT; a++) for (let b = 0; b < NP; b++) {
+      const k = a * NP + b; if (R[k] > 0) continue; let s2 = 0, n = 0;
+      for (const [da, db] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const aa = a + da; if (aa < 0 || aa >= NT) continue; const kk = aa * NP + ((b + db + NP) % NP); if (R[kk] > 0) { s2 += R[kk]; n++; } }
+      if (n) R[k] = s2 / n;
+    }
+    const S = { R }, geo = new THREE.SphereGeometry(1, 40, 24), A = geo.attributes.position;
+    for (let i = 0; i < A.count; i++) { v.fromBufferAttribute(A, i).normalize(); const r = Math.max(0.02, radAt(S, v.x, v.y, v.z)), ky = v.y < 0 ? 0.99 : 0.9; // 下半只横向缩进：壳底接到断面，从下往上看不到脸的内侧
+      A.setXYZ(i, c.x + v.x * r * 0.9, Math.max(bottom + 0.002, c.y + v.y * r * ky), c.z + v.z * r * 0.9); }
+    geo.deleteAttribute('uv'); geo.computeVertexNormals(); geo.computeBoundingSphere();
+    return (t.napeGeo = geo);
+  }
   function create(look, opts = {}) {
     let fi = idxOf(look.f); if (fi < 0) fi = 0;
     let hi = idxOf(look.h); if (hi < 0) hi = fi;
@@ -920,6 +976,13 @@ window.ModelHeads = (() => {
       if (m.morphTargetInfluences) { c.morphTargetInfluences = new Array(m.morphTargetInfluences.length).fill(0); c.morphTargetDictionary = m.morphTargetDictionary; }
       byName[m.name] = c; g.add(c);
     }
+    // 第二十五轮 MOD nape_fill：MMD 脸模只是“前面具”，后脑/后颈是空的（从后下方能看到脸的内侧、眼睛透出）。
+    // 用本头自己的脸部皮肤推出头骨轮廓（前半=脸模，后半=按耳平面镜像，底部接到断面圆），略缩进藏在脸/头发里面。
+    if (F.meta.grp === 'mmd' && window.Mods && Mods.on('nape_fill')) try {
+      const ng = napeGeo(F);
+      if (ng) { const nm = new THREE.MeshToonMaterial({ color: new THREE.Color(look.skinHex || '#fbe6da').multiplyScalar(0.86), gradientMap: grad }); own.push(nm);
+        const nape = new THREE.Mesh(ng, nm); nape.name = '__NAPE__'; nape.userData.kind = 'nape'; g.add(nape); }
+    } catch (e) { console.warn('nape_fill', F.meta.file, e); }
     // 表情：持有时可热切换，不眨眼、不重建模型。
     const setExpression = (ex0 = {}) => {
       for (const m of Object.values(byName)) if (m.morphTargetInfluences) m.morphTargetInfluences.fill(0);
