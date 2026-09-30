@@ -1793,3 +1793,13 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 加固 `js/saga.js`：电影期间隐藏 HUD 改用 `body.sgcine` 类（不再改元素行内 opacity），`end()` 移除；`tick` 兜底（CN 为空就移除）；`play` 抛错时走 `end()` 恢复（含第一人称武器可见性）。**未能在无头环境复现**（headless 无 pointer lock），若仍看不到技能栏，查 `hub.js` 的 `body.hubon` 与 `talents_ui.js` 的 `show=!!W&&!W.busy&&!W.dead`。
 - 说明：洞里技能栏左侧的 Q(闪避)/E(攻击)/H(药) 是**基础动作**，不需要学习，任何时候都能用；天赋技能（1–0 槽）只在学了之后才出现。
 - 手机：项目目前无触屏控制；`index.html` 同步加载 ~135MB JS（models 100MB + assets 29MB，gzip 后约 65MB）。方案见对话。
+
+## R49-load · 加载提速（MOD `fast_load`，默认开；关掉恢复旧流程）
+用户："继续优化地图加载速度，越快越好，秒加载最好"。沙盒里 swiftshader 跑不了真实整趟进图（主线程被软件 GL 卡死 >2 分钟），所以只测了 CPU 部分（node 里的 buildNode、heads_fit 里的 populate、页内模型解码），GPU/着色器编译部分按推理处理，**没有真机数据**。
+- `worlds.js goto`：淡出 260ms 不再串行等（与加载并行，加载层在 260ms 后才显示）；末尾 `wait(60)` 去掉；新增 `kickAhead(node)`：进场第一步就 `populate(node)`（只依赖 node）→ `Foe.preload`（身体模板+UAL 动画）与 `Beasts.prefetch`（野兽模型）与 `need()` 并行。
+- `b64buf`：fast_load 下改同步 atob（实测 19 个模型：fetch(data:) 735ms vs 同步 500ms）。
+- 地形：`H` 只在内圈（RM+18）逐点求；外圈（玩不到、被雾吃）每 2 格精确求一次，其余双线性插值。内圈与旧结果逐点相同（diff 0），外圈最大偏差 ~1m（高频山脊被平滑，在雾里）。node 里 buildNode 平均 102→78ms（测试桩里很多特性关着；真实游戏地形函数更重，收益更大）。
+- `foe.js`：`template()` 并发去重（preload 与 populate 同时请求只解析一次）；`planBodies/preload` 与 populate 里选身体的逻辑一致（IdLook.apply 幂等）；populate 先 `Promise.all` 并行载入全部身体模板再顺序 build；boot 5s 后空闲时预载 UAL 动画包。`Foe.preload` 已导出。
+- `beasts.js`：新增 `prefetch(node)`。
+- `mods.js`/`mods_i18n.js`：新增 fast_load。
+- 没做/后续：着色器预编译（需真机确认变体）、`paint()` 外圈降采样、邻居地点的 body 预载（会在战斗中造成 30–60ms 卡顿，暂不做）、GLB 贴图降分辨率（会改画质）。`renderer.debug.checkShaderErrors=false` 在 r147 里收益很小（getUniforms 仍会等链接），没加。

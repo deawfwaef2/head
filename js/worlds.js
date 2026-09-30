@@ -197,7 +197,8 @@ window.Worlds = (() => {
   // 第十九轮（加载提速）：① 所有脚本并行下载 ② base64 解码交给浏览器（fetch data:）③ 贴图/模型并行解析 ④ 空闲时后台预热（邻居地点/热门地区）⑤ 进场前先渲一帧编译着色器
   const PROF = window.__wprof = []; const tp = (l, t0) => PROF.push([l, Math.round(performance.now() - t0)]);
   const b64sync = (s) => { const bin = atob(s); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; };
-  const b64buf = async (s) => { try { const r = await fetch('data:application/octet-stream;base64,' + s); return await r.arrayBuffer(); } catch (e) { return b64sync(s); } };
+  const FL = () => !(window.Mods && Mods.on && Mods.on('fast_load') === false); // R49 MOD fast_load：加载提速（并行预载/去固定等待/地形外圈插值/同步解码）
+  const b64buf = async (s) => { if (FL()) return b64sync(s); /* R49：实测 19 个模型 fetch(data:) 735ms vs 同步 atob 500ms */ try { const r = await fetch('data:application/octet-stream;base64,' + s); return await r.arrayBuffer(); } catch (e) { return b64sync(s); } };
   const loadImg = (url) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url; });
   const tick = () => new Promise(r => setTimeout(r, 0));
   function script(name) {
@@ -422,7 +423,15 @@ window.Worlds = (() => {
     // 地形
     const ext = RM + 70, seg = Math.min(220, Math.round(ext * 2 / 1.1));
     const tg = new THREE.PlaneGeometry(ext * 2, ext * 2, seg, seg); tg.rotateX(-Math.PI / 2);
-    const tp = tg.attributes.position; for (let i = 0; i < tp.count; i++) tp.setY(i, H(tp.getX(i), tp.getZ(i))); tg.computeVertexNormals(); if (g) WGen.paint(tg, { st, LP, R });
+    const tp = tg.attributes.position;
+    if (FL()) { // R49：外圈（玩不到、被雾吃掉）每 3 格才精确求一次高度，其余双线性插值；内圈逐点精确。地形高度函数是加载里最重的一项
+      const K = 2, W1 = seg + 1, inR = RM + 18, inR2 = inR * inR, cache = new Float32Array(W1 * W1).fill(NaN), ex = (ix, iy) => { const k = iy * W1 + ix; let v = cache[k]; if (v !== v) { const j = k; v = cache[k] = H(tp.getX(j), tp.getZ(j)); } return v; };
+      for (let i = 0; i < tp.count; i++) { const x = tp.getX(i), z = tp.getZ(i), ix = i % W1, iy = (i / W1) | 0;
+        if (x * x + z * z <= inR2 || (ix % K === 0 && iy % K === 0)) { tp.setY(i, ex(ix, iy)); continue; }
+        const x0 = ix - ix % K, y0 = iy - iy % K, x1 = Math.min(x0 + K, seg), y1 = Math.min(y0 + K, seg), fx = (ix - x0) / Math.max(1, x1 - x0), fy = (iy - y0) / Math.max(1, y1 - y0);
+        const a = ex(x0, y0), b = ex(x1, y0), c = ex(x0, y1), d = ex(x1, y1); tp.setY(i, (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy); }
+    } else for (let i = 0; i < tp.count; i++) tp.setY(i, H(tp.getX(i), tp.getZ(i)));
+    tg.computeVertexNormals(); if (g) WGen.paint(tg, { st, LP, R });
     const gset = TEX[st.ground]; let gm;
     if (gset && window.Assets && Assets.triplanar) { gm = Assets.triplanar(gset, { scale: st.gs, normal: 1.1, env: 0.35, ao: 0.9, vertexColors: !!g, macro: window.WorldMaster ? WorldMaster.terr() : 0, ...((RKs) => RKs && TEX[RKs.name] ? { rock: TEX[RKs.name], rockTint: RKs.tint, rockLite: window.WorldMaster ? WorldMaster.terr() < 2 : false } : {})(window.WTerrain && WTerrain.act() ? WTerrain.rock(node) : null) }); gm.envMap = sky ? sky.env : null; }
     else gm = new THREE.MeshStandardMaterial({ color: '#556644', roughness: 1, vertexColors: !!g });
@@ -771,12 +780,25 @@ window.Worlds = (() => {
       const done = ok => { d.remove(); resolve(ok); }; d.onclick = e => { const b=e.target.closest('button'); if(b) done(b.dataset.a==='enter'); }; document.body.appendChild(d);
     });
   }
+  // R49：进场前就确定这个地点有谁（populate 只依赖 node 自身），把身体模板 / 动画 / 野兽模型提前并行载入
+  function kickAhead(node) {
+    if (!node.prey) populate(node);
+    if (node.home) return;
+    if (window.Foe && Foe.preload && !/[?&]nofoe=1/.test(location.search) && !(window.Mods && !Mods.on('foe_bodies'))) {
+      const list = node.prey.map(h => ({ h })), Bo = node.boss && !(G.S.bosses || {})[node.region] && window.Explore && Explore.BOSSES[node.region];
+      if (Bo) list.push({ h: node.bossH || null, boss: Bo, bossK: node.region });
+      Foe.preload(list).catch(() => { });
+    }
+    if (window.Beasts && Beasts.prefetch && !/[?&]nobeast=1/.test(location.search) && !(window.Mods && Mods.on('beasts') === false)) Beasts.prefetch(node).catch(() => { });
+  }
   async function goto(i, from) {
     W.busy = true; const node = W.graph.nodes[i];
-    fadeTo(1); await wait(260);
-    W.dom.load.style.display = 'flex'; W.dom.loadT.textContent = `前往「${node.name}」……`;
+    const fast = FL(); fadeTo(1); let fd = null;
+    if (fast) { fd = wait(260).then(() => { if (W) { W.dom.load.style.display = 'flex'; W.dom.loadT.textContent = `前往「${node.name}」……`; } }); } // R49：淡出与加载并行（不再先干等 260ms）
+    else { await wait(260); W.dom.load.style.display = 'flex'; W.dom.loadT.textContent = `前往「${node.name}」……`; }
     const tg0 = performance.now(); PROF.length = 0;
-    await need(stylesOf(i), (p) => { W.dom.loadB.style.width = Math.round(p * 100) + '%'; }); tp('need', tg0);
+    if (fast) { try { kickAhead(node); } catch (e) { console.warn('kickAhead', e); } } // R49：敌人身体/动画/野兽资源与场景资源并行下载解析
+    await need(stylesOf(i), (p) => { W.dom.loadB.style.width = Math.round(p * 100) + '%'; }); tp('need', tg0); if (fd) await fd;
     // 预热相邻地点的资产（后台、空闲时、一次一个）
     setTimeout(() => { if (!W) return; node.adj.forEach(b => warm(stylesOf(b))); }, 800);
     if (!W) return;
@@ -813,7 +835,7 @@ window.Worlds = (() => {
     try { const tc0 = performance.now(); const cm = G.camera; cm.position.set(W.pos.x, W.pos.y + EYE, W.pos.z); cm.rotation.set(G.player.pitch, G.player.yaw, 0, 'YXZ'); cm.updateMatrixWorld(true); if (G.post && G.post.on) G.post.render(B.sc, cm); else G.renderer.render(B.sc, cm); tp('firstframe', tc0); } catch (e) { console.warn('precompile', e); } // 进场前先渲一帧：着色器编译/贴图上传都藏在加载画面后面
     tp('total', tg0); W.dom.load.style.display = 'none'; hud(); banner(node);
     if (window.Mods && Mods.on && Mods.on('loc_story')) { const enter = await nodeStory(node, true); if (!W) return; if (!enter) { leaveHome(); return; } try { G.lockPointer(); } catch (e) {} } // 第二十一轮：用户不要进场冻结剧情卡 → MOD loc_story 默认关
-    await wait(60); fadeTo(0); W.busy = false;
+    if (!fast) await wait(60); fadeTo(0); W.busy = false;
     if (window.Overhear) try { Overhear.enter(node, { log: t => W && W.trip && W.trip.log.push({ t, cls: 'note' }) }); } catch (e) { console.warn(e); } // 第二十七轮：进场偷听对话框
     if (W.boss) setTimeout(() => { if (W && W.boss) bossSay(W.boss.B.say, 5); }, 1500);
   }

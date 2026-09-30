@@ -12,7 +12,10 @@ window.Foe = (() => {
   let _tg = null; const TOON_GRAD = () => _tg || (_tg = (() => { const t = new THREE.DataTexture(new Uint8Array(window.Mods && Mods.on('char_lift') ? [165, 208, 240, 255] : [120, 190, 235, 255]), 4, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })());
   function b64buf(s) { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; }
   // 载入身体模板（只解析一次，之后 SkeletonUtils 式克隆）
-  async function template(name) {
+  // R49 fast_load：并发去重（同一身体同时被 preload 与 populate 请求时只解析一次）
+  const TPM = {};
+  function template(name) { if (TMPL[name]) return Promise.resolve(TMPL[name]); return TPM[name] || (TPM[name] = template0(name).catch(e => { delete TPM[name]; throw e; })); }
+  async function template0(name) {
     if (TMPL[name]) return TMPL[name];
     await script(name); const E = BODY_MODELS[name];
     const gltf = await new Promise((res, rej) => new THREE.GLTFLoader().parse(b64buf(E.glb), '', res, rej));
@@ -292,8 +295,22 @@ window.Foe = (() => {
     holder.add(w); hand.add(holder); return holder;
   }
   // ---- 生成：worlds.js 进入地点时调用 ----
+  const fastOn = () => !(window.Mods && Mods.on && Mods.on('fast_load') === false);
+  // 与 populate 里完全相同的选身体逻辑（IdLook.apply 幂等），返回需要的身体模板名
+  function planBodies(list) {
+    const used = new Set(), out = [];
+    for (const it of list) {
+      try {
+        const seed = (it.h && it.h.look && it.h.look.seed) || 7, r = mulberry32((seed * 2654435761) >>> 0);
+        if (it.h && window.IdLook) { try { IdLook.apply(it.h); } catch (e) { } }
+        let b = bodyFor(it.h, r, it.boss && it.bossK, used); used.add(b); if (window.CC0) b = CC0.body(b, seed); out.push(b);
+      } catch (e) { }
+    }
+    return [...new Set(out)];
+  }
+  function preload(list) { return Promise.all([loadAnim()].concat(planBodies(list).map(n => template(n).catch(() => 0)))); }
   async function populate(ctx, list) { // list = [{h, pos, boss}]
-    const keep = !!(arguments[2] && arguments[2].keep); /* R35：keep = 中途追加（猎手/精英），不清场 */ CTX = ctx; if (!keep) clear(); await loadAnim();
+    const keep = !!(arguments[2] && arguments[2].keep); /* R35：keep = 中途追加（猎手/精英），不清场 */ CTX = ctx; if (!keep) clear(); if (fastOn()) { const l2 = (() => { const m = +(location.search.match(/[?&]foemax=(\d+)/) || [])[1]; return m ? list.slice(-m) : list; })(); await preload(l2); } else await loadAnim();
     const out = [], used = new Set(), mx = +(location.search.match(/[?&]foemax=(\d+)/) || [])[1]; if (mx) list = list.slice(-mx);
     for (const it of list) {
       const r = mulberry32(((it.h.look.seed || 7) * 2654435761) >>> 0);
@@ -1016,5 +1033,6 @@ window.Foe = (() => {
     const pinv = new M4().copy(par.matrixWorld).invert().multiply(root.matrixWorld); hips.position.copy(want.applyMatrix4(pinv));
   }
   function has(name) { return !!(window.BODY_LIST && BODY_LIST.includes(name)); }
-  return { bodyFor, say: (fo, t, col) => talk(fo, t, col), hasHead: (h) => HEADS.includes(h), warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, dot: dotDmg, attack, ATK, tokenOK, ctx: () => CTX, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
+  try { setTimeout(() => { if (fastOn()) (window.requestIdleCallback || setTimeout)(() => { loadAnim().catch(() => { }); }); }, 5000); } catch (e) { } // R49：菜单空闲时先把动画包（1.4MB）载好，首次进图不用再等
+  return { preload, bodyFor, say: (fo, t, col) => talk(fo, t, col), hasHead: (h) => HEADS.includes(h), warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, dot: dotDmg, attack, ATK, tokenOK, ctx: () => CTX, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
 })();

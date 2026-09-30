@@ -218,5 +218,7 @@ window.Beasts = (() => {
   }
   // 掉落表 → Sack 物品（由 Sack.carcass 调用）
   function dropsOf(b) { const r = mulberry(b.e.seed >>> 0), out = []; for (const [id, a, c, p] of b.T.drops) if (r() < p && !(window.Sack && Sack.IT && !Sack.IT[id])) out.push([id, a + Math.floor(r() * (c - a + 1))]); if (!out.length) out.push(['meat', 1]); return out; }
-  return { spawn, clear, update, targets, plan, dropsOf, TYPES, wOf, loadType, get list() { return BS; }, get count() { return BS.filter(b => b.alive).length; } };
+  // R49 fast_load：进场前并行把这个地点会出现的野兽模型载好
+  function prefetch(node) { const P = plan(node); return Promise.all([...new Set(P.list.filter(e => e.alive && TYPES[e.k]).map(e => e.k))].map(loadType)); }
+  return { spawn, clear, update, targets, plan, prefetch, dropsOf, TYPES, wOf, loadType, get list() { return BS; }, get count() { return BS.filter(b => b.alive).length; } };
 })();
