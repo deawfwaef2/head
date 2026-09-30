@@ -1,4 +1,23 @@
 // 首级生成器 v3：跨模型混搭（脸×发型）、染发/瞳色/肤色、死气表情、血迹/伤疤/战纹着色器、头发摆动物理、种族特征与饰品
+// 第二十四轮：面部补光 FaceFill（MOD face_light）—— 光照算完后，按“已被照亮的程度”把不够亮的地方补到一个下限（偏向朝着相机的面）。
+// 已经被照亮的脸不变；背光/阴天/夜里的脸不再黑成一团。全局共享一个 uniform：开关/强度改变都不会重编译着色器。
+window.FaceFill = (() => {
+  let worldT = -1e9; const done = new WeakSet(); // 不能用 userData 标记：clone() 会复制 userData 却不复制 onBeforeCompile
+  const u = { get value() { if (window.Mods && !Mods.on('face_light')) return 0; return performance.now() - worldT < 600 ? 0.75 : 0.45; } }; // 亮度下限（满光≈1.08；白天≈0.9–1.0 不受影响，夜里≈0.5 提到 0.75）：野外 0.75，洞穴 0.45
+  function inject(sh, k) {
+    sh.uniforms.uFill = u;
+    sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform float uFill;\nvoid main() {')
+      .replace('#include <aomap_fragment>', `#include <aomap_fragment>
+      { vec3 litC = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse; float al = max(dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)), 1e-3) * 0.3183; // 与上面软膝盖同单位：满光≈1.08
+        float lr = dot(litC, vec3(0.299, 0.587, 0.114)) / al; float fc = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
+        totalEmissiveRadiance += diffuseColor.rgb * 0.3183 * max(0.0, uFill * ${k.toFixed(2)} - lr) * (0.45 + 0.55 * fc); }`);
+  }
+  function wrap(m, k) { // 包一层 onBeforeCompile（clone() 不会复制它：克隆后要重新包）
+    if (!m || !m.isMeshToonMaterial || done.has(m)) return m; const prev = m.customProgramCacheKey(), o = m.onBeforeCompile;
+    m.onBeforeCompile = function (sh, r) { o.call(this, sh, r); inject(sh, k); }; m.customProgramCacheKey = () => prev + '|ff' + k; done.add(m); return m;
+  }
+  return { u, wrap, world() { worldT = performance.now(); } };
+})();
 window.ModelHeads = (() => {
   const T = [];               // templates
   const SRC = new WeakMap();  // mesh -> src material（不要放 userData，clone 会 JSON 序列化贴图）
@@ -321,7 +340,7 @@ window.ModelHeads = (() => {
           }`);
     };
     m.customProgramCacheKey = () => 'hair4';
-    return m;
+    return FaceFill.wrap(m, 0.6);
   }
   function browMat(src, U, lum) {
     const m = new THREE.MeshToonMaterial({ map: src.map || null, gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: src.depthWrite });
@@ -408,7 +427,7 @@ window.ModelHeads = (() => {
           diffuseColor.rgb = mix(diffuseColor.rgb, blood, bm * 0.88);`);
     };
     m.customProgramCacheKey = () => 'skin6';
-    return m;
+    return FaceFill.wrap(m, 1.0);
   }
 
   // ---------- 饰品几何（共享） ----------
