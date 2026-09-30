@@ -28,7 +28,7 @@ window.SPIRIT_DATA = (() => {
       likes: { race: ['demon'], trait: ['沉默寡言', '孤僻', '冷静', '冷酷'] }, hates: { trait: ['话痨'] }, tag: '寡言，但什么都看在眼里' },
     { id: 'laogu', n: '老骨', title: '骨龙长老', form: '龙骨圣山的先祖，戴圆眼镜的小骨龙', land: 'peak', arche: 'elder', col: '#fff0c8', art: 'laogu',
       likes: { race: ['dragon', 'angel'], rar: [3, 4] }, hates: {}, tag: '活得最久，记得最多' },
-    { id: 'chudai', n: '初代', title: '第一位洞主', form: '与洞窟订下第一份契约的食人魔', land: null, arche: 'elder', col: '#ff8a4a', art: 'chudai', artFallback: 'xiaozhu', final: 1,
+    { id: 'chudai', n: '初代', title: '第一位洞主', form: '与洞窟订下第一份契约的食人魔', land: null, arche: 'elder', col: '#ff8a4a', art: 'chudai', final: 1,
       likes: {}, hates: {}, tag: '九灯皆亮时才会现身' }
   ];
   const BY = {}; ROSTER.forEach(r => BY[r.id] = r);
