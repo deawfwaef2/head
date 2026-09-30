@@ -276,7 +276,7 @@
   </div>
   <button class="bigbtn" id="startBtn">开始游戏</button>
   <button class="bigbtn" id="modBtn" style="margin-left:10px;background:linear-gradient(135deg,#3a2a50,#2a1a3a)">🧩 MOD</button>
-  <button class="smallbtn" id="resetBtn">删除存档重新开始</button> <button class="smallbtn musicBtn" onclick="SFX.toggleMusic()">🎵 BGM 开</button>
+  <button class="smallbtn" id="tutBtn">📖 新手教程 / チュートリアル / Tutorial</button> <button class="smallbtn" id="resetBtn">删除存档重新开始</button> <button class="smallbtn musicBtn" onclick="SFX.toggleMusic()">🎵 BGM 开</button>
   <div class="keys"><span><kbd>WASD</kbd>移动</span><span><kbd>鼠标</kbd>视角</span><span><kbd>左键</kbd>把玩首级</span><span><kbd>E</kbd>互动</span><span><kbd>I</kbd>查看首级故事</span><span><kbd>B</kbd>建造</span><span><kbd>Tab</kbd>属性/装备</span><span><kbd>Esc</kbd>暂停</span></div>
   <div id="credits">头部基础模型：pixiv Inc. VRoid 样例 (CC0 / 使用条款)、VirtualCast VRM 样例 (VRM Public License)、Godette by SirRichard94 (CC-BY)、以及 24 位 VRoid 社区作者公开的 VRM 模型 —— 经裁切、混搭与改造。<br>音乐：Kevin MacLeod (incompetech.com) CC-BY 4.0 · 音效：Kenney (CC0)。详见 CREDITS.md</div>
 </div>
@@ -504,6 +504,7 @@
 <script src="js/spirits.js"></script>
 <script src="js/perf2.js"></script>
 <script src="js/feel.js"></script>
+<script src="js/tutorial.js"></script>
 <script>
 (async () => {
   const bar = document.querySelector('#loadbar i'), txt = document.getElementById('loadtxt');
@@ -531,6 +532,7 @@
   document.getElementById('menu').classList.remove('hidden');
   document.getElementById('modBtn').addEventListener('click', e => { e.stopPropagation(); Mods.open(); });
   document.getElementById('startBtn').addEventListener('click', e => { e.stopPropagation(); SFX.init(); if (UI.needIntro()) { SFX.music('cave'); UI.showIntro(); } else G.lockPointer(); });
+  document.getElementById('tutBtn').addEventListener('click', e => { e.stopPropagation(); if (window.Tutorial) { Tutorial.restart(); } document.getElementById('startBtn').click(); });
   document.getElementById('resetBtn').addEventListener('click', e => { e.stopPropagation(); if (confirm('确定删除存档？所有首级、装备、建筑都会消失。')) { G.wipe(); location.reload(); } });
 })();
 </script>

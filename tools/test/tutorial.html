@@ -1,0 +1,10 @@
+<!doctype html><meta charset=utf-8><body style="background:#223;margin:0">
+<div id="introCopy"><b data-lang="zh" class="on"></b></div>
+<script>
+// 教程状态机测试：用假的 G / UI / Combat / Worlds 驱动每一步
+const P={pos:{x:0,z:0},yaw:0};
+window.G={playing:true,uiOpen:false,player:P,S:{intro:0,stats:{pokes:0,trips:0}},cave:{exitPos:{x:5,z:-6},merchantPos:{x:-4,z:-3}},heads:[],held:null,save(){G._sv=(G._sv||0)+1},toast(){}};
+window.UI={open:''};window.Combat={drawn:false};window.Worlds={active:false,_W:{stats:{kill:0}}};
+window.Mods={on:()=>true};
+</script>
+<script src="/js/tutorial.js"></script>

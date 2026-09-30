@@ -1441,3 +1441,14 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 反“贴脸狂点”：1.4 秒内挨第 3 刀 → 不硬直 + 职业脱身（后滚/侧闪/脚下药瓶），冷却 4 秒；长枪手脱身后的突刺、双刀侧闪后的连斩霸体。测试证明以前贴脸每 0.3 秒一刀可无限硬直，新职业技能根本放不出。
 - 定身（网/夹子）：**js/worlds.js:829** 玩家移速多乘 `FoeRoles3.moveK()`（一处）。连按空格缩短。遮罩 DOM `#fr3root`（z 40）。
 - 其他：mods.js 加一条；index.html 在 foe_roles2.js 后加 script；tools/test/fight.html 加 script。调试计数 `FoeRoles3.CNT`。
+
+---
+## R38（新手引导教程）
+用户需求：加入游戏教程引导玩家、教学玩法；**新存档都要有教程**。
+- 新文件 `js/tutorial.js`（`window.Tutorial`，MOD `tutorial`，默认开）。只读游戏状态（G / UI / Combat / Worlds），不改其他文件的逻辑。`index.html` 只加了 1 个 script 和标题菜单按钮「📖 新手教程」(`#tutBtn`)。`js/mods.js` 新增 `tutorial` 条目（无需 migration，def:true）。
+- 触发：`fresh0 = !G.S.intro`（载入时是全新存档）→ 开场故事演完（`S.intro` 变真且 `UI.open!=='intro'`）→ `start(0)`。老存档（`S.tut` 不存在且 fresh0=false）不会自动触发，只能靠标题按钮 / F9 重看。转生（`applyPending` 设 `S.intro=1`）不会重触发。进度存 `G.S.tut={i,lang,off,done}`（删存档=新教程）。
+- UI：右上角非阻塞小卡片（top:58px,z-index 40，`pointer-events:none`，只有按钮可点），中/日/EN 三语（按钮切换，记 localStorage `soulhead_tut_lang`；默认取标题页语言）。走路类步骤有屏幕箭头 🧭（指向商人 / 洞口）。Enter = 跳过当前步；F9 = 关闭 / 重开（完成后 F9 = 重新开始）。卡片在 `UI.open==='intro'` 或 `!G.playing` 时隐藏。
+- 21 步，3 章：洞窟（看 / 走 / 斯尼克 E / Tab 属性 / B 建造 / 洞口 / E 出洞）→ 出洞狩猎（F 拔刀 / 左键挥砍 / 连点刺 / 右键格挡 / Q 闪身 / 击倒 / E 拾取 / 门撤退）→ 回洞经营（扛袋倒出 / E 拿首级 / 左键把玩出魂晶 / F·I 回忆档案 / T 天赋及其他快捷键）→ 结语。每步 `tick(st,c)` 4Hz 轮询（try/catch），`where:'cave'|'world'|'any'`，不在对应场景会显示“⏳ 等待”，不会卡死（Enter 总能跳过）。
+- 教程文案里的按键已对照源码核实：G 放置 / V 表情 / 右键扔 / 长按 E 精确摆放 / F 回忆（手持或对准首级，否则 F=拔刀）/ I 查看 / K 收藏 / L 日志 / J 成就 / Y 神灵簿 / T 天赋 / M（洞内=音乐，洞外=地图）/ H 药。以后改键位需同步 `js/tutorial.js` 的 STEPS 文案。
+- 测试：`tools/test/tutorial.html`（假 G/UI/Combat/Worlds，不加载整个游戏）+ Playwright 脚本逐步驱动 21 步全部自动推进、Enter 跳过、F9 重开、语言切换均通过（整个游戏在 2GB 沙盒里跑不动，未做整包实机测试）。
+- 未做：教程内不覆盖武器附魔/训练小游戏/天赋树细节；没有高亮 3D 物体（只有箭头）。
