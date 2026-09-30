@@ -393,8 +393,8 @@ window.Foe = (() => {
         }
       } else if (!SMART && fo.state === 'flee') {
         turnTo = Math.atan2(-dx, -dz); spd = 2.9 + fo.rar * 0.12; f.play('Sprint_Loop', { fade: 0.2 });
-        const pr = Math.hypot(fo.pos.x, fo.pos.z);
-        if (pr > ctx.R - 3) { const tx = -fo.pos.z / pr, tz = fo.pos.x / pr, sg = (tx * -dx + tz * -dz) > 0 ? 1 : -1; turnTo = Math.atan2(tx * sg * 0.9 - fo.pos.x / pr * 0.3, tz * sg * 0.9 - fo.pos.z / pr * 0.3); if (d < 2.2 && fo.cd <= 0) { fo.state = 'chase'; talk(fo, pickR(Math.random, SAY.fight)); } }
+        const E = EDGE(fo.pos.x, fo.pos.z);
+        if (E[0] < 3) { const tx = E[2], tz = -E[1], sg = (tx * -dx + tz * -dz) > 0 ? 1 : -1; turnTo = Math.atan2(tx * sg * 0.9 + E[1] * 0.3, tz * sg * 0.9 + E[2] * 0.3); if (d < 2.2 && fo.cd <= 0) { fo.state = 'chase'; talk(fo, pickR(Math.random, SAY.fight)); } }
         else if (fo.sayT <= 0 && Math.random() < 0.006) sayP(fo, 'flee', SAY.flee);
       }
       else if (SMART && fo.state === 'retreat') { // 第二十一轮：重伤后退开整顿（聪明的敌人不会一味送死）
@@ -510,12 +510,13 @@ window.Foe = (() => {
     if (best) { const dC = Math.hypot(best.rx, best.rz) || 1e-3, cA = Math.atan2(best.rx, best.rz), half = Math.asin(Math.min(1, best.m / dC)) + 0.12;
       if (!(fo.sideT > 0)) fo.side = best.lat > 0 ? -1 : 1; fo.sideT = 1.5; // 选定绕行方向后坚持一会儿，沿着树丛/石堆整圈绕过去，不左右摇摆
       out = cA + fo.side * half; }
-    const pr = Math.hypot(fo.pos.x, fo.pos.z); if (pr > CTX.R - 3.5) { const k = Math.min(1.5, (pr - (CTX.R - 3.5)) / 3), ox = Math.sin(out) - fo.pos.x / pr * k, oz = Math.cos(out) - fo.pos.z / pr * k; out = Math.atan2(ox, oz); }
+    const E = EDGE(fo.pos.x, fo.pos.z); if (E[0] < 3.5) { const k = Math.min(1.5, (3.5 - E[0]) / 3), ox = Math.sin(out) + E[1] * k, oz = Math.cos(out) + E[2] * k; out = Math.atan2(ox, oz); }
     return out; }
   // 第二十一轮：导航网格 + 流场寻路（障碍全是圆，墙=一串小圆；局部绕行会被凹形死角困住，所以用 BFS 距离场）
+  const EDGE = (x, z) => { if (CTX.edge) return CTX.edge(x, z); const pr = Math.hypot(x, z) || 1; return [CTX.R - pr, -x / pr, -z / pr]; }; // R46：到墙的距离 + 内法线（圆形地图与特殊形状通用）
   let NAV = null; const NB = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
-  function navBuild() { const R = CTX.R, cs = 0.8, n = Math.ceil(2 * R / cs) + 1, blk = new Uint8Array(n * n), lim = (R - 1.3) * (R - 1.3);
-    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const x = -R + i * cs, z = -R + j * cs; if (x * x + z * z > lim) blk[j * n + i] = 1; }
+  function navBuild() { const R = CTX.RM || CTX.R, cs = CTX.RM ? 1.0 : 0.8, n = Math.ceil(2 * R / cs) + 1, blk = new Uint8Array(n * n), lim = (CTX.R - 1.3) * (CTX.R - 1.3), Ed = CTX.edge; // R46：特殊形状 → 网格覆盖外接圆，按真实边界挡
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const x = -R + i * cs, z = -R + j * cs; if (Ed ? Ed(x, z)[0] < 1.3 : x * x + z * z > lim) blk[j * n + i] = 1; }
     for (const c of CTX.cols) { const rr = c.r + 0.3, i0 = Math.max(0, Math.floor((c.x - rr + R) / cs)), i1 = Math.min(n - 1, Math.ceil((c.x + rr + R) / cs)), j0 = Math.max(0, Math.floor((c.z - rr + R) / cs)), j1 = Math.min(n - 1, Math.ceil((c.z + rr + R) / cs));
       for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const x = -R + i * cs - c.x, z = -R + j * cs - c.z; if (x * x + z * z < rr * rr) blk[j * n + i] = 1; } }
     NAV = { cols: CTX.cols, nc: CTX.cols.length, R, cs, n, blk, fields: new Map(), q: new Int32Array(n * n) }; }

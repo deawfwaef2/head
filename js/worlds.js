@@ -100,8 +100,8 @@ window.Worlds = (() => {
     else if (k === 'henge') { const a = far(); const d = R * 0.22; P.cx = Math.cos(a) * d; P.cz = Math.sin(a) * d; P.top = clamp(R * 0.16, 5, 8); P.hh = clamp(R * 0.09, 2.4, 4);
       P.dh = (x, z) => P.hh * (1 - sstep(P.top, P.top + 6, Math.hypot(x - P.cx, z - P.cz))); }
     else if (k === 'ravine') { P.hx = (r() - 0.5) * R * 0.2; P.hz = (r() - 0.5) * R * 0.2; P.segs = [];
-      for (const d of doorList) { const mx = (d.x * 0.93 + P.hx) / 2, mz = (d.z * 0.93 + P.hz) / 2, px = -(d.z - P.hz), pz = d.x - P.hx, pl = Math.hypot(px, pz) || 1, w = (r() - 0.5) * R * 0.35;
-        const m2x = mx + px / pl * w, m2z = mz + pz / pl * w; P.segs.push([d.x * 0.93, d.z * 0.93, m2x, m2z], [m2x, m2z, P.hx, P.hz]); }
+      for (const d of doorList) { const ex = d.x - Math.cos(d.a) * 2.4, ez = d.z - Math.sin(d.a) * 2.4, mx = (ex + P.hx) / 2, mz = (ez + P.hz) / 2, px = -(ez - P.hz), pz = ex - P.hx, pl = Math.hypot(px, pz) || 1, w = (r() - 0.5) * R * 0.35;
+        const m2x = mx + px / pl * w, m2z = mz + pz / pl * w; P.segs.push([ex, ez, m2x, m2z], [m2x, m2z, P.hx, P.hz]); /* R46：峡谷一直通到门口（以前止于 0.93R，特殊形状的门前是一堵墙）*/ }
       P.dist = (x, z) => { let m = Math.hypot(x - P.hx, z - P.hz) - 3.5; for (const s of P.segs) m = Math.min(m, segD(x, z, s[0], s[1], s[2], s[3])); return m; };
       P.dh = (x, z) => 5.5 * sstep(3.2, 8, P.dist(x, z)) * (1 - sstep(R - 1, R + 4, Math.hypot(x, z)) * 0.5);
       P.skip = (kind, x, z) => (kind === 'tree' || kind === 'rock' || kind === 'wall' || kind === 'prop') && P.dist(x, z) < 3.4; }
@@ -390,9 +390,16 @@ window.Worlds = (() => {
     const LP = window.WLayout ? WLayout.plan(node, nz) : null, Rf = LP ? LP.Rf : (() => R), RM = LP ? LP.Rmax : R; // 第十八轮 wlayout：不规则边界/地形/布局
     // 门的位置先定：均匀分布在边界上
     const doorList = node.adj.map(b => ({ to: b })); if (node.home || node.stone) doorList.push({ to: -1 });
-    const a0 = r() * Math.PI * 2; doorList.forEach((d, k) => { d.a = a0 + k / doorList.length * Math.PI * 2 + (r() - 0.5) * 0.5 / doorList.length; d.x = Math.cos(d.a) * (Rf(d.a) - 0.6); d.z = Math.sin(d.a) * (Rf(d.a) - 0.6); });
+    const a0 = r() * Math.PI * 2, tips = LP && LP.shaped && LP.tips ? LP.tips.map(a => [r(), a]).sort((p, q) => p[0] - q[0]).map(e => e[1]) : null; // R46：特殊形状的地图，门优先开在尖角 / 长廊两端
+    const placed = []; doorList.forEach((d, k) => { let a;
+      if (tips && k < tips.length) a = tips[k] + (r() - 0.5) * 0.06;
+      else if (tips) { let best = a0, bd = -1; for (let q = 0; q < 72; q++) { const aa = q / 72 * Math.PI * 2 + r() * 0.05, x = Math.cos(aa) * Rf(aa), z = Math.sin(aa) * Rf(aa); let m = 1e9; for (const o of placed) m = Math.min(m, Math.hypot(o.x - x, o.z - z)); if (m > bd) { bd = m; best = aa; } } a = best; } // 门尽量彼此远离
+      else a = a0 + k / doorList.length * Math.PI * 2 + (r() - 0.5) * 0.5 / doorList.length;
+      d.a = a; d.x = Math.cos(a) * (Rf(a) - 0.6); d.z = Math.sin(a) * (Rf(a) - 0.6);
+      if (tips && LP.edge) { const E = LP.edge(d.x, d.z); if (E[1] || E[2]) d.a = Math.atan2(-E[2], -E[1]); } // R46：门朝向 = 边界外法线（弯曲边界上径向方向会指出墙外）
+      placed.push(d); });
     if (LP) WLayout.paths(LP, doorList);
-    let Rmin = R; if (LP) for (let i = 0; i < 24; i++) Rmin = Math.min(Rmin, Rf(i / 24 * Math.PI * 2));
+    let Rmin = R; if (LP) for (let i = 0; i < 24; i++) Rmin = Math.min(Rmin, Rf(i / 24 * Math.PI * 2)); if (LP && LP.Rmin) Rmin = Math.min(Rmin, LP.Rmin);
     const LY = layPlan(node, Rmin, doorList); // 第十八轮（总管理师）：布局原型，与 wlayout 叠加；用不规则边界的最小半径
     // R41：门口视线走廊——进门后朝里 ~12m、宽 ~4m 的带子里压平起伏（以前土丘/土墩常正好挡在门口，一进门只看见一面土坡）
     const corL = Math.min(13, Rmin * 0.55), corOn = !(window.Mods && Mods.on && Mods.on('wfix41') === false);
@@ -401,10 +408,11 @@ window.Worlds = (() => {
       return f; };
     const H0 = (x, z) => { const rr = Math.hypot(x, z), ang = Math.atan2(z, x);
       const fl = flat(x, z), inner = (nz(x * 0.06 + 50, z * 0.06 + 50) - 0.5) * 1.6 * (LP ? LP.relief : 1) * fl * sstep(0, 5, rr) + (LP ? WLayout.dH(LP, x, z, fl) : 0), Ra = LP ? Rf(ang) : R;
-      const rim = st.hill * sstep(Ra + 0.5, Ra + 16, rr) * (0.55 + 0.9 * nz(Math.cos(ang) * 3 + 9, Math.sin(ang) * 3 + 9)) + st.hill * 1.2 * sstep(Ra + 20, Ra + 60, rr);
+      const dO = LP && LP.dOut ? LP.dOut(x, z) : rr - Ra; // R46：按到边界的真实距离起坡（长廊侧墙不再被极坐标压扁成悬崖）
+      const rim = st.hill * sstep(0.5, 16, dO) * (0.55 + 0.9 * nz(Math.cos(ang) * 3 + 9, Math.sin(ang) * 3 + 9)) + st.hill * 1.2 * sstep(20, 60, dO);
       return inner + rim + (LY.dh ? LY.dh(x, z) : 0); };
     let H = H0; if (g) { WGen.prepare(st, node, { R, Rmin, nz, doorList, LY, H0 }); H = (x, z) => g.h(x, z, H0(x, z), flat(x, z)); }
-    if (window.WTerrain) try { H = WTerrain.wrap(H, { node, st, R, Rmin, doorList, LY, g, flat }); } catch (e) { console.warn('WTerrain', e); } // R46 地形特色化：脊状分形 + 标志地貌
+    if (window.WTerrain) try { H = WTerrain.wrap(H, { node, st, R, Rmin, doorList, LY, g, flat, LP }); } catch (e) { console.warn('WTerrain', e); } // R46 地形特色化：脊状分形 + 标志地貌
     if (corOn && node.lay !== 'ravine') { // R41：视线锥——从每道门朝中心看，地形高度软限制在一条缓升的视线下面（土丘被压成垭口，而不是整座挡在眼前）
       const Hr = H, sight = doorList.map(d => ({ x: d.x, z: d.z, ux: -Math.cos(d.a), uz: -Math.sin(d.a), L: Math.hypot(d.x, d.z) + 4, h0: Hr(d.x, d.z) }));
       H = (x, z) => { let h = Hr(x, z); for (const s of sight) { const px = x - s.x, pz = z - s.z, t = px * s.ux + pz * s.uz; if (t < 3 || t > s.L) continue;
@@ -462,9 +470,11 @@ window.Worlds = (() => {
     }
     // 宝箱
     node.chests.forEach((c, k) => {
-      let x = 0, z = 0; for (let t = 0; t < 40; t++) { const a = r() * 6.28, d = R * (0.2 + r() * 0.65); x = Math.cos(a) * d; z = Math.sin(a) * d; if (free(x, z, 1.5)) break; }
-      mark(x, z, 1.5); const g = window.Assets && Assets.fit('treasure_chest', { w: 0.9, x, y: H(x, z) - 0.02, z, ry: r() * 6.3 });
-      if (g) { sc.add(g); c.g = g; } c.x = x; c.z = z; if (!c.opened || (c.items && c.items.length)) inter.push({ kind: 'chest', c, x, z }); cols.push({ x, z, r: 0.5 });
+      const pit = (x, z) => { const y = H(x, z); let hi = -1e9, lo = 1e9; for (let i = 0; i < 6; i++) hi = Math.max(hi, H(x + Math.cos(i * 1.047) * 4, z + Math.sin(i * 1.047) * 4)); for (let i = 0; i < 6; i++) lo = Math.min(lo, H(x + Math.cos(i * 1.047 + 0.5) * 4, z + Math.sin(i * 1.047 + 0.5) * 4)); return Math.max(Math.abs(H(x + 1, z) - y), Math.abs(H(x, z + 1) - y)) > 0.6 || hi - y > 1.6 || y - lo > 1.6; }; // R46：宝箱不放在陡坡 / 坑底
+      let x = 0, z = 0; for (let t = 0; t < 120; t++) { if (LP && LP.shaped && LP.samp) { const q = LP.samp(r, 3); x = q[0]; z = q[1]; if (Math.hypot(x, z) < R * 0.25) continue; } else { const a = r() * 6.28, d = R * (0.2 + r() * 0.65); x = Math.cos(a) * d; z = Math.sin(a) * d; } if (free(x, z, 1.5) && !(g && g.wd && g.wd(x, z).d < 1.5) && !(t < 100 && pit(x, z))) break; }
+      if (!free(x, z, 1.5) || (g && g.wd && g.wd(x, z).d < 1.5)) { for (let t = 0; t < 400; t++) { const a = r() * 6.28, d = (LP && LP.Rmin || R) * Math.sqrt(r()) * 0.9, xx = Math.cos(a) * d, zz = Math.sin(a) * d; if (free(xx, zz, 0.9) && !(g && g.wd && g.wd(xx, zz).d < 1.5) && !pit(xx, zz)) { x = xx; z = zz; break; } } } // 兜底：再找一遍
+      mark(x, z, 1.5); const gc = window.Assets && Assets.fit('treasure_chest', { w: 0.9, x, y: H(x, z) - 0.02, z, ry: r() * 6.3 });
+      if (gc) { sc.add(gc); c.g = gc; } c.x = x; c.z = z; if (!c.opened || (c.items && c.items.length)) inter.push({ kind: 'chest', c, x, z }); cols.push({ x, z, r: 0.5 });
     });
     if (window.Sack) Sack.placeLoot(node, { sc, H, free, mark, cols, inter, R, r });
     // 普通散布
@@ -479,7 +489,8 @@ window.Worlds = (() => {
       const cap = (kind === 'grass' ? (g ? 3200 : 2200) : kind === 'tree' ? (g ? 64 : 40) : 160) * (LP && LP.clump && kind !== 'grass' ? 1.5 : 1) * WMD;
       const n = Math.min(cap, Math.round(dens * WMD * (vg && (kind === 'tree' || kind === 'plant') ? 1.45 : 1) * area * (LP ? WLayout.densK(LP, kind) : 1) * (0.7 + r() * 0.6)));
       for (let i = 0; i < n; i++) {
-        const a = r() * 6.28, d = RM * Math.sqrt(r()) * 0.97, x = Math.cos(a) * d, z = Math.sin(a) * d, v = pick(r, vs), s = s0 + r() * (s1 - s0);
+        let a, d, x, z; if (LP && LP.shaped && LP.samp) { const q = LP.samp(r, 0.6); x = q[0]; z = q[1]; a = q[2]; d = q[3]; } else { a = r() * 6.28; d = RM * Math.sqrt(r()) * 0.97; x = Math.cos(a) * d; z = Math.sin(a) * d; }
+        const v = pick(r, vs), s = s0 + r() * (s1 - s0);
         if (stp && (kind === 'grass' || kind === 'plant' || kind === 'tree') && stp(x, z) > (kind === 'tree' ? 0.8 : 1.05)) continue; // R46：陡坡不长草树
         if (vg && r() > vg(kind, x, z)) continue;
         if (LP && (d > Rf(a) * 0.97 || !WLayout.keep(LP, x, z, kind, r))) continue;
@@ -505,18 +516,20 @@ window.Worlds = (() => {
     // 山坡上也长草/灌木（不投影、无碰撞）
     if (!LITE) for (const [list, dens, s0, s1, kind, fkind] of st.props) {
       if ((kind !== 'grass' && kind !== 'plant') || fkind === 'flower') continue; const vs = variants(list); if (!vs.length) continue;
-      const ha = Math.PI * ((R + 18) * (R + 18) - R * R) / 100, n = Math.min(kind === 'grass' ? 1200 : 150, Math.round(dens * ha * 0.35));
-      for (let i = 0; i < n; i++) { const a = r() * 6.28, rr = Rf(a) + 0.5 + r() * 17.5, v = pick(r, vs); if (g && !WGen.keep(g, kind, Math.cos(a) * rr, Math.sin(a) * rr, r)) continue; put(v.t, Math.cos(a) * rr, Math.sin(a) * rr, (s0 + r() * (s1 - s0)) * 1.1, r() * 6.28, null, true, g ? WGen.ic(g, kind, Math.cos(a) * rr, Math.sin(a) * rr, r) : undefined); }
+      const ha = LP && LP.shaped ? LP.perim * 18.5 / 100 : Math.PI * ((R + 18) * (R + 18) - R * R) / 100, n = Math.min(kind === 'grass' ? 1200 : 150, Math.round(dens * ha * 0.35));
+      for (let i = 0; i < n; i++) { const a = r() * 6.28; let rr = Rf(a) + 0.5 + r() * 17.5, v = pick(r, vs);
+        if (LP && LP.shaped) { const b = LP.bp(r() * LP.perim), o = 0.5 + r() * 17.5; const x = b[0] + b[2] * o, z = b[1] + b[3] * o; if (g && !WGen.keep(g, kind, x, z, r)) continue; put(v.t, x, z, (s0 + r() * (s1 - s0)) * 1.1, r() * 6.28, null, true, g ? WGen.ic(g, kind, x, z, r) : undefined); continue; } if (g && !WGen.keep(g, kind, Math.cos(a) * rr, Math.sin(a) * rr, r)) continue; put(v.t, Math.cos(a) * rr, Math.sin(a) * rr, (s0 + r() * (s1 - s0)) * 1.1, r() * 6.28, null, true, g ? WGen.ic(g, kind, Math.cos(a) * rr, Math.sin(a) * rr, r) : undefined); }
     }
     // 边界：两圈（近圈贴着可走边界，远圈在山坡上当背景）
     if (st.edge && !LITE) {
       const [list, spacing, s0, s1] = st.edge, vs = variants(list.map(n => LO[n] && MODELS[n + '_lo'] ? n + '_lo' : n));
       if (vs.length) for (const [rr0, rr1, sk] of [[R + 0.8, R + 5, 1], [R + 7, R + 22, 1.35]]) {
-        const n = Math.round(Math.PI * 2 * (rr0 + rr1) / 2 / (spacing * (sk > 1 ? 1.8 : 1)));
+        const SH = LP && LP.shaped && LP.bp, n = SH ? Math.round(LP.perim / (spacing * (sk > 1 ? 1.8 : 1))) : Math.round(Math.PI * 2 * (rr0 + rr1) / 2 / (spacing * (sk > 1 ? 1.8 : 1)));
         for (let i = 0; i < n; i++) {
-          const a = i / n * Math.PI * 2 + (r() - 0.5) * 0.3 / n * 6; const rr = rr0 + r() * (rr1 - rr0) + (Rf(a) - R);
-          if (sk === 1 && doorList.some(d => Math.abs(Math.atan2(Math.sin(a - d.a), Math.cos(a - d.a))) * R < 3.2)) continue;
-          const v = pick(r, vs), s = (s0 + r() * (s1 - s0)) * sk, x = Math.cos(a) * rr, z = Math.sin(a) * rr;
+          const a = i / n * Math.PI * 2 + (r() - 0.5) * 0.3 / n * 6; let rr = rr0 + r() * (rr1 - rr0) + (Rf(a) - R), x, z;
+          if (SH) { const b = LP.bp((i + (r() - 0.5) * 0.6) / n * LP.perim), off = rr0 - R + r() * (rr1 - rr0); x = b[0] + b[2] * off; z = b[1] + b[3] * off; if (sk === 1 && doorList.some(d => Math.hypot(x - d.x, z - d.z) < 4.2)) continue; }
+          else { if (sk === 1 && doorList.some(d => Math.abs(Math.atan2(Math.sin(a - d.a), Math.cos(a - d.a))) * R < 3.2)) continue; x = Math.cos(a) * rr; z = Math.sin(a) * rr; }
+          const v = pick(r, vs), s = (s0 + r() * (s1 - s0)) * sk;
           put(v.t, x, z, s, r() * 6.28, null, sk > 1, g ? WGen.ic(g, 'tree', x, z, r) : undefined);
         }
       }
@@ -540,7 +553,7 @@ window.Worlds = (() => {
       cols.push({ x: d.x + Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z + Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 }, { x: d.x - Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z - Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 });
       return Object.assign(d, { g, label, home });
     });
-    return { site: LY.slots ? LY : null, sc, H, R, Rf: LP ? Rf : null, wx: (LPX && LPX.wx) || GD ? (dt, p, now) => { if (LPX && LPX.wx) LPX.wx(dt, p, now); if (GD) GD.update(dt, p, now); } : null, tag: [LP ? LP.tag : '', g ? g.tag.join(' · ') : ''].filter(Boolean).join(' · '), lp: LP, cols, doors, inter, sun, sunDir, terr, style: st, spots, lay: LY.k, bossAt: LY.boss ? new V3(LY.boss.x, 0, LY.boss.z) : null };
+    return { site: LY.slots ? LY : null, sc, H, R, Rf: LP ? Rf : null, RM, edge: LP && LP.edge ? LP.edge : null, wx: (LPX && LPX.wx) || GD ? (dt, p, now) => { if (LPX && LPX.wx) LPX.wx(dt, p, now); if (GD) GD.update(dt, p, now); } : null, tag: [LP ? LP.tag : '', g ? g.tag.join(' · ') : ''].filter(Boolean).join(' · '), lp: LP, cols, doors, inter, sun, sunDir, terr, style: st, spots, lay: LY.k, bossAt: LY.boss ? new V3(LY.boss.x, 0, LY.boss.z) : null };
   }
   // 画布文字 → 精灵（门牌/气泡）
   function makeLabel(text, col) {
@@ -553,16 +566,16 @@ window.Worlds = (() => {
   function glow() { if (glowTex) return glowTex; const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,255,255,.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); glowTex = new THREE.CanvasTexture(c); return glowTex; }
 
   // ================= 猎物（魂光，第 4 步换真实身体）=================
-  function spot(B, r) { if (B.spots && B.spots.length) { const s = B.spots.shift(); return new V3(s.x, 0, s.z); } let x = 0, z = 0; for (let t = 0; t < 30; t++) { const a = r() * 6.28, d = B.R * (0.3 + r() * 0.55); x = Math.cos(a) * d; z = Math.sin(a) * d; if (B.cols.every(c => Math.hypot(c.x - x, c.z - z) > c.r + 0.8) && B.doors.every(dd => Math.hypot(dd.x - x, dd.z - z) > 5)) break; } return new V3(x, 0, z); }
+  function spot(B, r) { if (B.spots && B.spots.length) { const s = B.spots.shift(); if (B.edge) { const E = B.edge(s.x, s.z); if (E[0] < 2) { s.x += E[1] * (2 - E[0]); s.z += E[2] * (2 - E[0]); } } return new V3(s.x, 0, s.z); } let x = 0, z = 0; for (let t = 0; t < 30; t++) { if (B.lp && B.lp.shaped && B.lp.samp) { const q = B.lp.samp(r, 3); x = q[0]; z = q[1]; if (Math.hypot(x, z) < B.R * 0.25) continue; } else { const a = r() * 6.28, d = B.R * (0.3 + r() * 0.55); x = Math.cos(a) * d; z = Math.sin(a) * d; } if (B.cols.every(c => Math.hypot(c.x - x, c.z - z) > c.r + 0.8) && B.doors.every(dd => Math.hypot(dd.x - x, dd.z - z) > 5)) break; } return new V3(x, 0, z); }
   // 给 js/foe.js 的接口
   function beastCtx(B, node) { // 给 js/beasts.js 的接口：复用 foeCtx 的受击/格挡/事件/伤害换算
     const fc = foeCtx(B, node), sp = mulberry(node.seed ^ 0x2545F491);
-    return { sc: B.sc, H: B.H, cols: B.cols, R: B.R, doors: B.doors, pos: () => W.pos, st: () => G.st(), sees: (pos, maxD) => sees({ pos }, maxD), spot: () => spot(B, sp),
+    return { sc: B.sc, H: B.H, cols: B.cols, R: B.R, RM: B.RM, edge: B.edge, Rf: B.Rf, doors: B.doors, pos: () => W.pos, st: () => G.st(), sees: (pos, maxD) => sees({ pos }, maxD), spot: () => spot(B, sp),
       hitPlayer: fc.hitPlayer, event: fc.event, floatDmg: fc.floatDmg, power: fc.power, toast: (t, c, s) => G.toast && G.toast(t, c, s), shake: (v) => { W.shake = Math.max(W.shake || 0, v); }, W: () => W };
   }
   function foeCtx(B, node) {
     return {
-      sc: B.sc, H: B.H, cols: B.cols, R: B.R, doors: B.doors, pvel: W.vel, escaped: (fo) => { const nd = W.graph.nodes[W.cur], i = nd.prey.indexOf(fo.h); if (i >= 0) nd.prey.splice(i, 1); G.toast && G.toast(`🚪 ${NM(fo.h.c)} 从门逃走了……（首级没了）`, '#ffb080', 2.4); W.trip.log.push({ t: `${fo.h.c.name}从「${nd.name}」的门逃走了。` }); if (W.stats) W.stats.combo = 0; }, player: { pos: W.pos, get yaw() { return G.player.yaw; }, get crouch() { return G.player.crouch; } },
+      sc: B.sc, H: B.H, cols: B.cols, R: B.R, RM: B.RM, edge: B.edge, Rf: B.Rf, doors: B.doors, pvel: W.vel, escaped: (fo) => { const nd = W.graph.nodes[W.cur], i = nd.prey.indexOf(fo.h); if (i >= 0) nd.prey.splice(i, 1); G.toast && G.toast(`🚪 ${NM(fo.h.c)} 从门逃走了……（首级没了）`, '#ffb080', 2.4); W.trip.log.push({ t: `${fo.h.c.name}从「${nd.name}」的门逃走了。` }); if (W.stats) W.stats.combo = 0; }, player: { pos: W.pos, get yaw() { return G.player.yaw; }, get crouch() { return G.player.crouch; } },
       st: () => G.st(), sees: (pos, maxD) => sees({ pos }, maxD), say: (anchor, text, col) => { if (text) say(anchor, text, col); },
       floatDmg: (pos, n, big) => floatDmg(pos, n, big), renderer: G.renderer, camera: G.camera, event: (t, fo, d) => foeEvent(t, fo, d), windup: (fo, clip) => { if (window.CombatFX && CombatFX.on) { CombatFX.windup(fo, clip); return; } const dd = W ? Math.hypot(fo.pos.x - W.pos.x, fo.pos.z - W.pos.z) : 5, v = Math.max(0, 1 - dd / 14); if (!v) return; SFX.play && SFX.play('draw', 0.5 * v, 0.62, 0.05); if (/Heavy|Sword_Attack/.test(clip)) SFX.play && SFX.play('heavy', 0.45 * v, 0.7, 0.05); }, // 第十九轮：起手音 toast: (t, c, d) => G.toast && G.toast(t, c, d), shake: (k) => { W.shake = Math.max(W.shake || 0, k); },
       playerSwinging: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.sw || Combat.state.thrust > 0)),
@@ -687,7 +700,7 @@ window.Worlds = (() => {
   function spawnPrey(B, node) {
     const r = mulberry(node.seed ^ 0x5bd1e995), out = [];
     node.prey.forEach((h, k) => {
-      let x = 0, z = 0; for (let t = 0; t < 30; t++) { const a = r() * 6.28, d = B.R * (0.3 + r() * 0.6); x = Math.cos(a) * d; z = Math.sin(a) * d; if (B.cols.every(c => Math.hypot(c.x - x, c.z - z) > c.r + 0.6)) break; }
+      let x = 0, z = 0; for (let t = 0; t < 30; t++) { if (B.lp && B.lp.shaped && B.lp.samp) { const q = B.lp.samp(r, 3); x = q[0]; z = q[1]; if (Math.hypot(x, z) < B.R * 0.25) continue; } else { const a = r() * 6.28, d = B.R * (0.3 + r() * 0.6); x = Math.cos(a) * d; z = Math.sin(a) * d; } if (B.cols.every(c => Math.hypot(c.x - x, c.z - z) > c.r + 0.6)) break; }
       const col = new THREE.Color(RC[h.c.rar]); const g = new THREE.Group();
       const core = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow(), color: col.clone().multiplyScalar(2.2), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false })); core.scale.setScalar(0.5);
       const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow(), color: col.clone().multiplyScalar(0.7), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false })); halo.scale.setScalar(1.6);
@@ -861,7 +874,7 @@ window.Worlds = (() => {
     } else { W.vel.x *= 0.8; W.vel.z *= 0.8; }
     W.vel.y -= 14 * dt; W.pos.addScaledVector(W.vel, dt);
     // 碰撞：边界圆 + 物体圆
-    const rr = Math.hypot(W.pos.x, W.pos.z), lim = (B.Rf ? B.Rf(Math.atan2(W.pos.z, W.pos.x)) : B.R) - 0.4; if (rr > lim) { W.pos.x *= lim / rr; W.pos.z *= lim / rr; }
+    const rr = Math.hypot(W.pos.x, W.pos.z), lim = (B.Rf ? B.Rf(Math.atan2(W.pos.z, W.pos.x)) : B.R) - 0.4; if (B.lp && B.lp.shaped && B.lp.clamp) B.lp.clamp(W.pos, 0.4); else if (rr > lim) { W.pos.x *= lim / rr; W.pos.z *= lim / rr; } // R46：特殊形状沿法线推回（径向会把人沿长廊拖回中心）
     for (const c of B.cols) { const dx = W.pos.x - c.x, dz = W.pos.z - c.z, m = c.r + 0.35, d2 = dx * dx + dz * dz; if (d2 >= m * m) continue; const d = Math.sqrt(d2); if (d > 1e-5) { W.pos.x += dx / d * (m - d); W.pos.z += dz / d * (m - d); } }
     const gy = B.H(W.pos.x, W.pos.z); if (W.pos.y <= gy) { W.pos.y = gy; W.vel.y = 0; W.onGround = true; } else if (W.pos.y > gy + 0.05) W.onGround = false;
     const moving = Math.hypot(W.vel.x, W.vel.z);
@@ -910,11 +923,11 @@ window.Worlds = (() => {
         if (p.brave && d < 5) { p.state = 'fight'; vx = -dx / d * 2.4; vz = -dz / d * 2.4; if (d < 1.5 && p.cd <= 0) preyStrike(p, s); }
         else { p.state = 'flee'; const spd = 2.2 + p.rar * 0.45; vx = dx / d * spd; vz = dz / d * spd; if (p.sayT <= 0 && Math.random() < 0.01) { say(p, pick(Math.random, PREY_SAY.flee), '#fff'); p.sayT = 4; } }
         // 被逼到边界时沿切线滑开；被逼急了会反扑
-        const pr = Math.hypot(p.pos.x, p.pos.z); if (pr > B.R - 2.5) { const tx = -p.pos.z / pr, tz = p.pos.x / pr, sg = (tx * dx + tz * dz) > 0 ? 1 : -1; vx = vx * 0.3 + tx * sg * 2.6; vz = vz * 0.3 + tz * sg * 2.6; if (d < 2.2 && p.cd <= 0) { if (p.sayT <= 0) { say(p, pick(Math.random, PREY_SAY.fight), '#ffb0a0'); p.sayT = 3; } preyStrike(p, s); } }
+        const pr = Math.hypot(p.pos.x, p.pos.z) || 1, E = B.edge ? B.edge(p.pos.x, p.pos.z) : [B.R - pr, -p.pos.x / pr, -p.pos.z / pr]; if (E[0] < 2.5) { const tx = E[2], tz = -E[1], sg = (tx * dx + tz * dz) > 0 ? 1 : -1; vx = vx * 0.3 + tx * sg * 2.6; vz = vz * 0.3 + tz * sg * 2.6; if (d < 2.2 && p.cd <= 0) { if (p.sayT <= 0) { say(p, pick(Math.random, PREY_SAY.fight), '#ffb0a0'); p.sayT = 3; } preyStrike(p, s); } }
       } else { p.state = 'idle'; vx = Math.sin(now * 0.7 + p.rar) * 0.4; vz = Math.cos(now * 0.53 + p.rar * 2) * 0.4; if (d > 20) p.seen = false; }
       p.pos.x += vx * dt; p.pos.z += vz * dt;
       for (const c of B.cols) { const ex = p.pos.x - c.x, ez = p.pos.z - c.z, m = c.r + 0.3, e2 = ex * ex + ez * ez; if (e2 >= m * m) continue; const e = Math.sqrt(e2); if (e > 1e-5) { p.pos.x += ex / e * (m - e); p.pos.z += ez / e * (m - e); } }
-      const pr = Math.hypot(p.pos.x, p.pos.z), pl = B.R - 1; if (pr > pl) { p.pos.x *= pl / pr; p.pos.z *= pl / pr; }
+      if (B.lp && B.lp.shaped && B.lp.clamp) B.lp.clamp(p.pos, 1); else { const pr = Math.hypot(p.pos.x, p.pos.z), pl = B.R - 1; if (pr > pl) { p.pos.x *= pl / pr; p.pos.z *= pl / pr; } }
       p.pos.y = B.H(p.pos.x, p.pos.z) + 1.35 + Math.sin(now * 2.3 + p.rar) * 0.12;
       const pulse = 1 + Math.sin(now * 5 + p.rar) * 0.12; p.core.scale.setScalar(0.5 * pulse * (p.flash > 0 ? 1.8 : 1)); p.halo.scale.setScalar(1.6 * pulse);
       if (p.flash > 0) p.flash -= dt;
@@ -966,7 +979,7 @@ window.Worlds = (() => {
       const rad = (d - want) * 0.8; bo.pos.x += (dx / d * rad + tx * Math.sin(bo.t * 0.6) * 1.5) * dt * sp * 0.6; bo.pos.z += (dz / d * rad + tz * Math.sin(bo.t * 0.6) * 1.5) * dt * sp * 0.6;
       bo.cd -= dt; if (bo.cd <= 0 && bo.stag <= 0 && d < 9) { bo.tele = Math.max(0.45, 0.9 - bo.tier * 0.05); if (bo.sayT <= 0) { bossSay(pick(Math.random, bo.B.taunt), 2.5); bo.sayT = 6; } }
     }
-    const pr = Math.hypot(bo.pos.x, bo.pos.z), pl = B.R - 1.5; if (pr > pl) { bo.pos.x *= pl / pr; bo.pos.z *= pl / pr; }
+    if (B.lp && B.lp.shaped && B.lp.clamp) B.lp.clamp(bo.pos, 1.5); else { const pr = Math.hypot(bo.pos.x, bo.pos.z), pl = B.R - 1.5; if (pr > pl) { bo.pos.x *= pl / pr; bo.pos.z *= pl / pr; } }
     bo.pos.y = B.H(bo.pos.x, bo.pos.z) + 1.6 + Math.sin(now * 2) * 0.1;
     const pulse = 1 + Math.sin(now * 4) * 0.1 + (bo.tele > 0 ? 0.35 : 0); bo.core.scale.setScalar(1.3 * pulse * (bo.flash > 0 ? 1.5 : 1)); bo.halo.scale.setScalar(4.2 * pulse); if (bo.flash > 0) bo.flash -= dt;
     W.dom.bossHp.style.width = bo.hp + '%';

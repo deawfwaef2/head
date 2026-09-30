@@ -106,8 +106,8 @@ window.WGen = (() => {
       f.h = (x, z) => { let h = 0; for (const k of K) { const d2 = (x - k.x) ** 2 + (z - k.z) ** 2; h += k.h * Math.exp(-d2 / (k.s * k.s)); } return h; }; }
     else if (kind === 'mesa') { const H0 = (2.2 + r() * 2.2) * amp, rad = R * (0.32 + r() * 0.16), nr = 1 + Math.floor(r() * 2), rs = []; for (let i = 0; i < nr; i++) rs.push(r() * 6.283);
       f.h = (x, z) => { const dx = x - ox * 0.6, dz = z - oz * 0.6, d = Math.hypot(dx, dz), a = Math.atan2(dz, dx), rho = d / (rad * (1 + (nz(x * 0.06 + 3, z * 0.06 + 8) - 0.5) * 0.55));
-        let ramp = 0; for (const q of rs) ramp = Math.max(ramp, Math.exp(-((Math.atan2(Math.sin(a - q), Math.cos(a - q)) / 0.42) ** 2))); const w = 0.1 + 0.85 * ramp; return H0 * (1 - sstep(1 - w, 1 + w, rho)) - H0 * 0.15; }; f.mesa = { x: ox * 0.6, z: oz * 0.6, r: rad, h: H0 }; }
-    else if (kind === 'crater') { const A = (2 + r() * 2.4) * amp, rr = R * (0.3 + r() * 0.16); f.h = (x, z) => { const d = Math.hypot(x - ox * 0.5, z - oz * 0.5) * (1 + (nz(x * 0.07, z * 0.07) - 0.5) * 0.4) / rr; return A * (Math.exp(-(((d - 1) / 0.28) ** 2)) * 0.9 - 0.75 * (1 - sstep(0.15, 0.95, d))); }; }
+        let ramp = 0; for (const q of rs) ramp = Math.max(ramp, Math.exp(-((Math.atan2(Math.sin(a - q), Math.cos(a - q)) / 0.42) ** 2))); const w = 0.22 + 0.73 * ramp; /* R46：悬崖边缘放缓一点（原 0.1 → 近垂直） */ return H0 * (1 - sstep(1 - w, 1 + w, rho)) - H0 * 0.15; }; f.mesa = { x: ox * 0.6, z: oz * 0.6, r: rad, h: H0 }; }
+    else if (kind === 'crater') { const A = (2 + r() * 2.4) * amp, rr = R * (0.3 + r() * 0.16), ga = r() * 6.283; f.h = (x, z) => { const d = Math.hypot(x - ox * 0.5, z - oz * 0.5) * (1 + (nz(x * 0.07, z * 0.07) - 0.5) * 0.4) / rr, an = Math.atan2(z - oz * 0.5, x - ox * 0.5), dA = Math.abs(Math.atan2(Math.sin(an - ga), Math.cos(an - ga))); return A * (Math.exp(-(((d - 1) / 0.28) ** 2)) * 0.9 * (1 - 0.85 * Math.exp(-((dA / 0.5) ** 2))) - 0.75 * (1 - sstep(0.15, 0.95, d))); }; } // R46：环形山一侧有豁口，坑底走得进去
     else if (kind === 'gully') { const A = 1.4 + r() * 1.4, W = 2.4 + r() * 2.2, pts = channel(r, R, doorList, 10), D = pts && pts.dist; f.h = (x, z) => { if (!D) return 0; const d = D(x, z).d; return -A * (1 - sstep(W * 0.4, W * 2.6, d)) + 0.12; }; f.gully = pts; if (!pts) f.h = () => 0; }
     else f.h = () => 0;
     return f;
@@ -222,7 +222,7 @@ window.WGen = (() => {
       const flip = sm[0] < sm[N - 1]; const arr = flip ? sm.slice().reverse() : sm.slice(); for (let i = 1; i < N; i++) arr[i] = Math.min(arr[i], arr[i - 1] - 0.02); const lv = flip ? arr.reverse() : arr;
       g.water = { kind: 'river', ch, lv: lv.map(y => y - 0.3), w: 1.5 + r() * 1.7 }; } else g.waterKind = 'ponds'; }
     if (g.waterKind === 'ponds' && !g.water) { const n = R < 18 ? 1 : 1 + Math.floor(r() * 3), P = [];
-      for (let t = 0; t < 60 && P.length < n; t++) { const a = r() * 6.283, d = Rmin * (0.15 + r() * 0.55), x = Math.cos(a) * d, z = Math.sin(a) * d, pr = clamp(Rmin * (0.12 + r() * 0.12), 2.6, 8.5); if (doorList.some(dd => Math.hypot(dd.x - x, dd.z - z) < pr + 8) || P.some(q => Math.hypot(q.x - x, q.z - z) < q.r + pr + 3) || Math.hypot(x, z) + pr > Rmin - 2) continue; if (LY && LY.k === 'lake' && Math.hypot(x - LY.cx, z - LY.cz) < LY.Lr + pr + 3) continue; P.push({ x, z, r: pr, sx: 0.75 + r() * 0.6, th: r() * 3.14, ph: r() * 6.28 }); }
+      for (let t = 0; t < 60 && P.length < n; t++) { const a = r() * 6.283, d = Rmin * (0.15 + r() * 0.55), x = Math.cos(a) * d, z = Math.sin(a) * d, pr = clamp(Rmin * (0.12 + r() * 0.12), 2.6, 8.5); if (!(() => { let lo = 1e9, hi = -1e9; for (let i = 0; i < 9; i++) { const aa = i * 0.785, rr2 = i ? pr * (i % 2 ? 1.3 : 2.4) : 0, y = H0(x + Math.cos(aa) * rr2, z + Math.sin(aa) * rr2) + T.h(x + Math.cos(aa) * rr2, z + Math.sin(aa) * rr2) * tk; lo = Math.min(lo, y); hi = Math.max(hi, y); } return hi - lo < 1.0 + pr * 0.12; })()) continue; /* R46：池塘只挖在平坦处 */ if (doorList.some(dd => Math.hypot(dd.x - x, dd.z - z) < pr + 8) || P.some(q => Math.hypot(q.x - x, q.z - z) < q.r + pr + 3) || Math.hypot(x, z) + pr > Rmin - 2) continue; if (LY && LY.k === 'lake' && Math.hypot(x - LY.cx, z - LY.cz) < LY.Lr + pr + 3) continue; P.push({ x, z, r: pr, sx: 0.75 + r() * 0.6, th: r() * 3.14, ph: r() * 6.28 }); }
       if (P.length) { let s = 0; for (const p of P) { let a = 0; for (let i = 0; i < 8; i++) a += H0(p.x + Math.cos(i) * p.r * 1.2, p.z + Math.sin(i) * p.r * 1.2) + T.h(p.x, p.z) * tk; p.lv = a / 8 - 0.35; s++; } g.water = { kind: 'ponds', P }; } else g.waterKind = ''; }
     const W = g.water;
     // 河/池的距离场（岸边着色 + 体块）
@@ -235,9 +235,9 @@ window.WGen = (() => {
       const q = wd(x, z);
       if (W.kind === 'river') { const bw = 4.5 + W.w * 0.8; if (q.d > bw) return h; const t = q.t * W.ch.n, i = Math.min(W.ch.n - 1, Math.floor(t)), f = t - i, LV = W.lv, L = LV[Math.min(i, LV.length - 1)] * (1 - f) + LV[Math.min(i + 1, LV.length - 1)] * f;
         if (q.d < 0) return L - 0.25 - 0.55 * Math.min(1, -q.d / W.w * 1.4);
-        return lerp(L - 0.25, Math.max(h, L + 0.02), sstep(0, bw, q.d)); }
+        return lerp(L - 0.25, lerp(Math.max(h, L + 0.02), h, sstep(bw * 0.55, bw, q.d)), sstep(0, bw, q.d)); } // R46：岸顶平滑回到原地形（以前在 bw 处有断崖）
       else { if (q.d > 7) return h; const p = q.p, bw = Math.max(2.6, p.r * 0.55);
-        if (q.d < 0) return p.lv - 0.3 - 0.9 * Math.min(1, -q.d / (p.r * 0.7)); const k = sstep(0, bw, q.d); return lerp(p.lv - 0.3, Math.max(h, p.lv + 0.02), k); }
+        if (q.d < 0) return p.lv - 0.3 - 0.9 * Math.min(1, -q.d / (p.r * 0.7)); const k = sstep(0, bw, q.d); return lerp(p.lv - 0.3, lerp(Math.max(h, p.lv + 0.02), h, sstep(bw, 7, q.d)), k); } // R46：池岸不再抬成平台断崖
     };
     return g;
   }
@@ -255,7 +255,7 @@ window.WGen = (() => {
       const sl = 1 - ny; if (sl > 0.22) { const k = sstep(0.22, 0.62, sl); r_ = lerp(r_, 0.6, k * 0.5); g_ = lerp(g_, 0.58, k * 0.5); b_ = lerp(b_, 0.55, k * 0.5); }
       if (g.wd) { const q = g.wd(x, z); if (q.d < 3.2) { const k = 1 - sstep(0, 3.2, q.d); r_ *= 1 - 0.42 * k; g_ *= 1 - 0.34 * k; b_ *= 1 - 0.3 * k; } }
       if (LP && LP.pathD) { const d = LP.pathD(x, z); if (d < 1.6) { const k = 1 - sstep(0.4, 1.6, d); r_ = lerp(r_, r_ * 1.25 + 0.05, k); g_ = lerp(g_, g_ * 1.05, k * 0.8); b_ = lerp(b_, b_ * 0.82, k); } }
-      const hh = clamp(y * 0.05, -0.2, 0.2); const fade = 1 - 0.3 * sstep(R + 2, R + 30, rr);
+      const hh = clamp(y * 0.05, -0.2, 0.2); const fade = 1 - 0.3 * (LP && LP.dOut ? sstep(2, 30, LP.dOut(x, z)) : sstep(R + 2, R + 30, rr));
       col[i * 3] = r_ * gm.r * (1 + hh) * fade; col[i * 3 + 1] = g_ * gm.g * (1 + hh) * fade; col[i * 3 + 2] = b_ * gm.b * (1 + hh) * fade;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); return true;
@@ -325,8 +325,8 @@ window.WGen = (() => {
     const light = (x, y, z, col, I, D) => { if (X.lights.n >= 2) return; X.lights.n++; const pl = new THREE.PointLight(col, I, D, 2); pl.position.set(x, y, z); sc.add(pl); return pl; };
     const one = (names) => { const vs = variants(names); return vs.length ? vs[Math.floor(r() * vs.length)] : null; };
     const wdOK = (x, z, rad) => !g.wd || g.wd(x, z).d > rad + 1.2;
-    const spotFor = (rad0) => { const why = { free: 0, wd: 0, edge: 0, path: 0, door: 0 }; g.why = why; for (let t = 0; t < 160; t++) { const rad = t < 60 ? rad0 : t < 110 ? rad0 * 0.7 : rad0 * 0.45, a = r() * 6.283, d = R * (0.06 + r() * 0.72), x = Math.cos(a) * d, z = Math.sin(a) * d;
-      if (Math.hypot(x, z) + rad > R - 1.5) { why.edge++; continue; } if (!free(x, z, rad)) { why.free++; continue; } if (!wdOK(x, z, rad)) { why.wd++; continue; } if (LP && LP.pathD && LP.pathD(x, z) < rad + 0.6) { why.path++; continue; } if (doorList.some(dd => Math.hypot(dd.x - x, dd.z - z) < rad + 5)) { why.door++; continue; } return [x, z]; } return null; };
+    const spotFor = (rad0) => { const why = { free: 0, wd: 0, edge: 0, path: 0, door: 0 }; g.why = why; for (let t = 0; t < 160; t++) { const rad = t < 60 ? rad0 : t < 110 ? rad0 * 0.7 : rad0 * 0.45, a = r() * 6.283, d = R * (0.06 + r() * 0.72); let x = Math.cos(a) * d, z = Math.sin(a) * d; if (LP && LP.shaped && LP.samp) { const q = LP.samp(r, rad + 2); x = q[0]; z = q[1]; } // R46：特殊形状（长廊 / 臂）上也摆景物
+      if (LP && LP.shaped && LP.dOut ? LP.dOut(x, z) > -(rad + 1.5) : Math.hypot(x, z) + rad > R - 1.5) { why.edge++; continue; } if (!free(x, z, rad)) { why.free++; continue; } if (!wdOK(x, z, rad)) { why.wd++; continue; } if (LP && LP.pathD && LP.pathD(x, z) < rad + 0.6) { why.path++; continue; } if (doorList.some(dd => Math.hypot(dd.x - x, dd.z - z) < rad + 5)) { why.door++; continue; } return [x, z]; } return null; };
     const putH = (name, x, z, o, ry, dy) => { const v = one([name]); if (!v) return 0; const sz = v.t.size, k = o.h ? o.h / Math.max(0.1, sz.y) : o.w / Math.max(0.1, sz.x, sz.z); put(v.t, x, z, k, ry, dy != null ? H(x, z) + dy : undefined); return k; };
     const axis = (v, th) => v.t.size.x >= v.t.size.z ? -th : Math.PI / 2 - th; // 让模型长轴指向 th
     const B = {

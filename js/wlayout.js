@@ -25,6 +25,94 @@ window.WLayout = (() => {
     shrine: { n: '无名祭坛', st: 'ruins forest swamp capital fortress abyss peak meadow', rad: 2.4 }
   };
 
+  // ---------- 0) R46 形状系统（MOD `map_shapes`；?ws=0 临时关）----------
+  // 用户：来点长点的图或者特殊形状的图。做法：边界仍是“极坐标半径表 ρ(a)”（星形域，和门 / 散布 / 墙 / 地形的老接口一致），
+  // 但 ρ 由一组图元的并集（圆盘 / 胶囊 / 椭圆 / 圆角凸多边形）射线行进得到：长廊、花生、三叶/五叶花、十字/星形、三角/矩形/六边形、L/V 形、S 形蛇道。
+  // 始终并入一个半径 0.68R 的基础圆盘 ⇒ 原点在内部、最小半径 ≥0.68R（布局原型、出生点、平坦区都不必改）。
+  const SHON = () => !(window.Mods && Mods.on && Mods.on('map_shapes') === false) && !/[?&]ws=0/.test(location.search);
+  const RCAP = 66, NT = 720, TAU = Math.PI * 2;
+  const SHAPEW = [['round', 30], ['long', 16], ['lobes', 12], ['arms', 11], ['poly', 9], ['ell', 6], ['bent', 8], ['snake', 8]];
+  const SHNAME = { long: '长廊形', lobes: '花瓣形', arms: '星芒形', poly: '棱角形', ell: '长椭圆形', bent: '折角形', snake: '蛇形' };
+  function wpick(r, L) { let t = 0; for (const e of L) t += e[1]; let x = r() * t; for (const e of L) { x -= e[1]; if (x <= 0) return e[0]; } return L[0][0]; }
+  const segDist2 = (x, z, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, t = clamp(((x - ax) * dx + (z - az) * dz) / Math.max(1e-9, dx * dx + dz * dz), 0, 1), ex = x - ax - dx * t, ez = z - az - dz * t; return ex * ex + ez * ez; };
+  function primIn(q, x, z) {
+    if (q.t === 'd') { const dx = x - q.x, dz = z - q.z; return dx * dx + dz * dz < q.r * q.r; }
+    if (q.t === 'c') return segDist2(x, z, q.x0, q.z0, q.x1, q.z1) < q.r * q.r;
+    if (q.t === 'e') { const dx = x - q.x, dz = z - q.z, u = dx * q.c + dz * q.s, v = -dx * q.s + dz * q.c; return (u / q.a) ** 2 + (v / q.b) ** 2 < 1; }
+    if (q.t === 'p') { const V = q.v, n = V.length; let ins = true; for (let i = 0; i < n; i++) { const a = V[i], b = V[(i + 1) % n]; if ((b[0] - a[0]) * (z - a[1]) - (b[1] - a[1]) * (x - a[0]) < 0) { ins = false; break; } } if (ins) return true;
+      for (let i = 0; i < n; i++) { const a = V[i], b = V[(i + 1) % n]; if (segDist2(x, z, a[0], a[1], b[0], b[1]) < q.r * q.r) return true; } return false; }
+    return false;
+  }
+  function shapePrims(r, R, kind, th) {
+    const RB = Math.max(R * 0.68, Math.min(R, 13)), Q = [], D = (x, z, rr) => Q.push({ t: 'd', x, z, r: rr }), C = (x0, z0, x1, z1, rr) => Q.push({ t: 'c', x0, z0, x1, z1, r: rr });
+    const u = [Math.cos(th), Math.sin(th)], v = [-u[1], u[0]], at = (t, o) => [u[0] * t + v[0] * (o || 0), u[1] * t + v[1] * (o || 0)];
+    const cap = Rm => Math.min(Rm, RCAP - 4);
+    if (kind === 'long') {
+      const w = Math.max(R * (0.68 + r() * 0.22), RB * 0.9), L1 = cap(R * (1.7 + r() * 1.7)), L0 = cap(R * (0.9 + r() * 1.7)), a = at(-L0), b = at(L1); C(a[0], a[1], b[0], b[1], w);
+      const nb = Math.floor(r() * 3.4); for (let i = 0; i < nb; i++) { const t = (r() * 1.6 - 0.8) * Math.min(L0, L1), o = (r() - 0.5) * w * 0.6, p = at(t, o); D(p[0], p[1], w * (1.12 + r() * 0.3)); }
+    } else if (kind === 'lobes') {
+      const n = [2, 2, 3, 3, 4, 5][Math.floor(r() * 6)], rho = R * (n > 3 ? 0.62 : 0.72) * (0.85 + r() * 0.3), ph = r() * 0.5;
+      for (let k = 0; k < n; k++) { const a = th + k / n * TAU + (r() - 0.5) * (n > 2 ? 0.35 : 0.12) + ph, rr = rho * (0.82 + r() * 0.36), dd = Math.min(rr * 0.93, rr * (0.6 + r() * 0.3) * (n > 3 ? 1.25 : 1.1)), x = Math.cos(a) * dd, z = Math.sin(a) * dd;
+        D(x, z, rr); C(0, 0, x * 0.9, z * 0.9, rr * 0.62); }
+    } else if (kind === 'arms') {
+      const n = [2, 3, 3, 4, 4, 5, 6][Math.floor(r() * 7)], w0 = R * (n > 4 ? 0.3 : 0.38), off = r() * TAU;
+      for (let k = 0; k < n; k++) { const a = (n === 2 ? th + k * Math.PI / 2 : off + k / n * TAU + (r() - 0.5) * 0.3), len = cap(R * (1.25 + r() * 1.05) * (n === 2 ? 1.25 : 1)), w = w0 * (0.85 + r() * 0.3);
+        const x1 = Math.cos(a) * len, z1 = Math.sin(a) * len; C(0, 0, x1, z1, w); if (n === 2) { C(0, 0, -x1 * (0.6 + r() * 0.7), -z1 * (0.6 + r() * 0.7), w); } }
+    } else if (kind === 'poly') {
+      const n = [3, 4, 4, 5, 6, 6][Math.floor(r() * 6)], rc = R * (n === 3 ? 1.55 : 1.25) * (0.88 + r() * 0.3), ro = R * (0.16 + r() * 0.22), V = [];
+      if (n === 4 && r() < 0.75) { const a = R * (1.25 + r() * 1.2), b = R * (0.62 + r() * 0.16); for (const [sx, sz] of [[1, 1], [-1, 1], [-1, -1], [1, -1]]) { const p = at(sx * (a - ro), sz * (b - ro)); V.push(p); } V.sort((p, q) => Math.atan2(p[1], p[0]) - Math.atan2(q[1], q[0])); }
+      else { for (let k = 0; k < n; k++) { const a = th + k / n * TAU; V.push([Math.cos(a) * (rc - ro * 1.6), Math.sin(a) * (rc - ro * 1.6)]); } }
+      Q.push({ t: 'p', v: V, r: ro });
+    } else if (kind === 'ell') {
+      const a = cap(R * (1.9 + r() * 1.3)), b = R * (0.78 + r() * 0.2); Q.push({ t: 'e', x: 0, z: 0, a, b, c: u[0], s: u[1] });
+    } else if (kind === 'bent') {
+      const ph = Math.PI * (0.36 + r() * 0.45) * (r() < 0.5 ? 1 : -1), w = R * (0.56 + r() * 0.2), l1 = cap(R * (1.3 + r() * 1.3)), l2 = cap(R * (1.2 + r() * 1.3)), a1 = th, a2 = th + ph;
+      C(0, 0, Math.cos(a1) * l1, Math.sin(a1) * l1, w); C(0, 0, Math.cos(a2) * l2, Math.sin(a2) * l2, w); D(0, 0, w * 1.12);
+      if (r() < 0.4) { const a3 = th - ph * 0.8, l3 = cap(R * (0.9 + r() * 0.9)); C(0, 0, Math.cos(a3) * l3, Math.sin(a3) * l3, w * 0.85); }
+    } else if (kind === 'snake') {
+      const w = R * (0.5 + r() * 0.18), L0 = cap(R * (1.2 + r() * 1.4)), L1 = cap(R * (1.2 + r() * 1.4)), A = w * (0.7 + r() * 0.9), kk = (0.7 + r() * 0.9) * Math.PI / Math.max(L0 + L1, 1), ph = r() * 0.6 - 0.3, N = 14; let pr = null;
+      for (let i = 0; i <= N; i++) { const t = -L0 + (L0 + L1) * i / N, o = A * Math.sin(t * kk + ph) * (0.35 + 0.65 * Math.min(1, Math.abs(t) / (w * 1.5))), p = at(t, o); if (pr) C(pr[0], pr[1], p[0], p[1], w); pr = p; }
+    }
+    D(0, 0, RB);
+    return Q;
+  }
+  function shapeUp(P, r, node, R) {
+    const old = P.Rf; let kind = 'round';
+    if (SHON()) { kind = window.__wlShape || wpick(r, SHAPEW); if (node.lay === 'lake' || node.lay === 'henge') kind = kind === 'round' ? 'round' : (r() < 0.5 ? 'round' : kind); }
+    const tab = new Float32Array(NT);
+    if (kind === 'round') { for (let i = 0; i < NT; i++) tab[i] = old(i / NT * TAU); }
+    else {
+      const th = r() * TAU, Q = shapePrims(r, R, kind, th), ins = (x, z) => { for (const q of Q) if (primIn(q, x, z)) return true; return false; };
+      for (let i = 0; i < NT; i++) { const a = i / NT * TAU, ca = Math.cos(a), sa = Math.sin(a); let t = 0; const st = 0.5; while (t < RCAP + 6 && ins(ca * (t + st), sa * (t + st))) t += st; let lo = t, hi = t + st; for (let k = 0; k < 8; k++) { const m = (lo + hi) / 2; if (ins(ca * m, sa * m)) lo = m; else hi = m; } tab[i] = lo; }
+      for (let pass = 0; pass < 2; pass++) { const c = Float32Array.from(tab); for (let i = 0; i < NT; i++) { let sm = 0; for (let k = -5; k <= 5; k++) sm += c[(i + k + NT) % NT]; tab[i] = Math.max(c[i] * 0.5, sm / 11); } }
+      const wob = 0.02 + r() * 0.07, F = 3 + Math.floor(r() * 4), ph = r() * TAU;
+      for (let i = 0; i < NT; i++) tab[i] = clamp(tab[i] * (1 + wob * (0.5 + 0.5 * Math.sin(i / NT * TAU * F + ph))), Math.max(R * 0.66, Math.min(R, 13)), RCAP);
+      P.shaped = kind; P.elong = 0; P.lob = 0;
+    }
+    P.kind = kind; P.tab = tab;
+    const at = a => { let x = a % TAU; if (x < 0) x += TAU; const f = x / TAU * NT, i = Math.floor(f) % NT, j = (i + 1) % NT, k = f - Math.floor(f); return tab[i] * (1 - k) + tab[j] * k; };
+    P.Rf = at;
+    let mn = 1e9, mx = 0, ak = 0; for (let i = 0; i < NT; i++) { mn = Math.min(mn, tab[i]); mx = Math.max(mx, tab[i]); ak += tab[i] * tab[i]; } P.Rmin = mn; P.Rmax = mx; P.areaK = ak / NT / (R * R);
+    // 面积均匀采样：角度按 ρ² 加权，再 d = ρ·√u
+    const cdf = new Float32Array(NT + 1); for (let i = 0; i < NT; i++) cdf[i + 1] = cdf[i] + tab[i] * tab[i];
+    P.samp = (rr, m) => { const x = rr() * cdf[NT]; let lo = 0, hi = NT; while (hi - lo > 1) { const md = (lo + hi) >> 1; if (cdf[md] <= x) lo = md; else hi = md; } const a = (lo + rr()) / NT * TAU, d = Math.max(0, at(a) - (m || 0)) * Math.sqrt(rr()); return [Math.cos(a) * d, Math.sin(a) * d, a, d]; };
+    // 到边界的带符号距离（正=边界外）：(r-ρ)/√(1+(ρ'/ρ)²)，直线墙上是精确的
+    const dOut = (x, z) => { const rr = Math.hypot(x, z); if (rr < 1e-6) return -tab[0]; const a = Math.atan2(z, x), rho = at(a), e = 0.0087, dr = (at(a + e) - at(a - e)) / (2 * e), f = 1 / Math.sqrt(1 + (dr / rho) ** 2); return (rr - rho) * f; };
+    P.dOut = dOut;
+    // edge(x,z) → [到墙的距离（内为正）, 内法线 nx, nz]（法线仅在 d<8 时计算）
+    P.edge = (x, z) => { const d = -dOut(x, z); if (d > 8) return [d, 0, 0]; const e = 0.3, gx = dOut(x + e, z) - dOut(x - e, z), gz = dOut(x, z + e) - dOut(x, z - e), l = Math.hypot(gx, gz) || 1; return [d, -gx / l, -gz / l]; };
+    P.clamp = (p, m) => { for (let i = 0; i < 6; i++) { const E = P.edge(p.x, p.z); if (E[0] >= m) break; const k = m - E[0]; p.x += E[1] * k; p.z += E[2] * k; } };
+    // 门口候选：ρ 的局部峰（尖角 / 长廊两端），按 ρ 从大到小、彼此间隔 ≥40°
+    const pk = []; for (let i = 0; i < NT; i++) { let ok = true; for (let k = -24; k <= 24; k += 2) if (tab[(i + k + NT) % NT] > tab[i] + 1e-4) { ok = false; break; } if (ok && tab[i] > mn * 1.22) pk.push([tab[i], i / NT * TAU]); }
+    pk.sort((a, b) => b[0] - a[0]); P.tips = []; for (const [, a] of pk) if (P.tips.every(b => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))) > 0.7)) P.tips.push(a);
+    P.shapeName = SHNAME[kind] || '';
+    // 沿边界等弧长取点（边界树带 / 坡上草环用）：bp(t) → [x, z, 外法线 nx, nz]
+    const bx = new Float32Array(NT + 1), bz = new Float32Array(NT + 1), cum = new Float32Array(NT + 1); for (let i = 0; i <= NT; i++) { const a = (i % NT) / NT * TAU; bx[i] = Math.cos(a) * tab[i % NT]; bz[i] = Math.sin(a) * tab[i % NT]; if (i) cum[i] = cum[i - 1] + Math.hypot(bx[i] - bx[i - 1], bz[i] - bz[i - 1]); }
+    P.perim = cum[NT];
+    P.bp = t => { const x = ((t % P.perim) + P.perim) % P.perim; let lo = 0, hi = NT; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cum[m] <= x) lo = m; else hi = m; } const k = (x - cum[lo]) / Math.max(1e-6, cum[lo + 1] - cum[lo]), px = bx[lo] + (bx[lo + 1] - bx[lo]) * k, pz = bz[lo] + (bz[lo + 1] - bz[lo]) * k;
+      let tx = bx[Math.min(NT, lo + 2)] - bx[Math.max(0, lo - 1)], tz = bz[Math.min(NT, lo + 2)] - bz[Math.max(0, lo - 1)]; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l; let nx = tz, nz = -tx; if (nx * px + nz * pz < 0) { nx = -nx; nz = -nz; } return [px, pz, nx, nz]; };
+  }
+
   // ---------- 1) 规划：形状 / 地形 / 布局 / 天气 ----------
   function plan(node, nz) {
     if (!on() || node.home) return null;
@@ -32,7 +120,7 @@ window.WLayout = (() => {
     P.elong = r() < 0.5 ? 0.18 + r() * 0.34 : 0; P.th = r() * 6.283; P.lob = 0.05 + r() * 0.15; P.lobF = 2 + Math.floor(r() * 3); P.ph = r() * 6.283;
     P.Rf = a => R * (1 + P.elong * Math.cos(a - P.th) ** 2 + P.lob * (0.5 + 0.5 * Math.sin(a * P.lobF + P.ph)));
     P.Rmax = R * (1 + P.elong + P.lob);
-    let ak = 0; for (let i = 0; i < 32; i++) ak += (P.Rf(i / 32 * 6.283) / R) ** 2; P.areaK = ak / 32;
+    shapeUp(P, r, node, R);
     P.relief = pick(r, [0.35, 0.7, 1, 1, 1.7, 2.6]);
     if (r() < 0.35) { const a = r() * 6.283, d = R * (window.Mods && Mods.on && Mods.on('wfix41') === false ? r() * 0.3 : 0.32 + r() * 0.28); P.hump = { /* R41：土丘不再压在正中（进门就挡视线） */ x: Math.cos(a) * d, z: Math.sin(a) * d, h: (r() < 0.65 ? 1 : -0.6) * (1.4 + r() * 1.6), s: R * (0.2 + r() * 0.15) }; }
     P.path = r() < 0.6;
@@ -46,7 +134,7 @@ window.WLayout = (() => {
     for (let i = 0; i < cnt && ok.length; i++) P.sp.push(ok.splice(Math.floor(r() * ok.length), 1)[0]);
     if (window.__wlForce) Object.assign(P, window.__wlForce(P)); // 调试用（_w.html）
     P.r = r;
-    P.tag = [...P.sp.map(k => SP[k].n), P.path ? '小径' : '', P.clump ? '林丛' : '', P.hump ? (P.hump.h > 0 ? '土丘' : '洼地') : '', WXN[P.wx] || ''].filter(Boolean).join(' · ');
+    P.tag = [P.shapeName, ...P.sp.map(k => SP[k].n), P.path ? '小径' : '', P.clump ? '林丛' : '', P.hump ? (P.hump.h > 0 ? '土丘' : '洼地') : '', WXN[P.wx] || ''].filter(Boolean).join(' · ');
     return P;
   }
   // ---------- 2) 小径：从每扇门蜿蜒到中心 ----------
@@ -103,9 +191,9 @@ window.WLayout = (() => {
     if (P.segs && lay !== 'ravine') { const vs = variants(['rock_09', 'rock_07', 'namaqualand_rocks_01#*']); let acc = 0;
       if (vs.length) for (const s of P.segs) { const L = Math.hypot(s[2] - s[0], s[3] - s[1]); acc += L; if (acc < 2.4) continue; acc = 0; if (r() < 0.35) continue;
         const sd = r() < 0.5 ? -1 : 1, nx = -(s[3] - s[1]) / (L || 1), nz = (s[2] - s[0]) / (L || 1), x = s[2] + nx * sd * (1.35 + r() * 0.3), z = s[3] + nz * sd * (1.35 + r() * 0.3);
-        if (Math.hypot(x, z) > R * 0.95) continue; const v = pick(r, vs), k = (0.28 + r() * 0.22) / Math.max(0.2, Math.max(v.t.size.x, v.t.size.z)); put(v.t, x, z, k, r() * 6.28); } }
-    const spotFor = rad => { for (let t = 0; t < 60; t++) { const a = r() * 6.283, d = R * (0.12 + r() * 0.6), x = Math.cos(a) * d, z = Math.sin(a) * d;
-      if (!free(x, z, rad)) continue; if (P.pathD && P.pathD(x, z) < rad + 0.8) continue; if (Math.hypot(x, z) + rad > R - 1) continue; return [x, z]; } return null; };
+        if (P.dOut ? P.dOut(x, z) > -1.5 : Math.hypot(x, z) > R * 0.95) continue; const v = pick(r, vs), k = (0.28 + r() * 0.22) / Math.max(0.2, Math.max(v.t.size.x, v.t.size.z)); put(v.t, x, z, k, r() * 6.28); } }
+    const spotFor = rad => { for (let t = 0; t < 60; t++) { let x, z; if (P.shaped && P.samp) { const q = P.samp(r, rad + 2); x = q[0]; z = q[1]; if (Math.hypot(x, z) < R * 0.3) continue; } else { const a = r() * 6.283, d = R * (0.12 + r() * 0.6); x = Math.cos(a) * d; z = Math.sin(a) * d; }
+      if (!free(x, z, rad)) continue; if (P.pathD && P.pathD(x, z) < rad + 0.8) continue; if (P.shaped && P.dOut) { if (P.dOut(x, z) > -(rad + 1.5)) continue; } else if (Math.hypot(x, z) + rad > R - 1) continue; return [x, z]; } return null; };
     const flame = (x, y, z, s) => { const f = window.Assets && Assets.flame && Assets.flame(x, y, z, s); if (f) sc.add(f); };
     const B = {
       camp(x, z) {
@@ -198,5 +286,5 @@ window.WLayout = (() => {
       pos[o] = x; pos[o + 1] = y; pos[o + 2] = z; }
       if (kind === 'fireflies') mat.opacity = 0.6 + Math.sin(now * 2.1) * 0.35; geo.attributes.position.needsUpdate = true; };
   }
-  return { plan, paths, dH, keep, densK, dress, on };
+  return { plan, paths, dH, keep, densK, dress, on, shapes: SHAPEW.map(e => e[0]) };
 })();

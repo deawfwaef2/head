@@ -61,7 +61,7 @@ window.Hunters2 = (() => {
     const d = BY[id], node = W.graph.nodes[W.cur], L = lvOf(id), rec = powOf(L);
     try {
       const h = recFor(id, node.loc), P = W.pos, R = (C.R || 20) - 3;
-      let best = null; for (let i = 0; i < 14; i++) { const a = Math.random() * 6.283, r = 9 + Math.random() * 5; const x = P.x + Math.sin(a) * r, z = P.z + Math.cos(a) * r; if (Math.hypot(x, z) < R) { best = [x, z]; break; } }
+      let best = null; for (let i = 0; i < 14; i++) { const a = Math.random() * 6.283, r = 9 + Math.random() * 5; const x = P.x + Math.sin(a) * r, z = P.z + Math.cos(a) * r; if (C.edge ? C.edge(x, z)[0] > 3 : Math.hypot(x, z) < R) { best = [x, z]; break; } }
       if (!best) { const a = Math.atan2(-P.x, -P.z); best = [P.x + Math.sin(a) * 8, P.z + Math.cos(a) * 8]; }
       const pos = V3().set(best[0], 0, best[1]);
       banner(d.ic + ' ' + d.n + ' 穿越而来', d.t + ' · Lv.' + L + ' · 战力 ' + rec, '她在的时候，所有的门都被封死了', d.col);

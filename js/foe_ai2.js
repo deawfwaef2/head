@@ -182,7 +182,7 @@ window.FoeAI2 = (() => {
   // ================= 技能 / 战术（追击分支里、先于职业调用；返回非空 = 接管本帧移动）=================
   const fin = (fo, cd, brk) => { const s = fo.sk; if (s && s.fx) for (const e of s.fx) kill(e); fo.sk = null; fo.yOff = 0; fo.cd = Math.max(fo.cd, cd || 1); fo.skCd = (4.5 + Math.random() * 4) * (1 - 0.4 * (fo.tier || 0)); if (brk) { fo.broken = Math.max(fo.broken || 0, brk); } fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); };
   const baseDmg = (fo, ctx, mul) => { const st = ctx.st(); return Math.max(2, Math.round(st.maxHp * (0.05 + fo.rar * 0.013 + (fo.armed ? 0.02 : 0)) * dmgK(fo) * (fo.dmgMul || 1) * (mul || 1))); };
-  const arenaClamp = (ctx, x, z) => { const R = (ctx.R || 40) - 1.6, d = Math.hypot(x, z); return d > R ? [x / d * R, z / d * R] : [x, z]; };
+  const arenaClamp = (ctx, x, z) => { if (ctx.edge) { for (let i = 0; i < 4; i++) { const E = ctx.edge(x, z); if (E[0] >= 1.6) break; x += E[1] * (1.6 - E[0]); z += E[2] * (1.6 - E[0]); } return [x, z]; } const R = (ctx.R || 40) - 1.6, d = Math.hypot(x, z); return d > R ? [x / d * R, z / d * R] : [x, z]; }; // R46：特殊形状按真实边界
   const others = fo => { for (const o of F_().foes) if (o !== fo && !o.dead && o.sk) return true; return false; };
 
   function startSkill(fo, k, d, P, ctx, face) {
@@ -227,7 +227,7 @@ window.FoeAI2 = (() => {
         return { turnTo: s.yaw, spd: 0 }; }
       if (s.ph === 'rush') { setV(fo, s.dx * 10.5, s.dz * 10.5); fo.yaw = s.yaw;
         if (!s.hit && Math.hypot(P.pos.x - fo.pos.x, P.pos.z - fo.pos.z) < 1.15) { s.hit = true; C.hitPlayer(fo, s.dmg, { ang: 0, thrust: true, heavy: true, unblock: true }); try { C.shake && C.shake(0.5); } catch (e) {} }
-        const pr = Math.hypot(fo.pos.x, fo.pos.z); if (s.t >= 0.72 || (C.R && pr > C.R - 1.7)) { s.ph = 'rec'; s.t = 0; f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); fo.broken = Math.max(fo.broken || 0, 1.0); if (!s.hit) { try { C.toast && C.toast('💢 冲空了——破绽！', '#ffe070', 1.1); } catch (e) {} } }
+        const pr = Math.hypot(fo.pos.x, fo.pos.z); if (s.t >= 0.72 || (C.R && (C.edge ? C.edge(fo.pos.x, fo.pos.z)[0] < 1.7 : pr > C.R - 1.7))) { s.ph = 'rec'; s.t = 0; f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); fo.broken = Math.max(fo.broken || 0, 1.0); if (!s.hit) { try { C.toast && C.toast('💢 冲空了——破绽！', '#ffe070', 1.1); } catch (e) {} } }
         return { turnTo: s.yaw, spd: 0 }; }
       if (s.t >= 0.9) fin(fo, 1.0, 0); return { turnTo: face, spd: 0 };
     }

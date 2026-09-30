@@ -100,7 +100,7 @@ window.Beasts = (() => {
   function move(b, mx, mz) {
     const P = b.pos; P.x += mx; P.z += mz;
     for (const c of C.cols) { const dx = P.x - c.x, dz = P.z - c.z, d = Math.hypot(dx, dz), m = c.r + b.T.r * 0.55; if (d < m && d > 1e-4) { P.x = c.x + dx / d * m; P.z = c.z + dz / d * m; b.hitWall = true; } }
-    const R = C.R * 0.96, rr = Math.hypot(P.x, P.z); if (rr > R) { P.x *= R / rr; P.z *= R / rr; b.hitWall = true; }
+    if (C.edge) { for (let i = 0; i < 4; i++) { const E = C.edge(P.x, P.z); if (E[0] >= 1.2) break; P.x += E[1] * (1.2 - E[0]); P.z += E[2] * (1.2 - E[0]); b.hitWall = true; } } else { const R = C.R * 0.96, rr = Math.hypot(P.x, P.z); if (rr > R) { P.x *= R / rr; P.z *= R / rr; b.hitWall = true; } } // R46
     for (const d of (C.doors || [])) { const dx = P.x - d.x, dz = P.z - d.z, dd = Math.hypot(dx, dz); if (dd < 2.2 && dd > 1e-4) { P.x = d.x + dx / dd * 2.2; P.z = d.z + dz / dd * 2.2; } } // 野兽不进门
     P.y = C.H(P.x, P.z);
   }

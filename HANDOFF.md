@@ -1729,3 +1729,14 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 用户：“不限制 CC0 了”“偷听 UI 你目前这个还不如老版那个”。
 - **`cc0_only` 默认改为关**（`mods.js` def:false + 迁移 `__v 11`：旧存档也一次性关掉；O 面板仍可重新打开）。关掉后走原来的 IDENT/VB 身体表（原神等身体的服饰本来就贴身份）；`id_outfit` 只在 CC0 模式生效；`id_look` 在关 CC0 时只改 VRoid(CC0) 头，原神/MMD 头保留自带发型/头饰，`dress()` 只给 4 具 CC0 裙装身体换色。已验证：关 CC0 时 knight→Eula、ranger→Amber、witch→Darkness_Shibu。head_collage/head_native 等 R38 的联动开关未动（想恢复 R36b 的“头保持原样”需用户另说）。
 - **`overhear.js`**：新增 MOD `overhear_old`（默认开）= 第二十八轮老版弹框（`showOld`，`#ohold`：屏幕中下方、气泡尖角、每个说话人一块名牌含魂阶/阶位/口头禅、对白逐句弹出）；关掉 = R42 顶部长条 + 半身像。
+## R46 stage 4（偷听 UI 卡顿 / 长图与特殊形状地图 / 地形自检）
+用户原话：「现在改版偷听UI好卡」「来点长点的图或者特殊形状的图」「你自己模拟，要完全正确的地形，不要千篇一律」。
+- **偷听 UI 卡顿（js/overhear.js）**：原因＝`portraitOf` 渲染头像时加灯、去雾、改输出编码 → 着色器变体与主渲染不同，首次必须临时编译（几百 ms 卡死），且一帧里同步渲 3 张。
+  现在：后处理开启时走 HDR 线性 RT（FloatType），不改灯光、不换雾类型（只改 uniform：FogExp2.density=0）、`toneMapping=None`（与主渲染一致，无新变体），JS 侧 ACES 近似+gamma 转 PNG；头像逐个错开渲染（弹框先出，头像 500ms+350ms×i 后补上）；192×224；渲染时 `shadowMap.autoUpdate=false`；CSS 去掉 drop-shadow 滤镜、缩小 box-shadow、`will-change/contain`、去掉 height 过渡。测试页 `tools/test/overhear.html`（两条路径都出图、状态全部还原）。**未在真实游戏里实测帧时间。**
+- **长图 / 特殊形状（MOD `map_shapes`，`?ws=0` 关）**：`js/wlayout.js` `shapeUp`。边界仍是极坐标半径表 ρ(a)（720 格，星形域，老接口全兼容），但由图元并集射线行进得到：`long` 长廊（长宽比可到 3–4，Rmax≤66）、`lobes` 2–5 叶花瓣/花生、`arms` 2–6 臂十字/星芒、`poly` 三角/矩形/五六边形（圆角）、`ell` 长椭圆、`bent` 折角 L/V/Y、`snake` S 形；`round` 仍是旧近圆。始终并入基础圆盘 `max(0.68R, min(R,13))` ⇒ 最小半径有保证。
+  新增 LP 接口：`Rf/Rmax/Rmin/areaK/tips/samp(r,m)/dOut(x,z)/edge(x,z)→[距墙,内法线nx,nz]/clamp(p,m)/bp(t)/perim`。`dOut` 是到边界的真实带符号距离（直墙精确）。
+  worlds.js：门优先开在尖角/长廊端（其余门取离其它门最远的边界点），门朝向＝边界外法线；坡（rim）按 `dOut` 起坡；散布/宝箱/生成点按面积均匀采样 `samp`；边界树带与坡上草环沿边界等弧长；玩家撞墙沿法线推回（`lp.clamp`，不再径向拖回中心）；foe/beast/hunter/prey/boss 的边界判定全部改用 `ctx.edge`（foe.js 的 `EDGE`、导航网格覆盖外接圆按真实边界挡；foe_ai2/foe_roles2/beasts/hunters2 同步）。圆形地图没有 `edge` 时全部回退旧逻辑。
+  wterrain.js：地貌落点 `spot` 用 `samp`（长廊/各臂上都有地貌），遮罩衰减按 `dOut`。wgen.js：景物落点、地面着色衰减同样用 `dOut`。
+- **地形自检模拟（tools/sim/）**：node 里加载真实 `worlds.js/wgen.js/wlayout.js/wterrain.js` + 真 three，对随机种子×风格×尺寸×形状调用 `Worlds._debug.buildNode`，1m 网格检查：NaN/超大、门在边界内且不在水里、门前平坦、门不互相贴近、从门出发 flood-fill（坡度≤0.95）所有门连通/中心可达/覆盖率、宝箱与生成点在界内、不在水里、可达、`cols` 不大量在墙外。`N=200 S=2 node sim2.js`；`diag.js` 找陡坡来源；`montage.js + montage.py` 生成俯视地形图；`shapetest.js` 校验形状表。
+  **这轮靠自检发现并修掉的真 bug（多数是旧代码的）**：① 池塘水位取自坡面 8 点平均，`max(h, lv+0.02)` 在 d=7m 处断开 → 抬出 5m 高的平台断崖（ravine/丘陵里常见）；河岸同理。已平滑过渡，并要求池塘只挖在平坦处。② 峡谷（ravine）通道止于 0.93R，特殊形状的门前是一堵 5.5m 高墙；现在通道通到门口。③ 环形山（crater）/火山（volcano）是封闭圈，坑里进不去 → 各开一个豁口。④ 台地（mesa）边缘近垂直 → 放缓。⑤ 多个地貌叠加出近垂直墙 → `wterrain` 把起伏量烘成 1.5m 网格做 8 邻域 Lipschitz 限幅（≤1.25 m/m），双线性取样，离边界 >18m 渐回原函数（无缝）。坡度 p99 从 ~5.1 降到 ~2.2–2.7；几个风格×约 1000 个节点的自检基本全过，剩下个别小图宝箱/中心点不可达（<0.5%）。
+- 未验证：真实游戏里的帧率、长图（Rmax 66、地形网格 ≤220 段 → 约 1.2m/格）的视觉与性能；没有在真实游戏里走过长廊；foe 导航网格在大图上（~130²）BFS 的耗时。下一步可看：长图里的植被密度（草上限 3200 被摊薄）、地图小地图/门标签。

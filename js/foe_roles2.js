@@ -82,7 +82,7 @@ window.FoeRoles2 = (() => {
   }
   function blink(fo, P, ctx) {
     const dx = fo.pos.x - P.pos.x, dz = fo.pos.z - P.pos.z, d = Math.hypot(dx, dz) || 1; let best = null;
-    for (let i = 0; i < 10; i++) { const a = Math.atan2(dz, dx) + (Math.random() - 0.5) * 2.4, R = 6.5 + Math.random() * 2.5, x = P.pos.x + Math.cos(a) * R, z = P.pos.z + Math.sin(a) * R; if (Math.hypot(x, z) > (ctx.R || 30) - 2) continue; let ok = true; for (const c of ctx.cols || []) if (Math.hypot(x - c.x, z - c.z) < (c.r || 0.5) + 0.6) { ok = false; break; } if (ok) { best = [x, z]; break; } }
+    for (let i = 0; i < 10; i++) { const a = Math.atan2(dz, dx) + (Math.random() - 0.5) * 2.4, R = 6.5 + Math.random() * 2.5, x = P.pos.x + Math.cos(a) * R, z = P.pos.z + Math.sin(a) * R; if (ctx.edge ? ctx.edge(x, z)[0] < 2 : Math.hypot(x, z) > (ctx.R || 30) - 2) continue; let ok = true; for (const c of ctx.cols || []) if (Math.hypot(x - c.x, z - c.z) < (c.r || 0.5) + 0.6) { ok = false; break; } if (ok) { best = [x, z]; break; } }
     if (!best) return false; if (window.Foe && Foe.spark) Foe.spark(fo.pos.clone().add(new (T().Vector3)(0, 1, 0)), 16, 'blue');
     fo.pos.x = best[0]; fo.pos.z = best[1]; if (window.Foe && Foe.spark) Foe.spark(fo.pos.clone().add(new (T().Vector3)(0, 1, 0)), 16, 'blue'); cue(fo, 'blink'); return true;
   }

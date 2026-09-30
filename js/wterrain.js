@@ -68,7 +68,8 @@ window.WTerrain = (() => {
     const dd = (x, z) => { let m = 1e9; for (const d of doors) m = Math.min(m, Math.hypot(x - d.x, z - d.z)); return m; };
     const feats = [], used = [], tags = [];
     const nfMax = R < 18 ? 2 : P.nf + 1, nf = 1 + Math.floor(r() * nfMax * (1 - 0.3 * (rug < 0.6 ? 1 : 0)));
-    const spot = (rad) => { for (let t = 0; t < 50; t++) { const a = r() * 6.283, d = R * (0.2 + r() * 0.55), x = Math.cos(a) * d, z = Math.sin(a) * d; if (dd(x, z) > rad + 7 && used.every(u => Math.hypot(u.x - x, u.z - z) > u.r + rad + 2)) { used.push({ x, z, r: rad }); return { x, z }; } } return null; };
+    const LPs = X.LP && X.LP.shaped && X.LP.samp ? X.LP : null; // R46：特殊形状的地图，地貌也撒到长廊 / 臂上
+    const spot = (rad) => { for (let t = 0; t < 50; t++) { let x, z; if (LPs) { const q = LPs.samp(r, rad + 3); x = q[0]; z = q[1]; if (Math.hypot(x, z) < R * 0.25) continue; } else { const a = r() * 6.283, d = R * (0.2 + r() * 0.55); x = Math.cos(a) * d; z = Math.sin(a) * d; } if (dd(x, z) > rad + 7 && used.every(u => Math.hypot(u.x - x, u.z - z) > u.r + rad + 2)) { used.push({ x, z, r: rad }); return { x, z }; } } return null; };
     const line = () => { const a = r() * 6.283; return { a, c: Math.cos(a), s: Math.sin(a), off: (r() - 0.5) * R * 0.7 }; };
     const MK = {
       scarp() { const L = line(), S = (3.4 + r() * 3.2) * sc * (r() < 0.5 ? 1 : -1), w = Math.abs(S) * 0.85, gt = (r() - 0.5) * R, gw = R * (0.14 + r() * 0.12), bend = 4 + r() * 8;
@@ -101,8 +102,8 @@ window.WTerrain = (() => {
       fissure() { const D = (1.8 + r() * 1.4) * Math.max(0.7, sc), w = 0.9 + r() * 0.7, n = 5 + Math.floor(r() * 3), a = r() * 6.283, len = R * (0.5 + r() * 0.5), cx = (r() - 0.5) * R * 0.4, cz = (r() - 0.5) * R * 0.4, P = [];
         for (let i = 0; i <= n; i++) { const t = i / n - 0.5; P.push([cx + Math.cos(a) * t * len * 2 + Math.cos(a + 1.57) * (r() - 0.5) * 7, cz + Math.sin(a) * t * len * 2 + Math.sin(a + 1.57) * (r() - 0.5) * 7]); }
         return (x, z) => { const q = polyD(P, x, z), env = Math.sin(Math.PI * clamp(0.02, 0.98, q.t)); return (-D * (1 - sstep(w * 0.3, w * 1.7, q.d)) + 0.2 * Math.exp(-(((q.d - w * 2) / 0.9) ** 2))) * env; }; },
-      volcano() { const rad = clamp(8, R * 0.5, 9 + r() * 4), p = spot(rad * 1.1); if (!p) return null; const Hc = (3.5 + r() * 3) * sc, cr = 0.16 + r() * 0.12;
-        return (x, z) => { const t = Math.hypot(x - p.x, z - p.z) * (1 + (v(x * 0.2 + oz, z * 0.2 + ox) - 0.5) * 0.25) / rad; if (t > 1.2) return 0; return Hc * Math.pow(1 - sstep(0, 1.15, t), 1.35) * (1 - 0.55 * Math.exp(-((t / cr) ** 2))); }; },
+      volcano() { const rad = clamp(6, R * 0.5, 9 + r() * 4), p = spot(rad * 1.1); if (!p) return null; const Hc = (3.5 + r() * 3) * sc, cr = 0.16 + r() * 0.12, ga = r() * 6.283;
+        return (x, z) => { const t = Math.hypot(x - p.x, z - p.z) * (1 + (v(x * 0.2 + oz, z * 0.2 + ox) - 0.5) * 0.25) / rad; if (t > 1.2) return 0; const an = Math.atan2(z - p.z, x - p.x), dA = Math.abs(Math.atan2(Math.sin(an - ga), Math.cos(an - ga))), br = Math.exp(-((dA / 0.45) ** 2)) * sstep(0.04, 0.32, t); /* 火山口一侧有缺口，口内走得进去 */ return Hc * Math.pow(1 - sstep(0, 1.15, t), 1.35) * (1 - 0.55 * Math.exp(-((t / cr) ** 2))) * (1 - 0.72 * br); }; },
       dune() { const rad = 12 + r() * 8, p = spot(rad * 0.8); if (!p) return null; const Ad = (0.5 + r() * 0.6) * Math.max(0.7, sc), k = 0.2 + r() * 0.2, a = r() * 6.283, c = Math.cos(a), s = Math.sin(a);
         return (x, z) => { const d = Math.hypot(x - p.x, z - p.z); if (d > rad * 1.3) return 0; const ph = ((x - p.x) * c + (z - p.z) * s) * k + (v(x * 0.05 + ox, z * 0.05 + oz) - 0.5) * 5; return Ad * (Math.pow(0.5 + 0.5 * Math.sin(ph), 1.6) * 1.6 - 0.5) * (1 - sstep(rad * 0.6, rad * 1.3, d)); }; }
     };
@@ -121,14 +122,31 @@ window.WTerrain = (() => {
     };
     const sh = 1.0 + r() * 0.9;
     const relief = (x, z) => { let h = base(x, z); for (const f of feats) h += f(x, z); if (P.strata) { const q = h / sh, i = Math.floor(q); h = lerp(h, sh * (i + sstep(0.3, 0.7, q - i)), P.strata); } return h; };
-    const wd = g && g.wd;
-    return (x, z) => {
+    const wd = g && g.wd, LPd = X.LP && X.LP.dOut ? X.LP : null;
+    const dOf = (x, z, rr) => LPd ? LPd.dOut(x, z) : rr - R;
+    const D = (x, z) => { // 遮罩后的起伏量（0 = 保持原地形）
       const rr = Math.hypot(x, z); let m = sstep(3.5, 13, dd(x, z)) * (0.3 + 0.7 * sstep(1.5, 8, rr));
-      if (m <= 0) return H(x, z);
-      m *= 1 - 0.6 * sstep(R + 10, R + 45, rr);
+      if (m <= 0) return 0;
+      m *= 1 - 0.6 * sstep(10, 45, dOf(x, z, rr));
       if (wd) m *= sstep(1.6, 7, wd(x, z).d);
-      return H(x, z) + (m > 0 ? relief(x, z) * m : 0);
+      return m > 0 ? relief(x, z) * m : 0;
     };
+    // R46 坡度限幅：多个地貌叠在一起（断崖 + 天坑 + 脊刃…）会出现近乎垂直的墙。把起伏量烘成 1.5m 网格，
+    // 做 8 邻域 Lipschitz 限幅（≤ SLIM 米/米），再双线性取样；离边界 >18m 处渐回原函数（无缝）。
+    if (!(window.WTerrain_noLimit)) {
+      const cs = 1.5, SLIM = 1.25 * (rug > 1.3 ? 1.12 : 1), ext = (X.LP && X.LP.Rmax ? X.LP.Rmax : (X.R || 20) + 2) + 25, n = Math.ceil(2 * ext / cs) + 1, G = new Float32Array(n * n);
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) G[j * n + i] = D(-ext + i * cs, -ext + j * cs);
+      const NB = [[1, 0, 1], [0, 1, 1], [1, 1, 1.4142], [1, -1, 1.4142]], lim = SLIM * cs; let ch = 0;
+      for (let it = 0; it < 6; it++) { ch = 0;
+        const step = (i, j) => { const c = j * n + i; let v = G[c]; for (const [di, dj, dl] of NB) for (const sg of [1, -1]) { const ii = i + di * sg, jj = j + dj * sg; if (ii < 0 || jj < 0 || ii >= n || jj >= n) continue; const w = G[jj * n + ii], L = lim * dl; if (v > w + L) v = w + L; else if (v < w - L) v = w - L; } if (v !== G[c]) { ch++; G[c] = v; } };
+        for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) step(i, j);
+        for (let j = n - 1; j >= 0; j--) for (let i = n - 1; i >= 0; i--) step(i, j);
+        if (!ch) break; }
+      const sample = (x, z) => { const fx = (x + ext) / cs, fz = (z + ext) / cs; if (fx < 0 || fz < 0 || fx >= n - 1 || fz >= n - 1) return null; const i = Math.floor(fx), j = Math.floor(fz), a = fx - i, b = fz - j, c = j * n + i; return (G[c] * (1 - a) + G[c + 1] * a) * (1 - b) + (G[c + n] * (1 - a) + G[c + n + 1] * a) * b; };
+      node._wtLim = ch; // 调试：最后一轮仍改动的格数
+      return (x, z) => { const d0 = D(x, z), rr = Math.hypot(x, z), w = 1 - sstep(18, 25, dOf(x, z, rr)); if (w <= 0) return H(x, z) + d0; const q = sample(x, z); return H(x, z) + (q == null ? d0 : d0 + (q - d0) * w); };
+    }
+    return (x, z) => H(x, z) + D(x, z);
   }
   // 植被构图：返回 (kind,x,z)=>保留概率（树/灌木）
   function veg(node, R) {
