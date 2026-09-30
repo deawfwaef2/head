@@ -934,7 +934,7 @@ window.Worlds = (() => {
   function bossHit(info) {
     const bo = W.boss; if (!bo || bo.dead) return; if (!bo.met) { bo.met = true; bo.state = 'fight'; W.dom.boss.style.display = 'block'; }
     const qa = Math.pow(clamp(bo.q, 0.25, 3), 0.7), sp = clamp(info.speed / 8, 0.5, 1.6) * (bo.stag > 0 ? 1.6 : 1) * (info.kind === 'thrust' ? 0.8 : 1);
-    const dealt = Math.max(1, Math.round(22 * qa * sp * 0.5 * (0.85 + Math.random() * 0.3)));
+    const dealt = Math.max(Math.round(9 * Math.max(0.8, Math.min(1.4, sp))), Math.round(22 * qa * sp * 0.5 * (0.85 + Math.random() * 0.3))); // 伤害下限 ≈ 9%（约 11 刀）
     bo.hp = Math.max(0, bo.hp - dealt); bo.flash = 0.15; floatDmg(bo.pos, dealt, sp > 1.2);
     if (bo.sayT <= 0 && Math.random() < 0.35) { bossSay(pick(Math.random, bo.B.hurt), 2); bo.sayT = 4; }
     if (bo.hp <= 0) bossWin();

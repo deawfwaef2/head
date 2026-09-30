@@ -132,8 +132,8 @@ window.Combat = (() => {
     if (!drawn || S.rmb || S.sw) return false; const heavy = type === 'heavy', fin = type === 'fin';
     const as = mmPick(); // 第二十六轮（用户：一直点就没力气、砍不动）：体力 6/9/16 → 4/6/12；范围内没有敌人时空挥只耗 35%（追人、试刀不会被掏空）
     if (!mmSpend((heavy ? 12 : fin ? 6 : 4) * (as ? 1 : 0.35), heavy ? 'charged' : 'swing')) return false;
-    const dur = (heavy ? 0.3 : fin ? 0.3 : 0.21) * Math.sqrt(S.wt) * ((window.Stamina && Stamina.ex) ? 1.3 : 1), pw = heavy ? 1 : fin ? 0.95 : 0.85;
-    S.sw = { t: 0, dur, dx: d[0], dy: d[1], pw, charged: heavy, v: new V3(d[0], d[1], 0), hit: false, h0: S.hand.clone(), as, lunged: 0, rk: 1, mm: true, type, step: M.combo, set: new Set(), sgn: -1, tid: as ? as.tid : null, hold: 0 };
+    const kk = Math.sqrt(S.wt) * ((window.Stamina && Stamina.ex) ? 1.3 : 1), wu = (heavy ? 0.05 : fin ? 0.09 : 0.08) * kk, dur = wu + (heavy ? 0.25 : fin ? 0.22 : 0.15) * kk, pw = heavy ? 1 : fin ? 0.95 : 0.85;
+    S.sw = { t: 0, dur, dx: d[0], dy: d[1], pw, charged: heavy, v: new V3(d[0], d[1], 0), hit: false, h0: S.hand.clone(), as, lunged: 0, rk: 1, mm: true, wu, ms0: performance.now(), type, step: M.combo, set: new Set(), sgn: -1, tid: as ? as.tid : null, hold: 0 };
     S.thrust = 0; S.thrustQ = 0; S.hitCd.clear(); S.charge = 0; S.charged = 0; M.buf = 0; M.bufType = null;
     M.combo = heavy ? 0 : (M.combo + 1) % 3; if (fin) M.combo = 0;
     if (window.CombatFX && CombatFX.on) CombatFX.swing(d[0], d[1], pw, heavy); else SFX.play('draw', 0.4, heavy ? 0.9 : 1.3);
@@ -195,7 +195,7 @@ window.Combat = (() => {
     return true;
   }
   function mmResolve(w) { // 每帧（swingStep 之后）：刃扫到的目标结算
-    if (w.t < w.dur * 0.2) return; cam.updateMatrixWorld(); const center = G.player.pos; let list = [];
+    if (w.t < w.wu + 0.02) return; cam.updateMatrixWorld(); const center = G.player.pos; let list = [];
     for (const p of providers) { try { list = list.concat(p(center) || []); } catch (e) {} }
     const foes = (window.Foe && Foe.foes) || [], heavy = w.type === 'heavy', half = heavy ? 0.95 : 0.8, reach = 1.5 + S.len * 0.8 + (heavy ? 0.3 : 0) + (w.lt || 0), amp = 0.62 * (S.len / 0.8);
     let px = 0, py = 0; const prim = w.tid != null ? list.find(t => t.id === w.tid) : null; if (prim) { const pf = foes.find(f => f.id2 === prim.id); chestOf(prim, pf, _ml); cam.worldToLocal(_ml); px = _ml.x; py = _ml.y; }
@@ -273,11 +273,13 @@ window.Combat = (() => {
   // 挥击动画：刀尖从“趋势反方向”一侧扫过准星到趋势方向一侧；直接摆姿态（不过弹簧），速度由位置差得出 → 走原有扫掠命中
   const HAND0 = new V3(0.2, -0.3, -0.36), _st = new V3();
   function swingStep(dt) {
-    const w = S.sw; if (w.mm && w.hold > 0) { w.hold -= dt; return; } w.t += dt; const u = Math.min(1, w.t / w.dur);
-    let sgn; if (u < 0.2) sgn = -1 - 0.12 * Math.sin(u / 0.2 * Math.PI / 2); else { const k = (u - 0.2) / 0.8, ez = 1 - Math.pow(1 - k, 2.0); sgn = -1.12 + 2.24 * ez; } // 前 20% 回拉，其后 80% 挥出
+    const w = S.sw; if (w.mm && w.hold > 0) { w.hold -= dt; return; } w.t += dt; const u = Math.min(1, w.t / w.dur), wuT = w.mm ? w.wu : w.dur * 0.2;
+    if (w.mm && w.t < wuT && w.type !== 'heavy') { // 第二十六轮（用户：轻微向右下偏移，刀却乱砍）：回拉阶段（~80ms）内持续读鼠标趋势——刀朝你移动鼠标的方向斩（左上→右下），不再固定套路
+      const nowm = performance.now(), T = rhSum(nowm, Math.min(220, nowm - w.ms0 + 90)); if (T.m >= 3) { const [ax, ay] = snap8(T.x, T.y); w.dx = ax; w.dy = ay; w.v.set(ax, ay, 0); } }
+    let sgn; if (w.t < wuT) sgn = -1 - 0.12 * Math.sin(w.t / wuT * Math.PI / 2); else { const k = (w.t - wuT) / Math.max(0.01, w.dur - wuT), ez = 1 - Math.pow(1 - k, 2.0); sgn = -1.12 + 2.24 * ez; } // 回拉 → 挥出
     w.sgn = sgn;
     const A = 0.62 * (S.len / 0.8) * (0.85 + 0.25 * w.pw) * (w.charged ? 1.2 : 1), dist = 0.82;
-    S.hand.set(HAND0.x + w.dx * sgn * 0.09, HAND0.y + w.dy * sgn * 0.07, HAND0.z - (u > 0.2 ? 0.04 : 0)); S.hv.set(0, 0, 0); S.tgt.copy(S.hand);
+    S.hand.set(HAND0.x + w.dx * sgn * 0.09, HAND0.y + w.dy * sgn * 0.07, HAND0.z - (w.t >= wuT ? 0.04 : 0)); S.hv.set(0, 0, 0); S.tgt.copy(S.hand);
     let cxo = 0, cyo = 0, dd = dist; w.rk = 1;
     if (w.as) { const l = asLocal(w.as, _al); const ln = l.length(); cxo = Math.max(-1.3, Math.min(1.3, l.x * 0.92)); cyo = Math.max(-0.9, Math.min(0.9, l.y * 0.92)); dd = Math.max(dist, -l.z);
       if (w.lt == null) w.lt = Math.max(0, Math.min(w.mm ? 1.4 : 1.0, ln - 1.75)); if (w.lt > 0 && u < 0.7) asLunge(w.as, w.lt, w, dt); }

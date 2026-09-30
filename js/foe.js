@@ -677,6 +677,7 @@ window.Foe = (() => {
     const q = ctx.power(fo), brk = fo.broken > 0, mult = (zone === 'head' ? 1.6 : zone === 'neck' ? 1.8 : /Arm|Leg/.test(zone) ? 0.7 : 1) * (brk ? 2 : 1) * side * (info.charged ? 2.2 : 1) * (info.mult || 1);
     let dealt = Math.max(1, Math.round((fo.boss ? 11 : 12) * q * sp * mult * (slash ? 1 : 0.8) * (0.85 + Math.random() * 0.3)));
     dealt = Math.max(dealt, Math.round(fo.maxHp * (fo.boss ? 0.09 : 0.17) * (info.fmul || 1) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：一记正常的砍至少削掉 ~17% 血（≈6 刀），霸主 ~9%（≈11 刀）——实力差距再大也不会出现“砍 20 刀不死”
+    { fo.nHit = (fo.nHit || 0) + 1; const cap = fo.boss ? 12 : 6; if (fo.nHit >= cap - 2) dealt = Math.max(dealt, Math.ceil(fo.hp / (cap + 1 - Math.min(fo.nHit, cap)))); } // 第二十六轮保险（用户：永远打不死）：不管护甲/角色/回血，普通敌人第 6 刀必死、霸主第 12 刀必死
     const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.12; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk);
     { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp); fo.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退：0.16 秒内推完（以前是一帧内整段位移 = “瞬移”）
     ctx.event && ctx.event('hit', fo, { dealt, zone, brk, kind: info.kind, spd, charged: info.charged });
