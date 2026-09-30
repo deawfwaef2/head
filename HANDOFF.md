@@ -1025,3 +1025,8 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **打不死**：持武器敌人站位 2.7m 且你一靠近就倒退 → `hold` 2.1/1.7m、退让阈值 hold-0.45；出手间隔 2.2+rand → 1.15+rand(0.5~1.1)；前摇 ws +0.12、定格 hold −0.08；蛮兵 HP ×1.9→1.4、盾卫 1.3→1.15、狂战 1.25→1.15；撤退回血 5%→1.2%/s、撤退时长 3~5.5→1.8~3s；投掷手后撤最多 1.8s、2.7m/s；刺客潜行超时 8→5s；**非霸主伤害下限 = maxHp×10%×挥速×部位系数**。
 - **螃蟹步**：绕圈/换位时身体转向前进方向（`turnTo = face ± 0.9`，slot 移动同理；手势 `fo.gestT>0` 时不动）；刺客潜行按移动方向转身。
 - 模拟（rar2 骑士，72% 命中追击型玩家）：q=1 各职业约 10~16s 杀死；q=0.4 约 15~20s。
+## 第二十四轮（陈列/地图 Agent）：头身比例 + 眼白发黑
+- 用户：有的头和身体不匹配、特别小；人物眼白是黑的。原神素材：用户说「留着不管，之后想办法」→ 本轮不动 GI_ 文件与原神身体。
+- **MOD head_norm**（默认开，look）：离线量了全部头模元数据 skinW（脸宽）：VRoid 0.134~0.173（多数 0.16），MMD 管线 0.116~0.133（--sc 0.75 固定缩放造成），GI_LaSignora 0.033（面具导致测不准）。**改了 js/heads.js**：新增 normK/normSize，parseOne 解析后对 grp==='mmd' 的头把几何体（含 morph position）与元数据（cut/bottom/skullTop/hairTop/front/skinW/eye/box）等比放大到脸宽 0.155（k∈[1,1.4]，测不准用 1.2）。这些 GLB 无节点变换/蒙皮，放大安全。手持/插桩/敌人身体上一致。
+- **MOD eye_white**（默认开，look）：根因 = 眼白材质 depthWrite:false → Master 管线 SAO（ultra/high 档 ao:1）在眼白处读到眼窝后面的深度，当成深洞压黑。**改了 js/heads.js** 眼白分支：写深度 + 颜色 0.62/自发光 0.62（原 0.9/0.28）。q=mid（无 AO）看不出问题，测试要用 ?q=ultra。
+- 测试工具（/home/user/bak/tools）：mk_s.py（只带指定头模的轻量页 _s.html，避免 63 个头全载 OOM）、bodyshot.py（头装到身体上并排渲染，ZOOM 特写）、eyeshot.py（游戏内手持首级大图，Q=ultra EW=true/false）、hsize.py（离线读 GLB/元数据量头尺寸）。

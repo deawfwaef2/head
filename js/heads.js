@@ -108,6 +108,34 @@ window.ModelHeads = (() => {
     mat.customProgramCacheKey = () => oldKey + '|fw1'; mat.needsUpdate = true; return mat;
   }
   const fwKind = (src, kind) => kind === 'skin' ? (/Face/i.test(src && src.name || '') ? 'skin' : null) : /Brow/i.test(src && src.name || '') || kind === 'brow' ? 'brow' : (kind === 'iris' || kind === 'hl' || /Iris|EyeWhite|Eyeline|Eyelash|Highlight|eye_trans|EyeExtra/i.test(src && src.name || '')) ? 'eye' : null;
+  // ---------- 第二十四轮 MOD head_norm：头模尺寸归一 ----------
+  // MMD 管线（pmx2vrm → vrm2head --sc 0.75）出来的头比 VRoid 头小约 20%（脸宽 0.116~0.133 vs 0.16），挂到身体上显得特别小。
+  // 解析时把几何体（含表情 morph）与元数据一起等比放大到脸宽 0.155；这些 GLB 没有节点变换/蒙皮，放大是安全的。
+  const NORM_W = 0.155;
+  function normK(entry) {
+    if (!(window.Mods && Mods.on('head_norm'))) return 1;
+    if (entry.grp !== 'mmd') return 1;
+    const w = entry.skinW;
+    // 脸宽测不准的（面具等，skinW 过小）用 MMD 组中位比例
+    const k = (w && w > 0.09) ? NORM_W / w : 1.2;
+    return Math.max(1, Math.min(1.4, k));
+  }
+  function normSize(entry, meshes) {
+    const k = normK(entry); entry._normK = k; if (k === 1) return;
+    const done = new Set();
+    for (const m of meshes) {
+      const g = m.geometry; if (!g || done.has(g)) continue; done.add(g);
+      g.scale(k, k, k);
+      const mp = g.morphAttributes && g.morphAttributes.position; if (mp) for (const a of mp) { for (let i = 0; i < a.array.length; i++) a.array[i] *= k; a.needsUpdate = true; }
+      g.computeBoundingBox(); g.computeBoundingSphere();
+    }
+    const sc = v => (typeof v === 'number' ? v * k : v);
+    if (entry.cut) for (const kk of ['x', 'y', 'z', 'r']) if (typeof entry.cut[kk] === 'number') entry.cut[kk] *= k;
+    for (const kk of ['bottom', 'skullTop', 'hairTop', 'front', 'skinW']) entry[kk] = sc(entry[kk]);
+    if (Array.isArray(entry.eye)) entry.eye = entry.eye.map(sc);
+    if (Array.isArray(entry.box)) entry.box = entry.box.map(b => b.map(sc));
+  }
+
   function parseOne(entry) {
     return new Promise((res) => {
       try {
@@ -115,6 +143,7 @@ window.ModelHeads = (() => {
           entry.glb = null;
           const meshes = [];
           gltf.scene.traverse(o => { if (o.isMesh && !(entry.skip || []).includes(o.name)) meshes.push(o); });
+          normSize(entry, meshes); // 第二十四轮 MOD head_norm：MMD 头按脸宽归一到 VRoid 标准，不再“头小身大”
           const lum = new Map(), greenFixes = new Map(), textureLums = new Map();
           const greenFixFor = src => { if (!greenFixes.has(src)) greenFixes.set(src, skinColorFix(src.map)); return greenFixes.get(src); };
           const textureLumFor = src => { if (!textureLums.has(src)) textureLums.set(src, avgLum(src.map)); return textureLums.get(src); };
@@ -864,7 +893,8 @@ window.ModelHeads = (() => {
           if (ew && window.Mods && Mods.on('head_repair')) {
             // 第十八轮：不再用不受光的 Basic（亮处发光、比脸亮一截）；改为受光卡通 + 少量自发光打底，暗处也不会变黑
             const c0 = src.color ? src.color.clone() : new THREE.Color(1, 1, 1);
-            out = new THREE.MeshToonMaterial({ map: src.map || null, color: c0.clone().multiplyScalar(0.9), emissive: c0.clone().multiplyScalar(0.28), emissiveMap: src.map || null, gradientMap: grad, transparent: src.transparent, opacity: src.opacity, alphaTest: src.alphaTest ? Math.min(src.alphaTest, 0.25) : 0.15, side: THREE.DoubleSide, depthWrite: false, name: src.name + ' · readable sclera' });
+            const ewk = (window.Mods && Mods.on('eye_white')) ? [0.62, 0.62] : [0.9, 0.28]; // 第二十四轮 MOD eye_white：暗洞里眼白发黑 → 一半受光一半自亮
+            out = new THREE.MeshToonMaterial({ map: src.map || null, color: c0.clone().multiplyScalar(ewk[0]), emissive: c0.clone().multiplyScalar(ewk[1]), emissiveMap: src.map || null, gradientMap: grad, transparent: src.transparent, opacity: src.opacity, alphaTest: src.alphaTest ? Math.min(src.alphaTest, 0.25) : 0.15, side: THREE.DoubleSide, depthWrite: !!(window.Mods && Mods.on('eye_white')), name: src.name + ' · readable sclera' }); // eye_white：写深度，SAO 不再把眼白当成深洞压黑
           } else out = new THREE.MeshToonMaterial({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: ew ? false : src.depthWrite });
           t.shared.set(key, out);
         } // 修复 MOD：眼白不再被幽暗洞窟光照压黑；关闭 MOD 时保留原 toon 路径
