@@ -1457,3 +1457,6 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 ### ① 头部拼图：由主管的 R38 `head_collage`（heads.js collageHair）+ `cc0_only` 实现
 - 本 agent 同时写了一版 `head_puzzle`（MMD 脸发型必借别人 + 拆自带头饰 `ownAcc`），与主管 `head_collage` 重复，已**撤回**（提交里只留说明，避免冲突）。`head_collage` 当前只换发型；**如需再“拆掉 MMD 脸自带头饰 cloth_*（眼线以上）”，参考思路：`create()` 里遍历 `F.faceMeshes` 时跳过 SRC 名字 /^cloth/ 且中心高于眼线的网格**。
 - 经验：push 前必须先 `git pull --rebase` 并检查冲突标记（`grep -n '^<<<<<<<' js/*.js`），不要只清 HANDOFF.md 的标记。
+
+### ② MOD UI 重做（js/mods.js 管理器界面部分；逻辑 set/normalize 不变）
+- 用户：“MOD UI 你重做下，现在这个不行落时了很难看”。旧版是粉紫色卡片墙且**漏掉了 `ui` 分类**（5 个 MOD 看不到）。新版：与游戏同风格的深棕金色；左侧分类（带 开启数/总数）+ 筛选（全部/已开启/已关闭/与默认不同/待应用）+ 顶部搜索（`/` 聚焦，Esc 先清搜索再关闭）；每行一个开关（画风组是单选圆点），点行展开详情（完整说明、默认值、ID、依赖、冲突）；“待应用”蓝色左边条 + 底栏列出待应用项；开关原地刷新不丢滚动位置。测试页 `tools/test/mods.html`。

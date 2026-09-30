@@ -212,55 +212,126 @@ window.Mods = (() => {
     if (!on('unlocks') && window.Unlocks) Unlocks.has = () => true;
   }
 
-  // ---------------- 管理器界面 ----------------
-  const CATN = { render: '🖼️ 画风渲染（只能选一个画风）', ui: '💎 界面', perf: '⚡ 性能', look: '🧬 角色外观', play: '🎲 玩法', asset: '🏛️ 模型与材质' };
+  // ---------------- 管理器界面（R39 重做：左侧分类 + 搜索 + 筛选 + 行内开关 + 点行展开详情；原地刷新不丢滚动位置） ----------------
+  const CATN = { render: '画风渲染', ui: '界面', perf: '性能', look: '角色外观', play: '玩法', asset: '模型与材质' };
+  const CATI = { render: '🖼️', ui: '💎', perf: '⚡', look: '🧬', play: '🎲', asset: '🏛️' };
+  const CATS = ['play', 'look', 'ui', 'render', 'perf', 'asset'];
+  const CATD = { render: '画风只能选一个（单选）', perf: '低配模式会关掉后处理类 MOD' };
   let box = null;
+  const view = { cat: 'all', q: '', f: 'all', open: null, note: '', scroll: 0 };
   function css() {
     if (document.getElementById('modcss')) return;
     const s = document.createElement('style'); s.id = 'modcss';
-    s.textContent = `#modbox{position:fixed;inset:0;z-index:60;background:rgba(6,3,8,.72);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;font-family:system-ui,'PingFang SC','Microsoft YaHei',sans-serif}
-    #modbox .mb{width:min(860px,95vw);max-height:90vh;overflow:auto;background:linear-gradient(160deg,#221820,#120b10);border:1px solid #6a4a5a;border-radius:18px;padding:18px 22px;color:#f3e6ea}
-    #modbox h2{margin:0 0 4px;font-size:24px}#modbox .sub{color:#c9a9b8;font-size:13px}
-    #modbox h3{margin:16px 0 8px;font-size:15px;color:#ffc8dc}
-    #modbox .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}
-    #modbox .mod{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid #4a3440;border-radius:12px;background:#1c1318;cursor:pointer;transition:border-color .15s,background .15s}
-    #modbox .mod:hover{border-color:#8a5a70}#modbox .mod.on{border-color:#ff7aa8;background:#2e1824}
-    #modbox .mod .ic{font-size:22px;line-height:1}#modbox .mod b{font-size:14px}#modbox .mod small{display:block;color:#c9a9b8;font-size:12px;line-height:1.35;margin-top:2px}
-    #modbox .tg{margin-left:auto;flex:none;width:38px;height:22px;border-radius:11px;background:#3a2a32;position:relative;transition:background .15s}
-    #modbox .tg:after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#aaa;transition:left .15s,background .15s}
-    #modbox .on .tg{background:#b0306a}#modbox .on .tg:after{left:19px;background:#fff}
-    #modbox .note{min-height:20px;margin-top:10px;font-size:13px;color:#ffd27a}
-    #modbox .bar{display:flex;gap:10px;justify-content:flex-end;margin-top:12px;position:sticky;bottom:-18px;background:#120b10;padding:10px 0}
-    #modbox button{border:1px solid #6a4a5a;background:#2e1f28;color:#f3e6ea;border-radius:11px;padding:9px 16px;font-size:14px;cursor:pointer}
-    #modbox button.pri{background:linear-gradient(135deg,#7a2e50,#4a1a60);border-color:#ff9ac8;font-weight:700}
-    #modbox .chg{color:#9adfff;font-size:12px;margin-left:6px}`;
+    s.textContent = `#modbox{position:fixed;inset:0;z-index:60;background:rgba(8,5,3,.78);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;font-family:system-ui,'PingFang SC','Microsoft YaHei',sans-serif;color:#ead8b8}
+#modbox *{box-sizing:border-box}
+#modbox .mb{width:min(1080px,96vw);height:min(760px,92vh);display:flex;flex-direction:column;background:linear-gradient(180deg,#24160f,#150d09);border:2px solid #6a4a2e;border-radius:20px;box-shadow:0 20px 80px rgba(0,0,0,.8),inset 0 0 60px rgba(0,0,0,.45);overflow:hidden}
+#modbox .hd{display:flex;align-items:center;gap:14px;padding:14px 20px 10px;border-bottom:1px solid #3c2a1a}
+#modbox .hd h2{margin:0;font-size:22px;color:#ffe2a0;letter-spacing:.06em;white-space:nowrap}
+#modbox .hd .cnt{font-size:12px;color:#a89070;white-space:nowrap}
+#modbox .sr{flex:1;position:relative;max-width:420px;margin-left:auto}
+#modbox .sr input{width:100%;padding:8px 12px 8px 34px;border-radius:10px;border:1px solid #5a3e28;background:#120a06;color:#ffeccb;font-size:14px;outline:none}
+#modbox .sr input:focus{border-color:#e0b75d}#modbox .sr:before{content:'🔍';position:absolute;left:10px;top:7px;font-size:14px;opacity:.7}
+#modbox .x{border:1px solid #5a3e28;background:#2a1b10;color:#d9c39f;border-radius:10px;padding:7px 12px;cursor:pointer;font-size:13px}#modbox .x:hover{border-color:#e0b75d;color:#fff0bc}
+#modbox .bd{flex:1;display:flex;min-height:0}
+#modbox .sd{width:188px;flex:none;padding:12px 10px;border-right:1px solid #3c2a1a;overflow:auto;background:rgba(0,0,0,.18)}
+#modbox .ct{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;cursor:pointer;font-size:14px;color:#cdb896;border:1px solid transparent;margin-bottom:2px}
+#modbox .ct:hover{background:#2a1b10}#modbox .ct.on{background:#3a2915;border-color:#8c6a3c;color:#fff0bc}
+#modbox .ct i{font-style:normal;width:20px;text-align:center}#modbox .ct em{margin-left:auto;font-style:normal;font-size:11.5px;color:#8f7b60}#modbox .ct.on em{color:#e0b75d}
+#modbox .fl{margin:12px 4px 4px;font-size:11px;color:#8f7b60;letter-spacing:.1em}
+#modbox .chip{display:inline-block;margin:2px 3px 2px 0;padding:3px 9px;border-radius:999px;border:1px solid #5a3e28;background:#1a110b;color:#bfa985;font-size:12px;cursor:pointer}
+#modbox .chip.on{background:#3a2915;border-color:#e0b75d;color:#fff0bc}
+#modbox .ls{flex:1;overflow:auto;padding:10px 16px 14px;scroll-behavior:auto}
+#modbox .gh{margin:14px 2px 6px;font-size:13px;color:#e0b75d;letter-spacing:.08em;display:flex;gap:8px;align-items:baseline}#modbox .gh:first-child{margin-top:2px}
+#modbox .gh small{color:#8f7b60;font-size:11.5px;letter-spacing:0}
+#modbox .row{border:1px solid #3c2a1a;border-radius:12px;background:#1b120c;margin-bottom:6px;transition:border-color .12s,background .12s}
+#modbox .row:hover{border-color:#6a4a2e}#modbox .row.on{border-color:#8c6a3c;background:#241710}#modbox .row.pend{box-shadow:inset 3px 0 0 #6fc0ff}
+#modbox .rh{display:flex;align-items:center;gap:12px;padding:9px 12px;cursor:pointer}
+#modbox .ic{font-size:22px;width:30px;text-align:center;flex:none}
+#modbox .tx{flex:1;min-width:0}#modbox .tx b{font-size:14.5px;color:#f3e4c6;font-weight:700}
+#modbox .tx small{display:block;color:#a89070;font-size:12.5px;line-height:1.4;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#modbox .row.ex .tx small{display:none}
+#modbox .tag{display:inline-block;margin-left:6px;padding:0 6px;border-radius:5px;font-size:10.5px;line-height:16px;vertical-align:1px;border:1px solid #5a3e28;color:#a89070}
+#modbox .tag.pd{color:#9fd4ff;border-color:#3f6f94}#modbox .tag.df{color:#c9b08a}#modbox .tag.nd{color:#e9a070;border-color:#7a4a2a}
+#modbox .sw{flex:none;width:44px;height:24px;border-radius:12px;background:#3a2a1e;border:1px solid #5a3e28;position:relative;cursor:pointer;transition:background .15s}
+#modbox .sw:after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#9a8468;transition:left .15s,background .15s}
+#modbox .on .sw{background:#7a5a1e;border-color:#e0b75d}#modbox .on .sw:after{left:23px;background:#fff0bc}
+#modbox .sw.rd{width:24px}#modbox .sw.rd:after{left:3px;opacity:0}#modbox .on .sw.rd:after{left:3px;opacity:1}
+#modbox .dt{display:none;padding:2px 14px 12px 54px;font-size:13px;line-height:1.65;color:#d8c6a6}
+#modbox .row.ex .dt{display:block}#modbox .dt .m{margin-top:6px;font-size:12px;color:#8f7b60}#modbox .dt .m b{color:#c9a768;font-weight:600}
+#modbox .em{padding:40px 10px;text-align:center;color:#8f7b60}
+#modbox .ft{display:flex;align-items:center;gap:10px;padding:10px 20px;border-top:1px solid #3c2a1a;background:rgba(0,0,0,.25)}
+#modbox .nt{flex:1;min-width:0;font-size:12.5px;color:#ffd27a;line-height:1.45;max-height:38px;overflow:hidden}#modbox .nt.pd{color:#9fd4ff}
+#modbox .bt{border:1px solid #5a3e28;background:#2a1b10;color:#d9c39f;border-radius:10px;padding:8px 16px;font-size:14px;cursor:pointer}#modbox .bt:hover{border-color:#e0b75d}
+#modbox .bt.pri{background:linear-gradient(135deg,#8a5a1c,#5a3810);border-color:#e0b75d;color:#fff0bc;font-weight:700}#modbox .bt[disabled]{opacity:.4;cursor:default}
+@media(max-width:760px){#modbox .sd{width:120px}#modbox .ct em{display:none}#modbox .hd .cnt{display:none}}`;
     document.head.appendChild(s);
+  }
+  const esc = t => String(t == null ? '' : t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const brief = d => { d = String(d || '').replace(/<[^>]+>/g, ''); const i = d.search(/[。！；]/); let t = i > 6 && i < 70 ? d.slice(0, i) : d.slice(0, 64); return t + (t.length < d.length ? '…' : ''); };
+  const pending = () => LIST.filter(m => !!st[m.id] !== !!bootSt[m.id]);
+  function match(m) {
+    if (view.cat !== 'all' && m.cat !== view.cat) return false;
+    if (view.f === 'on' && !st[m.id]) return false; if (view.f === 'off' && st[m.id]) return false;
+    if (view.f === 'chg' && !(!!st[m.id] !== !!m.def)) return false; if (view.f === 'pend' && !(!!st[m.id] !== !!bootSt[m.id])) return false;
+    const q = view.q.trim().toLowerCase(); if (q && !(m.n + ' ' + m.d + ' ' + m.id).toLowerCase().includes(q)) return false; return true;
+  }
+  function rowHTML(m) {
+    const pd = !!st[m.id] !== !!bootSt[m.id], ex = view.open === m.id;
+    const req = (m.requires || []).map(i => BY[i] && BY[i].n).filter(Boolean), cf = (m.conflicts || []).map(i => BY[i] && BY[i].n).filter(Boolean);
+    return `<div class="row ${st[m.id] ? 'on' : ''} ${pd ? 'pend' : ''} ${ex ? 'ex' : ''}" data-id="${m.id}"><div class="rh" data-a="ex"><div class="ic">${m.icon}</div><div class="tx"><b>${esc(m.n)}</b>${pd ? '<span class="tag pd">待应用</span>' : ''}${!!st[m.id] !== !!m.def && !pd ? '<span class="tag df">已改动</span>' : ''}${m.reload ? '<span class="tag nd">需重载</span>' : ''}<small>${esc(brief(m.d))}</small></div><div class="sw ${m.group ? 'rd' : ''}" data-a="tg" title="${m.group ? '选用这个画风' : '开 / 关'}"></div></div>`
+      + `<div class="dt">${esc(m.d)}<div class="m"><b>默认</b> ${m.def ? '开' : '关'}　<b>ID</b> ${m.id}${req.length ? `<br><b>依赖</b> ${esc(req.join('、'))}（开启时自动打开）` : ''}${cf.length ? `<br><b>冲突</b> ${esc(cf.join('、'))}（开启时自动关闭）` : ''}</div></div></div>`;
+  }
+  function listHTML() {
+    const out = []; const cats = view.cat === 'all' ? CATS : [view.cat];
+    for (const c of cats) { const ms = LIST.filter(m => m.cat === c && match(m)); if (!ms.length) continue;
+      out.push(`<div class="gh"><span>${CATI[c] || ''} ${CATN[c] || c}</span><small>${CATD[c] || ''}</small></div>` + ms.map(rowHTML).join('')); }
+    return out.join('') || '<div class="em">没有匹配的 MOD</div>';
+  }
+  function sideHTML() {
+    const cnt = c => LIST.filter(m => (c === 'all' || m.cat === c) && st[m.id]).length, tot = c => LIST.filter(m => c === 'all' || m.cat === c).length;
+    const fl = [['all', '全部'], ['on', '已开启'], ['off', '已关闭'], ['chg', '与默认不同'], ['pend', '待应用']];
+    return [['all', '📚', '全部']].concat(CATS.map(c => [c, CATI[c], CATN[c]])).map(([c, i, n]) => `<div class="ct ${view.cat === c ? 'on' : ''}" data-cat="${c}"><i>${i}</i>${n}<em>${cnt(c)}/${tot(c)}</em></div>`).join('')
+      + `<div class="fl">筛选</div>` + fl.map(([k, n]) => `<span class="chip ${view.f === k ? 'on' : ''}" data-f="${k}">${n}</span>`).join('');
+  }
+  function footHTML() {
+    const pd = pending(); return `<div class="nt ${pd.length && !view.note ? 'pd' : ''}">${esc(view.note) || (pd.length ? `待应用 ${pd.length} 项：` + esc(pd.slice(0, 5).map(m => (st[m.id] ? '＋' : '－') + m.n.replace(/（.*?）/g, '')).join('、') + (pd.length > 5 ? '…' : '')) : '点开关即可切换；点击条目展开详情。修改后需要“应用并重新载入”（会先自动存档）。')}</div>`
+      + `<button class="bt" data-a="def">恢复默认</button><button class="bt" data-a="close">${pd.length ? '暂不应用' : '关闭'}</button><button class="bt pri" data-a="apply" ${pd.length ? '' : 'disabled'}>应用并重新载入${pd.length ? ' (' + pd.length + ')' : ''}</button>`;
+  }
+  function refresh(keepScroll = true) {
+    if (!box) return; const ls = box.querySelector('.ls'), y = ls ? ls.scrollTop : 0;
+    box.querySelector('.sd').innerHTML = sideHTML(); box.querySelector('.ls').innerHTML = listHTML(); box.querySelector('.ft').innerHTML = footHTML();
+    box.querySelector('.cnt').textContent = `${LIST.filter(m => st[m.id]).length} / ${LIST.length} 已开启`;
+    if (keepScroll) box.querySelector('.ls').scrollTop = y;
   }
   function open() {
     css(); if (box) box.remove();
     if (document.pointerLockElement) document.exitPointerLock();
     if (window.G && G.setUIOpen) G.setUIOpen(true);
+    view.note = '';
     box = document.createElement('div'); box.id = 'modbox';
-    const changed = JSON.stringify(st) !== boot;
-    const cats = ['render', 'perf', 'look', 'asset', 'play'];
-    box.innerHTML = `<div class="mb"><h2>🧩 MOD 管理</h2><div class="sub">每个改动都可单独开关。冲突会自动处理（画风只能选一个；低配模式会关掉后处理类 MOD；依赖项会连带开关）。修改后点「应用并重新载入」（会先自动存档）。</div>
-      ${cats.map(c => `<h3>${CATN[c]}</h3><div class="grid">${LIST.filter(m => m.cat === c).map(m => `<div class="mod ${st[m.id] ? 'on' : ''}" data-id="${m.id}"><div class="ic">${m.icon}</div><div><b>${m.n}</b>${!!st[m.id] !== !!bootSt[m.id] ? '<span class="chg">待应用</span>' : ''}<small>${m.d}${m.requires ? `<br>依赖：${m.requires.map(r => BY[r].n).join('、')}` : ''}${m.conflicts && !m.group ? `<br>冲突：${m.conflicts.map(r => BY[r].n).join('、')}` : ''}</small></div><div class="tg"></div></div>`).join('')}</div>`).join('')}
-      <div class="note" id="modnote">${box._note || ''}</div>
-      <div class="bar"><button data-a="def">恢复默认</button><button data-a="close">${changed ? '暂不应用' : '关闭'}</button><button class="pri" data-a="apply" ${changed ? '' : 'disabled style="opacity:.45"'}>应用并重新载入</button></div></div>`;
+    box.innerHTML = `<div class="mb"><div class="hd"><h2>🧩 MOD 管理</h2><span class="cnt"></span><div class="sr"><input id="modq" placeholder="搜索名称 / 说明（按 / 聚焦）" value="${esc(view.q)}" autocomplete="off"></div><button class="x" data-a="close">✕ 关闭 Esc</button></div><div class="bd"><div class="sd"></div><div class="ls"></div></div><div class="ft"></div></div>`;
     box.addEventListener('click', e => {
-      const md = e.target.closest('.mod');
-      if (md) { const id = md.dataset.id; const notes = set(id, !st[id]); const n = notes.join('；'); open(); const nt = document.getElementById('modnote'); if (nt) nt.textContent = n; return; }
+      if (e.target === box) { close(); return; }
+      const ct = e.target.closest('[data-cat]'); if (ct) { view.cat = ct.dataset.cat; refresh(false); box.querySelector('.ls').scrollTop = 0; return; }
+      const ch = e.target.closest('[data-f]'); if (ch) { view.f = ch.dataset.f; refresh(false); return; }
+      const row = e.target.closest('.row');
+      if (row) { const id = row.dataset.id;
+        if (e.target.closest('[data-a="tg"]')) { const notes = set(id, !st[id]); view.note = notes.join('；'); refresh(); return; }
+        view.open = view.open === id ? null : id; refresh(); return; }
       const a = e.target.closest('button'); if (!a) return;
       if (a.dataset.a === 'close') close();
-      else if (a.dataset.a === 'def') { for (const m of LIST) st[m.id] = !!m.def; normalize(); save(); open(); }
+      else if (a.dataset.a === 'def') { for (const m of LIST) st[m.id] = !!m.def; normalize(); save(); view.note = '已恢复默认设置（仍需应用并重新载入）'; refresh(); }
       else if (a.dataset.a === 'apply') { save(); try { if (window.G) G.save(); } catch (er) {} location.reload(); }
     });
-    document.body.appendChild(box);
+    box.addEventListener('keydown', e => { if (e.target.id === 'modq' && e.code !== 'Escape') e.stopPropagation(); });
+    box.addEventListener('input', e => { if (e.target.id === 'modq') { view.q = e.target.value; refresh(false); } });
+    document.body.appendChild(box); refresh(false);
   }
   function close() { if (box) box.remove(); box = null; if (window.G && G.setUIOpen) G.setUIOpen(false); }
   addEventListener('keydown', e => {
     if (e.code === 'KeyO' && !e.repeat && !box && window.G && G.playing && !G.uiOpen) { e.preventDefault(); open(); }
-    else if (box && e.code === 'Escape') { e.preventDefault(); close(); }
+    else if (box && e.code === 'Escape') { e.preventDefault(); const q = document.getElementById('modq'); if (q && q.value) { q.value = ''; view.q = ''; refresh(false); } else close(); }
+    else if (box && e.key === '/' && document.activeElement && document.activeElement.id !== 'modq') { e.preventDefault(); const q = document.getElementById('modq'); if (q) q.focus(); }
   });
   return { LIST, on, set, apply, open, close, get state() { return st; }, get boot() { return bootSt; } };
 })();
