@@ -596,8 +596,13 @@ window.Worlds = (() => {
     const d = [['str', '力量'], ['con', '体魄'], ['agi', '敏捷'], ['ter', '凶威'], ['soul', '魂力']].filter(([k]) => s1[k] > s0[k]).map(([k, n]) => `${n}+${s1[k] - s0[k]}`).concat(s1.maxHp > s0.maxHp ? [`生命+${s1.maxHp - s0.maxHp}`] : []).join(' · ');
     achBanner(`升级！Lv.${up.to}`, d || '继续变强'); W && W.trip.log.push({ t: `⬆️ 食人魔升到 Lv.${up.to}（${d}）`, cls: 'gethead' }); SFX.levelup && SFX.levelup(); G.save && G.save();
   }
-  function foeEvent(t, fo, d) {
-    if (!W) return; if (window.Recall) Recall.log(fo, t, d); if (window.CombatFX) CombatFX.event(t, fo, d); // 第二十二轮（续 9）：命中/击杀/格挡音效 + 命中准星 const now = performance.now() / 1000, st = W.stats = W.stats || { kill: 0, decap: 0, execute: 0, onecut: 0, sever: 0, halve: 0, parry: 0, combo: 0, maxCombo: 0, lastHit: 0, kills: [] };
+  // 第二十六轮(i) 修“血掉到 0 不死 / 一刀冒一堆数字”：下面这行的 const now/st 以前被行尾注释吞掉 → 每次命中 ReferenceError(st) →
+  //   foe.js hit() 在扣血后、判定死亡前被打断（永远不死），combat.js 也没来得及把目标记为“已命中” → 同一刀每帧重复命中。
+  //   现在：声明单独成行；整个事件处理包 try/catch——音效/日志/成就里的任何 bug 都不能再打断伤害结算。
+  function foeEvent(t, fo, d) { try { foeEvent0(t, fo, d); } catch (e) { console.warn('foeEvent', t, e); } }
+  function foeEvent0(t, fo, d) {
+    if (!W) return; if (window.Recall) { try { Recall.log(fo, t, d); } catch (e) { console.warn(e); } } if (window.CombatFX) { try { CombatFX.event(t, fo, d); } catch (e) { console.warn(e); } } // 第二十二轮（续 9）：命中/击杀/格挡音效 + 命中准星
+    const now = performance.now() / 1000, st = W.stats = W.stats || { kill: 0, decap: 0, execute: 0, onecut: 0, sever: 0, halve: 0, parry: 0, combo: 0, maxCombo: 0, lastHit: 0, kills: [] };
     if (t === 'hit') { st.combo = now - st.lastHit < 2.5 ? st.combo + 1 : 1; st.lastHit = now; st.maxCombo = Math.max(st.maxCombo, st.combo); showCombo(st.combo, d && d.brk); if (st.combo >= 10) achAdd('combo', st.combo, true); return; }
     const rw = REW[t]; if (rw) { const mul = 1 + (fo.rar || 0) * 0.5 + (fo.boss ? 3 : 0), c = Math.round(rw[0] * mul * (1 + Math.min(1, st.combo / 20))); G.addCoins(c); W.trip.coins += c; gainXp(Math.max(1, Math.round(rw[0] * mul * 0.8)));
       floatDmg(fo.anchor ? fo.anchor.pos : fo.pos, `${rw[1]} +${c}🔮`, t === 'execute' || t === 'onecut'); SFX.coins && SFX.coins(); }

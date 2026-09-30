@@ -186,7 +186,7 @@ window.Combat = (() => {
       seg: { b0: P.clone().addScaledVector(dW, -0.3), t0: P.clone().addScaledVector(dW, 0.3), b1: P.clone().addScaledVector(dW, -0.3), t1: P.clone().addScaledVector(dW, 0.3) },
       assist: true, charged: heavy, tipSpeed: spd / 0.9, mult: fin ? 1.3 : 1, fmul: heavy ? 1.6 : fin ? 1.5 : 1.45, combo: w.step, mm: true });
     const zone = fo ? aimPoint(fo, w, _mp) : null; const P = zone ? _mp : _mp2.copy(chest); const inf = mk(P); if (zone) inf.zone = zone;
-    const res = tg.onHit ? tg.onHit(inf) : true;
+    let res = true; try { res = tg.onHit ? tg.onHit(inf) : true; } catch (e) { console.warn('onHit', e); } // 第二十六轮(i)：目标回调出错也算“这一刀已命中”，绝不每帧重复结算
     if (res === false) return false;
     w.set.add(tg.id); w.hit = true; const k = heavy ? 1 : fin ? 0.75 : 0.45, now = performance.now(); M.hitT = now;
     S.shake = Math.max(S.shake, 0.006 + 0.014 * k); M.kick.p += 0.008 + 0.02 * k; M.kick.r += -w.dx * (0.008 + 0.018 * k); M.kick.f = Math.max(M.kick.f, 1.2 + 3 * k); w.hold = heavy ? 0.05 : fin ? 0.035 : 0.022;
@@ -465,7 +465,7 @@ window.Combat = (() => {
         if (speed < 2) { if (S.wiggle && tg.kind !== 'head' && now - (S.wigT || 0) > 2.5) { S.wigT = now; G.toast && G.toast('🌀 来回乱晃没有冲力——大幅度挥砍 / 连点刺击才有伤害', '#9fd0ff', 1.8); } continue; }
         const info = { point: p1.clone(), vel: _vel.clone().multiplyScalar(f), speed, kind: S.thrust > 0 ? 'thrust' : 'slash', dir: dirName(), frac: f,
           commit, seg: { b0: S.lastBase.clone(), t0: S.lastTip.clone(), b1: _baseW.clone(), t1: _tipW.clone() }, from: fromAng(), assist: aa, charged: S.charged > 0 && S.thrust === 0, tipSpeed: S.thrust > 0 ? Math.max(S.tipSpeed, 5) : S.tipSpeed };
-        const res = tg.onHit ? tg.onHit(info) : true;
+        let res = true; try { res = tg.onHit ? tg.onHit(info) : true; } catch (e) { console.warn('onHit', e); } // 第二十六轮(i)：出错也进冷却
         if (res === false) continue; // 目标说“刃其实没碰到身体”：不进冷却，这一刀继续扫
         S.hitCd.set(tg.id, now); if (S.sw) S.sw.hit = true; if (info.charged && tg.kind !== 'head') S.charged = 0;
         const heavy = Math.min(1, speed / 10);
