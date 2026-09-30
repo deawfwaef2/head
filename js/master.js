@@ -14,7 +14,7 @@ window.Master = (() => {
   const P = { // 调色（黑暗奇幻：暖高光、冷暗部、偏低饱和的中间调、电影感对比）
     exposure: 1.25, bloomStr: 0.9, bloomThresh: 0.9, bloomKnee: 0.6, aoStr: 1.0, aoRadius: 0.55,
     rayStr: 0.55, rayDecay: 0.965, rayDensity: 0.9,
-    sat: 1.08, contrast: 1.07, shadowTint: [0.93, 0.98, 1.08], highTint: [1.06, 1.0, 0.9], vig: 0.42, grain: 0.028, ca: 0.0016
+    sat: 1.08, contrast: 1.07, shadowTint: [0.93, 0.98, 1.08], highTint: [1.06, 1.0, 0.9], vig: 0.42, grain: 0.028, ca: 0.0007
   };
   const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
   const quad = new THREE.PlaneGeometry(2, 2), cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);

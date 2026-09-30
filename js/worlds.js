@@ -144,8 +144,10 @@ window.Worlds = (() => {
       for (let i = 0; i < 4; i++) { const a = r() * 6.28, d = P.rc * (0.3 + r() * 0.4); spots.push({ x: Math.cos(a) * d, z: Math.sin(a) * d }); }
     } else if (k === 'lake') {
       let wy = Infinity; for (let i = 0; i < 20; i++) { const a = i / 20 * Math.PI * 2; wy = Math.min(wy, H(P.cx + Math.cos(a) * P.Lr * 0.98, P.cz + Math.sin(a) * P.Lr * 0.98)); } wy -= 0.12;
-      const wm = new THREE.MeshStandardMaterial({ color: st.night ? '#081418' : '#123038', roughness: 0.1, metalness: 0.0, transparent: true, opacity: 0.93, envMap: C.sky ? C.sky.env : null, envMapIntensity: 0.55 });
-      const water = new THREE.Mesh(new THREE.CircleGeometry(P.Lr * 1.2, 48).rotateX(-Math.PI / 2), wm); water.position.set(P.cx, wy, P.cz); water.receiveShadow = true; sc.add(water); sc.userData.water = water;
+      let wm; const nfx = window.WGen && WGen.waterMat && !(window.Mods && Mods.on && Mods.on('water_fx') === false);
+      if (nfx) { wm = WGen.waterMat(null, C.sky, st.night ? '#081418' : '#123038'); const rr = P.Lr * 1.2 + 1; try { WGen.bakeWaterDepth(null, wm, [[P.cx - rr, P.cz - rr, P.cx + rr, P.cz + rr]], (x, z) => ({ d: -(wy - H(x, z)) })); } catch (e) { console.warn('lake depth', e); } } // R50：湖也用新水面（岸线渐隐/泡沫/涟漪），深度直接取地形
+      else wm = new THREE.MeshStandardMaterial({ color: st.night ? '#081418' : '#123038', roughness: 0.1, metalness: 0.0, transparent: true, opacity: 0.93, envMap: C.sky ? C.sky.env : null, envMapIntensity: 0.55 });
+      const water = new THREE.Mesh(new THREE.CircleGeometry(P.Lr * 1.2, 48).rotateX(-Math.PI / 2), wm); if (nfx) { const U = wm.userData.U; water.onBeforeRender = () => { U.t.value = performance.now() / 1000; }; water.renderOrder = 1; } water.position.set(P.cx, wy, P.cz); water.receiveShadow = true; sc.add(water); sc.userData.water = water;
       cols.push({ x: P.cx, z: P.cz, r: P.Lr * 0.78 }); mark(P.cx, P.cz, P.Lr * 1.05);
       // 码头：从岸边伸向湖心
       const pa = Math.atan2(-P.cz, -P.cx) + (r() - 0.5) * 0.8, sx = P.cx + Math.cos(pa) * P.Lr * 0.95, sz = P.cz + Math.sin(pa) * P.Lr * 0.95, v = one(['modular_wooden_pier']);
@@ -437,6 +439,7 @@ window.Worlds = (() => {
     else gm = new THREE.MeshStandardMaterial({ color: '#556644', roughness: 1, vertexColors: !!g });
     if (st.tint) gm.color = new THREE.Color(st.tint);
     const terr = new THREE.Mesh(tg, gm); terr.receiveShadow = true; sc.add(terr);
+    let GR = null; if (g && window.WGrass) try { GR = WGrass.build(tg, { g, style: node.style || (st.name) || '', RM, R, LP, sc }); } catch (e) { console.warn('WGrass', e); } // R50 壳层草地
     // 天空（与 PMREM 同一套等距柱状映射）
     if (sky) {
       const sm = new THREE.ShaderMaterial({ uniforms: { map: { value: sky.bg }, k: { value: g ? g.skyK * Math.pow(g.sunK, 0.5) : (st.night ? 0.9 : 1.1) }, tint: { value: g ? g.skyTint : new THREE.Color(1, 1, 1) }, fogC: { value: new THREE.Color(0, 0, 0) }, hz: { value: 0 } }, depthWrite: false, side: THREE.BackSide, fog: false,
@@ -460,7 +463,9 @@ window.Worlds = (() => {
     const mark = (x, z, rad) => { const n = Math.ceil(rad / cell); const cx = Math.floor(x / cell), cz = Math.floor(z / cell); for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) occ.set((cx + i) + ',' + (cz + j), 1); };
     doorList.forEach(d => mark(d.x * 0.93, d.z * 0.93, 3.2));
     const inst = new Map(), instNS = new Map(); // 模板 → 矩阵列表（NS = 不投影，远景）
-    const put = (tm, x, z, s, ry, y0, ns, uc) => { const m = new THREE.Matrix4().compose(new V3(x, (y0 != null ? y0 : H(x, z)) - 0.04 * s, z), new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), ry), new V3(s, s, s)); if (uc) m.uc = uc; const M = ns ? instNS : inst; if (!M.has(tm)) M.set(tm, []); M.get(tm).push(m); };
+    const GRND = () => !(window.Mods && Mods.on && Mods.on('ground_props') === false); // R50 MOD ground_props：大件（岩石/树桩…）按脚印四角取最低地面并下沉，不再悬在坡上
+    const baseY = (tm, x, z, s, y0) => { let y = y0 != null ? y0 : H(x, z); if (y0 == null && tm && tm.size && GRND()) { const fp = Math.min(3.2, Math.max(tm.size.x, tm.size.z) * s * 0.42); if (fp > 0.45) { y = Math.min(y, H(x + fp, z), H(x - fp, z), H(x, z + fp), H(x, z - fp)); y -= Math.min(0.5, fp * 0.12); } } return y; };
+    const put = (tm, x, z, s, ry, y0, ns, uc) => { const m = new THREE.Matrix4().compose(new V3(x, baseY(tm, x, z, s, y0) - 0.04 * s, z), new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), ry), new V3(s, s, s)); if (uc) m.uc = uc; const M = ns ? instNS : inst; if (!M.has(tm)) M.set(tm, []); M.get(tm).push(m); };
     const variants = (list) => list.flatMap(n => templates(n).map(t => ({ t, n })));
     // 地标（先放，保证有空间）
     const spots = []; try { layPlace(LY, { sc, H, put, variants, mark, cols, doorList, spots, st, sky, node }); } catch (e) { console.warn('layout', LY.k, e); }
@@ -562,7 +567,7 @@ window.Worlds = (() => {
       cols.push({ x: d.x + Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z + Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 }, { x: d.x - Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z - Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 });
       return Object.assign(d, { g, label, home });
     });
-    return { site: LY.slots ? LY : null, sc, H, R, Rf: LP ? Rf : null, RM, edge: LP && LP.edge ? LP.edge : null, wx: (LPX && LPX.wx) || GD ? (dt, p, now) => { if (LPX && LPX.wx) LPX.wx(dt, p, now); if (GD) GD.update(dt, p, now); } : null, tag: [LP ? LP.tag : '', g ? g.tag.join(' · ') : ''].filter(Boolean).join(' · '), lp: LP, cols, doors, inter, sun, sunDir, terr, style: st, spots, lay: LY.k, bossAt: LY.boss ? new V3(LY.boss.x, 0, LY.boss.z) : null };
+    return { grass: GR, site: LY.slots ? LY : null, sc, H, R, Rf: LP ? Rf : null, RM, edge: LP && LP.edge ? LP.edge : null, wx: (LPX && LPX.wx) || GD ? (dt, p, now) => { if (LPX && LPX.wx) LPX.wx(dt, p, now); if (GD) GD.update(dt, p, now); } : null, tag: [LP ? LP.tag : '', g ? g.tag.join(' · ') : ''].filter(Boolean).join(' · '), lp: LP, cols, doors, inter, sun, sunDir, terr, style: st, spots, lay: LY.k, bossAt: LY.boss ? new V3(LY.boss.x, 0, LY.boss.z) : null };
   }
   // 画布文字 → 精灵（门牌/气泡）
   function makeLabel(text, col) {
@@ -867,7 +872,14 @@ window.Worlds = (() => {
   function dieNow() {
     if (!W || W.dead) return; W.dead = true; W.busy = true; if (window.Sack) Sack.onDeath();
     G.flash && G.flash('#600000', 0.9, 1500); W.trip.log.push({ t: `你倒在了「${W.graph.nodes[W.cur].name}」。` });
-    const api = W.api; setTimeout(() => { stop(); api.die(); }, 1200);
+    const api = W.api;
+    if (!(window.Mods && Mods.on && Mods.on('death_cine') === false)) { // R50 MOD death_cine：就地倒下（镜头下坠侧翻）→ 渐黑 → 死亡界面；以前是先传送回洞再弹界面
+      W.deadT = 0; try { window.SFX && SFX.thud && SFX.thud(1.2); } catch (e) { }
+      setTimeout(() => fadeTo(1), 1350);
+      setTimeout(() => { stop(); fadeTo(1); api.die(); setTimeout(() => fadeTo(0), 1250); }, 1750);
+      return;
+    }
+    setTimeout(() => { stop(); api.die(); }, 1200);
   }
 
   // ================= 每帧（由 game.js 主循环调用）=================
@@ -905,10 +917,12 @@ window.Worlds = (() => {
     const cam = G.camera; cam.position.set(W.pos.x, W.pos.y + P.h + bob, W.pos.z); cam.rotation.set(P.pitch, P.yaw, 0, 'YXZ');
     if (window.Combat && Combat.state && Combat.state.shake > 0) { cam.position.x += (Math.random() - 0.5) * Combat.state.shake * 0.08; cam.position.y += (Math.random() - 0.5) * Combat.state.shake * 0.08; }
     if (W.shake > 0) { W.shake -= dt; cam.position.x += (Math.random() - 0.5) * W.shake * 0.12; cam.position.y += (Math.random() - 0.5) * W.shake * 0.12; }
+    if (W.dead && W.deadT != null) { W.deadT += dt; const k = Math.min(1, W.deadT / 1.1), e = 1 - (1 - k) * (1 - k) * (1 - k); cam.position.y = W.pos.y + P.h + (0.2 - P.h) * e; cam.position.x += Math.cos(P.yaw) * 0.35 * e; cam.position.z -= Math.sin(P.yaw) * 0.35 * e; cam.rotation.set(P.pitch * (1 - e) - 0.25 * e, P.yaw, 1.35 * e, 'YXZ'); } // R50：倒地镜头
     if (window.Saga && Saga.cine) { try { Saga.cam(cam, dt, now); } catch (e) { console.warn(e); } } /* R49：剧情电影接管相机 */
     // 太阳影子跟随
     B.sun.target.position.set(W.pos.x, W.pos.y, W.pos.z); B.sun.position.copy(B.sun.target.position).addScaledVector(B.sunDir, 70);
     if (B.sc.userData.skyM) B.sc.userData.skyM.position.copy(cam.position);
+    if (B.grass) B.grass.update(cam.position, now);
     if (B.wx) try { B.wx(dt, cam.position, now); } catch (e) { B.wx = null; console.warn(e); }
     if (B.sc.userData.fire) B.sc.userData.fire.intensity = 2.2 * (0.85 + Math.sin(now * 13) * 0.08 + Math.sin(now * 29) * 0.05);
     // 门：靠近提示

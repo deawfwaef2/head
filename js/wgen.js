@@ -306,15 +306,36 @@ window.WGen = (() => {
     const t = new THREE.CanvasTexture(c); return softTex[key] = t;
   }
   function waterMat(g, sky, colHex) {
-    const m = new THREE.MeshStandardMaterial({ color: colHex, roughness: 0.04, metalness: 0.1, transparent: true, opacity: 0.93, side: THREE.DoubleSide, envMap: sky && sky.env || null, envMapIntensity: 0.65 });
-    const U = { t: { value: 0 } }; m.userData.U = U;
+    const fx = !(window.Mods && Mods.on && Mods.on('water_fx') === false); // R50 MOD water_fx：岸线渐隐 + 浅滩泛光 + 泡沫 + 远处涟漪，水不再是一块硬边的平板
+    const m = new THREE.MeshStandardMaterial({ color: colHex, roughness: fx ? 0.06 : 0.04, metalness: 0.1, transparent: true, opacity: fx ? 0.96 : 0.93, side: THREE.DoubleSide, envMap: sky && sky.env || null, envMapIntensity: fx ? 0.36 : 0.65 });
+    const dt0 = new THREE.DataTexture(new Uint8Array([255]), 1, 1, THREE.RedFormat); dt0.needsUpdate = true;
+    const U = { t: { value: 0 }, dt: { value: dt0 }, bb: { value: new THREE.Vector4(0, 0, 1, 1) }, on: { value: 0 } }; m.userData.U = U; m.userData.fx = fx;
     m.onBeforeCompile = (sh) => {
-      sh.uniforms.wt = U.t;
+      sh.uniforms.wt = U.t; sh.uniforms.wdt = U.dt; sh.uniforms.wbb = U.bb; sh.uniforms.won = U.on;
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = (modelMatrix * vec4(position,1.0)).xyz;');
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP; uniform float wt;')
-        .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n{ vec2 p = vWP.xz; float a = sin(p.x*1.9+wt*1.3)+sin(p.y*2.3-wt*1.1)+sin((p.x+p.y)*3.1+wt*1.9)*0.6; float b = cos(p.x*2.2-wt*1.2)+cos(p.y*1.7+wt*0.9)+cos((p.x-p.y)*2.7-wt*1.6)*0.6; normal = normalize(normal + vec3(a, 0.0, b) * 0.028); }');
+      let f = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP; uniform float wt; uniform sampler2D wdt; uniform vec4 wbb; uniform float won;');
+      if (fx) f = f.replace('#include <color_fragment>', `#include <color_fragment>
+        float wDep = 3.0; float wFoam = 0.0;
+        if (won > 0.5) { wDep = texture2D(wdt, (vWP.xz - wbb.xy) * wbb.zw).r * 2.5;
+          float wob = 0.05 * sin(vWP.x * 7.0 + wt * 1.7) * sin(vWP.z * 6.0 - wt * 1.3);
+          wFoam = (1.0 - smoothstep(0.0, 0.22, wDep + wob)) * smoothstep(0.0, 0.05, wDep + 0.02);
+          diffuseColor.rgb = mix(diffuseColor.rgb * 2.6 + vec3(0.02, 0.05, 0.03), diffuseColor.rgb * 0.75, smoothstep(0.03, 1.5, wDep));
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.82, 0.8), wFoam * 0.55);
+          diffuseColor.a = max(diffuseColor.a * smoothstep(0.0, 0.3, wDep), wFoam * 0.75); }`);
+      f = f.replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n{ vec2 p = vWP.xz; float a = sin(p.x*1.9+wt*1.3)+sin(p.y*2.3-wt*1.1)+sin((p.x+p.y)*3.1+wt*1.9)*0.6; float b = cos(p.x*2.2-wt*1.2)+cos(p.y*1.7+wt*0.9)+cos((p.x-p.y)*2.7-wt*1.6)*0.6; normal = normalize(normal + vec3(a, 0.0, b) * 0.028);'
+        + (fx ? ' float a2 = sin(p.x*7.3+wt*2.1)*sin(p.y*6.1-wt*1.7)+sin((p.x*0.8+p.y)*11.0-wt*2.6)*0.5, b2 = cos(p.x*6.1-wt*1.9)*sin(p.y*7.7+wt*1.5)+cos((p.x-p.y*0.7)*12.0+wt*2.3)*0.5; normal = normalize(normal + vec3(a2, 0.0, b2) * 0.022);' : '') + ' }');
+      sh.fragmentShader = f;
     };
     return m;
+  }
+  // R50：岸线深度图（不是美术贴图，只是距岸距离的数据）：每格 = 到水边的距离（0~2.5m）
+  function bakeWaterDepth(g, mat, boxes, fn) {
+    if (!mat.userData.fx || !(fn || (g && g.wd))) return; fn = fn || ((x, z) => g.wd(x, z));
+    let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const b of boxes) { x0 = Math.min(x0, b[0]); z0 = Math.min(z0, b[1]); x1 = Math.max(x1, b[2]); z1 = Math.max(z1, b[3]); }
+    if (!(x1 > x0 && z1 > z0)) return; const cs = Math.max(0.3, Math.max(x1 - x0, z1 - z0) / 160), nx = Math.max(2, Math.ceil((x1 - x0) / cs)), nz = Math.max(2, Math.ceil((z1 - z0) / cs)), data = new Uint8Array(nx * nz);
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const d = fn(x0 + (i + 0.5) * cs, z0 + (j + 0.5) * cs).d; data[j * nx + i] = Math.max(0, Math.min(255, Math.round(-d / 2.5 * 255))); }
+    const t = new THREE.DataTexture(data, nx, nz, THREE.RedFormat); t.minFilter = t.magFilter = THREE.LinearFilter; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.needsUpdate = true;
+    const U = mat.userData.U; U.dt.value = t; U.bb.value.set(x0, z0, 1 / (nx * cs), 1 / (nz * cs)); U.on.value = 1;
   }
   // 落地布景（每个 fn 返回 boss/敌人点位）
   function buildPieces(g, X) {
@@ -398,6 +419,7 @@ window.WGen = (() => {
         for (let i = 0; i < M; i++) { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(M - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, nx = -dz / l, nz = dx / l, y = lv[i] - 0.06; pos.push(pts[i][0] + nx * hw, y, pts[i][1] + nz * hw, pts[i][0] - nx * hw, y, pts[i][1] - nz * hw); if (i < M - 1) { const a0 = i * 2; idx.push(a0, a0 + 1, a0 + 2, a0 + 1, a0 + 3, a0 + 2); } }
         const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat); m.receiveShadow = false; m.frustumCulled = false; m.renderOrder = 1; m.userData.wg = 1; sc.add(m);
         for (let i = 0; i < M; i += 3) mark(pts[i][0], pts[i][1], W.w + 0.6);
+        { let bx0 = 1e9, bz0 = 1e9, bx1 = -1e9, bz1 = -1e9; for (const q of pts) { bx0 = Math.min(bx0, q[0]); bz0 = Math.min(bz0, q[1]); bx1 = Math.max(bx1, q[0]); bz1 = Math.max(bz1, q[1]); } try { bakeWaterDepth(g, mat, [[bx0 - hw - 1, bz0 - hw - 1, bx1 + hw + 1, bz1 + hw + 1]]); } catch (e) { console.warn('waterdepth', e); } }
         // 芦苇/岸石
         const reeds = variants(['grass_medium_02#*']); const cn = new C(1, 1, 1).multiply(g.grassMul);
         for (let i = 0; i < 90 && reeds.length; i++) { const k = Math.floor(r() * (M - 1)), a = pts[k], b = pts[k + 1], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, sd = r() < 0.5 ? -1 : 1, off = W.w + 0.1 + r() * 1.4, x = a[0] - dz / l * sd * off, z = a[1] + dx / l * sd * off; if (Math.hypot(x, z) > R * 1.02) continue; put(reeds[Math.floor(r() * reeds.length)].t, x, z, 2 + r() * 1.4, r() * 6.28, undefined, false, ic0(g, 'grass', x, z, r)); }
@@ -405,7 +427,8 @@ window.WGen = (() => {
         const pv = variants(['modular_wooden_pier'])[0], cands = []; for (let i = 4; i < M - 4; i++) if (Math.hypot(pts[i][0], pts[i][1]) < R * 0.75) cands.push(i);
         if (pv && cands.length) { const i = cands[Math.floor(r() * cands.length)], a = pts[i - 1], b = pts[i + 1], dx = b[0] - a[0], dz = b[1] - a[1], th = Math.atan2(dz, dx) + Math.PI / 2, Lb = 2 * (W.w + 1.6) + 1.5, Lm = Math.max(pv.t.size.z, pv.t.size.x, 0.5), s = Lb / Lm, deck = lv[i] + 0.08;
           put(pv.t, pts[i][0], pts[i][1], s, pv.t.size.x >= pv.t.size.z ? -th : Math.PI / 2 - th, deck - 1.0 * s); const PL = X.inst && X.inst.get(pv.t); if (PL && PL.length) PL[PL.length - 1].keep = 1; } }
-      else { for (const p of W.P) { const geo = new THREE.CircleGeometry(1, 40); geo.rotateX(-Math.PI / 2); const m = new THREE.Mesh(geo, mat); m.position.set(p.x, p.lv - 0.06, p.z); m.rotation.y = -p.th; m.scale.set(p.r * 1.45 * p.sx, 1, p.r * 1.45); m.frustumCulled = false; m.renderOrder = 1; m.userData.wg = 1; sc.add(m); cols.push({ x: p.x, z: p.z, r: p.r * 0.75 }); mark(p.x, p.z, p.r * 1.3);
+      else { try { bakeWaterDepth(g, mat, W.P.map(p => { const rr = p.r * 1.45 * Math.max(1, p.sx) + 1.5; return [p.x - rr, p.z - rr, p.x + rr, p.z + rr]; })); } catch (e) { console.warn('waterdepth', e); }
+        for (const p of W.P) { const geo = new THREE.CircleGeometry(1, 40); geo.rotateX(-Math.PI / 2); const m = new THREE.Mesh(geo, mat); m.position.set(p.x, p.lv - 0.06, p.z); m.rotation.y = -p.th; m.scale.set(p.r * 1.45 * p.sx, 1, p.r * 1.45); m.frustumCulled = false; m.renderOrder = 1; m.userData.wg = 1; sc.add(m); cols.push({ x: p.x, z: p.z, r: p.r * 0.75 }); mark(p.x, p.z, p.r * 1.3);
           const reeds = variants(['grass_medium_02#*']); for (let i = 0; i < 26 && reeds.length; i++) { const a = r() * 6.28, d = p.r * (1.05 + r() * 0.35), x = p.x + Math.cos(a) * d * p.sx, z = p.z + Math.sin(a) * d; if (!g.wd || g.wd(x, z).d < 0.2 || g.wd(x, z).d > 2.6) continue; put(reeds[Math.floor(r() * reeds.length)].t, x, z, 2 + r() * 1.4, r() * 6.28, undefined, false, ic0(g, 'grass', x, z, r)); } } }
     }
     // -- 布景
@@ -425,5 +448,5 @@ window.WGen = (() => {
   }
   const ic0 = (g, k, x, z, r) => ic(g, k, x, z, r);
   window.__wgenTest = { vnoise, makeTerrain };
-  return { on, style, assets, prepare, paint, ic, keep, dress, GRADES, SEASONS, TYPES, PIECES, mulberry, pick, wpick, vnoise, channel, segDist, sstep, clamp, lerp };
+  return { waterMat, bakeWaterDepth, on, style, assets, prepare, paint, ic, keep, dress, GRADES, SEASONS, TYPES, PIECES, mulberry, pick, wpick, vnoise, channel, segDist, sstep, clamp, lerp };
 })();

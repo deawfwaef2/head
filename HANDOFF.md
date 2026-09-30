@@ -1816,3 +1816,12 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **MOD `hunter_hud2`**（同文件 `ensureHud()` CSS 末尾追加 `#h2Hud.v2 …` 规则；`drawHud()` 给 `#h2Hud` 切 `v2` 类并输出新结构）：感应改成顶部 250px 黑曜石切角小面板（准星 SVG + 标签 + 百分比 / 4 段细条 / 一行“仇恨·升级还差·[U] 档案”），<30% 半透明；满时红描边“猎手将至”。猎手血条、横幅同风格（血金、切角、HP 条 30% 逃跑刻度、横幅金色细线代替糊状径向阴影）。用 ui3a 的 CSS 变量（有后备值）。id 不变。对比图：`/home/user/shots_r41/hud_r50.png`（工作区）。
 - **MOD `body_qc50`**（`js/cc0mode.js` `body()` 开头 `QBAD` 映射；`Foe.build` 入口本来就调 `CC0.body`，所以身份服装/Boss/旧存档都覆盖）：逐个渲染质检（`tools` 外的 qc.py，孤立场景）后停用 Q_Witch→Darkness_Shibu、Q_Medieval→Vita、Q_Adventurer→Q_Ranger、Q_Formal→Q_Peasant、Q_Soldier→Vita。原因：纯色无贴图低模、爪形手、手臂姿势坏、肤色和动漫头不符。Q_Ranger/Q_Peasant 有贴图，保留。**文件没删**（永不删身体规则），关 MOD 即恢复。给合作者：如果要再加 Quaternius 身体，请先确认有贴图、手型正常，并给皮肤材质打 `userData.skin` 以便染成头的肤色。
 - 身体库扩充调查：公开可直接下载的 CC0 VRoid 女性身体已全部用完或按规则剔除（madjin vroid/beta 全套、webaverse model7–13 = 同一批 pixiv 文件）；ToxSam/100Avatars CC0 是 Q 版吉祥物风格，不符。剩下唯一的路是 VRoid Hub 上作者标 CC0 的模型（需要 pixiv 登录，清单 `tools/r40_vroidhub_cc0.md`，用户下载到 `/home/user/vrm_in/` 后我来转）。
+
+## R50-gfx · 死亡镜头 + 画质（用户："角色死的时候会 TP 回家再播放死亡动画？""地图很劣质、多边形丘陵、有没有低成本大师级的渲染方案、毛茸茸"）
+全部是可开关 MOD，默认开。用 `tools/test/world.html?reg=meadow&seed=5` + `window.__node(i,{view:'eye'})` 截图验证（960×540，走 Master 后处理）。
+- **`death_cine`（worlds.js dieNow）**：以前玩家死亡 = 红闪 1.2s → `stop()`（镜头回洞窟）→ ui.die 再等 900ms 才弹死亡界面，所以看起来是"先传送回家再死"。现在：就地倒下（镜头下坠 + 侧翻 1.1s，frame() 里 `W.deadT`）→ 1.35s 渐黑 → 1.75s `stop()` 但保持黑屏 → `api.die()` → 死亡界面出现后 1.25s 淡出。Explore（文字版）未改。敌人的布娃娃在 fight.html 里测过：没有位置跳变。
+- **`ground_props`（worlds.js `baseY`）**：大件摆设（脚印>0.45m）按脚印四角取最低地面并下沉，不再悬在坡上。
+- **`water_fx`（wgen.js `waterMat`/`bakeWaterDepth`，worlds.js 湖布局也改用）**：水不再是硬边平板：距岸深度图（数据纹理，不是美术贴图）→ 岸线渐隐、浅滩泛亮、岸边泡沫、更细的涟漪、深处更深；环境反射 0.65→0.36。
+- **`shell_grass`（新文件 js/wgrass.js，index.html 与 world.html 已加 script）**：壳层草（shell texturing）：同一地形网格沿法线外推 12 层（只覆盖玩家可达区域、≤27m），片元着色器按哈希格子丢弃像素 → 一根根变细的草，顶端随风摆，`MeshLambert` 所以太阳/阴影/雾都正常；路、水边、陡坡自动不长；干旱地区稀疏偏枯黄；颜色 = 基色 × `g.grassMul`（季节）。无草模型、无贴图。新增 1 个着色器程序。**没有真机帧率数据**（沙箱软件渲染）；如太卡：减 `N`（wgrass.js）或在 MOD 里关 shell_grass。
+- master.js 色差 `ca` 0.0016→0.0007（细铁栏杆在屏幕边缘出现洋红/绿色条纹）。
+- 未做：① 用户说"违和的音效人物语音/人物模型"——太笼统，已向用户追问具体哪里违和；② 丘陵仍是 1.1m 网格 + 固定对角线三角化；③ 大块岩石（rock_face）上的黑斑是阴影/法线问题，未查。
