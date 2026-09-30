@@ -645,8 +645,28 @@ window.ModelHeads = (() => {
       delete LOOK.hx; delete LOOK.hn3; LOOK.skinHex = '#fbe6da'; LOOK.pale = 0.04;
       if (ra < 0.5) LOOK.acc = LOOK.acc.filter(a => a !== 'witchhat' && a !== 'crown'); else LOOK.acc = [];
     }
+    if (window.Mods && (Mods.on('hair_mix2') || Mods.on('acc_mix'))) mixLook(LOOK, faceIdx, grp, rarity);
     if (window.Mods && Mods.on('tier_look')) tierLook(LOOK, race, rarity, grp);
     return LOOK;
+  }
+  function mixLook(L, fi, grp, rarity) {
+    let s2 = ((L.seed || 1) * 4271 + 99991) % 2147483647 || 1; const r = () => (s2 = (s2 * 16807) % 2147483647) / 2147483647;
+    const F = T[fi], k = Math.max(0, Math.min(4, Math.round(+rarity || 0)));
+    if (Mods.on('hair_mix2') && grp !== 'godette' && r() < (grp === 'mmd' ? 0.3 : 0.22)) { // MMD 发型（原作配色、自带发饰）
+      const c = T.map((t, i) => i).filter(i => i !== fi && T[i].meta.grp === 'mmd' && T[i].hairMeshes.length);
+      for (let tries = 0; tries < 6 && c.length; tries++) { const j = c.splice(Math.floor(r() * c.length), 1)[0];
+        if (hairFitOK(F, T[j])) { L.h = T[j].meta.file; delete L.hx; delete L.hn3; L.hn = '原色'; break; } }
+    }
+    if (Mods.on('acc_mix') && grp !== 'godette' && r() < [0.06, 0.14, 0.26, 0.4, 0.55][k]) { // 饰品：同一头最多 2 件，大件（帽子）最多 1 件
+      const lib = accLib().filter(a => a.f !== L.h && a.f !== L.f); const ax = []; let big = accLib().some(x => x.f === F.meta.file && x.big); // 脸自带大件（帽子/大头冠）就不再叠
+      let hi = idxOf(L.h); if (hi < 0) hi = fi; hi = coverHair(fi, hi, L); const H = T[hi];
+      const S = hairShell(F, H, F.meta.file + '|' + H.meta.file + (hi === fi ? '|own' : ''), hi !== fi ? fitHair(F, H) : H.hairMeshes.map(m => m.geometry));
+      const want = r() < 0.3 + k * 0.08 ? 2 : 1;
+      for (let tries = 0; tries < 10 && ax.length < want && lib.length; tries++) { const a = lib.splice(Math.floor(r() * lib.length), 1)[0]; if (a.big && (big || r() > 0.35)) continue; if (ax.some(x => x.f === a.f)) continue; // 大件少出（避免满屏同款巫师帽）；同一来源头只取 1 件
+        if (!fitAcc(F, S, a, F.meta.file + '|' + H.meta.file + '|' + a.f + '|' + a.n)) continue; // 预检：只写入确实贴合的
+        big = big || a.big; ax.push({ f: a.f, n: a.n }); }
+      if (ax.length) { L.ax = ax; if (big) L.acc = (L.acc || []).filter(x => x !== 'crown' && x !== 'witchhat' && x !== 'tiara'); }
+    }
   }
   // ---------- 第二十五轮 MOD tier_look：魂阶外貌差异 ----------
   // 权重：凡魂偏普通脸模，神魂偏大师级 MMD 头（自带原作头饰）
@@ -713,6 +733,10 @@ window.ModelHeads = (() => {
         const k = binOf(v.x / r, v.y / r, v.z / r); if (r > R[k]) R[k] = r;
       }
     }
+    if (t.meta.grp === 'mmd' && window.Mods && (Mods.on('hair_mix2') || Mods.on('acc_mix'))) { // 第二十五轮：MMD 脸只有前面具 → 按耳平面镜像补出后脑，发型/饰品才贴得准
+      const zm = box.min.z + (box.max.z - box.min.z) * 0.3;
+      for (const m of skins) { const P = m.geometry.attributes.position; for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); if (v.z <= zm || v.y < box.min.y) continue; v.z = 2 * zm - v.z; v.sub(c); const r = v.length(); if (r < 1e-5) continue; const k = binOf(v.x / r, v.y / r, v.z / r); if (r > R[k]) R[k] = r; } }
+    }
     // 空格子用邻居填
     for (let pass = 0; pass < 6; pass++) for (let a = 0; a < NT; a++) for (let b = 0; b < NP; b++) {
       const k = a * NP + b; if (R[k] > 0) continue; let s = 0, n = 0;
@@ -730,6 +754,78 @@ window.ModelHeads = (() => {
     return (g(a0, b0) * (1 - fb) + g(a0, b1) * fb) * (1 - fa) + (g(a1, b0) * (1 - fb) + g(a1, b1) * fb) * fa;
   }
   const FIT = new Map();
+  // ---------- 第二十五轮 MOD hair_mix2 / acc_mix：发型与饰品跨头适配（每对先打分，只用合格的） ----------
+  const FITSC = new Map();
+  function hairFitOK(F, H) { // 相对原主人：覆盖/陷入不变差；拉伸 0.8~1.25；刘海不挡眼（眼带遮挡 ≤34%）；原主人自身陷入 ≥20% 的坏发型不外借
+    const key = F.meta.file + '|' + H.meta.file; if (FITSC.has(key)) return FITSC.get(key).ok;
+    const SF = skullMap(F), SH = skullMap(H), v = new V3(), Rh = new Float32Array(NT * NP).fill(-1);
+    let n = 0, sink = 0, ratio = 0, nr = 0; const eyeC = new Uint8Array(12), ey = SF.eyeY;
+    for (const m of H.hairMeshes) { const P = m.geometry.attributes.position; const step = Math.max(1, Math.floor(P.count / 6000));
+      for (let i = 0; i < P.count; i += step) {
+        v.fromBufferAttribute(P, i).sub(SH.c); const r = v.length() || 1e-5; const dx = v.x / r, dy = v.y / r, dz = v.z / r;
+        const rh = radAt(SH, dx, dy, dz), rf = radAt(SF, dx, dy, dz); const w = Math.max(0, Math.min(1, (v.y + 0.045) / 0.05));
+        let r2 = r + (rf - rh) * w; const off = r - rh; if (w > 0.5 && off > -0.004) r2 = Math.max(r2, rf + Math.max(0.0015, off * 0.9));
+        if (dy > -0.2) { n++; if (r2 < rf - 0.003) sink++; ratio += rf / Math.max(1e-4, rh); nr++; }
+        const k = binOf(dx, dy, dz); if (r2 > Rh[k]) Rh[k] = r2;
+        const yy = SF.c.y + dy * r2; if (dz > 0.55 && yy > ey - 0.012 && yy < ey + 0.006 && Math.abs(dx) < 0.6 && r2 > rf) eyeC[Math.min(11, Math.floor((dx + 0.6) / 0.1))] = 1; // 刘海挡住眼睛带
+      } }
+    let occ = 0; for (const c of eyeC) occ += c; occ /= 12;
+    let cov = 0, tot = 0;
+    for (let a = 0; a < NT; a++) for (let b = 0; b < NP; b++) { const th = (a + 0.5) / NT * Math.PI, ph = (b + 0.5) / NP * Math.PI * 2 - Math.PI;
+      const dy = Math.cos(th), dz = Math.sin(th) * Math.sin(ph); if (dy < -0.15 || (dz > 0.35 && dy < 0.55)) continue; // 头顶/后脑/两侧（不含脸）
+      tot++; const k = a * NP + b; if (Rh[k] >= SF.R[k] + 0.001) cov++; }
+    const rt = nr ? ratio / nr : 1, cv = cov / Math.max(1, tot), sk = n ? sink / n : 1;
+    // 相对标准：不比“戴在原主人头上”更差（覆盖最多掉 5%、陷入最多多 2%）；后颈本就露出的盘发/扎发不算错（VRoid 有真后颈、MMD 有 nape_fill）
+    let ok = true; if (F !== H) { hairFitOK(H, H); const b = FITSC.get(H.meta.file + '|' + H.meta.file); ok = b.sink < 0.2 && cv >= b.cov - 0.05 && sk <= b.sink + 0.02 && rt > 0.8 && rt < 1.25 && occ <= Math.min(0.6, Math.max(0.34, (b.occ || 0) + 0.08)); }
+    FITSC.set(key, { ok, cov: +cv.toFixed(3), sink: +sk.toFixed(3), rt: +rt.toFixed(3), occ: +occ.toFixed(2) }); return ok;
+  }
+  let ACCLIB = null;
+  function accLib() { // MMD 头上的独立饰品（帽子/头冠/花/发簪…，材质 cloth_*），排除眼睛以下的领口残片
+    if (ACCLIB) return ACCLIB; ACCLIB = [];
+    T.forEach(t => { if (t.meta.grp !== 'mmd') return; hairFitOK(t, t); const self = FITSC.get(t.meta.file + '|' + t.meta.file); if (self && self.sink >= 0.2) return; /* 头骨/发型本身不正常的头（如 Ganyu）不外借 */ const ey = (t.meta.eye && t.meta.eye[1] != null) ? t.meta.eye[1] : 0;
+      for (const m of t.faceMeshes) { const nm = (SRC.get(m) || {}).name || ''; if (!/^cloth/i.test(nm)) continue;
+        const P = m.geometry.attributes.position; if (P.count < 24) continue; m.geometry.computeBoundingBox(); const bb = m.geometry.boundingBox;
+        if ((bb.min.y + bb.max.y) / 2 < ey - 0.005 || bb.max.y < ey + 0.01) continue;
+        const sz = bb.getSize(new V3()); if (Math.max(sz.x, sz.y, sz.z) < 0.012) continue;
+        ACCLIB.push({ f: t.meta.file, n: m.name, t, m, big: bb.max.y > (t.meta.skullTop || 0.1) * 0.8 && sz.x > 0.12 }); } });
+    return ACCLIB;
+  }
+  const ACCFIT = new Map(), ACCWHY = new Map();
+  function fitAcc(F, dstS, a, key) { // 饰品按“离发型外轮廓的距离”搬到新头的发型上；返回 null = 不合格（陷进头皮/挡脸/拉伸过大）
+    if (ACCFIT.has(key)) return ACCFIT.get(key);
+    const A = a.t, srcS = hairShell(A, A, A.meta.file + '|' + A.meta.file + '|own', A.hairMeshes.map(m => m.geometry)), SF = skullMap(F);
+    const src = a.m.geometry, P = src.attributes.position, np = new Float32Array(P.count * 3), v = new V3();
+    const ey = SF.eyeY, bottom = F.meta.bottom != null ? F.meta.bottom : -0.1; let bad = 0, face = 0, st = 0;
+    // 刚性搬运：按“头骨平均半径之比”整体等比缩放（不扭曲形状），再沿饰品质心方向平移，使“最贴发型的 10% 顶点”到发型的间隙与原主人一致
+    const SA = skullMap(A), mR = S => { let t = 0, c = 0; for (let k = 0; k < S.R.length; k++) if (S.R[k] > 0) { t += S.R[k]; c++; } return c ? t / c : 0.1; };
+    const sc = Math.max(0.7, Math.min(1.3, mR(SF) / mR(SA))), N = P.count, gs = new Float32Array(N), gd = new Float32Array(N), ks = new Float32Array(N), kd = new Float32Array(N), u = new V3();
+    for (let i = 0; i < N; i++) { v.fromBufferAttribute(P, i).sub(srcS.c); u.add(v); const r = v.length() || 1e-5; gs[i] = r - radAt(srcS, v.x / r, v.y / r, v.z / r); ks[i] = r - radAt(SA, v.x / r, v.y / r, v.z / r); }
+    u.normalize(); let bur = 0;
+    const place = off => { bur = 0; for (let i = 0; i < N; i++) { v.fromBufferAttribute(P, i).sub(srcS.c).multiplyScalar(sc).addScaledVector(u, off);
+        np[i * 3] = dstS.c.x + v.x; np[i * 3 + 1] = dstS.c.y + v.y; np[i * 3 + 2] = dstS.c.z + v.z; const r = v.length() || 1e-5; gd[i] = r - radAt(dstS, v.x / r, v.y / r, v.z / r); kd[i] = r - radAt(SF, v.x / r, v.y / r, v.z / r);
+        if (gs[i] >= -0.002 && gd[i] < -0.008) bur++; } };
+    // 贴合：让“最贴发型的 10% 顶点”间隙 = 原主人头上的间隙×比例（限幅 -3~+4cm，防发散）；之后仍埋进发型就再外推
+    const q10 = g => { const c = Array.from(g).sort((x, y) => x - y); return c[Math.floor(c.length * 0.1)]; };
+    const g0 = q10(ks) * sc; let off = 0; place(0); // 以头骨为基准（两边头骨都可靠；发型外轮廓 MMD 蓬松/VRoid 贴头，不可比）
+    for (let t = 0; t < 3; t++) { off = Math.max(-0.02, Math.min(0.04, off + (g0 - q10(kd)))); place(off); }
+    const miss = Math.abs(q10(kd) - g0);
+    while (bur / N > 0.12 && off < 0.04) { off += 0.005; place(off); } st = off * N;
+    for (let i = 0; i < N; i++) { const x = np[i * 3] - dstS.c.x, y = np[i * 3 + 1] - dstS.c.y, z = np[i * 3 + 2] - dstS.c.z, r = Math.hypot(x, y, z) || 1e-5;
+      if (r < radAt(SF, x / r, y / r, z / r) - 0.002) bad++;
+      if (z / r > 0.45 && np[i * 3 + 1] < ey + 0.012 && np[i * 3 + 1] > bottom) face++; }
+    let why = ''; if (bur / N > 0.2) { bad = N; why += 'B'; } if (miss > 0.015) { bad = N; why += 'M' + miss.toFixed(3); } // 推到 4cm 仍埋在新发型里 = 对不上
+    { const c = Array.from(gs).sort((x, y) => x - y); if (c[Math.floor(N * 0.1)] > (a.big ? 0.055 : 0.025)) { /* 小件挂在别的饰品上（如胡桃帽上的梅花）搬走会悬空 */ bad = N; why += 'F' + c[Math.floor(N * 0.1)].toFixed(3); } } // 原主人头上就悬空的（光环/浮翼）不外借
+    let hid = 0; for (let i = 0; i < N; i++) if (gd[i] < -0.004) hid++; if (hid / N > 0.6) { bad = N; why += 'H' + (hid / N).toFixed(2); } // 被新发型包住看不见
+    { const cell = new Uint8Array(12); for (let i = 0; i < N; i++) { const x = np[i * 3] - dstS.c.x, y = np[i * 3 + 1], z = np[i * 3 + 2] - dstS.c.z, r = Math.hypot(x, y - dstS.c.y, z) || 1e-5;
+        if (z / r > 0.3 && y > ey - 0.015 && y < ey + 0.01 && Math.abs(x / r) < 0.6) cell[Math.min(11, Math.floor((x / r + 0.6) / 0.1))] = 1; }
+      let o = 0; for (const q of cell) o += q; if (o / 12 > 0.34) { face = N; why += 'E'; } } // 挡眼
+    let out = null; ACCWHY.set(key, { why, sc: +sc.toFixed(3), off: +off.toFixed(4), bur: +(bur / P.count).toFixed(3), bad: +(bad / P.count).toFixed(3), face: +(face / P.count).toFixed(3), st: +(st / P.count).toFixed(4) });
+    if (bad / P.count < 0.05 && face / P.count < 0.03) {
+      out = new THREE.BufferGeometry(); for (const k in src.attributes) out.setAttribute(k, src.attributes[k]);
+      out.setAttribute('position', new THREE.BufferAttribute(np, 3)); out.setIndex(src.index); out.computeVertexNormals(); out.computeBoundingSphere();
+    }
+    ACCFIT.set(key, out); return out;
+  }
   function fitHair(F, H) {
     const key = F.meta.file + '|' + H.meta.file; if (FIT.has(key)) return FIT.get(key);
     const SF = skullMap(F), SH = skullMap(H), v = new V3();
@@ -1028,6 +1124,12 @@ window.ModelHeads = (() => {
     const S = hairShell(F, H, F.meta.file + '|' + H.meta.file + (hi === fi ? '|own' : ''), hairGeos);
     if (look.hx && F.meta.grp !== 'godette') try { addHairX(hg, look, S, U, disposables); hg.traverse(o => { if (o.isMesh && o.material && o.material.customProgramCacheKey && o.material.customProgramCacheKey() === 'hair4') { stencilHair(o.material); o.renderOrder = 2; } }); } catch (e) { console.warn('hairX', e); }
     addAccessories(g, look, F.meta, U, disposables, S.top);
+    if (look.ax && look.ax.length && window.Mods && Mods.on('acc_mix')) try { // 第二十五轮：跨头饰品（不合格的直接不显示）
+      const lib = accLib();
+      for (const e of look.ax) { const a = lib.find(x => x.f === e.f && x.n === e.n); if (!a) continue;
+        const geo = fitAcc(F, S, a, F.meta.file + '|' + H.meta.file + '|' + e.f + '|' + e.n); if (!geo) continue;
+        const c = new THREE.Mesh(geo, getMat(a.m, a.t)); c.name = '__AX__' + e.n; c.renderOrder = 2; g.add(c); }
+    } catch (err) { console.warn('acc_mix', err); }
     if (window.HeadWear && look.hw && look.hw.length && (!window.Mods || Mods.on('headwear'))) try { HeadWear.build({ g, look, S, onShell, grad, disp: disposables }); } catch (e) { console.warn('headwear', e); }
     const radius = 0.1;
     return {
@@ -1043,6 +1145,7 @@ window.ModelHeads = (() => {
     get ready() { return ready; },
     get count() { return T.length; },
     files: () => T.map(t => t.meta.file),
+    mixDebug: { hairOK: (f, h) => hairFitOK(T[idxOf(f)], T[idxOf(h)]), hairSc: (f, h) => (hairFitOK(T[idxOf(f)], T[idxOf(h)]), FITSC.get(f + '|' + h)), acc: () => accLib().map(a => ({ f: a.f, n: a.n, big: a.big, src: (SRC.get(a.m) || {}).name, vc: a.m.geometry.attributes.position.count })), why: () => [...ACCWHY].map(([k, v]) => k + ' ' + JSON.stringify(v)) },
     debug: () => T.map(t => ({ f: t.meta.file, eye: !!t.eyeC, m: t.faceMeshes.map(m => m.name + ':' + ((SRC.get(m) || {}).name) + ':' + m.userData.kind + ':' + (m.geometry.attributes.position.count)) })),
     // 第十六轮（总管理师）：某个外观会用到的脸/发型贴图 —— 倒袋前逐帧 renderer.initTexture 预上传，避免首次渲染时同步解码大贴图卡顿
     mapsFor(look) { const out = new Set(); for (const k of [look.f, look.h]) { let i = idxOf(k); if (i < 0) i = 0; const t = T[i]; if (t) t.meshes.forEach(m => { const s = SRC.get(m) || m.material; if (s && s.map) out.add(s.map); }); } return [...out]; },
