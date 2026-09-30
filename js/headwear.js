@@ -8,8 +8,8 @@ window.HeadWear = (() => {
     flower: ['#ffffff', '#ffd0e0', '#ffe27a', '#c8a8ff', '#ff8aa8', '#a8d8ff', '#ff6a5a'],
     feather: [['#ffffff', '#a8c8ff'], ['#2a6a5a', '#9affd0'], ['#a01a1a', '#ffb060'], ['#1a1a1e', '#8a5aff'], ['#e8d8b0', '#6a4020']]
   };
-  const N = { ribbon: '大蝴蝶结', maid: '女仆头饰', bunny: '兔耳发箍', beret: '贝雷帽', minihat: '迷你礼帽', hairpins: '交叉发夹', star: '星星发夹', flowercrown: '花冠', goggles: '护目镜', kanzashi: '流苏发簪', bells: '铃铛发绳', feather: '羽饰', thorncrown: '暗棘之冠', twinbows: '双侧蝴蝶结' };
-  const GROUP = { beret: 'hat', minihat: 'hat', maid: 'band', bunny: 'band', goggles: 'band', flowercrown: 'band', thorncrown: 'band', ribbon: 'side', hairpins: 'side', star: 'side', kanzashi: 'side', bells: 'side', feather: 'side', twinbows: 'side' };
+  const N = { veil: '头纱', ribbon: '大蝴蝶结', maid: '女仆头饰', bunny: '兔耳发箍', beret: '贝雷帽', minihat: '迷你礼帽', hairpins: '交叉发夹', star: '星星发夹', flowercrown: '花冠', goggles: '护目镜', kanzashi: '流苏发簪', bells: '铃铛发绳', feather: '羽饰', thorncrown: '暗棘之冠', twinbows: '双侧蝴蝶结' };
+  const GROUP = { veil: 'hat', beret: 'hat', minihat: 'hat', maid: 'band', bunny: 'band', goggles: 'band', flowercrown: 'band', thorncrown: 'band', ribbon: 'side', hairpins: 'side', star: 'side', kanzashi: 'side', bells: 'side', feather: 'side', twinbows: 'side' };
   const BY_ID = {
     villager: { ribbon: 0.4, flowercrown: 0.25, hairpins: 0.2 }, shepherd: { flowercrown: 0.4, ribbon: 0.3, beret: 0.2 }, barmaid: { maid: 0.75, ribbon: 0.3 },
     smithgirl: { goggles: 0.7, hairpins: 0.3 }, herbalist: { flowercrown: 0.6, hairpins: 0.25 }, huntress: { feather: 0.6 }, bard: { beret: 0.7, feather: 0.5 },
@@ -58,6 +58,7 @@ window.HeadWear = (() => {
     else if (k === 'bells') { e.c = pick(r, ['#d81b3a', '#d81b3a', '#ffffff', '#1a1a1e']); e.v = r() < 0.5 ? 1 : -1; }
     else if (k === 'feather') { const f = pick(r, PAL.feather); e.c = f[0]; e.c2 = f[1]; e.v = r() < 0.5 ? 1 : -1; }
     else if (k === 'thorncrown') e.c = pick(r, ['#b04aff', '#ff2a4a', '#4affd0']);
+    else if (k === 'veil') { e.c = pick(r, ['#15131a', '#15131a', '#2a2630']); e.c2 = '#f4f2ee'; }
     return e;
   }
   const names = hw => (hw || []).map(e => N[e.k]).filter(Boolean);
@@ -87,6 +88,7 @@ window.HeadWear = (() => {
         if (e.k === 'kanzashi') kanzashi(e);
         if (e.k === 'bells') bells(e);
         if (e.k === 'feather') feather(e);
+        if (e.k === 'veil') veil(e);
       } catch (err) { console.warn('headwear', e.k, err); }
     }
     // --- 各件 ---
@@ -187,6 +189,22 @@ window.HeadWear = (() => {
         const bell = new THREE.Mesh(geo('bell', () => new THREE.SphereGeometry(0.0058, 16, 12)), gold); bell.position.set(x, -len - 0.005, 0.002); b.add(bell);
         const slit = new THREE.Mesh(geo('slit', () => new THREE.TorusGeometry(0.0058, 0.0007, 4, 20)), dark); slit.position.copy(bell.position); slit.rotation.x = Math.PI / 2; b.add(slit); }
       b.position.copy(s.p); b.quaternion.setFromUnitVectors(V(0, 0, 1), s.n); b.rotation.z = 0; b.rotation.x = 0; b.lookAt(s.p.clone().add(s.n)); g.add(b);
+    }
+    function veil(e) { // R43：修女头纱——罩住头顶和后脑，前面留出脸，两侧和背后垂到肩上；前缘一圈白色头巾边
+      const NT = 56, NP = 12, EXT = 4, R = NP + 1 + EXT, pos = [], idx = [];
+      const pt = (th, ph, lift) => { const d = V(Math.cos(ph) * Math.sin(th), Math.sin(ph), Math.cos(ph) * Math.cos(th)).normalize(); return { p: onShell(S, d.x, d.y, d.z, -lift), d }; };
+      const phMin = (th) => { const a = Math.abs(th); return a < 0.5 ? 0.95 : a > 1.45 ? -0.15 : 0.95 - 1.1 * ((a - 0.5) / 0.95); };
+      for (let i = 0; i <= NT; i++) {
+        const th = -Math.PI + (i / NT) * 2 * Math.PI, pm = phMin(th); let last = null;
+        for (let j = 0; j <= NP; j++) { const ph = 1.5 + (pm - 1.5) * (j / NP); const q = pt(th, ph, 0.008 + 0.004 * Math.sin(Math.PI * j / NP)); last = q.p; pos.push(q.p.x, q.p.y, q.p.z); }
+        const hang = Math.abs(th) > 1.3, hk = Math.min(1, (Math.abs(th) - 1.3) / 0.8);
+        for (let k = 1; k <= EXT; k++) { if (hang) { const q = pt(th, pm, 0.008 + 0.011 * k * (0.5 + 0.5 * hk)); pos.push(q.p.x, q.p.y - 0.04 * k * (0.55 + 0.45 * hk), q.p.z); } else pos.push(last.x, last.y, last.z); }
+      }
+      for (let i = 0; i < NT; i++) for (let j = 0; j < R - 1; j++) { const a = i * R + j, b = (i + 1) * R + j; idx.push(a, b, b + 1, a, b + 1, a + 1); }
+      const G = new THREE.BufferGeometry(); G.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); G.setIndex(idx); G.computeVertexNormals(); disp.push(G);
+      g.add(new THREE.Mesh(G, toon(e.c, { side: THREE.DoubleSide })));
+      const n = 40, A = { P: [], N: [] }; for (let i = 0; i <= n; i++) { const th = (i / n - 0.5) * 2 * 1.45, q = pt(th, phMin(th), 0.013); A.P.push(q.p); A.N.push(q.d); }
+      const band = strip(A, 0.0075, 0, 0.0008); g.add(new THREE.Mesh(band, toon(e.c2, { side: THREE.DoubleSide }))); disp.push(band);
     }
     function feather(e) {
       const s = surf(e.v * 0.8, 0.5, -0.4, 0.0);

@@ -72,6 +72,7 @@ window.Hunters2 = (() => {
       fo.absRec = rec; fo.hunter2 = id; fo.maxHp = fo.hp = Math.round(window.FoeAbs && FoeAbs.on ? HP0 * FoeAbs.hpK(rec) * (d.aff.length ? 1.3 : 1) : HP0 + L * 14);
       fo.iq = 1.25; fo.tier = 0.95; fo.brave = true; fo.seen = true; fo.state = 'chase'; fo.cd = 1 + Math.random(); fo.dmgMul = (fo.dmgMul || 1) * 1.15; fo.spdMul = (fo.spdMul || 1) * 1.08; fo.skPool = d.sk.length ? d.sk : null; fo.skCd = 1.5;
       if (W.foes && !W.foes.includes(fo)) W.foes.push(fo); else if (!W.foes) W.foes = [fo];
+      T.m = 0; T.armedAt = 0; // R43：猎手一到场，感应条就清零（以前要等她死/逃/撤退才归零，条一直满着）
       T.fo = fo; T.id = id; T.spawnAt = performance.now(); T.fleeAt = 0; T.sayT = 2; SS().L[id].meet++;
       setTimeout(() => say(fo, d.lines[0]), 900);
     } catch (e) { console.warn('Hunters2 spawn', e); }
@@ -101,7 +102,7 @@ window.Hunters2 = (() => {
     const node = W.graph.nodes[W.cur], quiet = !node || node.home || node.huntArena || node.eliteArena || (W.boss && !W.boss.dead) || W.busy || W.dead;
     const mins = (now - (T.t0 || (T.t0 = now))) / 60000;
     if (!T.fo && !quiet && now > T.cool) T.m += dt * (0.25 + mins * 0.06) * (window.Gear2 ? Gear2.senseMul() : 1); // 每分钟约 15%，停得越久涨得越快
-    T.m = Math.min(100, T.m);
+    T.m = Math.min(100, T.m); T.quiet = !!quiet;
     const al = alive();
     if (!T.fo && !quiet && T.m >= 100 && al.length && now > T.cool) {
       if (!T.armedAt) T.armedAt = now;
@@ -143,9 +144,10 @@ window.Hunters2 = (() => {
     if (hud) return hud;
     const s = document.createElement('style'); s.textContent = `
 #h2Hud{position:fixed;inset:0;pointer-events:none;z-index:34;display:none}
-#h2Sense{position:absolute;left:14px;top:196px;width:210px;font-size:11.5px;color:#e8d0c8;text-shadow:0 1px 3px #000;letter-spacing:1px}
-#h2Sense .b{height:5px;margin-top:3px;background:#0009;border-radius:3px;overflow:hidden}#h2Sense i{display:block;height:100%;width:0;background:linear-gradient(90deg,#6a3a8a,#ff4a6a);transition:width .3s}
-#h2Sense.full i{animation:h2p .8s infinite}@keyframes h2p{50%{opacity:.5}}#h2Sense small{opacity:.75}
+#h2Sense{position:absolute;left:50%;top:88px;transform:translateX(-50%);width:min(460px,62vw);font-size:16px;font-weight:800;color:#fff0e8;text-shadow:0 1px 4px #000,0 0 10px #000a;letter-spacing:1.5px;text-align:center;padding:8px 16px 6px;background:radial-gradient(ellipse at center,#1a0a10d8 50%,#1a0a1000 100%)}
+#h2Sense.off{display:none}#h2Sense.full{color:#ff9aa8;animation:h2g 1s ease-in-out infinite}@keyframes h2g{50%{text-shadow:0 0 18px #ff2050,0 1px 4px #000}}
+#h2Sense .b{height:13px;margin-top:5px;background:#000a;border:1px solid #ffffff55;border-radius:7px;overflow:hidden}#h2Sense i{display:block;height:100%;width:0;background:linear-gradient(90deg,#6a3a8a,#ff4a6a);transition:width .3s}
+#h2Sense.full i{animation:h2p .8s infinite}@keyframes h2p{50%{opacity:.5}}#h2Sense small{display:block;margin-top:3px;font-size:12.5px;font-weight:600;opacity:.85}
 #h2Bar{position:absolute;top:58px;left:50%;transform:translateX(-50%);width:min(520px,70vw);display:none;text-align:center;text-shadow:0 1px 4px #000;color:#fff}
 #h2Bar .n{font-size:16px;font-weight:800;letter-spacing:2px}#h2Bar .t{font-size:11.5px;opacity:.85}
 #h2Bar .hp{height:9px;background:#0009;border:1px solid #fff4;border-radius:5px;overflow:hidden;margin:4px 0 2px}#h2Bar .hp i{display:block;height:100%;background:linear-gradient(90deg,#c02040,#ff7090);transition:width .15s}
@@ -162,7 +164,8 @@ window.Hunters2 = (() => {
     const h = hud, s = SS(), al = alive().length;
     if (!al) { h.sense.innerHTML = '🏹 四名猎手已全部斩杀'; h.bar.style.display = 'none'; return; }
     const full = T.m >= 100;
-    h.sense.className = full ? 'full' : ''; h.sense.innerHTML = `🏹 猎手感应 ${Math.floor(T.m)}%${full ? ' <b style="color:#ff7090">· 随时会来</b>' : ''}<div class="b"><i style="width:${T.m}%"></i></div><small>仇恨 ${Math.floor(s.hate)} · 再 ${Math.ceil(HATE_STEP - s.hate % HATE_STEP)} 点全员升级 · U 查看猎手</small>`;
+    h.sense.className = (full ? 'full' : '') + (T.fo || T.quiet ? ' off' : ''); // R43：猎手在场 / 首领战 / 擂台 / 洞口时隐藏，不和顶部血条重叠
+ h.sense.innerHTML = `🏹 猎手感应 ${Math.floor(T.m)}%${full ? ' <b style="color:#ff7090">· 随时会来</b>' : ''}<div class="b"><i style="width:${T.m}%"></i></div><small>仇恨 ${Math.floor(s.hate)} · 再 ${Math.ceil(HATE_STEP - s.hate % HATE_STEP)} 点全员升级 · U 查看猎手</small>`;
     const fo = T.fo;
     if (fo && !fo.dead) {
       const d = BY[T.id], L = lvOf(T.id), o = odds(T.id), fl = T.fleeAt ? Math.max(0, FLEE_T - (now - T.fleeAt) / 1000) : 0;

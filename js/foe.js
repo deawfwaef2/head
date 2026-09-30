@@ -282,8 +282,9 @@ window.Foe = (() => {
     const out = [], used = new Set(), mx = +(location.search.match(/[?&]foemax=(\d+)/) || [])[1]; if (mx) list = list.slice(-mx);
     for (const it of list) {
       const r = mulberry32(((it.h.look.seed || 7) * 2654435761) >>> 0);
+      if (window.IdLook) { try { IdLook.apply(it.h); } catch (e) { console.warn('IdLook', e); } } // R43：身份决定发色/头饰
       const bodyName = bodyFor(it.h, r, it.boss && it.bossK, used); used.add(bodyName);
-      let f; try { f = await build(bodyName, it.h.look); await animate(f); } catch (e) { console.warn('foe body', bodyName, e); continue; }
+      let f; try { f = await build(bodyName, it.h.look); await animate(f); if (window.IdLook && !it.boss) IdLook.dress(f, it.h.c.id, it.h.look.seed); } catch (e) { console.warn('foe body', bodyName, e); continue; }
       const c = it.h.c, rar = c.rar, id = c.id;
       const fo = { h: it.h, f, pos: f.root.position, yaw: r() * 6.28, rar, id, hp: 0, maxHp: 0, state: 'idle', t: 0, cd: 1 + r() * 2, sayT: 0, seen: false,
         brave: !!it.boss || !!ARMED[id] || r() < 0.2 + rar * 0.1, boss: it.boss || null, bossK: it.bossK, dead: false, decap: false, rag: null, stag: 0, atk: null, block: 0, iq: 0.4 + rar * 0.15 + (it.boss ? 0.4 : 0),

@@ -1716,3 +1716,11 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - js/mods_i18n.js：加 char_unify 英/日译文。
 - tools/test/world.html：载入 mods.js（`?mods=id:0,id:1` 覆盖）、master/worldmaster/wterrain 后处理（`?post=0` 关）、`view:'face'` 特写（`sun:'back'|'front'|'side'`、`se` 仰角、`si` 太阳倍率、`cd` 距离），info 里带灯光清单。
 - 验证截图（逆光/强逆光/暗场景，开关对比）：关=脸泥棕+红交界；开=脸干净、衣服有体积、轮廓有逆光边；暗场景开 MOD 不比环境亮。
+
+## R47b（第四十三轮续：身份外观 / 猎手条 / 顶部醒目）
+用户：“你那些也不符合人设，应该去找合适的衣服-头发-饰品；猎手条满了过了之后不应该到 0 么；UI 藏在角落太不显眼。”
+- **新文件 `js/idlook.js`（MOD `id_look`，默认开）**：`IdLook.apply(h)`（在 `Foe.populate` 里、build 之前调用，改 `h.look`，头被砍下后是同一个 look）按身份 `c.id` 重配发色（`S` 表）、`look.acc`（公主 tiara / 女王 crown / 女巫 witchhat / 圣职 circlet，去掉不合身份的王冠等）、`look.hw` 头饰、发型 `hx`，并清掉 `look.ax`（跨头饰品）；`IdLook.dress(f,id)` 在身体 build 后给材质名以 `_CLOTH` 结尾的衣服/鞋做“按亮度重新着色”（克隆材质 + onBeforeCompile 注入 map_fragment 后：`mix(lum,c,keep)*tint`），修女黑修道服、骑士钢灰、游侠森林绿、女王深红等。**局限：Vita 的短裙/丝袜烘在皮肤贴图里，染不了**。霸主不着色。
+- **`headwear.js` 新增 `veil`（头纱）**：罩头顶/后脑，前面留脸，两侧背后垂到肩，前缘白头巾边；nun/abbess/novice 必带。
+- **CC0 调研结论**：ToxSam open-source-avatars（100Avatars 等）是 CC0 VRM，但全是梗图/卡通风（玉米、土豆……），不适合；CC0 的成年女性带幻想服饰的 VRoid 身体已经用完（Vivi 偏幼、Sendagaya 是学生制服已排除）。想要骑士甲/法袍等真实服装，只能关 `cc0_only`（IDENT 表本来就按原神身体设计）或再找新的 CC0 身体。
+- **猎手感应条（`hunters2.js`）**：① 猎手穿越到场的瞬间 `T.m=0`（以前要等她死/逃/撤退才归零，所以条一直满着）；② 条移到顶部居中（top:88px，宽 460px，16px 粗体，13px 高的条，满时红色脉冲），猎手在场/首领战/擂台/洞口时隐藏，避免和顶部血条重叠。
+- 测试台：`tools/test/heads_fit.html` 加了 `idlook.js`。
