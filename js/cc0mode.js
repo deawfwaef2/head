@@ -5,7 +5,7 @@
 // 身体：foe.js build() 入口用 CC0.body(name, seed) 把非 CC0 身体换成 CC0 身体。
 // 动作（Quaternius UAL）、野兽/道具（Quaternius）、场景（Poly Haven）本来就是 CC0，不受影响。
 window.CC0 = (() => {
-  const HEADS = ['Sendagaya_Shino', 'Sendagaya_Shibu', 'Darkness_Shibu', 'Vivi', 'Vita', 'Victoria_Rubin', 'HairSample_Female', 'AvatarSample_D_Darkness', 'Base_Female'];
+  const HEADS = ['Sendagaya_Shino', 'Sendagaya_Shibu', 'Darkness_Shibu', 'Vivi', 'Vita', 'Victoria_Rubin', 'HairSample_Female', 'AvatarSample_D_Darkness', 'Base_Female', 'Sakurada_Fumiriya', 'HairSample_Male']; // R40：+2 个 pixiv CC0 男性头（身体未接入，见 HANDOFF R40）
   const BODIES = ['Vita', 'Victoria_Rubin', 'Darkness_Shibu', 'HairSample_Female'];
   const HS = new Set(HEADS), BS = new Set(BODIES);
   const on = () => { try { return !window.Mods || !Mods.on || Mods.on('cc0_only') !== false; } catch (e) { return true; } };

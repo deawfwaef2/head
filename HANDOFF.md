@@ -1501,3 +1501,15 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 补翻译：游戏里按 F12 输入 `I18N.dump()` 会列出运行中遇到但没翻译的中文句子（按出现次数排序），往 `d_*.py` 里补再 build 即可。**未覆盖**：剧情/书籍/神灵台词/霸主台词/地点事件/MOD 说明等长文本（约 4000+ 句），仍显示中文；动态拼接的句子要么加 `{#0}` 句型，要么在源码里改成整句一个文本节点。
 - 测试台：`tools/test/i18n.html`（index 的静态外壳 + i18n）；天赋面板/武器面板可在 `tools/test/talents.html` 里注入 i18n 脚本查看。
 **宣传图**：`tools/promo/make.py` 生成 `promo/{zh,ja,en}/01_key…06_spirits.png`（1920×1080，各 6 张：主视觉/世界观/玩法循环/战斗/成长/神灵）。素材全部来自仓库真实资源（`js/spirit_art.js` Q 版神灵、`js/regionart.js` CC0 场景、`tools/promo/cap/wpn_*.png` 是游戏内「武器详细属性」面板的真实截图，由翻译引擎输出），无性化角色图。沙盒里整个游戏无法启动，所以没有整局实机截图；天赋树界面截图因沙盒缺 emoji 字体（图标会变豆腐块）没有采用。
+
+## R40（主管）：大规模收 CC0 VRoid 素材——调研 + 首批 2 头
+用户：“VRoid 模型最好看”，要大量高质量 CC0 VRoid（发型、脸、贴图、饰品，各种各样）。
+- **新增头**：`models/Sakurada_Fumiriya.js`、`models/HairSample_Male.js`（pixiv 官方 CC0，vrm2head→glbsimp→glbpack，共约 2.2MB）。已进 `js/cc0mode.js` HEADS、`index.html`（Vivi.js 之后，常驻加载）、`js/lore.js` HAIRSTYLE。二者是男性脸；混搭（head_collage）换发后偏中性，已渲染核对（lookgrid seed 3）。
+- **身体未接入**：两者原装身体已能用 `tools/vrm2body.py` 转出（~2–2.6MB），但全游戏文本/身份（VB 表、“她”60+ 处）都是女性，男身体会对不上 → 暂不提交。要接需先做代词/身份的性别化。
+- **hair_cover.js** 没有新头的评分（coverScore 返回 0 = 视为盖得住），以后可重跑离线评分。
+- **来源调研结论**：
+  - pixiv 官方 CC0 已全部收完（Sendagaya 系、Vivi/Vita/Victoria/Darkness_Shibu、HairSample F/M、Base、Sakurada）。AvatarSample_A/B/C、K/L/S 不是 CC0。
+  - OpenSourceAvatars（ToxSam，4000+ CC0）全是 NFT/低多边形卡通，没有 VRoid 动漫风，不收。
+  - webaverse/avatar-models：除 pixiv 那几个外均为 VRoid Hub 条款（多数禁止再分发），不收。
+  - **VRoid Hub 公开搜索 API**（`https://hub.vroid.com/api/search/character_models?keyword=CC0&count=100`，头 `X-Api-Version: 11`）可列出模型+许可字段：找到 160 个“标 CC0 且许可全开”的模型，人工筛出 25 个成年外观高品质的 → `tools/r40_vroidhub_cc0.md`（带链接）。**下载需要 pixiv 登录**，沙箱拿不到；`optimized_preview` 是受保护的预览文件，不要绕过。用户下载 .vrm 后按该文件里的命令一条条转换即可。
+- 新工具：`tools/vrmmeta.py`（按 URL 读 VRM 内嵌许可，只下载头部 JSON）。

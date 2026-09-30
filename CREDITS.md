@@ -125,3 +125,9 @@ models/CLS_*.js，由 js/headpacks.js 按 MOD pack_voc / pack_touhou / pack_cls 
 - 东方 Project（上海アリス幻樂団 二次创作）：藤原妹紅、蓬莱山輝夜、八雲藍 Ver1.00B、八雲紫 Ver1.011A。
 - 其他：Tda 式レム（Re:ゼロ）、トール（小林さんちのメイドラゴン）、2B（NieR:Automata）、ミカサ（進撃の巨人）、江ノ島盾子（ダンガンロンパ）、大梵天（深空之眼）、YYB 式秦始皇、LoveLive! μ's 六人（穂乃果・絵里・ことり・海未・真姫・希）。
 - 来源：takahirox/mmd-viewer-js、bear0830/mmd、若干 babylon-mmd 示例仓库中附带的模型；原作者见各模型 readme。转换脚本 tools/pmx2vrm.py + tools/vrm2head.py（只取头部）。
+
+## R40：新增 pixiv CC0 头
+| 文件 | 名称 | 作者 / 许可 | 备注 |
+|---|---|---|---|
+| `models/Sakurada_Fumiriya.js` | Sakurada Fumiriya（櫻田文里弥） | pixiv Inc.，CC0（VRM 内嵌 licenseName=CC0；源 madjin/vrm-samples vroid/beta） | 可公开分发 |
+| `models/HairSample_Male.js` | HairSample_Male | pixiv Inc.，CC0（pixiv 官方 FAQ 列为 CC0；源同上） | 可公开分发 |
