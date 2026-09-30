@@ -110,7 +110,7 @@ body.arr2 #rqCard{display:none!important}
   function threatHTML(k) {
     const S = G.S, B = window.Explore && Explore.BOSSES[k], won = (S.bosses || {})[k], RQ = window.RegionQuest, D = RQ && RQ.DATA && RQ.DATA[k];
     const minis = D ? D.minis.filter(m => !(S.rq && S.rq.minis && S.rq.minis[m.n])) : [];
-    let hu = ''; if (window.Hunters2 && Hunters2.on() && Hunters2.alive().length) { const al = Hunters2.alive(), top = al.map(id => [id, Hunters2.lvOf(id)]).sort((a, b) => b[1] - a[1])[0], d = Hunters2.BY[top[0]], o = Hunters2.odds(top[0]); hu = `<div>🏹 猎手 <b>${al.length}</b> 名仍在追踪你 · 最强 <b style="color:${d.col}">${esc(d.n)} Lv.${top[1]}</b>（胜率约 <span class="${o.p < 0.4 ? 'bad' : 'ok'}">${Math.round(o.p * 100)}%</span>）</div>`; }
+    let hu = ''; if (window.Hunters2 && Hunters2.on() && Hunters2.alive().length) { const al = Hunters2.alive().map(d => d.id), top = al.map(id => [id, Hunters2.lvOf(id)]).sort((a, b) => b[1] - a[1])[0], d = Hunters2.BY[top[0]], o = Hunters2.odds(top[0]); hu = `<div>🏹 猎手 <b>${al.length}</b> 名仍在追踪你 · 最强 <b style="color:${d.col}">${esc(d.n)} Lv.${top[1]}</b>（胜率约 <span class="${o.p < 0.4 ? 'bad' : 'ok'}">${Math.round(o.p * 100)}%</span>）</div>`; }
     const el = window.Elites && Elites.on() ? Elites.ALL.filter(d => d.loc === k && !Elites.SS().dead[d.id] && Elites.unlocked(d)) : [];
     return `<div class="ar-th">${B ? `<div>👑 霸主 <b>${esc(B.title)}·${esc(B.n)}</b> ${won ? '<span class="ok">✓ 已被你斩杀</span>' : '<span class="bad">· 在最深处</span>'}</div>` : ''}
 ${minis.length ? `<div>⚔️ 小BOSS：${minis.map(m => `<b>${esc(m.title)}·${esc(m.n)}</b>`).join('、')}</div>` : ''}${hu}
@@ -121,7 +121,7 @@ ${el.length ? `<div>👑 可挑战的精英：${el.map(d => `<b style="color:${d
     const [dn, dc] = q < 0.45 ? ['必死无疑', '#ff2020'] : q < 0.7 ? ['九死一生', '#ff5a3a'] : q < 0.95 ? ['危险', '#ffa030'] : q < 1.4 ? ['势均力敌', '#ffe060'] : q < 2.2 ? ['轻松', '#8fe080'] : ['屠宰场', '#60d0ff'];
     const RT = window.RegionQuest && RegionQuest.T, main = RT && RT.q ? `<div class="ar-it" style="--qc:#e7c27a"><div class="k">主 线</div><div class="n">📜 ${esc(RegionQuest.mText(RT.q))}</div><div class="w">${esc(D ? D.why : '')}</div><div class="r">奖励 🔮${RT.q.coin}${(RT.q.mats || []).length ? ' + 地区材料' : ''}</div></div>` : '';
     const side = T.side.map(x => `<div class="ar-it" style="--qc:#9ab0c8"><div class="k">支 线</div><div class="n">${esc(SQ[x.t].n(x.q))}</div><div class="w">${esc(SQ[x.t].why)}</div><div class="r">奖励 🔮${x.coin}${x.gear ? ' + 一件饰品' : ''}</div></div>`).join('');
-    const paras = [['', X.scene + (D && D.arrive ? '　' + D.arrive : '')], ['lo', X.lore], ['you', youLine(k)], ['ru', '「' + X.rumors[Math.floor(Math.random() * X.rumors.length)] + '」']];
+    const paras = [['', X.scene], ['lo', X.lore], ['you', youLine(k)], ['ru', '「' + X.rumors[Math.floor(Math.random() * X.rumors.length)] + '」']];
     return { h: `<div class="ar-hero" style="--lc:${L.color || '#e7c27a'};${img ? `background-image:url(${img})` : `background:${L.color}`}"><div class="ar-hx"><div class="ar-tag">${esc(D ? D.tag : '')}</div><div class="ar-nm">${L.icon || ''} ${esc(L.n)}</div>
 <div class="ar-chips"><span class="ar-chip" style="color:${dc}">${dn}</span><span class="ar-chip" style="color:#e8dcc8">推荐战力 ${L.rec} · 你 ${st.power}</span><span class="ar-chip" style="color:#c8b8e0">第 ${SS().v[k] || 1} 次踏入</span></div></div></div>
 <div class="ar-body"><div class="ar-st"><h5>抵 达</h5><div id="arText"></div></div><div class="ar-q"><h5>任 务</h5>${main}${side}<h5 style="margin-top:16px">威 胁</h5>${threatHTML(k)}</div></div>

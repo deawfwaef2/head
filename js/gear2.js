@@ -141,7 +141,7 @@ window.Gear2 = (() => {
   let lk = null, rgAcc = 0;
   setInterval(() => {
     try {
-      hook(); if (!on() || !window.G || !G.S) return; if (!SS().hint && G.toast && document.getElementById('menu') && document.getElementById('menu').classList.contains('hidden')) { SS().hint = 1; setTimeout(() => G.toast('🆕 Z 装备（传奇式饰品） · C 精英挑战 / 胜利进度 · U 食人魔猎手档案', '#ffd890', 6), 2500); } const W = window.Worlds && Worlds.active && Worlds._W; if (!W) { lk = null; return; }
+      hook(); if (!on() || !window.G || !G.S) return; if (!SS().hint && G.toast && document.getElementById('menu') && document.getElementById('menu').classList.contains('hidden')) { SS().hint = 1; setTimeout(() => G.toast('Z 装备 · C 精英 · U 猎手', '#ffd890', 4), 2500); } const W = window.Worlds && Worlds.active && Worlds._W; if (!W) { lk = null; return; }
       const a = sum(), st = G.st(); if (W.dead) return;
       if (a.regen && G.S.hp < st.maxHp && G.S.hp > 0) { rgAcc += a.regen * 0.25; if (rgAcc >= 1) { const n = Math.floor(rgAcc); rgAcc -= n; G.S.hp = Math.min(st.maxHp, G.S.hp + n); } }
       const k = (W.stats && W.stats.kill) || 0; if (lk == null) lk = k;
@@ -188,7 +188,7 @@ window.Gear2 = (() => {
 .g2note{margin-top:10px;font-size:12px;color:var(--u-dim,#a8977c);line-height:1.65}
 #g2Tip{position:fixed;z-index:90;pointer-events:none;display:none;max-width:300px;padding:10px 13px;font-size:12.5px;line-height:1.6;color:#e8dcc0;background:linear-gradient(180deg,rgba(28,19,22,.98),rgba(10,7,9,.98));box-shadow:0 0 0 1px var(--tc,rgba(231,194,122,.5)),0 0 0 4px rgba(0,0,0,.8),0 10px 30px #000}
 #g2Tip .tn{font-family:var(--u-serif,serif);font-size:16px;font-weight:900}
-@media (max-width:980px){.g2w{grid-template-columns:1fr}}`;
+@media (max-width:760px){.g2w{grid-template-columns:1fr}}`;
     document.head.appendChild(s);
   }
   const OLD = [['helm', '头盔'], ['weapon', '武器'], ['armor', '护甲'], ['charm', '护符'], ['bag', '背篓']];

@@ -1403,3 +1403,4 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **按键占用**：T 天赋面板，数字键 1-0 / Shift+1-0 快捷栏，Q 闪身，E 处决（旧），H 药水，R/G 旧技能映射。不与 C/U/Z（R35UI）、B/Tab/I/K、M、N、Y、O、J 冲突；`W` 不在 3D 探索里时（旧文字出猎/洞穴菜单）Talents 不拦截按键。
 - **坑**：worlds.js / foe.js 很多是一行长语句，**不要在行中间插 `//` 注释**（我第一次就把 Recall/CombatFX 调用注释掉了，已修，见 R36-talent fix）。
 - **测试**：`tools/test/talents.html`（假 G/Worlds/Foe 的 UI+引擎台，`VW=1600 VH=900 drive.py` 截图各页）；`tools/test/fight.html` 已加载 foe_abs + talents_data + talents，可用真 `foe.js` 逐个施放 31 个技能（需自己塞 `Worlds._W`/`G.HOOK`/`G.st=()=>RPG.stats(G.S,{})`，见本轮提交记录）。`drive.py` 支持 `VW/VH` 环境变量。完整 index.html 在 2GB 沙箱里跑不起来，**未做整包实机测试**，要看用户反馈（尤其 #wStat/#wHint 位置、`.wskills` 旧条已在 tbon 下隐藏）。
+- R35b 验证（真实游戏，960×540 无头）：C/U/Z 页签切换、Esc 关闭；出洞狩猎界面的地区精英栏和徽标；雾溪村出猎时到达大窗口正常弹出，逐字打字、空格跳过/进入，#arTrack 支线追踪和 #h2Sense 叠放正确。图标 🐦‍⬛ / 𓂀 显示不出来，已换成 🩺 / 🏺。
