@@ -1,2 +1,6 @@
 Beast models: Quaternius "Ultimate Animated Animals" (CC0 1.0), https://quaternius.com/packs/ultimateanimatedanimals.html
 Converted to GLB with unused animations stripped (Wolf, Fox, Bull, Stag).
+
+R41 regional monsters (beasts/m_*.js): Quaternius "Ultimate Monsters" (CC0 1.0), https://quaternius.com/packs/ultimatemonsters.html
+(poly.pizza bundle 5oyGWAmOB6; glTF copies from github.com/mika314/KitchenSink "Assets/Ultimate Monsters").
+Converted with tools/beast_pack.py: embedded glTF -> GLB, unused animations and buffer views stripped, geometry unchanged.

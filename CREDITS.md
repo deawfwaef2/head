@@ -92,6 +92,7 @@
 - Osage（おさげちゃん_mate2，浴衣）：Iwashi（https://twitter.com/ishiand151）· VRoid Hub 许可：everyone / 改造 allow / 再分发 allow / 暴力 allow / 法人商用 allow / 署名不要。源文件取自 github.com/josephrocca/ChatVRM-js/avatars。
 - AvatarSample_A：pixiv VRoid 官方样例（VRoid Studio sample, 许可见 VRM 元数据）。
 - 动作：Quaternius — Universal Animation Library 1 & 2（CC0）。
+- 地区野怪（R41）：Quaternius — Ultimate Monsters（CC0 1.0），beasts/m_*.js，经 tools/beast_pack.py 精简（只删未用动画，几何不变）。
 - 武器：Poly Haven（CC0）。
 
 ## 断面 PBR 贴图（head_repair MOD）

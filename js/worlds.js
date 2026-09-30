@@ -388,12 +388,22 @@ window.Worlds = (() => {
     if (LP) WLayout.paths(LP, doorList);
     let Rmin = R; if (LP) for (let i = 0; i < 24; i++) Rmin = Math.min(Rmin, Rf(i / 24 * Math.PI * 2));
     const LY = layPlan(node, Rmin, doorList); // 第十八轮（总管理师）：布局原型，与 wlayout 叠加；用不规则边界的最小半径
-    const flat = (x, z) => { let f = 1; for (const d of doorList) f = Math.min(f, sstep(2.5, 6, Math.hypot(x - d.x, z - d.z))); return f; };
+    // R41：门口视线走廊——进门后朝里 ~12m、宽 ~4m 的带子里压平起伏（以前土丘/土墩常正好挡在门口，一进门只看见一面土坡）
+    const corL = Math.min(13, Rmin * 0.55), corOn = !(window.Mods && Mods.on && Mods.on('wfix41') === false);
+    const flat = (x, z) => { let f = 1; for (const d of doorList) { f = Math.min(f, sstep(2.5, 6, Math.hypot(x - d.x, z - d.z)));
+      if (corOn) { const ux = -Math.cos(d.a), uz = -Math.sin(d.a), px = x - d.x, pz = z - d.z, t = px * ux + pz * uz; if (t > -2 && t < corL) { const perp = Math.abs(px * uz - pz * ux), w = 2.2 + t * 0.22; f = Math.min(f, Math.max(sstep(w, w + 4, perp), sstep(corL * 0.5, corL, t))); } } }
+      return f; };
     const H0 = (x, z) => { const rr = Math.hypot(x, z), ang = Math.atan2(z, x);
       const fl = flat(x, z), inner = (nz(x * 0.06 + 50, z * 0.06 + 50) - 0.5) * 1.6 * (LP ? LP.relief : 1) * fl * sstep(0, 5, rr) + (LP ? WLayout.dH(LP, x, z, fl) : 0), Ra = LP ? Rf(ang) : R;
       const rim = st.hill * sstep(Ra + 0.5, Ra + 16, rr) * (0.55 + 0.9 * nz(Math.cos(ang) * 3 + 9, Math.sin(ang) * 3 + 9)) + st.hill * 1.2 * sstep(Ra + 20, Ra + 60, rr);
       return inner + rim + (LY.dh ? LY.dh(x, z) : 0); };
     let H = H0; if (g) { WGen.prepare(st, node, { R, Rmin, nz, doorList, LY, H0 }); H = (x, z) => g.h(x, z, H0(x, z), flat(x, z)); }
+    if (corOn && node.lay !== 'ravine') { // R41：视线锥——从每道门朝中心看，地形高度软限制在一条缓升的视线下面（土丘被压成垭口，而不是整座挡在眼前）
+      const Hr = H, sight = doorList.map(d => ({ x: d.x, z: d.z, ux: -Math.cos(d.a), uz: -Math.sin(d.a), L: Math.hypot(d.x, d.z) + 4, h0: Hr(d.x, d.z) }));
+      H = (x, z) => { let h = Hr(x, z); for (const s of sight) { const px = x - s.x, pz = z - s.z, t = px * s.ux + pz * s.uz; if (t < 3 || t > s.L) continue;
+        const w = (1 - sstep(2.5 + t * 0.28, 6.5 + t * 0.4, Math.abs(px * s.uz - pz * s.ux))) * (1 - sstep(s.L - 6, s.L, t)); if (w <= 0) continue;
+        const lim = s.h0 + 0.35 + t * 0.045; if (h > lim) h -= (h - lim) * 0.8 * w; } return h; };
+    }
     // 地形
     const ext = RM + 70, seg = Math.min(220, Math.round(ext * 2 / 1.1));
     const tg = new THREE.PlaneGeometry(ext * 2, ext * 2, seg, seg); tg.rotateX(-Math.PI / 2);
@@ -405,11 +415,13 @@ window.Worlds = (() => {
     const terr = new THREE.Mesh(tg, gm); terr.receiveShadow = true; sc.add(terr);
     // 天空（与 PMREM 同一套等距柱状映射）
     if (sky) {
-      const sm = new THREE.ShaderMaterial({ uniforms: { map: { value: sky.bg }, k: { value: g ? g.skyK * Math.pow(g.sunK, 0.5) : (st.night ? 0.9 : 1.1) }, tint: { value: g ? g.skyTint : new THREE.Color(1, 1, 1) } }, depthWrite: false, side: THREE.BackSide, fog: false,
+      const sm = new THREE.ShaderMaterial({ uniforms: { map: { value: sky.bg }, k: { value: g ? g.skyK * Math.pow(g.sunK, 0.5) : (st.night ? 0.9 : 1.1) }, tint: { value: g ? g.skyTint : new THREE.Color(1, 1, 1) }, fogC: { value: new THREE.Color(0, 0, 0) }, hz: { value: 0 } }, depthWrite: false, side: THREE.BackSide, fog: false,
         vertexShader: 'varying vec3 vD; void main(){ vD = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }',
-        fragmentShader: 'uniform sampler2D map; uniform float k; uniform vec3 tint; varying vec3 vD; void main(){ vec3 d = normalize(vD); vec2 uv = vec2(atan(d.z, d.x) * 0.1591549 + 0.5, asin(clamp(d.y, -1.0, 1.0)) * 0.3183099 + 0.5); gl_FragColor = vec4(texture2D(map, uv).rgb * k * tint, 1.0); }' });
+        fragmentShader: 'uniform sampler2D map; uniform float k; uniform vec3 tint; uniform vec3 fogC; uniform float hz; varying vec3 vD; void main(){ vec3 d = normalize(vD); vec2 uv = vec2(atan(d.z, d.x) * 0.1591549 + 0.5, asin(clamp(d.y, -1.0, 1.0)) * 0.3183099 + 0.5); vec3 c = texture2D(map, uv).rgb * k * tint; if (hz > 0.0) { vec3 f = linearToOutputTexel(vec4(toneMapping(fogC), 1.0)).rgb; c = mix(c, f, (1.0 - smoothstep(-0.02, hz, d.y)) * 0.92); } gl_FragColor = vec4(c, 1.0); }' });
+      // R41：地平线雾带——天空下缘渐变到（经色调映射的）雾色，远处被雾吃掉的地形边缘与天空照片接起来，不再是一圈“纸板墙”，也盖住 HDRI 里拍到的地面景物
       const skyM = new THREE.Mesh(new THREE.SphereGeometry(300, 48, 24), sm); skyM.frustumCulled = false; skyM.renderOrder = -10; if (g) skyM.rotation.y = g.yaw; skyM.userData.sky = 1; sc.add(skyM); sc.userData.skyM = skyM;
       sc.environment = sky.env; if (window.FaceFill && FaceFill.env) FaceFill.env(sky.amb); sc.fog = g ? new THREE.FogExp2(sky.horizon.clone().multiplyScalar(st.night ? 0.6 : 0.78).multiply(g.fogMul), Math.max(0.006, Math.min(st.fog * (R > 30 ? 0.7 : 1) * (LP ? LP.fog : 1) * g.fk, (st.night ? 1.5 : 1.15) / (R + 14)))) : new THREE.FogExp2(sky.horizon.clone().multiplyScalar(st.night ? 0.6 : 0.78), Math.min(st.fog * (R > 30 ? 0.7 : 1) * (LP ? LP.fog : 1), Math.max(st.fog, 0.032)));
+      if (!(window.Mods && Mods.on && Mods.on('wfix41') === false)) { sm.uniforms.fogC.value = sc.fog.color; sm.uniforms.hz.value = st.night ? 0.07 : 0.1 + Math.min(0.08, sc.fog.density * 3); }
     } else { sc.fog = new THREE.FogExp2('#8899aa', 0.02); }
     // 光：太阳（从 HDRI 最亮方向）+ 半球补光
     let el = sky ? (0.5 - sky.sun[1]) * Math.PI : 0.8, az = sky ? (sky.sun[0] - 0.5) * Math.PI * 2 : 0.5; if (el < 0.35) el = 0.35 + (st.night ? 0.5 : 0); if (g) az -= g.yaw;
@@ -717,8 +729,9 @@ window.Worlds = (() => {
     if (node.stone && w.stone !== node.i) { const first = w.stone !== node.i; w.stone = node.i; if (first && !node.home) setTimeout(() => G.toast && G.toast(`🌀 点亮了魂门「${node.name}」——下次出猎从这里出发，也可从这里回洞`, '#9fd0ff', 5), 900); }
     try { G.save && G.save(); } catch (e) {}
   }
-  function stylesOf(i) { const lk = layOf(W.graph.nodes[i]), ln = LAYOUTS[lk] ? LAYOUTS[lk].need : []; return stylesOf0(i).concat(ln).filter((n, k, a) => a.indexOf(n) === k); }
-  function stylesOf0(i) { if (LITE) { const st0 = styleOf(W.graph.nodes[i]); return ['sky_' + st0.sky, 'tex_' + st0.ground]; } const st = styleOf(W.graph.nodes[i]); if (st.g) return WGen.assets(st, W.graph.nodes[i]); const names = ['sky_' + st.sky, 'tex_' + st.ground]; st.props.forEach(p => p[0].forEach(n => names.push(n.replace('#*', '')))); if (st.edge) st.edge[0].forEach(n => { names.push(n.replace('#*', '')); if (LO[n]) names.push(n + '_lo'); }); ['namaqualand_boulder_03', 'namaqualand_boulder_04', 'rock_09', 'horse_statue_01', 'gothic_statue', 'wooden_barrels_01', 'Barrel_02', 'wooden_military_crate', 'dead_tree_trunk', 'dead_tree_trunk_02', 'dead_quiver_trunk'].forEach(n => names.push(n)); return names.filter(n => n !== 'brazier'); }
+  function stylesOf(i) { return stylesOfN(W.graph.nodes[i]); }
+  function stylesOfN(nd) { const lk = layOf(nd), ln = LAYOUTS[lk] ? LAYOUTS[lk].need : []; return stylesOf0(nd).concat(ln).filter((n, k, a) => a.indexOf(n) === k); }
+  function stylesOf0(nd) { if (LITE) { const st0 = styleOf(nd); return ['sky_' + st0.sky, 'tex_' + st0.ground]; } const st = styleOf(nd); if (st.g) return WGen.assets(st, nd); const names = ['sky_' + st.sky, 'tex_' + st.ground]; st.props.forEach(p => p[0].forEach(n => names.push(n.replace('#*', '')))); if (st.edge) st.edge[0].forEach(n => { names.push(n.replace('#*', '')); if (LO[n]) names.push(n + '_lo'); }); ['namaqualand_boulder_03', 'namaqualand_boulder_04', 'rock_09', 'horse_statue_01', 'gothic_statue', 'wooden_barrels_01', 'Barrel_02', 'wooden_military_crate', 'dead_tree_trunk', 'dead_tree_trunk_02', 'dead_quiver_trunk'].forEach(n => names.push(n)); return names.filter(n => n !== 'brazier'); }
   function nodeStory(node, canRetreat) {
     if (!W || W.storySeen.has(node.i)) return Promise.resolve(true);
     W.storySeen.add(node.i); document.exitPointerLock && document.exitPointerLock();
@@ -1109,5 +1122,5 @@ window.Worlds = (() => {
     for (let t = 0; t < 6; t++) { const nd = ns[Math.floor(r() * ns.length)]; if (!nd.prey) { try { populate(nd); } catch (e) { return null; } } if (nd.prey && nd.prey.length) { const h = nd.prey[Math.floor(r() * nd.prey.length)]; if (h && h.c) return { c: h.c, where: `${nd.loc.n}·${nd.name}` }; } }
     return null;
   }
-  return { start, frame, onKey, onDown, stop, peekPrey, get active() { return !!W; }, get _W() { return W; }, STYLES, REGION, genGraph, genWorld, need, warm, warmRegion, _debug: { goto: (i) => W && goto(i, W.cur), buildNode, targets } };
+  return { start, frame, onKey, onDown, stop, peekPrey, get active() { return !!W; }, get _W() { return W; }, STYLES, REGION, genGraph, genWorld, need, warm, warmRegion, _debug: { goto: (i) => W && goto(i, W.cur), buildNode, targets, stylesOfN, layOf, populate } };
 })();

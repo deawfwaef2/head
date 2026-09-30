@@ -39,17 +39,27 @@ window.Beasts = (() => {
     const r = mulberry((node.seed ^ 0x7f4a7c15) >>> 0), list = [];
     if (!node.home && !node.boss && r() < 0.72) {
       const budget = ({ s: 1, m: 2, l: 3 }[node.size] || 2) + (r() < 0.35 ? 1 : 0);
-      let tot = 0; const ws = Object.entries(TYPES);
+      let tot = 0; const reg = (node.loc && node.loc.k) || 'village', ws = Object.entries(TYPES).map(([k, t]) => [k, { t, w: wOf(t, reg, node) }]).filter(([, x]) => x.w > 0).map(([k, x]) => [k, Object.assign({}, x.t, { w: x.w })]); if (!ws.length) return node.bst = { list };
       while (tot < budget && list.length < 6) {
         let x = r() * ws.reduce((a, [, t]) => a + t.w, 0), k = 'wolf'; for (const [kk, t] of ws) { if ((x -= t.w) <= 0) { k = kk; break; } }
         const T = TYPES[k], n = T.pack[0] + Math.floor(r() * (T.pack[1] - T.pack[0] + 1)), tint = Math.floor(r() * T.tints.length);
-        for (let i = 0; i < n; i++) list.push({ k, tint, alive: true, seed: (r() * 1e9) | 0 }); tot += k === 'wolf' ? 2 : 1;
+        for (let i = 0; i < n; i++) list.push({ k, tint, alive: true, seed: (r() * 1e9) | 0 }); tot += T.cost || (T.ai === 'pack' ? 2 : 1);
       }
     }
     return node.bst = { list };
   }
+  // R41：地区权重——T.reg = {village:1,…} 只在这些地区出现（权重 = w × reg[地区]）；没有 reg 的旧四兽用 OLD_REG（MOD region_beasts 关 → 旧行为：四兽各地通吃，怪物不出现）
+  const OLD_REG = { wolf: { village: 0.4, forest: 1, wilds: 1, fortress: 0.6, peak: 0.8, abbey: 0.3 }, fox: { village: 1, forest: 1, wilds: 0.5, capital: 0.3 }, bull: { wilds: 1.2, village: 0.4, fortress: 0.4 }, stag: { forest: 1, village: 0.6, peak: 0.6, abbey: 0.4 } };
+  const regOn = () => !(window.Mods && Mods.on && Mods.on('region_beasts') === false);
+  function wOf(t, reg, node) {
+    const k = Object.keys(TYPES).find(kk => TYPES[kk] === t);
+    if (!regOn()) return t.reg ? 0 : t.w;
+    const rw = t.reg || OLD_REG[k] || {}; let w = t.w * (rw[reg] || 0);
+    if (w > 0 && t.lay && node.lay && t.lay[node.lay]) w *= t.lay[node.lay]; // 某些布局更爱出某种（湖边多蛙等）
+    return w;
+  }
   async function spawn(ctx, node) {
-    clear(); C = ctx; const P = plan(node), want = P.list.filter(e => e.alive); if (!want.length) return 0;
+    clear(); C = ctx; const P = plan(node), want = P.list.filter(e => e.alive && TYPES[e.k]); if (!want.length) return 0;
     const types = [...new Set(want.map(e => e.k))]; await Promise.all(types.map(loadType));
     gRoot = new THREE.Group(); gRoot.name = 'beasts'; C.sc.add(gRoot); const rec = (node.loc && node.loc.rec) || 40;
     // 同群靠在一起
@@ -58,12 +68,12 @@ window.Beasts = (() => {
       const M = await loadType(e.k), T = TYPES[e.k]; let at = packAt[e.k + e.tint];
       if (!at) { at = packAt[e.k + e.tint] = C.spot(); let g = 0; while (g++ < 12 && Math.hypot(at.x - C.pos().x, at.z - C.pos().z) < 14) at = packAt[e.k + e.tint] = C.spot(); }
       const rr = mulberry(e.seed), x = at.x + (rr() - 0.5) * 3.2, z = at.z + (rr() - 0.5) * 3.2;
-      const root = cloneSkinned(M.scene), s = T.h / M.hgt, model = new THREE.Group(), g = new THREE.Group(); model.add(root); model.scale.setScalar(s); model.position.y = -M.minY * s; g.add(model);
-      const tn = T.tints[e.tint], mats = []; root.traverse(o => { if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m.color) { m.color.setRGB(Math.min(1, m.color.r * tn[0]), Math.min(1, m.color.g * tn[1]), Math.min(1, m.color.b * tn[2])); m.metalness = 0; m.roughness = 0.85; if (m.emissive) m.emissive.setRGB(0.02, 0.02, 0.02); mats.push(m); } }); });
+      const root = cloneSkinned(M.scene), s = T.h / M.hgt, model = new THREE.Group(), g = new THREE.Group(); model.add(root); model.scale.setScalar(s); model.position.y = -M.minY * s + (T.fly || 0); g.add(model);
+      const tn = T.tints[e.tint], mats = []; root.traverse(o => { if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m.color) { m.color.setRGB(Math.min(1, m.color.r * tn[0]), Math.min(1, m.color.g * tn[1]), Math.min(1, m.color.b * tn[2])); m.metalness = 0; m.roughness = T.rough || 0.85; if (m.emissive) m.emissive.setRGB(0.02, 0.02, 0.02); mats.push(m); } }); });
       g.position.set(x, C.H(x, z), z); g.rotation.y = rr() * 6.28; gRoot.add(g);
       const mixer = new THREE.AnimationMixer(root), acts = {}; M.clips.forEach(c => { acts[c.name] = mixer.clipAction(c); });
       const hpM = (window.FoeAbs && FoeAbs.on) ? FoeAbs.hpK(rec * 0.9) : 1 + Math.min(2.2, Math.sqrt(rec / 60) * 0.55); /* R35 foe_abs：野兽血量按地区绝对缩放 */
-      const b = { id: 'bst' + (++IDS), e, k: e.k, T, g, model, mixer, acts, mats, pos: g.position, yaw: g.rotation.y, hp: Math.round(T.hp * hpM), maxHp: Math.round(T.hp * hpM), alive: true, state: 'idle', t: rnd(0, 2), cd: rnd(0.5, 2), stun: 0, broken: 0, flash: 0, cur: '', lookT: rnd(1, 4), tgt: null, side: rr() < 0.5 ? 1 : -1, stuck: 0, lastP: new V3(x, 0, z), provoked: false, noticed: false, hitDone: false, lootAt: 0, tint: e.tint,
+      const b = { id: 'bst' + (++IDS), e, k: e.k, T, g, model, baseY: -M.minY * s, mixer, acts, mats, pos: g.position, yaw: g.rotation.y, hp: Math.round(T.hp * hpM), maxHp: Math.round(T.hp * hpM), alive: true, state: 'idle', t: rnd(0, 2), cd: rnd(0.5, 2), stun: 0, broken: 0, flash: 0, cur: '', lookT: rnd(1, 4), tgt: null, side: rr() < 0.5 ? 1 : -1, stuck: 0, lastP: new V3(x, 0, z), provoked: false, noticed: false, hitDone: false, lootAt: 0, tint: e.tint,
         stub: { pos: g.position, boss: null, broken: 0, stag: 0, rar: 1, h: { c: { name: T.n } }, f: { play() { } }, anchor: { pos: g.position }, dead: false, sayT: 99, atk: null, seen: true, state: 'chase', hp: 1, maxHp: 1 } };
       play(b, 'Idle', { fade: 0 }); if (acts.Idle) acts.Idle.time = rnd(0, 2); BS.push(b);
     }
@@ -71,8 +81,8 @@ window.Beasts = (() => {
   }
   function clear() { if (gRoot && gRoot.parent) { gRoot.traverse(o => { if (o.isMesh) { o.geometry.dispose && 0; (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose && m.dispose()); } }); gRoot.parent.remove(gRoot); } gRoot = null; BS.forEach(b => b.mixer.stopAllAction()); BS = []; }
   function play(b, name, o = {}) {
-    const a = b.acts[name]; if (!a) return null; if (b.cur === name && !o.restart) return a;
-    const prev = b.acts[b.cur]; a.reset(); a.setLoop(o.once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity); a.clampWhenFinished = !!o.once; a.setEffectiveTimeScale(o.speed || 1); a.setEffectiveWeight(1);
+    const al = b.T.clips && b.T.clips[name], a = b.acts[name] || (al && b.acts[al[0]]); if (!a) return null; if (b.cur === name && !o.restart) return a; // R41：T.clips = {Gallop:['Run',1.0]} 动画名别名 + 速度倍率
+    const prev = b.acts[b.cur] || (b.T.clips && b.T.clips[b.cur] && b.acts[b.T.clips[b.cur][0]]); a.reset(); a.setLoop(o.once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity); a.clampWhenFinished = !!o.once; a.setEffectiveTimeScale((o.speed || 1) * (al && !b.acts[name] ? (al[1] || 1) : 1)); a.setEffectiveWeight(1);
     a.play(); if (prev && prev !== a) prev.crossFadeTo(a, o.fade == null ? 0.18 : o.fade, false); b.cur = name; return a;
   }
 
@@ -115,13 +125,14 @@ window.Beasts = (() => {
       const dx = P.x - b.pos.x, dz = P.z - b.pos.z, d = Math.hypot(dx, dz);
       if (d < 55 || !b.alive) b.mixer.update(dt);
       if (b.flash > 0) { b.flash -= dt; const f = Math.max(0, b.flash / 0.12) * 0.7; b.mats.forEach(m => m.emissive && m.emissive.setRGB(0.02 + f, 0.02, 0.02)); }
+      if (b.T.fly) { const fy = b.alive ? b.baseY + b.T.fly + Math.sin(now * 2.1 + b.side * 1.7) * 0.12 : Math.max(b.baseY, b.model.position.y - dt * 2.6); b.model.position.y = fy; } // R41：飞行怪悬停上下浮动，死后落地
       if (!b.alive) { if (b.lootAt && now > b.lootAt) { b.lootAt = 0; if (window.Sack && Sack.carcass) Sack.carcass(b, C.W()); } continue; }
       if (d > 80) continue; b.t += dt; b.cd -= dt; b.stun -= dt; if (b.broken > 0) b.broken -= dt;
       // 卡住检测
       const mv = Math.hypot(b.pos.x - b.lastP.x, b.pos.z - b.lastP.z); b.lastP.set(b.pos.x, 0, b.pos.z);
       if (['stalk', 'chase', 'flee'].includes(b.state) && mv < 0.15 * dt * 6 && d > 2) { b.stuck += dt; if (b.stuck > 1.6) { b.side = -b.side; b.stuck = 0.5 + 0.0; } } else b.stuck = Math.max(0, b.stuck - dt * 2);
       if (b.kb) { const kt = Math.min(dt, b.kb.t); move(b, b.kb.x * kt, b.kb.z * kt); b.kb.t -= dt; if (b.kb.t <= 0) b.kb = null; }
-      if (b.state === 'stun') { if (b.stun <= 0) { b.state = b.k === 'bull' ? 'paw' : b.k === 'stag' ? 'fight' : b.k === 'fox' ? 'chase' : 'stalk'; b.hitDone = false; b.t = 0; b.cd = 0.4; } continue; }
+      if (b.state === 'stun') { if (b.stun <= 0) { b.state = ({ charger: 'paw', skittish: 'fight', hitrun: 'chase' })[b.T.ai] || 'stalk'; b.hitDone = false; b.t = 0; b.cd = 0.4; } continue; }
       if (b.stun > 0 && b.state !== 'charge') continue;
       if (d < 0.85 && d > 1e-4 && b.state !== 'charge') { const pu = Math.min(0.85 - d, 7 * dt); b.pos.x -= dx / d * pu; b.pos.z -= dz / d * pu; } // 不重叠在玩家身上
       ({ pack: aiPack, hitrun: aiHitrun, charger: aiCharger, skittish: aiSkittish })[b.T.ai](b, dt, P, d, dx, dz);
@@ -165,7 +176,7 @@ window.Beasts = (() => {
     if (b.state === 'paw') { play(b, 'Idle_HitReact1', { speed: 0.7 }); face(b, P.x, P.z, dt, 5); b.lockX = P.x; b.lockZ = P.z; if (b.t > 1.05) { b.state = 'charge'; b.t = 0; b.hitDone = false; const l = Math.hypot(P.x - b.pos.x, P.z - b.pos.z) || 1; b.cx = (P.x - b.pos.x) / l; b.cz = (P.z - b.pos.z) / l; b.hitWall = false; play(b, 'Gallop', { speed: 1.15 }); } return; }
     if (b.state === 'charge') { b.yaw = Math.atan2(b.cx, b.cz); b.g.rotation.y = b.yaw; move(b, b.cx * T.dash * dt, b.cz * T.dash * dt);
       if (!b.hitDone && d < T.reach) { b.hitDone = true; bite(b, T.dmg, { heavy: true, ang: 1.57 }); }
-      if (b.hitWall || b.t > 1.5 || b.hitDone && b.t > 0.4) { b.state = 'stun'; b.stun = b.hitWall ? 2.4 : 1.5; b.broken = b.stun; b.t = 0; play(b, 'Idle_HitReact1', { once: true, restart: true }); C.toast && b.hitWall && C.toast('💥 野牛撞在了障碍上——趁现在砍！', '#ffe0a0', 1.4); } return; }
+      if (b.hitWall || b.t > 1.5 || b.hitDone && b.t > 0.4) { b.state = 'stun'; b.stun = b.hitWall ? 2.4 : 1.5; b.broken = b.stun; b.t = 0; play(b, 'Idle_HitReact1', { once: true, restart: true }); C.toast && b.hitWall && C.toast(`💥 ${b.T.n}撞在了障碍上——趁现在砍！`, '#ffe0a0', 1.4); } return; }
     if (b.state === 'fight') { b.state = 'paw'; }
   }
   function aiSkittish(b, dt, P, d) { // 鹿：见人就跑，被逼到角落或受伤后才踢
@@ -181,22 +192,22 @@ window.Beasts = (() => {
 
   // ---- 被砍 ----
   function targets() {
-    const out = []; for (const b of BS) { if (!b.alive) continue; const p = b.pos.clone(); p.y += b.T.h * 0.55; out.push({ id: b.id, pos: p, r: b.T.r, kind: 'foe', onHit: (info) => hit(b, info) }); } return out;
+    const out = []; for (const b of BS) { if (!b.alive) continue; const p = b.pos.clone(); p.y += b.T.h * 0.55 + (b.T.fly || 0); out.push({ id: b.id, pos: p, r: b.T.r, kind: 'foe', onHit: (info) => hit(b, info) }); } return out;
   }
   function hit(b, info) {
     if (!b.alive || !C) return false; const slash = info.kind !== 'thrust', sp = Math.max(0.5, Math.min(1.8, (info.speed || 5) / 8));
     const q = C.power(b.stub), mult = (b.broken > 0 ? 2 : 1) * (info.charged ? 2.2 : 1) * (info.mult || 1);
     let dealt = Math.max(1, Math.round(12 * q * sp * mult * (slash ? 1 : 0.8) * rnd(0.85, 1.15)));
-    if (!(window.FoeAbs && FoeAbs.on)) dealt = Math.max(dealt, Math.round(b.maxHp * (b.k === 'bull' ? 0.15 : b.k === 'stag' ? 0.2 : 0.25) * (info.fmul || 1) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：狼/狐约 4 刀、鹿 5 刀、野牛 7 刀（以前野牛要 20+ 刀）
-    if (!(window.FoeAbs && FoeAbs.on)) { b.nHit = (b.nHit || 0) + 1; const cap = b.k === 'bull' ? 8 : 6; if (b.nHit >= cap - 2) dealt = Math.max(dealt, Math.ceil(b.hp / (cap + 1 - Math.min(b.nHit, cap)))); } // 保险：第 6 刀（野牛 8 刀）必死
-    b.hp -= dealt; b.flash = 0.12; b.provoked = true; const fp = b.pos.clone(); fp.y += b.T.h * 0.8; C.floatDmg(fp, dealt, sp > 1.2 || b.broken > 0);
-    { const kv = (info.vel || new V3()).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((b.k === 'bull' ? 0.1 : 0.28) * sp); b.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退分 0.16 秒推完（以前一帧瞬移）
+    if (!(window.FoeAbs && FoeAbs.on)) dealt = Math.max(dealt, Math.round(b.maxHp * (b.T.floor || (b.T.ai === 'charger' ? 0.15 : b.T.ai === 'skittish' ? 0.2 : 0.25)) * (info.fmul || 1) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：狼/狐约 4 刀、鹿 5 刀、野牛 7 刀（以前野牛要 20+ 刀）
+    if (!(window.FoeAbs && FoeAbs.on)) { b.nHit = (b.nHit || 0) + 1; const cap = b.T.cap || (b.T.ai === 'charger' ? 8 : 6); if (b.nHit >= cap - 2) dealt = Math.max(dealt, Math.ceil(b.hp / (cap + 1 - Math.min(b.nHit, cap)))); } // 保险：第 6 刀（野牛 8 刀）必死
+    b.hp -= dealt; b.flash = 0.12; b.provoked = true; const fp = b.pos.clone(); fp.y += b.T.h * 0.8 + (b.T.fly || 0); C.floatDmg(fp, dealt, sp > 1.2 || b.broken > 0);
+    { const kv = (info.vel || new V3()).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((b.T.ai === 'charger' ? 0.1 : 0.28) * sp); b.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退分 0.16 秒推完（以前一帧瞬移）
     C.event && C.event('hit', b.stub, { dealt, zone: 'body', brk: b.broken > 0 });
     window.SFX && (SFX.chop && SFX.chop(), SFX.squish && SFX.squish(0.5)); window.Foe && Foe.spark && Foe.spark(info.point || fp, 5, 'red');
     if (b.hp <= 0) { die(b, info); return true; }
-    if (b.state === 'idle' || b.state === 'flee' && b.k !== 'stag') { b.state = b.k === 'wolf' ? 'stalk' : b.k === 'bull' ? 'paw' : b.k === 'stag' ? 'fight' : 'chase'; b.t = 0; b.cd = 0.5; b.noticed = true; b.ring = Math.atan2(b.pos.x - C.pos().x, b.pos.z - C.pos().z); b.dir = b.side; }
-    else if (b.k === 'stag' && b.state === 'flee') { b.state = 'fight'; b.t = 0; }
-    if (b.state !== 'charge' && !(b.k === 'bull' && b.state === 'paw' && !info.charged)) { b.stun = b.k === 'bull' ? 0.2 : 0.4; b.state = 'stun'; b.t = 0; play(b, 'Idle_HitReact1', { once: true, restart: true, fade: 0.05 }); }
+    if (b.state === 'idle' || b.state === 'flee' && b.T.ai !== 'skittish') { b.state = ({ pack: 'stalk', charger: 'paw', skittish: 'fight' })[b.T.ai] || 'chase'; b.t = 0; b.cd = 0.5; b.noticed = true; b.ring = Math.atan2(b.pos.x - C.pos().x, b.pos.z - C.pos().z); b.dir = b.side; }
+    else if (b.T.ai === 'skittish' && b.state === 'flee') { b.state = 'fight'; b.t = 0; }
+    if (b.state !== 'charge' && !(b.T.ai === 'charger' && b.state === 'paw' && !info.charged)) { b.stun = b.T.ai === 'charger' ? 0.2 : 0.4; b.state = 'stun'; b.t = 0; play(b, 'Idle_HitReact1', { once: true, restart: true, fade: 0.05 }); }
     return true;
   }
   function die(b, info) {
@@ -205,6 +216,6 @@ window.Beasts = (() => {
     C.event && C.event('kill', b.stub); C.shake && C.shake(0.3); C.toast && C.toast(`${b.T.ico} ${b.T.n}倒下了——按 E 搜刮尸骸`, '#ffd0a0', 2.2);
   }
   // 掉落表 → Sack 物品（由 Sack.carcass 调用）
-  function dropsOf(b) { const r = mulberry(b.e.seed >>> 0), out = []; for (const [id, a, c, p] of b.T.drops) if (r() < p) out.push([id, a + Math.floor(r() * (c - a + 1))]); if (!out.length) out.push(['meat', 1]); return out; }
-  return { spawn, clear, update, targets, plan, dropsOf, TYPES, get list() { return BS; }, get count() { return BS.filter(b => b.alive).length; } };
+  function dropsOf(b) { const r = mulberry(b.e.seed >>> 0), out = []; for (const [id, a, c, p] of b.T.drops) if (r() < p && !(window.Sack && Sack.IT && !Sack.IT[id])) out.push([id, a + Math.floor(r() * (c - a + 1))]); if (!out.length) out.push(['meat', 1]); return out; }
+  return { spawn, clear, update, targets, plan, dropsOf, TYPES, wOf, loadType, get list() { return BS; }, get count() { return BS.filter(b => b.alive).length; } };
 })();

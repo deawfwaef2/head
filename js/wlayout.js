@@ -34,7 +34,7 @@ window.WLayout = (() => {
     P.Rmax = R * (1 + P.elong + P.lob);
     let ak = 0; for (let i = 0; i < 32; i++) ak += (P.Rf(i / 32 * 6.283) / R) ** 2; P.areaK = ak / 32;
     P.relief = pick(r, [0.35, 0.7, 1, 1, 1.7, 2.6]);
-    if (r() < 0.35) { const a = r() * 6.283, d = R * r() * 0.3; P.hump = { x: Math.cos(a) * d, z: Math.sin(a) * d, h: (r() < 0.65 ? 1 : -0.6) * (1.4 + r() * 1.6), s: R * (0.2 + r() * 0.15) }; }
+    if (r() < 0.35) { const a = r() * 6.283, d = R * (window.Mods && Mods.on && Mods.on('wfix41') === false ? r() * 0.3 : 0.32 + r() * 0.28); P.hump = { /* R41：土丘不再压在正中（进门就挡视线） */ x: Math.cos(a) * d, z: Math.sin(a) * d, h: (r() < 0.65 ? 1 : -0.6) * (1.4 + r() * 1.6), s: R * (0.2 + r() * 0.15) }; }
     P.path = r() < 0.6;
     if (r() < 0.5) P.clump = { f: 0.06 + r() * 0.07, th: 0.47 + r() * 0.08 };
     else if (r() < 0.4) { P.glade = R * (0.25 + r() * 0.15); P.gx = (r() - 0.5) * R * 0.3; P.gz = (r() - 0.5) * R * 0.3; }

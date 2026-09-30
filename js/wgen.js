@@ -136,7 +136,8 @@ window.WGen = (() => {
     const r = mulberry((node.seed ^ 0x9e3779b9) >>> 0), st = Object.assign({}, base), g = st.g = { node, r, seed: node.seed };
     const R = node.R, sn = node.style;
     // 天空 / 氛围
-    st.sky = wpick(r, SKYALT[sn] || [[base.sky, 1]]); const sm = SKYM[st.sky] || { k: 2 }; st.night = sm.night ? 1 : 0;
+    const fix41 = !(window.Mods && Mods.on && Mods.on('wfix41') === false); // R41：cobblestone_street_night 是现代街景照片（路牌、窗户），不再当天空；换成城堡护城河/无月夜
+    st.sky = wpick(r, (SKYALT[sn] || [[base.sky, 1]]).map(([k, w]) => fix41 && k === 'cobblestone_street_night' ? [sn === 'capital' || sn === 'fortress' ? 'teutonic_castle_moat' : 'moonless_golf', w] : [k, w])); const sm = SKYM[st.sky] || { k: 2 }; st.night = sm.night ? 1 : 0;
     const gw = st.night ? Object.entries(Object.assign({ moon: 1, void: 1 }, GWN[sn] || {})) : Object.entries(GW[sn] || { golden: 1, noon: 1, overcast: 1 });
     g.gk = wpick(r, gw); g.grade = GRADES[g.gk]; g.yaw = r() * 6.2832;
     st.sun = sm.k * (st.night ? 1 : 1) * (0.9 + r() * 0.25); g.sunCol = new C(g.grade.sun); g.sunK = g.grade.sk; g.hemK = g.grade.hem; g.fk = g.grade.fk * (0.8 + r() * 0.4); g.fogMul = new C(g.grade.fog[0], g.grade.fog[1], g.grade.fog[2]); g.skyTint = new C(g.grade.tint[0], g.grade.tint[1], g.grade.tint[2]);
@@ -289,6 +290,14 @@ window.WGen = (() => {
     return out;
   }
   let _tex = null;
+  // R41：光束材质——按视角淡出（侧对镜头时不再变成一根根发亮的细线）+ 近处淡出 + 上下两端柔化
+  function beamMat(col, op) {
+    if (window.Mods && Mods.on && Mods.on('wfix41') === false) return new THREE.MeshBasicMaterial({ map: softTex('beam'), color: col, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+    const m = new THREE.ShaderMaterial({ uniforms: { map: { value: softTex('beam') }, col: { value: col.clone ? col.clone() : new C(col) }, op: { value: op } }, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false,
+      vertexShader: 'varying vec2 vUv; varying vec3 vN; varying vec3 vP; void main(){ vUv = uv; vN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position, 1.0); vP = mv.xyz; gl_Position = projectionMatrix * mv; }',
+      fragmentShader: 'uniform sampler2D map; uniform vec3 col; uniform float op; varying vec2 vUv; varying vec3 vN; varying vec3 vP; void main(){ float f = abs(dot(normalize(vN), normalize(-vP))); float a = texture2D(map, vUv).a * op * f * f * smoothstep(3.0, 10.0, length(vP)) * smoothstep(0.0, 0.25, vUv.y) * (1.0 - smoothstep(0.6, 1.0, vUv.y)); gl_FragColor = vec4(col * a, 1.0); }' });
+    m.opacity = op; return m;
+  }
   function softTex(kind) { // 只是渐变贴图（光束/雾团），不是模型或材质贴图
     const key = '_t' + kind; if (softTex[key]) return softTex[key];
     const c = document.createElement('canvas'), N = 64; c.width = c.height = N; const x = c.getContext('2d');
@@ -404,9 +413,9 @@ window.WGen = (() => {
     { const got = new Set((g.placed || []).map(q => PIECES[q.k].n)); g.tag = g.tag.filter(t => !g.pieces.some(p => p.n === t) || got.has(t)); }
     // -- 光束
     const sd = X.sunDir; if (g.shafts && sd && sd.y > 0.15) { const grp = new THREE.Group(), n = 7 + Math.floor(r() * 6), mats = [], q = new THREE.Quaternion().setFromUnitVectors(new V3(0, 1, 0), sd.clone().normalize());
-      for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * R * 0.95, x = Math.cos(a) * d, z = Math.sin(a) * d, Lh = 26 + r() * 14, w = 1.6 + r() * 3.4, mt = new THREE.MeshBasicMaterial({ map: softTex('beam'), color: g.sunCol, transparent: true, opacity: 0.1 + r() * 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }); mt.userData.b = mt.opacity; mt.userData.ph = r() * 6.28; mats.push(mt);
+      for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * R * 0.95, x = Math.cos(a) * d, z = Math.sin(a) * d, Lh = 26 + r() * 14, w = 1.6 + r() * 3.4, mt = beamMat(g.sunCol, 0.1 + r() * 0.1); mt.userData.b = mt.opacity; mt.userData.ph = r() * 6.28; mats.push(mt);
         for (let k = 0; k < 2; k++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, Lh), mt), o = new THREE.Group(); o.add(m); m.rotation.y = k * Math.PI / 2; o.position.set(x, H(x, z), z).addScaledVector(sd, Lh * 0.5 - 1); o.quaternion.copy(q); o.frustumCulled = false; m.frustumCulled = false; m.userData.wg = 1; grp.add(o); } }
-      sc.add(grp); upd.push((dt, p, now) => { for (const mt of mats) mt.opacity = mt.userData.b * (0.75 + 0.25 * Math.sin(now * 0.6 + mt.userData.ph)); }); }
+      sc.add(grp); upd.push((dt, p, now) => { for (const mt of mats) { mt.opacity = mt.userData.b * (0.75 + 0.25 * Math.sin(now * 0.6 + mt.userData.ph)); if (mt.uniforms) mt.uniforms.op.value = mt.opacity; } }); }
     // -- 地雾团
     if (g.mist > 0 && sc.fog) { const n = Math.round((R < 20 ? 8 : 14) * g.mist), fc = sc.fog.color.clone().lerp(new C(1, 1, 1), 0.25), grp = new THREE.Group(), mm = [];
       for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * R * 0.85, x = Math.cos(a) * d, z = Math.sin(a) * d, s = 9 + r() * 12; let hm = -1e9; for (let k = 0; k < 6; k++) hm = Math.max(hm, H(x + Math.cos(k) * s * 0.3, z + Math.sin(k) * s * 0.3)); const mt = new THREE.MeshBasicMaterial({ map: softTex('mist'), color: fc, transparent: true, opacity: (0.1 + r() * 0.12) * Math.min(1, g.mist + 0.2), depthWrite: false, fog: true }); mt.userData.b = mt.opacity; mt.userData.ph = r() * 6.28; mm.push(mt);

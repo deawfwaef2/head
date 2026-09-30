@@ -103,7 +103,7 @@ window.HitHud = (() => {
       const nm = fo.per && fo.per.title ? fo.per.title.replace(/【[^】]*】/, '') : (fo.h && fo.h.c && fo.h.c.name) || '';
       track(fo, 'foe', nm, fo.hp, fo.maxHp, fo.dead, fo.anchor.pos, 0.72, dt);
     }
-    if (window.Beasts && Beasts.list) for (const b of Beasts.list) { if (!b.T || !b.pos) continue; track(b, 'beast', (b.T.ico || '') + (b.T.n || ''), b.hp, b.maxHp, !b.alive, b.pos, (b.T.h || 1) + 0.35, dt); }
+    if (window.Beasts && Beasts.list) for (const b of Beasts.list) { if (!b.T || !b.pos) continue; track(b, 'beast', (b.T.ico || '') + (b.T.n || ''), b.hp, b.maxHp, !b.alive, b.pos, (b.T.h || 1) + 0.35 + (b.T.fly || 0), dt); }
     for (const [k, b] of BAR) if (window.Foe && Foe.foes && !Foe.foes.includes(k) && !(window.Beasts && Beasts.list && Beasts.list.includes(k))) { b.el.remove(); BAR.delete(k); } // 换地点：清掉
     raf = requestAnimationFrame(frame);
   }

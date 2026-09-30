@@ -1,0 +1,126 @@
+<!doctype html><html><head><meta charset="utf-8"><base href="/"><title>world</title>
+<style>body{margin:0;background:#111;color:#ddd;font:12px monospace}#cv{display:block}</style></head><body>
+<canvas id="cv" width="960" height="540"></canvas>
+<!-- R41（主管）：地点渲染测试台——只加载世界相关脚本（完整游戏在 2GB 沙箱会 OOM）。
+  用法：?reg=forest&seed=7   window.__node(i, {view:'eye'|'top'|'low', lay:'camp'}) → dataURL；window.__graph 是地点图 -->
+<script src="/lib/three.min.js"></script><script src="/lib/GLTFLoader.js"></script>
+<script src="/js/mods.js"></script><script src="/js/render.js"></script><script src="/js/assets.js"></script>
+<script src="/assets/GothicBed_01.js"></script>
+<script src="/assets/GothicCommode_01.js"></script>
+<script src="/assets/Lantern_01.js"></script>
+<script src="/assets/WoodenTable_01.js"></script>
+<script src="/assets/antique_estoc.js"></script>
+<script src="/assets/antique_katana_01.js"></script>
+<script src="/assets/baseball_bat.js"></script>
+<script src="/assets/brass_candleholders.js"></script>
+<script src="/assets/brass_goblets.js"></script>
+<script src="/assets/chinese_armchair.js"></script>
+<script src="/assets/dining_table.js"></script>
+<script src="/assets/hdri_hikers_cave.js"></script>
+<script src="/assets/img_fire.js"></script>
+<script src="/assets/katana_stand_01.js"></script>
+<script src="/assets/kite_shield.js"></script>
+<script src="/assets/large_castle_door.js"></script>
+<script src="/assets/large_iron_gate.js"></script>
+<script src="/assets/machete.js"></script>
+<script src="/assets/namaqualand_boulder_02.js"></script>
+<script src="/assets/namaqualand_boulder_05.js"></script>
+<script src="/assets/ornate_medieval_mace.js"></script>
+<script src="/assets/ornate_mirror_01.js"></script>
+<script src="/assets/ornate_war_hammer.js"></script>
+<script src="/assets/rock_face_01.js"></script>
+<script src="/assets/rock_moss_set_02.js"></script>
+<script src="/assets/standing_chalkboard_01.js"></script>
+<script src="/assets/stone_fire_pit.js"></script>
+<script src="/assets/tex_cut_wagyu.js"></script>
+<script src="/assets/tex_dark_rock.js"></script>
+<script src="/assets/tex_rock_ground.js"></script>
+<script src="/assets/treasure_chest.js"></script>
+<script src="/assets/wine_barrel_01.js"></script>
+<script src="/assets/wooden_axe_02.js"></script>
+<script src="/assets/wooden_crate_01.js"></script>
+<script src="/assets/wooden_lantern_01.js"></script>
+<script src="/assets/ClassicConsole_01.js"></script>
+<script src="/assets/Rockingchair_01.js"></script>
+<script src="/assets/Sofa_01.js"></script>
+<script src="/assets/Television_01.js"></script>
+<script src="/assets/bull_head.js"></script>
+<script src="/assets/chinese_console_table.js"></script>
+<script src="/assets/dining_chair_02.js"></script>
+<script src="/assets/fancy_picture_frame_01.js"></script>
+<script src="/assets/fancy_picture_frame_02.js"></script>
+<script src="/assets/flower_ursinia.js"></script>
+<script src="/assets/garden_gnome.js"></script>
+<script src="/assets/hanging_picture_frame_01.js"></script>
+<script src="/assets/hanging_picture_frame_02.js"></script>
+<script src="/assets/hanging_picture_frame_03.js"></script>
+<script src="/assets/horse_head.js"></script>
+<script src="/assets/lion_head.js"></script>
+<script src="/assets/magnifying_glass_01.js"></script>
+<script src="/assets/planter_box_01.js"></script>
+<script src="/assets/round_wooden_table_02.js"></script>
+<script src="/assets/tea_set_01.js"></script>
+<script src="/assets/throw_pillows_01.js"></script>
+<script src="/assets/vintage_microscope.js"></script>
+<script src="/assets/vintage_oil_lamp.js"></script>
+<script src="/assets/watering_can_metal_01.js"></script>
+<script src="/assets/brass_pot_01.js"></script>
+<script src="/assets/carved_wooden_plate.js"></script>
+<script src="/assets/gothic_coffee_table.js"></script>
+<script src="/assets/stone_01.js"></script>
+<script src="/assets/wicker_basket_01.js"></script>
+<script src="/assets/wooden_bucket_02.js"></script>
+<script src="/assets/wooden_cutting_board.js"></script>
+<script src="/assets/wooden_ladder.js"></script>
+<script src="/assets/limb_hand_amber.js"></script>
+<script src="/assets/limb_hand_avatar.js"></script>
+<script src="/assets/limb_hand_jean.js"></script>
+<script src="/assets/limb_hand_mona.js"></script>
+<script src="/assets/limb_hand_shenhe.js"></script>
+<script src="/assets/limb_foot_amber.js"></script>
+<script src="/assets/limb_foot_jean.js"></script>
+<script src="/assets/limb_foot_mona.js"></script>
+<script src="/js/lore.js"></script><script src="/js/wgen.js"></script><script src="/js/wlayout.js"></script>
+<script src="/js/worlds.js"></script><script src="/js/beasts.js"></script><script src="/js/beasts_reg.js"></script><script src="/js/wsites.js" onerror="this.remove()"></script>
+<script>
+const q = new URLSearchParams(location.search);
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('cv'), antialias: false, preserveDrawingBuffer: true });
+renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+const camera = new THREE.PerspectiveCamera(62, 960 / 540, 0.1, 400);
+window.__game = { S: { bosses: {}, stats: {}, heads: [] }, st: () => ({ power: 300, maxHp: 100 }), camera, renderer, player: { yaw: 0, pitch: 0 } };
+window.G = window.__game;
+const loc = Lore.LOCS.find(l => l.k === (q.get('reg') || 'forest'));
+const graph = window.__graph = Worlds.genGraph(loc, +(q.get('seed') || 7));
+let cur = null;
+window.__node = async (i, o = {}) => {
+  const nd = graph.nodes[i]; if (o.lay) window.__forceLay = o.lay; else delete window.__forceLay; delete nd.lay;
+  if (!nd.chests) { nd.chests = [{}, {}]; nd.prey = []; }
+  const names = Worlds._debug.stylesOfN(nd); await Worlds.need(names);
+  if (cur) { cur.sc.traverse(x => { if (x.geometry) x.geometry.dispose(); }); }
+  if (window.Beasts) Beasts.clear();
+  if (o.bst) nd.bst = { list: o.bst.map((k, j) => ({ k, tint: 0, alive: true, seed: 1234 + j * 77 })) };
+  const B = cur = window.__B = Worlds._debug.buildNode(nd);
+  let nb = 0; window.__P = new THREE.Vector3(999, 0, 999);
+  if (window.Beasts && o.beasts !== false) {
+    const ctx = { sc: B.sc, H: B.H, cols: B.cols, R: B.R, doors: B.doors, spot: () => { const a = Math.random() * 6.28, d = B.R * (0.2 + Math.random() * 0.5); return new THREE.Vector3(Math.cos(a) * d, 0, Math.sin(a) * d); }, pos: () => window.__P, st: () => ({ maxHp: 100 }), sees: () => !!o.sees, hitPlayer() {}, power: () => 1, toast() {}, floatDmg() {}, W: () => null };
+    try { nb = await Beasts.spawn(ctx, nd); Beasts.list.forEach(b => b.mixer.update(0.5)); } catch (e) { console.warn('beasts', e); }
+  }
+  if (o.zoo && Beasts.list.length) { // 一排站好：门内 6m 处横排，镜头看过去；可选跑 AI 若干秒（假玩家站在镜头处）
+    const d0 = B.doors[0], ins = new THREE.Vector3(-Math.cos(d0.a), 0, -Math.sin(d0.a)), side = new THREE.Vector3(-ins.z, 0, ins.x), L = Beasts.list, n = L.length;
+    const cx = d0.x + ins.x * 3, cz = d0.z + ins.z * 3;
+    L.forEach((b, j) => { const off = (j - (n - 1) / 2) * (o.gap || 2.2), x = cx + ins.x * (o.dist || 6) + side.x * off, z = cz + ins.z * (o.dist || 6) + side.z * off; b.pos.set(x, B.H(x, z), z); b.yaw = Math.atan2(-ins.x, -ins.z); b.g.rotation.y = b.yaw; });
+    window.__P.set(cx, B.H(cx, cz), cz);
+    if (o.run) { for (let t = 0; t < o.run; t += 1 / 30) Beasts.update(1 / 30, performance.now() / 1000 + t); } else L.forEach(b => b.mixer.update(0.3));
+    camera.position.set(cx - ins.x * 1.5, B.H(cx, cz) + (o.camY || 1.7), cz - ins.z * 1.5); camera.lookAt(cx + ins.x * 8, B.H(cx, cz) + 0.6, cz + ins.z * 8);
+    B.sc.add(camera); renderer.render(B.sc, camera);
+    return { url: renderer.domElement.toDataURL('image/jpeg', 0.85), info: { i, style: nd.style, beasts: L.map(b => b.k + ':' + b.state + ':' + b.cur + ':' + b.model.position.y.toFixed(2)) } };
+  }
+  const v = o.view || 'eye', d0 = B.doors[0];
+  if (v === 'top') { camera.position.set(0, B.R * 1.9, B.R * 0.9); camera.lookAt(0, 0, 0); }
+  else if (v === 'beast' && Beasts.list.length) { const b = Beasts.list[o.bi || 0]; const p = b.pos; camera.position.set(p.x + 3.2, B.H(p.x + 3.2, p.z + 3.2) + 1.8, p.z + 3.2); camera.lookAt(p.x, p.y + 0.6, p.z); }
+  else { const ins = new THREE.Vector3(-Math.cos(d0.a), 0, -Math.sin(d0.a)); const x = d0.x + ins.x * 2.4, z = d0.z + ins.z * 2.4; camera.position.set(x, B.H(x, z) + (v === 'low' ? 3.5 : 1.45), z); camera.lookAt(x + ins.x * 10, B.H(x, z) + (v === 'low' ? 0.5 : 1.2), z + ins.z * 10); }
+  B.sc.add(camera); renderer.render(B.sc, camera);
+  return { url: renderer.domElement.toDataURL('image/jpeg', 0.85), info: { i, style: nd.style, lay: nd.lay, size: nd.size, R: B.R, tag: B.tag, name: nd.name, beasts: window.Beasts ? Beasts.list.map(b => b.k) : [], site: nd.site || null } };
+};
+window.__ready = true;
+</script></body></html>
