@@ -1454,9 +1454,6 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 未做：教程内不覆盖武器附魔/训练小游戏/天赋树细节；没有高亮 3D 物体（只有箭头）。
 
 ## R39（用户：① 头发-头-饰品别绑定、原神头一起搭配很违和，要混搭拼图、看不出是哪个角色 ② MOD UI 重做（旧的难看） ③ 探索 UI 加更多文本：地区对你的反馈/名声/杀掉角色的后续故事（影响·关系）/反馈随机给资源）
-### ① MOD `head_puzzle`（heads.js，默认开）—— 撤销 R36b 的 head_native
-- 用户原话：“你不要头发-头-饰品什么绑定，比如那些原神头一起搭配的看着很违和！而且你不要原始原神头出来，而是混搭，不要看出来是某个原神角色，用其拼图”。R36b 我们曾理解成“别混搭”，**方向反了**：现在是“别整套原装出现”。
-- 规则：MMD/原神头 = 脸保留；**发型必借别的头**（`puzzleHair(fi,seed)` 确定性随机，只取 `hairFitOK`（不陷入/不挡眼/不拉伸）+ `coverScore≤0.03`（hair_cover）合格的，候选包含 VRoid 发型）；**自带头饰（cloth_* 眼线以上，`ownAcc(t)`）不渲染**；再由 `mixLook` 从别的头饰品库借 0~2 件（acc_mix 预检合格才写入，MMD 脸概率 [.45,.5,.58,.66,.74]）。
-- `resolveLook(look)`：旧存档/固定人设里 `h===f` 的 MMD 头在 `create/hairColor/mapsFor` 里按同一规则自动拼（不改存档里的 look）。`ModelHeads.hairOf(look)` / `puzzleOn(look)` 供调试。
-- mods.js：新增 `head_puzzle`；迁移 `__v10`：`head_native=false, hair_mix2=true, acc_mix=true`。`skullMap` 的“MMD 镜像后脑”在 `head_puzzle` 开时也启用。
-- 测试台：`tools/test/puzzle.html?pz=0|1&faces=GI_HuTao,..`（≤12 个模型；相机 yaw 0.4 看正脸）。实测 4 张原神脸全部换发型、头饰拆掉，贴合正常（胡桃脸+莫娜发、雷电脸+胡桃发…）。
+### ① 头部拼图：由主管的 R38 `head_collage`（heads.js collageHair）+ `cc0_only` 实现
+- 本 agent 同时写了一版 `head_puzzle`（MMD 脸发型必借别人 + 拆自带头饰 `ownAcc`），与主管 `head_collage` 重复，已**撤回**（提交里只留说明，避免冲突）。`head_collage` 当前只换发型；**如需再“拆掉 MMD 脸自带头饰 cloth_*（眼线以上）”，参考思路：`create()` 里遍历 `F.faceMeshes` 时跳过 SRC 名字 /^cloth/ 且中心高于眼线的网格**。
+- 经验：push 前必须先 `git pull --rebase` 并检查冲突标记（`grep -n '^<<<<<<<' js/*.js`），不要只清 HANDOFF.md 的标记。
