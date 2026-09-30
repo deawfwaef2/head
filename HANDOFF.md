@@ -1460,3 +1460,25 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 
 ### ② MOD UI 重做（js/mods.js 管理器界面部分；逻辑 set/normalize 不变）
 - 用户：“MOD UI 你重做下，现在这个不行落时了很难看”。旧版是粉紫色卡片墙且**漏掉了 `ui` 分类**（5 个 MOD 看不到）。新版：与游戏同风格的深棕金色；左侧分类（带 开启数/总数）+ 筛选（全部/已开启/已关闭/与默认不同/待应用）+ 顶部搜索（`/` 聚焦，Esc 先清搜索再关闭）；每行一个开关（画风组是单选圆点），点行展开详情（完整说明、默认值、ID、依赖、冲突）；“待应用”蓝色左边条 + 底栏列出待应用项；开关原地刷新不丢滚动位置。测试页 `tools/test/mods.html`。
+
+## R38（主管）：CC0 模式（默认开）+ 拼图混搭
+用户：“你不要头发-头-饰品什么绑定……不要原始原神头出来，而是混搭，不要看出来是某个原神角色，用其拼图！”“默认开启 CC0 模式，游戏里只有 CC0 模型，但可以关闭。”
+（注意：R36b 把上一轮同一句话理解成“不要混搭”并加了 head_native；用户这次明确要混搭 → head_native 默认关。R39 的 head_puzzle 与本节重复，已由 R39 自己撤回。）
+
+**CC0 模式：MOD `cc0_only`（默认开）——新文件 `js/cc0mode.js`（`window.CC0`，在 heads.js 前加载）**
+- CC0 白名单（依据 CREDITS + pixiv 官方说明；AvatarSample_A/B/C/K/L/S 只是“样本条款”，**不是 CC0**；Seed-san/Twist=VRM PL，Godette=CC-BY，VRoid Hub 作者头、MMD/原神均非 CC0）：
+  - 头 9 个：Sendagaya_Shino / Sendagaya_Shibu / Darkness_Shibu / Vivi / Vita / Victoria_Rubin / HairSample_Female / AvatarSample_D_Darkness / Base_Female
+  - 身体 4 具：Vita / Victoria_Rubin / Darkness_Shibu / HairSample_Female
+- **index.html**：54 个非 CC0 头的 `<script src="models/…">` 改为内联 `if (Mods.on('cc0_only') === false) document.write(...)`（file:// 可用；CC0 模式下不下载不解析 → 启动更快）。**js/headpacks.js**：CC0 模式直接 return。
+- **js/heads.js**：`OK(i)` / `okList()`；randomLook 挑脸、allHair、tierFace（权重 0）、mixLook 发型候选与饰品库、coverHair 都只用 OK 的模型；新增 `resolve(look)`：非 CC0（或未加载）的脸/发型按 `hash(f|seed)` 固定换成 CC0（旧存档不改，只改显示），去掉非 CC0 饰品。`create()`、`randomLook()` 返回值、`mapsFor`、`hairColor`、`meta(look对象)` 都走 resolve；导出 `ModelHeads.resolve`。
+- 调 `meta` 的 3 处他人文件改为传外观对象：`explore.js:134`、`recall_iw.js`（`meta(lk)`）、`ui.js:224`（先 resolve）。
+- **js/foe.js**：`bodyFor` 外包一层 `CC0.body(name, seed)`（原函数改名 `bodyFor0`）；`build()` 入口也兜底。
+- 动作 / 野兽 / 道具 / 场景本来就是 CC0，不受影响。
+
+**拼图混搭：MOD `head_collage`（默认开，conflicts head_native；CC0 关闭时才有效果）**
+- `resolve()`：MMD/原神脸若戴自己的头发 → 按种子固定换成另一个 MMD 头里 `hairFitOK` 通过的发型（`collageHair`，缓存）；旧存档也生效。
+- `create()`：发型不是自己的时，**隐藏脸模自带头饰**（`ownAcc`：cloth_* 材质、眼睛以上；胡桃梅花帽/芙宁娜礼帽/黑天鹅面纱等）。
+- mixLook：MMD 脸拼第三个头饰品的概率 0.45+0.1×魂阶。借用饰品若包围盒不挨着头/发（悬空）则不显示。
+- mods.js：迁移 `__v10` → cc0_only / head_collage / hair_mix2 / acc_mix = true，head_native = false；三项 def 同步。
+- 测试台 `tools/test/lookgrid.html?cc0=1|0&collage=1|0&list=…&n=12&seed=…&old=GI_Eula,…`，`__grid()` 返回每个头的 f/h/ax。结果：CC0 模式 12 随机 + 3 旧原神存档 → 全部 CC0；关 CC0 → 24 张 MMD/原神脸 0 张戴自己头发，12 张带借用饰品，目检截图正常。
+- 已知：特征特别强的发型（雷电紫辫、千织红饰棕发、飞霄狐耳）换到别的脸上仍有辨识度；下一步可对借来的发型整体换色。

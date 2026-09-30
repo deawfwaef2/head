@@ -1193,6 +1193,13 @@ window.ModelHeads = (() => {
     if (fi >= 0 && T[fi].meta.grp === 'mmd' && window.Mods && Mods.on('head_collage') && idxOf(L.h) === fi) { const j = collageHair(fi, (look.seed || 0) + 17); if (j >= 0) { w(); L.h = T[j].meta.file; L.hn = '原色'; delete L.hx; delete L.hn3; } }
     return L;
   }
+  const OWNACC = new Map();
+  function ownAcc(t) { // R38 拼图：这张 MMD 脸模自带的头饰网格（帽子/头冠/面纱/发簪…，判定同 accLib，但不排除“坏头”）
+    if (OWNACC.has(t)) return OWNACC.get(t); const out = new Set(), ey = (t.meta.eye && t.meta.eye[1] != null) ? t.meta.eye[1] : 0;
+    for (const m of t.faceMeshes) { const nm = (SRC.get(m) || {}).name || ''; if (!/^cloth/i.test(nm)) continue; const P = m.geometry.attributes.position; if (P.count < 24) continue;
+      m.geometry.computeBoundingBox(); const bb = m.geometry.boundingBox; if ((bb.min.y + bb.max.y) / 2 < ey - 0.005 || bb.max.y < ey + 0.01) continue; out.add(m); }
+    OWNACC.set(t, out); return out;
+  }
   function create(look, opts = {}) {
     look = resolve(look);
     let fi = idxOf(look.f); if (fi < 0) fi = 0;
@@ -1242,7 +1249,9 @@ window.ModelHeads = (() => {
     const presets = F.meta.presets || {};
     const byName = {};
     const hlMeshes = [];
+    const strip = (F.meta.grp === 'mmd' && hi !== fi && window.Mods && Mods.on('head_collage')) ? ownAcc(F) : null; // R38 拼图：拆掉原作自带头饰（梅花帽/礼帽/面纱…），否则一眼认出是谁
     for (const m of F.faceMeshes) {
+      if (strip && strip.has(m)) continue;
       if (m.userData.kind === 'hl' && !opts.alive) continue; // 死眼：去掉高光（通灵 MV 里的“生前”版本保留）
       const c = new THREE.Mesh(m.geometry, fmMat(getMat(m, F), SRC.get(m), m.userData.kind)); c.name = m.name; c.renderOrder = m.renderOrder; c.userData.kind = m.userData.kind;
       if (m.userData.kind === 'hl') hlMeshes.push(c);
@@ -1310,8 +1319,10 @@ window.ModelHeads = (() => {
     addAccessories(g, look, F.meta, U, disposables, S.top);
     if (look.ax && look.ax.length && window.Mods && Mods.on('acc_mix')) try { // 第二十五轮：跨头饰品（不合格的直接不显示）
       const lib = accLib();
+      let axBox = null;
       for (const e of look.ax) { const a = lib.find(x => x.f === e.f && x.n === e.n); if (!a) continue;
         const geo = fitAcc(F, S, a, F.meta.file + '|' + H.meta.file + '|' + e.f + '|' + e.n); if (!geo) continue;
+        { if (!geo.boundingBox) geo.computeBoundingBox(); const gb = axBox || (axBox = new THREE.Box3().setFromObject(g).expandByScalar(0.003)); if (!gb.intersectsBox(geo.boundingBox)) continue; } // R38：悬空（不挨着头/发）的借用饰品不显示
         const c = new THREE.Mesh(geo, getMat(a.m, a.t)); c.name = '__AX__' + e.n; c.renderOrder = 2; g.add(c); }
     } catch (err) { console.warn('acc_mix', err); }
     if (window.HeadWear && look.hw && look.hw.length && (!window.Mods || Mods.on('headwear')) && !(window.Mods && Mods.on('head_native') && (() => { const fi = idxOf(look.f); return fi >= 0 && T[fi].meta.grp === 'mmd'; })())) try { /* R36b head_native：MMD/原神头自带发型和头饰，不再额外叠程序化头饰 */ HeadWear.build({ g, look, S, onShell, grad, disp: disposables }); } catch (e) { console.warn('headwear', e); }
