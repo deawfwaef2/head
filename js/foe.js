@@ -163,6 +163,7 @@ window.Foe = (() => {
       if (cur && o.fade !== 0) { a.play(); cur.crossFadeTo(a, o.fade == null ? 0.2 : o.fade, false); } else a.play();
       cur = a; f.cur = name; return a;
     };
+    f._cur = () => cur; f._setCur = a => { cur = a; }; if (window.Locomo) Locomo.install(f); // R47 npc_locomo：移动动作按实际速度混合
     return f;
   }
   const sfx = () => window.SFX || {};
@@ -475,13 +476,13 @@ window.Foe = (() => {
       if (!fo.atk && !(fo.stag > 0) && !(fo.block > 0) && fo.state === 'chase' && spd < 0.5 && !(fo.gestT > 0)) { // 绕圈/走位时身体转向前进方向（以前正面朝你、脚朝前走着横向滑 = 螃蟹步）
         if (strafe === 3 && fo.slotV) { const hd = Math.atan2(fo.slotV.x, fo.slotV.z), rel = ang(hd - face); if (Math.abs(rel) < 2.3) turnTo = face + clampA(rel, 0.95); }
         else if (strafe === 1 || strafe === -1) turnTo = face + strafe * 0.9; }
-      if (turnTo != null) fo.yaw += clampA(ang(turnTo - fo.yaw), 6 * dt * (0.6 + fo.iq) * (spd > 4 ? 1.4 : 1));
+      if (window.Locomo && Locomo.on() && !fo.atk && !(fo.stag > 0)) Locomo.turn(fo, turnTo, dt, spd); /* R47 npc_locomo：角速度弹簧转身 */ else { fo.yawV = 0; if (turnTo != null) fo.yaw += clampA(ang(turnTo - fo.yaw), 6 * dt * (0.6 + fo.iq) * (spd > 4 ? 1.4 : 1)); }
       { // 第十九轮：速度带加速度（不再瞬间换向）；侧移/后退都以“面向玩家”的方向为基准
         let vx = 0, vz = 0; if (spd > 0) { vx = Math.sin(fo.yaw) * spd; vz = Math.cos(fo.yaw) * spd; }
         if (strafe === 3 && !fo.atk && fo.stag <= 0 && fo.slotV) { vx += fo.slotV.x * 1.6; vz += fo.slotV.z * 1.6; }
         else if (strafe && !fo.atk && fo.stag <= 0) { if (strafe === 2) { vx -= Math.sin(face) * 0.8; vz -= Math.cos(face) * 0.8; } else { vx += Math.cos(face) * strafe * 0.85; vz -= Math.sin(face) * strafe * 0.85; } }
-        if (fo.rv) { vx += fo.rv.x; vz += fo.rv.z; fo.rv = null; } // 职业给的额外世界速度（绕背 / 翻滚 / 倒退）
-        const fv = fo.fv || (fo.fv = new V3()), kk = 1 - Math.exp(-(fo.atk ? 14 : 6) * dt); fv.x += (vx - fv.x) * kk; fv.z += (vz - fv.z) * kk;
+        const burst = !!fo.rv; if (fo.rv) { vx += fo.rv.x; vz += fo.rv.z; fo.rv = null; } // 职业给的额外世界速度（绕背 / 翻滚 / 倒退）
+        const fv = fo.fv || (fo.fv = new V3()); if (!(window.Locomo && Locomo.on() && Locomo.accel(fo, fv, vx, vz, dt, burst))) { const kk = 1 - Math.exp(-(fo.atk ? 14 : 6) * dt); fv.x += (vx - fv.x) * kk; fv.z += (vz - fv.z) * kk; } // R47 npc_locomo：起步/刹车加速度上限
         fo.pos.x += fv.x * dt; fo.pos.z += fv.z * dt;
         if (fo.kb) { const kt = Math.min(dt, fo.kb.t); fo.pos.x += fo.kb.x * kt; fo.pos.z += fo.kb.z * kt; fo.kb.t -= dt; if (fo.kb.t <= 0) fo.kb = null; }
         const pd = Math.hypot(fo.pos.x - P.pos.x, fo.pos.z - P.pos.z), mn = 1.05; // 永远不贴进玩家 1.05m 内（第一人称近裁剪穿模闪烁）
@@ -489,6 +490,7 @@ window.Foe = (() => {
       }
       if (fo.state === 'chase') guardAI(fo, dt, d); guardShow(fo);
       collide(fo.pos, 0.35); fo.pos.y = ctx.H(fo.pos.x, fo.pos.z) + (fo.yOff || 0); f.root.rotation.y = fo.yaw;
+      if (window.Locomo) Locomo.tick(fo, dt); // R47 npc_locomo
       f.mixer.update(dt);
       fo.f.bones.head.getWorldPosition(fo.anchor.pos); fo.anchor.pos.y -= 0.3;
       { // 受击闪红 + 第十九轮：蓄力时身体渐亮（红=普通，橙=重击），出手瞬间最亮 —— 只改 uniform，不新建材质

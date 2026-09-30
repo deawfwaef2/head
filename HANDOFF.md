@@ -1769,3 +1769,14 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 月之魔女：`Elites.MOON.cond` 改为「月之线索 ≥7」（运行时补丁，Saga 关闭则回到 13 精英）。线索来源：月使（斩首）、8 个章节闪回（kills≥10 / 首个霸主 / 首个猎手 / 首个精英 / 失败≥2 / 成功≥3 / 同地区≥4 次 / 稀有头）。线索列表显示在「精英挑战」面板顶部。
 - 未验证：真实游戏里的相机接管（FPV 手臂/武器是 camera 子节点，进电影时隐藏；FPV 若每帧重设 visible 会露一下）、HUD 隐藏（body 直属子元素 opacity=0）、目标注入在狭长/特殊形状地图上的位置。
 - 待做（同一轮后续）：回忆祭坛建筑（随机 3 选 1 技能，不同流派）、头棋 AI 加强。
+## R41（主管）g —— R47 第 4 项：人物移动像 GMod（+ 用户：R47f 的风格全部保留，world_cel 改默认开）
+- 新 MOD `npc_locomo`（默认开），新文件 `js/locomo.js`。实测（脚+脚趾着地点轨迹，tools/test 下 calib 脚本思路见文件头）：髋高 0.93m 身体上 UAL 自然步速 走 0.98 / Jog 5.9 / Sprint ~9.1 m/s。
+  原 AI：走 1.6–1.8m/s（脚前滑 ~2×）、慢跑 3.4m/s 播 Jog×0.85（腿快 1.5×，原地蹬跑步机）、Sprint 同理 → GMod 感。
+  - 拦截 f.play 的 Walk/Walk_Formal/Jog/Sprint → 按【实际位移速度】三段相位同步混合（左脚最前相位对齐），播放速率 = 速度/混合步幅，限幅 走 0.5–1.8×、跑 0.5/0.62–1.25×。后退只用走路倒放。
+  - 起步 7m/s² / 刹车 10m/s²（职业 rv 突进 16，攻击 fo.atk 时保持原 14/s 指数响应）。
+  - 转身：角速度弹簧（角加速度 26rad/s²，最大角速度随速度 5.2→2.3 rad/s），跑动时向内侧倾身（≤0.12rad，root.rotation.z）。
+  - AI 要 Idle 但还在滑行（>0.55m/s）→ 先减速到 0.35m/s 再切。攻击/受击立即交叉淡出移动动作。
+  - 测试：同速度下着地脚滑移（m/s）旧→新：0.8m/s 0.30→0.09；3.5m/s 1.65→0.20；4.5m/s 3.45→0.22。真实 AI（world.html crowd+sees）追击→逼近→出拳全流程无报错。
+- foe.js 4 处钩子（均带 R47 npc_locomo 注释）：animate 暴露 `f._cur/_setCur` + `Locomo.install(f)`；转身行；速度平滑行（`burst` 标志）；`mixer.update` 前 `Locomo.tick`。
+- mods.js：npc_locomo 条目；world_cel 默认 true。mods_i18n.js：npc_locomo。index.html / world.html：foe.js 前加 locomo.js。
+- world.html：`window.__foes`（crowd 敌人数组）。
