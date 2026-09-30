@@ -537,9 +537,10 @@ window.Worlds = (() => {
       sc: B.sc, H: B.H, cols: B.cols, R: B.R, doors: B.doors, pvel: W.vel, escaped: (fo) => { const nd = W.graph.nodes[W.cur], i = nd.prey.indexOf(fo.h); if (i >= 0) nd.prey.splice(i, 1); G.toast && G.toast(`🚪 ${NM(fo.h.c)} 从门逃走了……（首级没了）`, '#ffb080', 2.4); W.trip.log.push({ t: `${fo.h.c.name}从「${nd.name}」的门逃走了。` }); if (W.stats) W.stats.combo = 0; }, player: { pos: W.pos, get yaw() { return G.player.yaw; }, get crouch() { return G.player.crouch; } },
       st: () => G.st(), sees: (pos, maxD) => sees({ pos }, maxD), say: (anchor, text, col) => { if (text) say(anchor, text, col); },
       floatDmg: (pos, n, big) => floatDmg(pos, n, big), renderer: G.renderer, camera: G.camera, event: (t, fo, d) => foeEvent(t, fo, d), windup: (fo, clip) => { if (window.CombatFX && CombatFX.on) { CombatFX.windup(fo, clip); return; } const dd = W ? Math.hypot(fo.pos.x - W.pos.x, fo.pos.z - W.pos.z) : 5, v = Math.max(0, 1 - dd / 14); if (!v) return; SFX.play && SFX.play('draw', 0.5 * v, 0.62, 0.05); if (/Heavy|Sword_Attack/.test(clip)) SFX.play && SFX.play('heavy', 0.45 * v, 0.7, 0.05); }, // 第十九轮：起手音 toast: (t, c, d) => G.toast && G.toast(t, c, d), shake: (k) => { W.shake = Math.max(W.shake || 0, k); },
-      playerSwinging: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.thrust > 0)),
+      playerSwinging: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.sw || Combat.state.thrust > 0)),
       playerAiming: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.tipSpeed > 3)),
       handAng: (fo) => { const CS = window.Combat && Combat.drawn && Combat.state; if (!CS) return null; // 第十八轮：刀尖锁准星 → 刀来自“准星相对这个敌人”的方向；挥动中用挥动来向
+        if (CS.sw && CS.sw.v) return Math.atan2(-CS.sw.v.y, -CS.sw.v.x); // R26：出刀中用刀路来向
         if (CS.lmb && CS.mv && CS.mv.lengthSq() > 4e4) return Math.atan2(-CS.mv.y, -CS.mv.x);
         if (fo && fo.pos) { const p = _hv.set(fo.pos.x, fo.pos.y + 1.2, fo.pos.z).project(G.camera); if (p.z < 1 && Math.hypot(p.x, p.y) > 0.08) return Math.atan2(-p.y, -p.x); }
         return Math.atan2(CS.hand.y + 0.1, CS.hand.x - 0.04); },

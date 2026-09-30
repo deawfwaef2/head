@@ -199,6 +199,12 @@ window.CombatFX = (() => {
     else if (kind === 'rage') { voice(o, t, 240, 420, 0.6, 0.18, [900, 1600]); voice(o, t + 0.1, 160, 330, 0.5, 0.12, [700, 1300]); tn(o, 'sawtooth', 70, 140, t, 0.5, 0.08, 0.1); nz(o, t, 0.6, 0.2, 'bandpass', 900, 300, 0.8, 0.1); }
     else if (kind === 'armor') { if (!gate('armor', 120)) return; ring(o, t, 820, 0.14, 0.3); nz(o, t, 0.04, 0.3, 'highpass', 3000, 3000, 0.7, 0.001); tn(o, 'sine', 110, 50, t, 0.2, 0.3, 0.003); } // 蛮兵硬吃一刀：当啷
     else if (kind === 'dodged') { nz(o, t, 0.14, 0.18, 'bandpass', 1200, 500, 1, 0.01); }
+    else if (kind === 'cast') { if (!gate('cast', 250)) return; nz(o, t, 0.5, 0.16, 'bandpass', 500, 2600, 1.4, 0.15); tn(o, 'sine', 300, 900, t, 0.45, 0.07, 0.12); ring(o, t + 0.3, 1320, 0.05, 0.4, [[1, 1, 1], [2.01, 0.4, 0.7]]); } // 吟唱：上扫的沙沙 + 清亮泛音
+    else if (kind === 'heal') { const b = bus(1, s.p, 0.35); [0, 4, 7, 12].forEach((sm, i) => tn(b, 'triangle', 523 * Math.pow(2, sm / 12), 523 * Math.pow(2, sm / 12), t + i * 0.09, 0.5, 0.09, 0.01)); }
+    else if (kind === 'pop') { if (!gate('pop', 80)) return; nz(o, t, 0.12, 0.3, 'highpass', 2500, 6000, 0.8, 0.002); tn(o, 'sine', 900, 200, t, 0.18, 0.2, 0.003); }
+    else if (kind === 'parry') { if (!gate('parry', 150)) return; ring(o, t, 1500, 0.1, 0.25); nz(o, t, 0.04, 0.25, 'highpass', 3500, 3500, 0.7, 0.001); }
+    else if (kind === 'rally') { const b = bus(1, s.p, 0.4); tn(b, 'sawtooth', 110, 110, t, 0.9, 0.12, 0.08); tn(b, 'sawtooth', 165, 165, t + 0.05, 0.85, 0.09, 0.08); tn(b, 'sawtooth', 220, 247, t + 0.3, 0.6, 0.08, 0.05); nz(b, t, 0.5, 0.1, 'lowpass', 600, 300, 0.7, 0.1); }
+    else if (kind === 'blink') { nz(o, t, 0.2, 0.22, 'highpass', 2000, 7000, 0.8, 0.005); tn(o, 'sine', 1400, 300, t, 0.2, 0.12, 0.004); }
     else if (kind === 'slam') { tn(o, 'sine', 90, 32, t, 0.7, 0.9, 0.004); nz(o, t, 0.5, 0.4, 'lowpass', 400, 80, 0.7, 0.01); kick(0.4); }
   }
   // 敌人脚步（按距离 + 体型）/ 刺客潜行

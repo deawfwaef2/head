@@ -4,9 +4,10 @@ async function trial(kind, o) {
   H.ttk = null; if (window.G) { G.player.pos.set(0,0,0); G.player.yaw = 0; G.player.pitch = 0; G.S.hp = 200; const C = Combat.state; C.lmb = C.rmb = false; C.sw = null; C.thrust = 0; C.thrustQ = 0; C.charge = 0; C.charged = 0; C.stam = 100; C.hitCd.clear(); if (window.Stamina && Stamina.ex !== undefined) { try { Stamina.reset && Stamina.reset(); } catch (e) {} } }
   const info = await setup(Object.assign({}, o));
   const T0 = window.__vt; let t0 = 0, phase = 0, nextT = 0, swings = 0; const f0 = Foe.foes[0];
-  const bot = (t, dt) => {
-    const f = aim(o.zy); if (f && o.off) { G.player.yaw += o.off * Math.sin(t * 2.3); G.player.pitch += (o.off * 0.6) * Math.sin(t * 1.7); } if (f && o.walk) approach(o.stand || 1.5, dt);
+  const bot = (t, dt) => { if (window.__dbg && t - T0 > 2.3) window.__dbg();
+    const f = aim(o.zy); if (f && o.off) { G.player.yaw += o.off * Math.sin(t * 2.3); G.player.pitch += (o.off * 0.6) * Math.sin(t * 1.7); } if (f && o.walk && t - T0 >= (o.delay || 0)) approach(o.stand || 1.5, dt);
     if (Foe.foes.every(f => f.dead)) { H.stop = true; H.ttk = t - T0; return; }
+    if (t - T0 < (o.delay || 0)) return;
     if (kind === 'click') { // 连点：按下 70ms 松开，间隔 0.38s
       if (phase === 0 && t >= nextT) { Combat.onDown(0); phase = 1; nextT = t + 0.07; swings++; }
       else if (phase === 1 && t >= nextT) { Combat.onUp(0); phase = 0; nextT = t + 0.3; } }

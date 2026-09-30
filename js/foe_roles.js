@@ -23,8 +23,10 @@ window.FoeRoles = (() => {
     if (!on() || it.boss) return;
     const armed = fo.armed, w = armed ? [['brute', 0.14], ['skirm', 0.2], ['guard', 0.18], ['assassin', 0.15], ['berserk', 0.14], ['ranged', 0.12], [null, 0.07]] : [['brute', 0.22], ['skirm', 0.34], ['berserk', 0.26], [null, 0.18]];
     let x = r() * w.reduce((a, b) => a + b[1], 0), role = null; for (const [k, p] of w) { if ((x -= p) <= 0) { role = k; break; } }
+    if (window.FoeRoles2) { const r2 = FoeRoles2.pick(fo, r, role); if (r2) role = r2; } // R26：新职业
     if (!role) return; const I = INFO[role];
     fo.role = role; fo.spdMul = I.spd; fo.dmgMul = I.dmg; fo.maxHp = fo.hp = Math.max(8, Math.round(fo.maxHp * I.hp)); fo.rs = { roll: 0, rollCd: 2 + r() * 2, t: 0 };
+    if (window.FoeRoles2 && FoeRoles2.R[role]) FoeRoles2.init(fo, role);
     if (role === 'berserk') { fo.brave = true; fo.retreated = true; } // 不后退
     for (const m of fo.mats || []) if (m.color) { m.color.r *= I.tint[0]; m.color.g *= I.tint[1]; m.color.b *= I.tint[2]; } // 轻微职业色调（不新建材质）
   }
@@ -32,6 +34,7 @@ window.FoeRoles = (() => {
 
   // ---- 选招 / 调参 ----
   function clip(fo, cur, d, force) {
+    if (window.FoeRoles2 && FoeRoles2.R[fo.role]) return FoeRoles2.clip(fo, cur, d, force);
     const r = Math.random(), a = fo.armed;
     switch (fo.role) {
       case 'brute': return a ? (r < 0.5 ? 'Sword_Attack' : r < 0.65 ? 'Sword_Heavy_Combo' : null) : 'Melee_Hook';
@@ -54,10 +57,12 @@ window.FoeRoles = (() => {
       if (Math.abs(rel) > 2.0) { A.back = true; A.dmgMul *= 1.6; if (window.CombatFX) CombatFX.roleCue(fo, 'backstab'); }
     }
     else if (role === 'ranged') { if (A.clip === 'OverhandThrow') { A.ranged = true; A.ws *= 0.85; A.ws2 = Math.min(1, A.ws * 1.7); A.hold = 0.3; A.feint = false; if (h0) h0.thrust = true; } }
+    if (window.FoeRoles2) FoeRoles2.tune(fo, A, d);
     A.dmg = Math.max(1, Math.round(A.dmg * A.dmgMul));
   }
   function after(fo) { // 收招后
     const role = fo.role; if (!role) return; const Foe_ = window.Foe;
+    if (window.FoeRoles2 && FoeRoles2.R[role]) FoeRoles2.after(fo);
     if (role === 'skirm' || role === 'assassin') { if (fo.state === 'chase' && !fo.boss) { fo.state = 'retreat'; fo.retT = role === 'assassin' ? 1.8 + Math.random() : 1.0 + Math.random() * 0.7; } fo.cd = Math.max(fo.cd, role === 'assassin' ? 1.5 : 0.6); }
     else if (role === 'berserk') fo.cd *= fo.rage2 ? 0.3 : 0.5;
     else if (role === 'brute') fo.cd += 0.9;
@@ -70,6 +75,7 @@ window.FoeRoles = (() => {
     const rs = fo.rs; if (!rs || fo.dead) return null; label(fo, ctx); rs.t += dt; rs.P = P; const f = fo.f;
     if (fo.poise > 0 && fo.role === 'brute') fo.poise = Math.max(0, fo.poise - 9 * dt);
     const Foe_ = window.Foe, tok = () => Foe_ && Foe_.tokenOK(fo);
+    if (window.FoeRoles2 && FoeRoles2.R[fo.role]) return FoeRoles2.tick(fo, dt, d, face, dx, dz, P, ctx);
     if (fo.role === 'skirm') {
       rs.rollCd -= dt;
       if (rs.roll > 0) { rs.roll -= dt; const sgn = rs.rollDir; fo.rv = { x: Math.cos(face) * sgn * 5.4 - Math.sin(face) * 0.8, z: -Math.sin(face) * sgn * 5.4 - Math.cos(face) * 0.8 }; if (rs.roll <= 0) { f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.15 }); } return { turnTo: face, spd: 0 }; }
@@ -114,12 +120,14 @@ window.FoeRoles = (() => {
 
   // ---- 翻滚中：刃穿过去 / 受击反应 ----
   function evade(fo, info) {
+    if (window.FoeRoles2) FoeRoles2.evade(fo, info);
     const rs = fo.rs; if (!rs || !(rs.roll > 0)) return false;
     if (performance.now() - (rs.evT || 0) > 350) { rs.evT = performance.now(); const c = window.Foe && Foe.ctx && Foe.ctx(); if (c && c.floatDmg) c.floatDmg(fo.anchor.pos, '闪', false); if (window.CombatFX) CombatFX.roleCue(fo, 'dodged'); }
     return true;
   }
   function hurt(fo, dealt, info, zone) { // 返回 true = 这一下不产生硬直
     if (!fo.role) return false; const role = fo.role;
+    if (window.FoeRoles2 && FoeRoles2.R[role]) return FoeRoles2.hurt(fo, dealt, info, zone);
     if (role === 'berserk' && !fo.rage2 && fo.hp <= fo.maxHp * 0.5) { fo.rage2 = true; fo.spdMul = 1.3; fo.dmgMul *= 1.0; if (window.CombatFX) CombatFX.roleCue(fo, 'rage'); const c = window.Foe && Foe.ctx && Foe.ctx(); if (c && c.toast) c.toast('🔥 狂战进入狂暴——更快更狠！', '#ff8060', 1.8); for (const m of fo.mats || []) if (m.color) { m.color.g *= 0.8; m.color.b *= 0.8; } }
     if (role === 'brute') { fo.poise = (fo.poise || 0) + dealt; if (fo.poise >= 26 || info.charged || (fo.broken > 0)) { fo.poise = 0; return false; } if (window.CombatFX) CombatFX.roleCue(fo, 'armor'); return true; } // 蛮兵硬吃：当啷一声，不硬直
     if (role === 'berserk' && fo.rage2 && !info.charged) { fo.poise = (fo.poise || 0) + dealt; if (fo.poise < 20) return true; fo.poise = 0; }
@@ -137,6 +145,7 @@ window.FoeRoles = (() => {
   }
   const _t = { x: 0, y: 0, z: 0 };
   function update(dt, ctx) {
+    if (window.FoeRoles2) FoeRoles2.update(dt, ctx);
     if (!PROJ.length) return; const P = ctx.player, CS = window.Combat && Combat.drawn && Combat.state, F = window.Foe, T = window.THREE;
     for (let i = PROJ.length - 1; i >= 0; i--) {
       const p = PROJ[i], o = p.g; p.life -= dt; o.position.addScaledVector(p.v, dt); o.rotation.x += 22 * dt; let kill = p.life <= 0;
@@ -154,6 +163,6 @@ window.FoeRoles = (() => {
       if (kill) { o.parent && o.parent.remove(o); PROJ.splice(i, 1); }
     }
   }
-  function clear() { for (const p of PROJ) p.g.parent && p.g.parent.remove(p.g); PROJ.length = 0; }
+  function clear() { if (window.FoeRoles2) FoeRoles2.clear(); for (const p of PROJ) p.g.parent && p.g.parent.remove(p.g); PROJ.length = 0; }
   return { assign, clip, tune, after, tick, evade, hurt, fire, update, clear, INFO };
 })();

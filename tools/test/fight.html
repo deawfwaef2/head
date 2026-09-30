@@ -8,7 +8,7 @@ window.SFX = new Proxy({}, { get: (t, k) => k === 'ctx' || k === 'out' ? undefin
 <script src="/lib/three.min.js"></script><script src="/lib/GLTFLoader.js"></script>
 <script src="/js/mods.js"></script><script src="/js/lore.js"></script><script src="/js/rpg.js"></script>
 <script src="/models/AvatarSample_K.js"></script><script src="/js/hair_cover.js"></script><script src="/js/heads.js"></script><script src="/js/headwear.js"></script>
-<script src="/js/combat.js"></script><script src="/js/stamina.js"></script><script src="/js/foe.js"></script><script src="/js/foe_roles.js"></script>
+<script src="/js/combat.js"></script><script src="/js/stamina.js"></script><script src="/js/foe.js"></script><script src="/js/foe_roles.js"></script><script src="/js/foe_roles2.js"></script>
 <script src="/js/persona_lines.js"></script><script src="/js/persona.js"></script>
 <script>
 const V3 = THREE.Vector3;
@@ -26,15 +26,15 @@ async function setup(opts) {
     const G = { camera, scene, renderer, vm, weapon, fist: null, S, heads: [], player, uiOpen: false, toast() { }, burst() { }, kick() { }, flash() { }, lockPointer() { }, save() { }, damage(n) { H.dmgIn += n; S.hp -= n; }, st: () => ({ power: __opts.power || 120, atk: 10, def: 5, dodge: 0.05, maxHp: 200 }) };
     window.__game = G; window.G = G; Combat.init(G); Combat.toggle(true);
     window.CTXH = { sc: scene, H: () => 0, cols: [], R: 40, doors: [], pvel: new V3(), escaped() { }, player: { pos: player.pos, get yaw() { return player.yaw; }, get crouch() { return false; } },
-      st: G.st, sees: () => true, say() { }, floatDmg(pos, n, big) { H.dmgOut += n; H.hits++; }, renderer, camera,
-      event(t, fo, d) { H.log.push(t === 'hit' && d ? 'hit:' + d.zone : t); if (t === 'kill') H.kills++; }, windup() { }, playerSwinging: () => false, playerAiming: () => false, handAng: () => null, clang() { if (window.Combat) Combat.recoil(1); },
+      st: G.st, sees: () => true, say() { }, floatDmg(pos, n, big) { if (typeof n === 'string') { H.log.push('F' + n); return; } H.dmgOut += n; H.hits++; }, renderer, camera,
+      event(t, fo, d) { H.log.push(t === 'hit' && d ? 'hit:' + d.zone : t); if (t === 'kill') H.kills++; }, windup() { }, playerSwinging: () => !!(Combat.drawn && (Combat.state.lmb || Combat.state.sw || Combat.state.thrust > 0)), playerAiming: () => false, handAng: () => { const CS = Combat.state; if (CS.sw && CS.sw.v) return Math.atan2(-CS.sw.v.y, -CS.sw.v.x); return Math.atan2(CS.hand.y + 0.1, CS.hand.x - 0.04); }, clang() { if (window.Combat) Combat.recoil(1); },
       power: (fo) => __opts.q || 1, toast() { }, shake() { }, bossMeet() { }, bossHp() { }, onDeath() { },
       hitPlayer(fo, n, h) { H.dmgIn += n; H.log.push('hurt'); } };
     Combat.addProvider(() => Foe.targets());
     await ModelHeads.init();
   }
   Object.assign(__opts, opts); G.S.eq.weapon = opts.weapon || 0; const ctx = CTXH, player = G.player, S = G.S, scene = G.scene;
-  const S0 = Lore.LOCS[opts.loc || 0], list = [];
+  window.__forceRole = opts.role || null; const S0 = Lore.LOCS[opts.loc || 0], list = [];
   const specs = opts.foes || [{ x: 0, z: -2.6 }];
   for (const sp of specs) { const h = RPG.foe(S, S0, (sp.seed || 123) >>> 0, new Set(), new Set()); if (sp.rar != null) h.c.rar = sp.rar; list.push({ h, pos: new V3(sp.x, 0, sp.z), boss: sp.boss }); }
   await Foe.populate(ctx, list);

@@ -1125,3 +1125,11 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 伤害：`info.fmul` 轻 1.45 / 终结 1.5×1.3 / 重 1.6×2.2；普通敌人约 4 刀（≈1.3s），霸主 ≈ 8 刀。
 - 手感：命中 = 屏震 + 镜头沿斩向压/侧倾（`M.kick`，在 `prerender` 里加到相机旋转）+ FOV 冲击 + 22~50ms 只冻刀不冻镜头 + 命中回体力 3~6；体力：轻 6 / 终结 9 / 重 16，不再按刃尖速度持续扣体力。
 - 测试台（`tools/test/fight.html` + `bots.js`）：click/flick/hold/wave/mash/sloppy 六种机器人 × 12 种敌人，全部 30 秒内击杀（旧版 wave 永远 0 伤害）。注意：测试台里虚拟时钟不要回零（combat 里有 performance.now 绝对时间状态）。
+
+## R26d — 新敌人角色（MOD `foe_roles2`，默认开）
+- 新增 `js/foe_roles2.js`（`window.FoeRoles2`），由 `js/foe_roles.js` 的 assign/clip/tune/after/tick/evade/hurt/update/clear 钩子调用；`index.html` 在 foe_roles.js 之后加载。
+- 五个角色：**duelist 决斗者**（玩家挥刀时招架→反击，不逃跑）、**juggernaut 重甲**（正面非蓄力伤害×0.3，要绕背/蓄力重击破防，韧性 40）、**mage 法师**（紫色法球，HP<50% 三连发，近身闪现；挥刀可击碎 2.3m 内法球，右键格挡可挡）、**healer 治疗者**（10m 内队友 +30% 回血，被打断；只在场上≥2 敌人时出现；同伴全死后原地发慌）、**warcaller 战吼者**（9m 红圈，队友 ×1.2 速 ×1.25 伤，<55% 血时集结全体追击）。
+- `combatfx.js` `roleCue` 新增 cast/heal/pop/parry/rally/blink；`worlds.js` `playerSwinging` 现包含 `Combat.state.sw`，`handAng` 优先取 `CS.sw.v`。
+- 测试钩子：`window.__forceRole`（字符串或按 `Foe.foes.length` 索引的数组）。`tools/test/fight.html` 与 `bots.js`（新增 `o.delay`）已更新；harness 的 `playerSwinging/handAng` 现与游戏一致。
+- 验证（light harness）：五个角色均无 JS 报错；duelist 会 `blocked`；mage 法球命中玩家（站桩 70 伤害）；healer 回血（F✚）；warcaller 给 buf；老角色矩阵回归全部 1.3–2.9s 击杀。踩坑：新角色必须 `fo.brave=true` 且 `fo.retreated=true`，否则被打后进 flee 状态，role.tick 不再被调用；healer/mage 后退速度必须低于玩家走速（1.8/1.9）否则打不到。
+- 待做：野兽变体、HUD 连击点、教程文本更新。
