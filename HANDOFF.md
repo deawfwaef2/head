@@ -1412,3 +1412,17 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **MOD `skin_sss`（默认开，heads.js `SSS_GLSL`）**：3D 真人皮肤质感。保留 PBR，只对“肤色像素”（按反照率色相/饱和度/亮度判定，头发衣服不受影响）加：明暗交界带血红色散射、背光侧暖色填充、掠射角红色透光边、整体微暖；头发/衣服硬高光压到 30%、皮肤 55~70%，另加极淡油脂光泽。极暗环境不抬亮。**`anime_shade` 默认改为关**（用户要 3D shader 风格；mods.js 迁移 `__v8` 一次性关掉）。测试台 `tools/test/shade.html?sss=0|1&anime=1`（脸朝向 yaw≈2.45~2.7）。
 - **MOD `head_native`（默认开）**：头保持原样。迁移 `__v9` 把 `hair_mix2`（跨头发型）和 `acc_mix`（跨头饰品库）关掉；MMD/原神头不再叠程序化头饰（heads.js HeadWear.build 前的判断）。想要混搭：关 head_native 并手动开那两项。没动 VRoid 系头自己的发型替换。
 - 测试：`fight.html` 里 boss 被 `Foe.execute` 不死（hp 150→127）、`mult:50` 的脖子重击只扣 10%。
+
+## R37 — 用户 6 条反馈（开发者模式默认关 / 鼠标找不回 / 头棋朝向与不说话 / 战斗太简单 / F 视角头小 / 断面）
+1. **dev_mode 默认关**（c58cc68）：`js/mods.js` `def:false` + 迁移 `__v<7 → dev_mode=false`。（迁移版本号以 mods.js 实际最大值为准，别人已加到 __v9，新增请继续递增。）
+2. **鼠标出现后点不回游戏 / ESC 无效 / 锁不上**（`js/game.js`，紧跟 `setUI` 之后的 R37 块）：
+   - 根因：ESC 不是“用户手势”键，面板用 ESC 关闭后 `requestPointerLock` 必失败；某些面板异常退出会让 `uiOpen` 卡在 true；原来只有点 canvas 才会重锁，面板/遮罩盖着时点不到。
+   - 修：① 游戏中（playing 且无 UI、未锁定）屏幕下方常驻“🖱️ 鼠标已释放 — 点击画面回到游戏”；document 级 capture `mousedown`（非按钮/输入框）→ 重锁；② `uiOpen` 卡死：按 ESC 后 250ms 若屏幕中心是画面而非面板 → 复位；或 2.5s 内连点画面 3 次 → 复位（`G.unstick()` 也导出）；③ `setUI(false)` 后 60ms 自动尝试重锁（ESC 触发的会被浏览器拒绝 → 原有 `lockFailed` 提示）。
+3. **头棋**（`js/chess.js`）：头朝向 = 朝对手（红方 yaw=π、蓝方 0），只随镜头偏转 `0.3·sin(cam.t−base)`（≤0.3rad）；`talk()`/`face()` 直接 return（无气泡、无表情）；`key=''` 不再设 EXMAP 表情。Snik 侧栏台词不动（那不是头）。
+4. **战斗 AI（MOD `foe_mind`，新文件 `js/foe_mind.js`，默认开）**：包装 `FoeAI2.update/tune/after/tick`（foe.js 运行时读 `window.FoeAI2.x`，没改 foe.js / foe_ai2.js）。习惯记忆 `FoeMind._H`（guard/spam/circle/retreat）；每敌人性格 `fo.mind`（pat/rush/tri/cnt）；每刀节奏 6 选 1（quick / normal / delayed / bait=假动作后立刻真刀 / brk=红光破防 / 读盾补刀），`A.mk` 记录；`mindAfter` 读你出手瞬间的反应（举盾→破防刀；后撤→Sword_Dash 突进；侧闪→快刀；站着挨→拉开）；走位：打了就跑（kiteT）、反击型引你空挥（后撤预算 backBudget）、突进型绕圈预判。不改伤害（FoeAbs 继续管）。测试：`/var/work/mind_test.js`（fight.html 里三种玩家行为：不举盾 / 一直举盾 / 乱挥，举盾 120s 后 guard 习惯=0.93、出现 4 次 brk）。`tools/test/fight.html` 已加载 foe_mind.js。
+   - 注意：fight.html 的 Melee_Hook 动画时间在虚拟时钟下偶尔卡在 ct=0.1（关掉 foe_mind 也复现），是测试台问题，不是 AI bug。
+5. **F 视角头小于手**（`js/recall_iw.js`）：`S.k`=包围盒高/0.26，MMD 系头包围盒含发量/发饰（0.27~0.59，VRoid 中位 0.30）→ k 偏大 → 手被放大。非 VRoid 头（`ModelHeads.meta(look.f).grp !== 'vroid'`）改为 `k=1.15+0.1·(kRaw−1.15)`，夹在 [1.05,1.3]；`S.kRaw` 保留原值。
+6. **断面（`js/heads.js` `fitCut`）**：新增 `tools/test/cutview.html`（`?list=a,b,c&hide=` + `__cut('neck'|'under'|'side')`、`__dbg()`、`__metric()`、`__skin()`；用 cap.py 截 #cv；一次不要超过 ~12 个头，否则 Chromium 丢 WebGL 上下文）。逐个目检非 VRoid 头发现：颈圈顶点只有半圈（甚至混入下巴/衣领顶点）→ 凸包成了 D 形/扇形断面，盖不住颈口，露出里面的皮肤碎片（申鹤、Hysilens、Jingliu、Feixiao、Mokou 等）。修：① 最小二乘拟合圆，点在圆周上最大空缺 >100° 就在空缺补圆周点；② 凸包必须“像颈口”：`面积/(π·meanR²) ≥ 0.87` 且 `面积/(π·r0²)` 在 [0.2, 2.2]，否则退回原 `__CUT__` 圆盘（压到切平面）。`ModelHeads.cutDbg()` 可看每个头的拟合信息（`bad:true` = 已退回）。
+   - 仍可留意：头后面“nape 壳”（MMD 后脑补丁）从下往上看是白色锯齿边（头发遮住时看不到，F 视角从下看才可能露）；VRoid 头的断面因脖子倾斜看着是斜椭圆，属正常。
+- 改动文件：`js/game.js`、`js/chess.js`、`js/foe_mind.js`（新）、`js/mods.js`（+foe_mind）、`index.html`（+script）、`js/recall_iw.js`、`js/heads.js`、`tools/test/cutview.html`（新）、`tools/test/fight.html`、`HANDOFF.md`。
+- 提醒用户：聊天里的 GitHub PAT 已多次暴露，请去 GitHub 撤销并换新。

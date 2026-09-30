@@ -378,7 +378,7 @@ window.startGame = function () {
     else if (!noLock && !uiOpen && !lockRetry) { playing = false; $('menu').classList.remove('hidden'); save(); }
   });
   document.addEventListener('pointerlockerror', () => lockFailed());
-  function setUI(open) { uiOpen = open; if (open) { if (document.pointerLockElement) document.exitPointerLock(); } }
+  function setUI(open) { uiOpen = open; if (open) { if (document.pointerLockElement) document.exitPointerLock(); } else if (playing && !noLock) setTimeout(() => { if (playing && !uiOpen && !document.pointerLockElement && !film) lockPointer(); }, 60); /* R37：关面板后自动尝试重新锁定（ESC 关闭时浏览器会拒绝 → 走 lockFailed 提示，点一下画面即可） */ }
   // R37（用户：“有时候鼠标出现之后点不回去游戏了，没法按 ESC 也没法锁定鼠标”）——鼠标找回：
   //  1) 游戏中（playing 且没开 UI）鼠标没被锁定 → 屏幕下方常驻提示“点击画面回到游戏”，任意位置按下（不是按钮/输入框）就重新锁定；
   //  2) 某个面板异常退出导致 uiOpen 卡死：按 ESC（250ms 后屏幕中心是画面而不是面板）或连点画面 3 次 → 强制复位 uiOpen 并重新锁定；
