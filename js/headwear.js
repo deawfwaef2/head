@@ -67,7 +67,7 @@ window.HeadWear = (() => {
   const geo = (k, f) => GEO[k] || (GEO[k] = f());
   function build(ctx) {
     const { g, look, S, onShell, grad, disp } = ctx;
-    const toon = (c, o = {}) => { const m = new THREE.MeshToonMaterial(Object.assign({ color: c, gradientMap: grad }, o)); disp.push(m); return m; };
+    const toon = (c, o = {}) => { const m = new (window.ModelHeads&&ModelHeads.MTM||THREE.MeshToonMaterial)(Object.assign({ color: c, gradientMap: grad }, o)); disp.push(m); return m; };
     const metal = (c, rough = 0.28) => { const m = new THREE.MeshStandardMaterial({ color: c, metalness: 0.85, roughness: rough }); disp.push(m); return m; };
     const surf = (x, y, z, out = 0.002) => { const d = V(x, y, z).normalize(); return { p: onShell(S, d.x, d.y, d.z, -out), n: d }; };
     const face = (o, p, n, upHint = V(0, 1, 0)) => { o.position.copy(p); const m = new THREE.Matrix4(); const z = n.clone().normalize(), x = new THREE.Vector3().crossVectors(upHint, z).normalize(); if (x.lengthSq() < 1e-6) x.set(1, 0, 0); const y = new THREE.Vector3().crossVectors(z, x); m.makeBasis(x, y, z); o.quaternion.setFromRotationMatrix(m); };
@@ -144,7 +144,7 @@ window.HeadWear = (() => {
       h.add(new THREE.Mesh(geo('minihat', () => new THREE.LatheGeometry(prof, 36)), m));
       const band = new THREE.Mesh(geo('mhB', () => new THREE.CylinderGeometry(0.0282, 0.0272, 0.011, 36, 1, true)), m2); band.position.y = 0.012; h.add(band);
       const rose = bow(toon, e.c2 || '#d81b3a', 0.3); rose.position.set(0.024, 0.014, 0.012); rose.rotation.y = 0.9; h.add(rose);
-      const veil = new THREE.Mesh(geo('veil', () => { const G = new THREE.SphereGeometry(0.05, 20, 8, -0.2, 2.2, 1.3, 0.5); return G; }), new THREE.MeshToonMaterial({ color: '#111', gradientMap: grad, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false })); disp.push(veil.material); veil.position.y = 0.03; veil.rotation.y = 0.6; h.add(veil);
+      const veil = new THREE.Mesh(geo('veil', () => { const G = new THREE.SphereGeometry(0.05, 20, 8, -0.2, 2.2, 1.3, 0.5); return G; }), new (window.ModelHeads&&ModelHeads.MTM||THREE.MeshToonMaterial)({ color: '#111', gradientMap: grad, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false })); disp.push(veil.material); veil.position.y = 0.03; veil.rotation.y = 0.6; h.add(veil);
       h.position.copy(s.p).addScaledVector(s.n, -0.003); h.quaternion.setFromUnitVectors(V(0, 1, 0), s.n.clone().add(V(0.35, 0, 0)).normalize()); g.add(h);
     }
     function crown(e, dark) {

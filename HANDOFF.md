@@ -1303,3 +1303,14 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   - `js/mods.js`：在 `head_qc` 后加 `recall_iw` 条目。
   - `game.js` 未改（主循环只看 `Recall.active`，原场景模式下保持 false；持头插值被 pre 覆盖）。
 - 测试工具：`bak/tools/riw.py`（按动作/时间截图，`FUNC=1` 跑按键功能测试），`mk_r.py`（保留手部资源的轻量测试页）。
+## R33 — 用户：“新发现的头很多太大，像大头娃娃；头在任何环境都偏暗、不感光，不要这个效果”
+- **实测（tools 外的临时台 _tools/wv/fl.html，gitignore，同一身体挂 VRoid/GI/HSR/ZZZ/NTE/CLS 头，PBR 环境图+ACES，对标游戏渲染器）**：
+  - 暗/不感光的根因 = 头是 `MeshToonMaterial`：4 级色阶、**拿不到天空环境图**（身体是 PBR + envMapIntensity 0.55）、无方向性层次 → 野外脸发灰（亮度 ≈ 身体的 70%），洞里只有“亮/补光下限”两档，对火光方向不敏感。R26j/R29 的 uEnvA/膝盖/补光下限都是在卡通材质上打补丁。
+  - 尺寸：脸宽/眼距经 head_norm2 已对齐 VRoid，但 MMD 的发量/发饰/兽耳使整颗头包围盒仍比 VRoid 大 30~90%（VRoid 0.23，MMD 0.34~0.49，原始单位）→ 视觉上还是“大头”。
+- **MOD `head_pbr`**（默认开，js/heads.js 顶部 `MTM()` 工厂；需重载）：heads.js 里所有 `new THREE.MeshToonMaterial` 换成 `new MTM`，开 MOD 时返回 `MeshStandardMaterial`（roughness .88、metalness 0、envMapIntensity .55，与身体同），关 MOD = 原卡通。headwear.js 的帽饰用 `ModelHeads.MTM`。所有着色器注入（染发/肤色/血迹/眼/FaceFill）用的 `#include` 锚点两种材质通用，未改。
+  - 新增 `FaceFill.tune.pbr`（0.62）：PBR 头的反照率倍率（染色/肤色参数是按卡通光标定的，PBR 吃到完整环境光会偏白）。默认注入 `FaceFill.HPBR_OBC`（在 `#include <lights_physical_fragment>` 前 `diffuseColor.rgb *= uHeadK`）；hair/skin 自带 onBeforeCompile 的由 `FaceFill.wrap` 注入同一句（靠 `userData.hpbr` 标记区分，避免重复）。toon 的软膝盖/uEnvA 对 PBR 头不再起作用（也不需要）。
+  - 实拍：野外（天空环境+太阳）脸/发颜色回到贴图原色（甘雨浅蓝发、卡芙卡紫红发），亮度与身体一致；洞里（单点火光+弱环境）头部有明确的受光面/背光面。
+- **MOD `head_norm3`**（默认开；heads.js `normK2` 末尾；需重载）：head_norm2 之后整体再 ×0.95，含头发包围盒高（×k）超过 VRoid 中位 0.316 的再 ×√(0.316/bn)，下限 0.82。例：雅、妹红最多收到 0.80~0.85，甘雨/卡芙卡/LL 系 0.95。`entry._normK3` 可查。
+- 没改：foe.js headFit/BODY_HEADK、FaceFill 的 floor 值、存档。若以后觉得头偏亮：调 `FaceFill.tune.pbr`；偏大：调 normK2 里的 0.95 / 0.316。
+- 测试台备忘：ModelHeads 全量 121 个 GLB 一起载会让 2GB 沙箱 Chromium 崩（~400s 后 Target crashed）；用 12 个头的子集页即可。`Mods.on` 读 bootSt（需重载才变），页内 `Mods.set` 不会改变本次渲染。
+- 改动文件：js/heads.js、js/headwear.js、js/mods.js（+head_pbr、head_norm3）、HANDOFF.md。

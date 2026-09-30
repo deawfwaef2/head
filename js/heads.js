@@ -10,24 +10,27 @@ window.FaceFill = (() => {
   // 卡通软膝盖（下面 ShaderLib.toon 补丁，满光只到 ≈0.76、烈日封顶 ≈1.08）当初是身体也用卡通材质时加的；现在身体是 PBR 不压缩 → 野外头比身体暗 25%+。
   // head_tone：野外（活人头长在身体上）关掉头的软膝盖；洞里（只有陈列首级、篝火）保留，防止被火光冲白。
   // 野外改成：满光以内线性（与 PBR 身体同一条响应），超过满光再柔性压到 tune.knee 倍封顶。
-  const tune = { knee: 1.35, env: 0.4 }; // 实测（草甸/松林，脸颊 vs 脖子）：1.45/1 发白，1.45/0 偏黄，1.3/0.5 最接近
+  const tune = { knee: 1.35, env: 0.4, pbr: 0.62 }; // R33 pbr：head_pbr 头的反照率倍率（PBR 头吃到与身体同样多的环境光，贴图/染色参数是按卡通光标定的，不压一压会偏白）
+  const hk = { get value() { return tune.pbr; } }; // 实测（草甸/松林，脸颊 vs 脖子）：1.45/1 发白，1.45/0 偏黄，1.3/0.5 最接近
   const ko = { get value() { return (window.Mods && !Mods.on('head_tone')) || performance.now() - worldT > 600 ? 0 : tune.knee; } };
   const envT = new THREE.Color(); const ea = { get value() { return (window.Mods && !Mods.on('head_tone')) || performance.now() - worldT > 600 ? ZERO : envT.copy(envA).multiplyScalar(tune.env); } };
-  function inject(sh, k, toon) {
-    sh.uniforms.uFill = u; if (toon) { sh.uniforms.uEnvA = ea; sh.uniforms.uKneeOff = ko; }
+  function inject(sh, k, toon, hp) {
+    sh.uniforms.uFill = u; if (hp) sh.uniforms.uHeadK = hk; if (toon) { sh.uniforms.uEnvA = ea; sh.uniforms.uKneeOff = ko; }
     if (toon) sh.fragmentShader = sh.fragmentShader.replace('float _s = clamp(_t / _ex, 0.0, 1.3);', 'float _s = clamp(_t / _ex, 0.0, 1.3); if (uKneeOff > 1.001) { float _t2 = _ex <= 1.0 ? _ex : 1.0 + (uKneeOff - 1.0) * (1.0 - exp((1.0 - _ex) / (uKneeOff - 1.0))); _s = _t2 / _ex; }');
-    sh.fragmentShader = sh.fragmentShader.replace('void main() {', (toon ? 'uniform vec3 uEnvA; uniform float uKneeOff;\n' : '') + 'uniform float uFill;\nvoid main() {')
+    sh.fragmentShader = sh.fragmentShader.replace('void main() {', (toon ? 'uniform vec3 uEnvA; uniform float uKneeOff;\n' : '') + (hp ? 'uniform float uHeadK;\n' : '') + 'uniform float uFill;\nvoid main() {')
+      .replace('#include <lights_physical_fragment>', hp ? 'diffuseColor.rgb *= uHeadK;\n#include <lights_physical_fragment>' : '#include <lights_physical_fragment>')
       .replace('#include <aomap_fragment>', `${toon ? 'reflectedLight.indirectDiffuse += uEnvA * ' + k.toFixed(2) + ' * diffuseColor.rgb;' : ''}
       #include <aomap_fragment>
       { vec3 litC = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse; float al = max(dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)), 1e-3) * 0.3183; // 与上面软膝盖同单位：满光≈1.08
         float lr = dot(litC, vec3(0.299, 0.587, 0.114)) / al; float fc = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
         totalEmissiveRadiance += diffuseColor.rgb * 0.3183 * max(0.0, uFill * ${k.toFixed(2)} - lr) * (0.45 + 0.55 * fc); }`);
   }
+  const HPBR_OBC = function (sh) { sh.uniforms.uHeadK = hk; sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform float uHeadK;\nvoid main() {').replace('#include <lights_physical_fragment>', 'diffuseColor.rgb *= uHeadK;\n#include <lights_physical_fragment>'); }; // R33：head_pbr 头材质的默认注入（hair/skin 自带 onBeforeCompile 的由 wrap 注入同一句）
   function wrap(m, k) { // 包一层 onBeforeCompile（clone() 不会复制它：克隆后要重新包）
     if (!m || !(m.isMeshToonMaterial || (m.isMeshStandardMaterial && window.Mods && Mods.on('char_lift'))) || done.has(m)) return m; /* R29 char_lift：身体默认是 PBR 标准材质（foe_toon 关）→ 以前完全没补光，洞里发黑 */ const prev = m.customProgramCacheKey(), o = m.onBeforeCompile;
-    const toon = !!m.isMeshToonMaterial; m.onBeforeCompile = function (sh, r) { o.call(this, sh, r); inject(sh, k, toon); }; m.customProgramCacheKey = () => prev + '|ff' + k + (toon ? 'e' : ''); done.add(m); return m;
+    const toon = !!m.isMeshToonMaterial, hp = !!(m.userData && m.userData.hpbr) && o !== HPBR_OBC; m.onBeforeCompile = function (sh, r) { o.call(this, sh, r); inject(sh, k, toon, hp); }; m.customProgramCacheKey = () => prev + '|ff' + k + (toon ? 'e' : '') + (hp ? 'h' : ''); done.add(m); return m;
   }
-  return { u, wrap, tune, world() { worldT = performance.now(); }, env(c) { if (c) envA.copy(c).multiplyScalar(0.55); else envA.setRGB(0, 0, 0); } };
+  return { u, wrap, tune, hk, HPBR_OBC, world() { worldT = performance.now(); }, env(c) { if (c) envA.copy(c).multiplyScalar(0.55); else envA.setRGB(0, 0, 0); } };
 })();
 window.ModelHeads = (() => {
   const T = [];               // templates
@@ -57,6 +60,13 @@ window.ModelHeads = (() => {
 
   const grad = (() => { const d = new Uint8Array(window.Mods && Mods.on('char_lift') ? [165, 208, 240, 255] : [120, 190, 235, 255]); /* R29 char_lift：洞里角色暗部别发黑（头身同一条色阶） */ const t = new THREE.DataTexture(d, 4, 1, THREE.RedFormat); const sm = !!(window.Mods && Mods.on('smooth_faces')); t.minFilter = t.magFilter = sm ? THREE.LinearFilter : THREE.NearestFilter; t.needsUpdate = true; return t; })();
 
+  // R33 MOD head_pbr：头的材质由卡通（MeshToon，不吃环境光/天空、无高光，只有 4 级色阶）改为与身体同类的 PBR 标准材质（同一套灯光、环境图、envMapIntensity 0.55、同一条响应曲线）。
+  // 所有着色器注入（染发/肤色/血迹/FaceFill…）用的都是两种材质共有的 #include 锚点，无需改动。关 MOD = 老卡通头。
+  function MTM(p) {
+    if (window.Mods && !Mods.on('head_pbr')) return new THREE.MeshToonMaterial(p);
+    const q = Object.assign({}, p); delete q.gradientMap; if (q.roughness == null) q.roughness = 0.88; if (q.metalness == null) q.metalness = 0;
+    const m = new THREE.MeshStandardMaterial(q); m.envMapIntensity = 0.55; m.userData.hpbr = 1; m.onBeforeCompile = FaceFill.HPBR_OBC; m.customProgramCacheKey = () => 'hpbr1'; return m;
+  }
   function b64ToBuf(b64) { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
 
   function avgLum(tex) {
@@ -151,7 +161,11 @@ window.ModelHeads = (() => {
     if (kw && ki) k = Math.abs(Math.log(kw / ki)) < 0.25 ? Math.sqrt(kw * ki) : near(kw, ki);
     else { k = kw || ki || kb || 1; if (kb && Math.abs(Math.log(k / kb)) > 0.5) k = kb; }
     entry._normW = w; entry._normIPD = ipd; entry._normKB = kb;
-    return Math.max(0.5, Math.min(1.5, k));
+    k = Math.max(0.5, Math.min(1.5, k));
+    // R33 MOD head_norm3：脸宽对齐之后，MMD 的发量/发饰/兽耳让整颗头的轮廓仍比 VRoid 大一圈（包围盒高 0.36~0.49 vs 0.316）→ 看起来还是“大头”。
+    // 整体再缩 5%；含头发包围盒仍超过 VRoid 中位的，按平方根比例再收（下限 0.82），发量越夸张收得越多。
+    if (!window.Mods || Mods.on('head_norm3')) { const bn = bh * k; let k3 = 0.95; if (bn > 0.316) k3 *= Math.max(0.82, Math.sqrt(0.316 / bn)); k = Math.max(0.45, k * k3); entry._normK3 = k3; }
+    return k;
   }
   function normSize(entry, meshes) {
     const k = (window.Mods && Mods.on('head_norm2')) ? normK2(entry, meshes) : normK(entry); entry._normK = k; if (Math.abs(k - 1) < 0.01) return;
@@ -379,7 +393,7 @@ window.ModelHeads = (() => {
   }
 
   function hairMat(src, U, lum) {
-    const m = new THREE.MeshToonMaterial({ map: src.map || null, gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest || (src.transparent ? 0.25 : 0.4), side: THREE.DoubleSide, depthWrite: src.depthWrite });
+    const m = new MTM({ map: src.map || null, gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest || (src.transparent ? 0.25 : 0.4), side: THREE.DoubleSide, depthWrite: src.depthWrite });
     m.name = src.name;
     m.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, { uHC1: U.hc1, uHC2: U.hc2, uGrad: U.grad, uHK: { value: 0.95 / lum }, uSway: U.sway, uHTop: U.hTop, uHLen: U.hLen, uShiny: U.shiny, uT: GT, uPh: U.ph, uHover: U.hover });
@@ -405,7 +419,7 @@ window.ModelHeads = (() => {
     return FaceFill.wrap(m, 0.6);
   }
   function browMat(src, U, lum) {
-    const m = new THREE.MeshToonMaterial({ map: src.map || null, gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: src.depthWrite });
+    const m = new MTM({ map: src.map || null, gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: src.depthWrite });
     m.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, { uHC1: U.hc1, uHK: { value: 0.7 / lum } });
       sh.fragmentShader = sh.fragmentShader
@@ -416,7 +430,7 @@ window.ModelHeads = (() => {
     return m;
   }
   function irisMat(src, U, lum) {
-    const m = new THREE.MeshToonMaterial({ map: src.map || null, gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: src.depthWrite });
+    const m = new MTM({ map: src.map || null, gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: src.depthWrite });
     m.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, { uEC1: U.ec1, uEC2: U.ec2, uDull: U.dull, uHK: { value: 0.85 / lum }, uGlow: U.glow, uT: GT });
       injectVertex(sh, false);
@@ -435,7 +449,7 @@ window.ModelHeads = (() => {
     return m;
   }
   function skinMat(src, U) {
-    const m = new THREE.MeshToonMaterial({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: src.depthWrite });
+    const m = new MTM({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: src.depthWrite });
     m.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, { uMk: U.mk, uHover: U.hover, uSkin: U.skin, uSkinFix: { value: (window.Mods && Mods.on('head_repair') && src.userData ? src.userData._headGreenFix || 0 : 0) }, uPale: U.pale, uBlood: U.blood, uSpat: U.spat, uSeed: U.seed, uCutY: U.cutY, uH: U.hH, uScar: U.scar, uPaint: U.paint, uPaintC: U.paintC, uEye: U.eye });
       injectVertex(sh, false);
@@ -525,7 +539,7 @@ window.ModelHeads = (() => {
     const skullTop = meta.skullTop || 0.1;
     const f = look.feat;
     if (f === 'elf' && meta.file !== 'AvatarSample_D_Darkness') {
-      const m = new THREE.MeshToonMaterial({ color: new THREE.Color(look.skinHex).multiplyScalar(0.98), gradientMap: grad }); disposables.push(m);
+      const m = new MTM({ color: new THREE.Color(look.skinHex).multiplyScalar(0.98), gradientMap: grad }); disposables.push(m);
       for (const s of [-1, 1]) { const e = new THREE.Mesh(elfEarGeo(), m); e.position.set(s * 0.074, eye[1] - 0.004, -0.006); e.rotation.set(-0.5, 0, -s * 1.15); g.add(e); }
     }
     if (f === 'horn' || f === 'horn2') {
@@ -534,8 +548,8 @@ window.ModelHeads = (() => {
       for (const s of [-1, 1]) { const h = new THREE.Mesh(hornGeo(k), m); h.position.set(s * 0.042, skullTop - 0.012, 0.012); h.rotation.set(0.2, 0, -s * 0.45); g.add(h); }
     }
     if (f === 'beast') {
-      const m = new THREE.MeshToonMaterial({ color: new THREE.Color(look.hc1).multiplyScalar(0.9), gradientMap: grad }); disposables.push(m);
-      const inner = mat('earIn', () => new THREE.MeshToonMaterial({ color: '#f0a8b0', gradientMap: grad }));
+      const m = new MTM({ color: new THREE.Color(look.hc1).multiplyScalar(0.9), gradientMap: grad }); disposables.push(m);
+      const inner = mat('earIn', () => new MTM({ color: '#f0a8b0', gradientMap: grad }));
       for (const s of [-1, 1]) {
         const e = new THREE.Mesh(beastEarGeo(), m); e.position.set(s * 0.046, top - 0.018, -0.012); e.rotation.set(-0.15, s * 0.3, -s * 0.35); g.add(e);
         const i2 = new THREE.Mesh(beastEarGeo(), inner); i2.scale.set(0.6, 0.7, 0.6); i2.position.set(0, 0.004, 0.006); e.add(i2);
@@ -568,17 +582,17 @@ window.ModelHeads = (() => {
         const cols = ['#ffffff', '#ffd0e0', '#ffe27a', '#c8a8ff', '#ff8aa8'];
         for (let i = 0; i < 9; i++) {
           const an = (i / 9) * Math.PI * 2;
-          const fl = new THREE.Mesh(geo('flower', () => new THREE.IcosahedronGeometry(0.009, 0)), mat('fl' + i % 5, () => new THREE.MeshToonMaterial({ color: cols[i % 5], gradientMap: grad })));
+          const fl = new THREE.Mesh(geo('flower', () => new THREE.IcosahedronGeometry(0.009, 0)), mat('fl' + i % 5, () => new MTM({ color: cols[i % 5], gradientMap: grad })));
           fl.position.set(Math.cos(an) * 0.078, top - 0.028 + Math.sin(an * 3) * 0.004, Math.sin(an) * 0.078 - 0.005); g.add(fl);
         }
       }
       if (a === 'witchhat') {
         const hc = look.hatC || '#2a1a3a';
-        const hm = mat('hat' + hc, () => new THREE.MeshToonMaterial({ color: hc, gradientMap: grad, side: THREE.DoubleSide }));
+        const hm = mat('hat' + hc, () => new MTM({ color: hc, gradientMap: grad, side: THREE.DoubleSide }));
         const hat = new THREE.Group();
         const brim = new THREE.Mesh(geo('brim', () => new THREE.CylinderGeometry(0.125, 0.125, 0.004, 32)), hm); hat.add(brim);
         const cone = new THREE.Mesh(geo('hcone', () => { const c = new THREE.ConeGeometry(0.085, 0.2, 24, 6, true); c.translate(0, 0.1, 0); const p = c.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); p.setZ(i, p.getZ(i) - Math.pow(Math.max(0, y) / 0.2, 2.2) * 0.07); } c.computeVertexNormals(); return c; }), hm); hat.add(cone);
-        const band = new THREE.Mesh(geo('band', () => new THREE.CylinderGeometry(0.082, 0.085, 0.018, 24, 1, true)), mat('bandM', () => new THREE.MeshToonMaterial({ color: '#8a1a2a', gradientMap: grad }))); band.position.y = 0.012; hat.add(band);
+        const band = new THREE.Mesh(geo('band', () => new THREE.CylinderGeometry(0.082, 0.085, 0.018, 24, 1, true)), mat('bandM', () => new MTM({ color: '#8a1a2a', gradientMap: grad }))); band.position.y = 0.012; hat.add(band);
         hat.position.set(0, top - 0.03, -0.01); hat.rotation.set(-0.12, 0, 0.1); g.add(hat);
       }
       if (a === 'patch' && false) {
@@ -957,7 +971,7 @@ window.ModelHeads = (() => {
   function addHairX(hg, look, S, U, disposables) {
     const hx = look.hx; if (!hx) return;
     const st0 = strandTex(); const hm = hairMat({ map: st0, transparent: false, alphaTest: 0, depthWrite: true, name: 'hx' }, U, st0.userData.lum * 1.08); disposables.push(hm);
-    const rib = new THREE.MeshToonMaterial({ color: hx.rib || '#b01a2a', gradientMap: grad }); disposables.push(rib);
+    const rib = new MTM({ color: hx.rib || '#b01a2a', gradientMap: grad }); disposables.push(rib);
     const add = (g) => { const m = new THREE.Mesh(g, hm); hg.add(m); disposables.push(g); return m; };
     const L = hx.len || 1, rs = hx.seed || 1;
     let s = rs * 9973 + 1; const rr = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
@@ -1108,7 +1122,7 @@ window.ModelHeads = (() => {
       let out;
       const keep = t.meta && t.meta.grp === 'mmd' && (k === 'hair' || k === 'brow' || k === 'iris'); // MMD 头模：保留原贴图配色，不重新染色
       if (k === 'cut') out = getCut();
-      else if (keep) { out = new THREE.MeshToonMaterial({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest || (k === 'hair' ? 0.4 : 0), side: THREE.DoubleSide, depthWrite: src.depthWrite }); own.push(out); }
+      else if (keep) { out = new MTM({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest || (k === 'hair' ? 0.4 : 0), side: THREE.DoubleSide, depthWrite: src.depthWrite }); own.push(out); }
       else if (k === 'hair') { out = hairMat(src, U, t.lum.get(src) || 0.6); own.push(out); }
       else if (k === 'brow') { out = browMat(src, U, t.lum.get(src) || 0.4); own.push(out); }
       else if (k === 'iris') { out = irisMat(src, U, t.lum.get(src) || 0.5); own.push(out); }
@@ -1121,8 +1135,8 @@ window.ModelHeads = (() => {
             // 第十八轮：不再用不受光的 Basic（亮处发光、比脸亮一截）；改为受光卡通 + 少量自发光打底，暗处也不会变黑
             const c0 = src.color ? src.color.clone() : new THREE.Color(1, 1, 1);
             const ewk = (window.Mods && Mods.on('eye_white')) ? [0.62, 0.62] : [0.9, 0.28]; // 第二十四轮 MOD eye_white：暗洞里眼白发黑 → 一半受光一半自亮
-            out = new THREE.MeshToonMaterial({ map: src.map || null, color: c0.clone().multiplyScalar(ewk[0]), emissive: c0.clone().multiplyScalar(ewk[1]), emissiveMap: src.map || null, gradientMap: grad, transparent: src.transparent, opacity: src.opacity, alphaTest: src.alphaTest ? Math.min(src.alphaTest, 0.25) : 0.15, side: THREE.DoubleSide, depthWrite: !!(window.Mods && Mods.on('eye_white')), name: src.name + ' · readable sclera' }); // eye_white：写深度，SAO 不再把眼白当成深洞压黑
-          } else out = new THREE.MeshToonMaterial({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: ew ? false : src.depthWrite });
+            out = new MTM({ map: src.map || null, color: c0.clone().multiplyScalar(ewk[0]), emissive: c0.clone().multiplyScalar(ewk[1]), emissiveMap: src.map || null, gradientMap: grad, transparent: src.transparent, opacity: src.opacity, alphaTest: src.alphaTest ? Math.min(src.alphaTest, 0.25) : 0.15, side: THREE.DoubleSide, depthWrite: !!(window.Mods && Mods.on('eye_white')), name: src.name + ' · readable sclera' }); // eye_white：写深度，SAO 不再把眼白当成深洞压黑
+          } else out = new MTM({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: ew ? false : src.depthWrite });
           t.shared.set(key, out);
         } // 修复 MOD：眼白不再被幽暗洞窟光照压黑；关闭 MOD 时保留原 toon 路径
       }
@@ -1151,7 +1165,7 @@ window.ModelHeads = (() => {
     // 用本头自己的脸部皮肤推出头骨轮廓（前半=脸模，后半=按耳平面镜像，底部接到断面圆），略缩进藏在脸/头发里面。
     if (F.meta.grp === 'mmd' && window.Mods && Mods.on('nape_fill')) try {
       const ng = napeGeo(F);
-      if (ng) { const nm = new THREE.MeshToonMaterial({ color: new THREE.Color(look.skinHex || '#fbe6da').multiplyScalar(0.86), gradientMap: grad }); own.push(nm);
+      if (ng) { const nm = new MTM({ color: new THREE.Color(look.skinHex || '#fbe6da').multiplyScalar(0.86), gradientMap: grad }); own.push(nm);
         // 后脑部分涂发色（真 MMD 模型的头皮本就是发色；あにまさ式短后发+双马尾之间会露出这块），眼线以下渐变回肤色（后颈）
         const hc = H.meta.grp === 'mmd' ? hairAvgCol(H) : new THREE.Color(look.hc1 || '#333333'); const ey = F.meta.eye ? F.meta.eye[1] : 0;
         if (hc) nm.onBeforeCompile = sh => { sh.uniforms.uHairC = { value: hc.clone().multiplyScalar(0.8) }; sh.uniforms.uEyeY = { value: ey };
@@ -1223,7 +1237,7 @@ window.ModelHeads = (() => {
   }
 
   return {
-    init, create, randomLook, HAIR, EYE, SKIN, faceSkin, tick(t) { GT.value = t; },
+    MTM, init, create, randomLook, HAIR, EYE, SKIN, faceSkin, tick(t) { GT.value = t; },
     // R29 body_match：这个头实际显示的发色（mmd 发型用贴图平均色，其他用染发色），给 foe.js 挑配色协调的身体
     hairColor(look) { try { const H = T[idxOf(look.h || look.f)]; if (H && H.meta.grp === 'mmd') { const c = hairAvgCol(H); if (c) return c.clone().convertLinearToSRGB(); } return new THREE.Color(look.hc1 || '#333333'); } catch (e) { return null; } },
     get ready() { return ready; },
