@@ -1491,3 +1491,13 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - UI 接入（各 1~2 行）：`regionquest.js` `detHTML` 在霸主栏后插 `RegionEcho.detHTML(k)`（称号+名声/恐惧+5 势力关系条+仇家+最近 4 段故事+说明），`itemHTML` 加 `RegionEcho.badge`；`arrival2.js` `html()` 的 paras 与右栏各加一处。
 - 测试：`tools/test/regionecho.html`（假 G/Worlds/Sack，Lore.makeCharacter 造人）；完整游戏在 2GB 沙盒跑不动，未做整包实机测试。
 - 已知限制：仅 Worlds 出猎（默认）记录；Explore 3D 旧模式和文字旅途不记录。
+## R38（语言选择 i18n + 启动崩溃修复 + 宣传图）— 作者：本轮 agent
+**用户要求**：①开局先选 中/日/英 再开始加载，游戏中可随时切换；②做宣传截图（图片+文字，世界观/玩法等，中日英三套）；③修复「启动失败：Cannot read properties of undefined (reading 'S')」。
+**启动崩溃**（`d9c8b93`）：R36 天赋引擎 `Talents.tal()/agg()/lv()` 在 `startGame()`→`RPG.stats` 期间读 `G0().S`，但此时 `window.G` 还不存在。`js/talents.js` 已加 `LAST` 回退。**规则：凡是 `RPG.stats`/`startGame` 可达的代码都不能假设 `window.G` 存在。**
+**i18n 设计**（全部在新文件，核心基础设施，非 MOD）：
+- `js/i18n.js`：`window.I18N`。localStorage `soulhead_lang`（zh/ja/en）。首次进入显示选语言界面（1/2/3 键也行），`index.html` 启动 IIFE 里 `await I18N.ready()` 之后才开始加载。右上角 🌐 按钮随时切换；与 `#introCopy` 的中/日/英页签双向同步；教程 `js/tutorial.js` 语言跟随（见 `js/i18n_rules.js`）。
+- 做法：游戏源码仍是中文，在 **DOM 层**翻译（MutationObserver，文本节点 + title/placeholder/alt/aria-label；`[data-copy]`、`#tut`、`#credits`、textarea/script/style 不翻译）。查找顺序：整句精确 → 带占位符句型（`{0}` 短文本、`{#0}` 数字、`{@0}` 长文本，捕获组里的中文会递归翻译）→ 自定义规则 `I18N.rule(re,fn)` → 「A · B · C」逐段翻译 → 词组替换（仅 ≥3 字词条；2 字词条要在第 4 项写 1 才参与词组替换，避免「攻击/范围」污染长句）。切回中文会还原原文。
+- 词典：源在 `tools/i18n/d_*.py`（[zh,en,ja]，`$name` 会被转成 `{#n}`），运行 `python3 tools/i18n/build.py` 生成 `js/i18n_data.js`（**不要手改生成文件**）。现有 ~740 条：菜单/HUD 提示/加载文案、天赋·技能·流派·属性全部、天赋面板/提示/飘字、武器详细属性、装备/材料/品阶/魂阶、背包标签、战斗飘字、成就名。
+- 补翻译：游戏里按 F12 输入 `I18N.dump()` 会列出运行中遇到但没翻译的中文句子（按出现次数排序），往 `d_*.py` 里补再 build 即可。**未覆盖**：剧情/书籍/神灵台词/霸主台词/地点事件/MOD 说明等长文本（约 4000+ 句），仍显示中文；动态拼接的句子要么加 `{#0}` 句型，要么在源码里改成整句一个文本节点。
+- 测试台：`tools/test/i18n.html`（index 的静态外壳 + i18n）；天赋面板/武器面板可在 `tools/test/talents.html` 里注入 i18n 脚本查看。
+**宣传图**：`tools/promo/make.py` 生成 `promo/{zh,ja,en}/01_key…06_spirits.png`（1920×1080，各 6 张：主视觉/世界观/玩法循环/战斗/成长/神灵）。素材全部来自仓库真实资源（`js/spirit_art.js` Q 版神灵、`js/regionart.js` CC0 场景、`tools/promo/cap/wpn_*.png` 是游戏内「武器详细属性」面板的真实截图，由翻译引擎输出），无性化角色图。沙盒里整个游戏无法启动，所以没有整局实机截图；天赋树界面截图因沙盒缺 emoji 字体（图标会变豆腐块）没有采用。
