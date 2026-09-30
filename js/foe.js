@@ -179,7 +179,8 @@ window.Foe = (() => {
     Victoria_Rubin: ['princess', 'lady', 'saint', 'choir', 'singer', 'countess', 'musician', 'elfprincess', 'archangel', 'moonpriest'],
     Darkness_Shibu: ['witch', 'hexer', 'covenlady', 'duchess', 'fallen', 'countess', 'bogwitch', 'courtmage', 'abyssqueen', 'shaman'],
     HairSample_Female: ['villager', 'novice', 'herbalist', 'shepherd', 'choir', 'saint', 'medic', 'druid', 'barmaid', 'nun'],
-    AvatarSample_B: ['catthief', 'bard', 'engineer', 'alchemist', 'musician', 'merc', 'smithgirl']
+    AvatarSample_B: ['catthief', 'bard', 'engineer', 'alchemist', 'musician', 'merc', 'smithgirl'],
+    Osage: ['villager', 'foxmiko', 'singer', 'herbalist', 'barmaid', 'dragonmiko', 'musician', 'shepherd'] // 浴衣（Iwashi，VRoid Hub 许可允许改造/再分发/暴力）；材质合并，不可染色
   };
   const VB_ID = {}; for (const b in VB) for (const id of VB[b]) (VB_ID[id] = VB_ID[id] || []).push(b);
   const LIGHT = ['瓷白', '象牙', '蜜色', '苍白'];

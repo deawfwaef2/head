@@ -85,6 +85,7 @@
 - 原神角色 VRM（Jean, Noelle, Amber, Rosaria, Lisa, Sucrose, Xiangling, Ningguang, Furina, Kokomi, Yae Miko, Shenhe, Mona, Eula, Beidou）：角色与美术 © HoYoverse（原神），MMD→VRM 转换版（来自 dionaka/py.turtle 仓库）。仅供私人使用，不公开发布。
 - 光莉 HikariCape / HikariScholar：あわ (VRoid) · VRM。
 - Vita / Victoria_Rubin / Darkness_Shibu / HairSample_Female（CC0）、AvatarSample_B（VRoid 样本条款：Everyone / 暴力 Allow / 商用 Allow）：pixiv Inc. VRoid 官方样本模型原装身体（第二十四轮，MOD vroid_bodies），源文件取自 github.com/madjin/vrm-samples。
+- Osage（おさげちゃん_mate2，浴衣）：Iwashi（https://twitter.com/ishiand151）· VRoid Hub 许可：everyone / 改造 allow / 再分发 allow / 暴力 allow / 法人商用 allow / 署名不要。源文件取自 github.com/josephrocca/ChatVRM-js/avatars。
 - AvatarSample_A：pixiv VRoid 官方样例（VRoid Studio sample, 许可见 VRM 元数据）。
 - 动作：Quaternius — Universal Animation Library 1 & 2（CC0）。
 - 武器：Poly Haven（CC0）。

@@ -1058,3 +1058,5 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - js/foe.js：TINT 加这 5 具（VRoid 皮肤是独立材质，可随首级染色）；新增 VB / VB_ID 表（身体→身份），bodyFor() 在 Mods.on('vroid_bodies') 时把 VB_ID[身份] 追加到 IDENT 候选（不改 IDENT 原表、不动 BOSS_BODY）。
 - js/mods.js：新条目 vroid_bodies（look，默认开），放在 head_norm 前面。
 - 未做：SKIN_FIX 精调（新身体用默认 LIFT）；古铜肤色时手部略偏橙，可用 calib 流程补。
+- 追加 big/body/Osage.js（おさげちゃん_mate2 浴衣，Iwashi，VRoid Hub 许可全允许，源 josephrocca/ChatVRM-js）。材质被合并成 FACE+SKIN 两个（头发、衣服在 SKIN 图集里）→ 不进 TINT；头模也不收（vrm2head 拿不到头发，脸是通用 VRoid 脸）。同仓库另一个 Whingles 禁止改造，已排除。
+- 已排查不收的来源：VIPE Heroes（Q 版大头街头风，与黑暗奇幻不搭）、AITuberKit 的 nikechan（有另行的二创规约）、openSizebox（LFS 指针/受限）。

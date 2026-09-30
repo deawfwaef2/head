@@ -30,7 +30,7 @@ window.Mods = (() => {
     // ---------- 角色外观 ----------
     { id: 'head_repair', cat: 'look', icon: '🩹', n: '首级外观修复', d: '对齐真实切颈平面、按颈部轮廓封口；使用 CC0 肉质 PBR 贴图，并减轻异常绿肤与暗黑眼白。', def: true },
     { id: 'hair_cover', cat: 'look', icon: '🧢', n: '后脑/后颈补洞（第二十一轮）', d: '部分脸模没有后脑勺与后颈皮肤，借来的头发盖不住时会从后面看到脸的内侧。按离线评分表（js/hair_cover.js）自动换成盖得住的头发；关闭则恢复原组合。', def: true },
-    { id: 'vroid_bodies', cat: 'look', icon: '👗', n: '新身体：VRoid 官方五套（第二十四轮）', d: '追加 5 具非原神身体（pixiv VRoid 官方 CC0 模型的原装衣服）：Vita 蓝色战斗装、Victoria Rubin 白色礼裙、Darkness Shibu 青花长裙、HairSample 白色连衣裙、AvatarSample B 街头夹克。按衣服风格分配给对应身份；皮肤可随首级染色（深肤色也能配）。关闭则只用旧身体。', def: true },
+    { id: 'vroid_bodies', cat: 'look', icon: '👗', n: '新身体：VRoid 六套（第二十四轮）', d: '追加 5 具非原神身体（pixiv VRoid 官方 CC0 模型的原装衣服）：Vita 蓝色战斗装、Victoria Rubin 白色礼裙、Darkness Shibu 青花长裙、HairSample 白色连衣裙、AvatarSample B 街头夹克，外加 Iwashi 的浴衣少女（おさげちゃん）。按衣服风格分配给对应身份；皮肤可随首级染色（深肤色也能配）。关闭则只用旧身体。', def: true },
     { id: 'head_norm', cat: 'look', icon: '📏', n: '头模尺寸归一（第二十四轮）', d: 'MMD 管线的头比 VRoid 头小约两成，挂在身体上显得特别小。载入时按脸宽等比放大到标准尺寸（需重新载入）。', def: true },
     { id: 'eye_white', cat: 'look', icon: '👁️', n: '眼白提亮（第二十四轮）', d: '洞窟火光很暗时眼白被压成灰黑。改为一半受光、一半自身亮度：暗处仍是白的，亮处不比脸亮。', def: true },
     { id: 'feel_bubble', cat: 'play', icon: '💬', n: '把玩旁白（第二十一轮）', d: '低频打字机小字卡：描述你正在怎么摆弄首级（拿起的分量、长传几米、弹了几下、叠罗汉……）。第三人称旁白，首级不说话。', def: true },
