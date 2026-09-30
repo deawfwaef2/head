@@ -340,7 +340,7 @@ window.Combat = (() => {
         if (res === false) continue; // 目标说“刃其实没碰到身体”：不进冷却，这一刀继续扫
         S.hitCd.set(tg.id, now); if (S.sw) S.sw.hit = true; if (info.charged && tg.kind !== 'head') S.charged = 0;
         const heavy = Math.min(1, speed / 10);
-        S.stop = 0.015 + heavy * 0.035; // 第十八轮：顿帧缩短（长顿帧像卡顿）
+        S.stop = 0; // 第二十二轮（续 13）：命中不再冻结武器/手部更新（15~50ms 的冻结会被手感当成输入卡顿）；反馈只靠屏震 + 音效 + 血花
         S.shake = 0.004 + heavy * 0.012; if (G.kick) G.kick(heavy * 0.6); // 第二十二轮：这行原来被上面的注释吞掉了，屏震一直没生效
       }
     }
@@ -402,7 +402,7 @@ window.Combat = (() => {
   // 格挡角度 t 秒前与 a 的夹角（用于“最后一刻转对方向”的完美格挡）
   function guardWas(tAgo, a) { const now = performance.now() / 1000; let best = null; for (const [t, g] of S.gHist) if (now - t >= tAgo) best = g; if (best == null) return Math.PI; return Math.abs(Math.atan2(Math.sin(best - a), Math.cos(best - a))); }
   // 被敌人格挡：弹刀
-  function recoil(k = 1) { S.stop = 0.14 * k; S.shake = 0.02 * k; S.hv.multiplyScalar(-0.7); S.ctrl.x *= 0.6; S.ctrl.y *= 0.6; S.stam = Math.max(0, S.stam - 8 * k); if (G.kick) G.kick(0.8 * k); }
+  function recoil(k = 1) { S.stop = 0.05 * k; S.shake = 0.02 * k; S.hv.multiplyScalar(-0.7); S.ctrl.x *= 0.6; S.ctrl.y *= 0.6; S.stam = Math.max(0, S.stam - 8 * k); if (G.kick) G.kick(0.8 * k); }
   function useStam(n) { if (S.stam < n * 0.5) return false; S.stam = Math.max(0, S.stam - n); return true; }
   const attach = (sc) => { if (trail && trail.m) sc.add(trail.m); if (trail) trail.pts.length = 0; };
   return { attach, init, toggle, onWeapon, onDown, onUp, onMove, update, prerender, addProvider, guardWas, recoil, useStam, setThreats(fn) { threatSrc = fn; }, get drawn() { return drawn; }, get enabled() { return enabled; }, get state() { return S; }, get guardDir() { return S.rmb ? S.gdir : null; } };
