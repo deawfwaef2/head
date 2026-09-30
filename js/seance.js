@@ -292,5 +292,5 @@ window.Seance = (() => {
     SFX.duck && SFX.duck(false);
     cb.onClose && cb.onClose();
   }
-  return { open, close, get active() { return !!st; }, _st: () => st };
+  return { open, close, TR, EXK, get active() { return !!st; }, _st: () => st };
 })();

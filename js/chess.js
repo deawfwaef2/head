@@ -39,12 +39,14 @@ window.Chess = (() => {
   const KN = [[1, 2], [2, 1], [-1, 2], [-2, 1], [1, -2], [2, -1], [-1, -2], [-2, -1]];
   const DI = [[1, 1], [1, -1], [-1, 1], [-1, -1]], OR = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   const typeOfRec = r => { const c = r.c; if (c.rar >= 4 && (c.shiny || (c.aff && c.aff.length >= 2))) return 'A'; return ['P', 'N', 'B', 'R', 'Q'][Math.min(4, c.rar)]; };
+  const XS = new Array(64).fill(null); // 第二十五轮：每颗头的「特殊走法」（HeadGame 按性格随机生成的跳跃偏移，随棋子移动）
   function gen(T, S, side, capsOnly) {
     const out = [];
     for (let i = 0; i < 64; i++) {
       if (!T[i] || S[i] !== side) continue;
       const t = T[i], f = i & 7, r = i >> 3;
       const add = (j) => { if (T[j] && S[j] === side) return false; if (capsOnly && !T[j]) return !T[j]; out.push([i, j]); return !T[j]; };
+      if (XS[i] && t !== 'K') { const fw = side === 0 ? 1 : -1; for (const [dx, dy] of XS[i]) { const f1 = f + dx, r1 = r + dy * fw; if (f1 >= 0 && f1 < 8 && r1 >= 0 && r1 < 8) add(r1 * 8 + f1); } }
       if (t === 'P') {
         const d = side === 0 ? 1 : -1, r1 = r + d;
         if (r1 >= 0 && r1 < 8) {
@@ -70,8 +72,8 @@ window.Chess = (() => {
       v += S[i] === 0 ? s : -s; }
     return v;
   }
-  function makeMove(T, S, m) { const [a, b] = m; const cap = [T[b], S[b]]; T[b] = T[a]; S[b] = S[a]; T[a] = ''; S[a] = -1; let promo = false; if (T[b] === 'P' && ((S[b] === 0 && b >> 3 === 7) || (S[b] === 1 && b >> 3 === 0))) { T[b] = 'Q'; promo = true; } return [cap, promo]; }
-  function unmake(T, S, m, u) { const [a, b] = m; T[a] = u[1] ? 'P' : T[b]; S[a] = S[b]; T[b] = u[0][0]; S[b] = u[0][1]; }
+  function makeMove(T, S, m) { const [a, b] = m; const cap = [T[b], S[b]]; const cx = XS[b]; XS[b] = XS[a]; XS[a] = null; T[b] = T[a]; S[b] = S[a]; T[a] = ''; S[a] = -1; let promo = false; if (T[b] === 'P' && ((S[b] === 0 && b >> 3 === 7) || (S[b] === 1 && b >> 3 === 0))) { T[b] = 'Q'; promo = true; } return [cap, promo, cx]; }
+  function unmake(T, S, m, u) { const [a, b] = m; XS[a] = XS[b]; XS[b] = u[2] || null; T[a] = u[1] ? 'P' : T[b]; S[a] = S[b]; T[b] = u[0][0]; S[b] = u[0][1]; }
   let nodes = 0, deadline = 0;
   function order(T, ms) { return ms.sort((x, y) => (T[y[1]] ? VAL[T[y[1]]] * 10 - VAL[T[y[0]]] : 0) - (T[x[1]] ? VAL[T[x[1]]] * 10 - VAL[T[x[0]]] : 0)); }
   function qs(T, S, side, a, b, d) {
@@ -333,7 +335,7 @@ window.Chess = (() => {
     if (e.target !== el.querySelector('canvas')) return; const sq = pick(e); if (sq !== st.hover) { st.hover = sq; if (sq >= 0 && st.T[sq]) showInfo(sq); else if (st.sel >= 0) showInfo(st.sel); else el.querySelector('.ch-info').style.display = 'none'; } }
   function showInfo(sq) { const p = st.pieces.find(q => q.alive && q.sq === sq); const box = el.querySelector('.ch-info'); if (!p) { box.style.display = 'none'; return; }
     const t = st.T[sq];
-    if (p.rec) { const c = p.rec.c; box.innerHTML = `<div class="n" style="color:${RCOL[c.rar]}">${GLYPH[t]} ${esc(c.name)}</div><div>${RNAME[c.rar]}${c.shiny ? ' · ✨异色' : ''} · ${esc(c.raceN)} · ${esc(c.idN)}</div>${c.title ? `<div style="color:#ffcf7a">「${esc(c.title)}」</div>` : ''}<div style="margin-top:6px"><b>${NAME[t]}</b>：${MOVE_DESC[t]}</div>`; }
+    if (p.rec) { const c = p.rec.c; box.innerHTML = `<div class="n" style="color:${RCOL[c.rar]}">${GLYPH[t]} ${esc(c.name)}</div><div>${RNAME[c.rar]}${c.shiny ? ' · ✨异色' : ''} · ${esc(c.raceN)} · ${esc(c.idN)}</div>${c.title ? `<div style="color:#ffcf7a">「${esc(c.title)}」</div>` : ''}<div style="margin-top:6px"><b>${NAME[t]}</b>：${MOVE_DESC[t]}</div>${window.HeadGame && XS[sq] ? `<div style="margin-top:4px;color:#ffcf7a">✦ 她的棋路「${esc(HeadGame.profile(p.rec).chess.style)}」：额外 ${esc(HeadGame.profile(p.rec).chess.shapeNames.join("、"))}（${XS[sq].length} 个落点）</div>` : ''}`; }
     else box.innerHTML = `<div class="n">${GLYPH[t]} 木制${NAME[t]}</div><div style="color:#b8a080">斯尼克亲手削的，缺了个角。</div><div style="margin-top:6px"><b>${NAME[t]}</b>：${MOVE_DESC[t]}</div>`;
     box.style.display = 'block'; }
   let markGroup = null;
@@ -360,7 +362,7 @@ window.Chess = (() => {
   function pieceAt(sq) { return st.pieces.find(p => p.alive && p.sq === sq); }
   function doMove(m) {
     const mover = pieceAt(m[0]), victim = pieceAt(m[1]), capT = st.T[m[1]], side = st.turn;
-    st.hist.push({ T: st.T.slice(), S: st.S.slice(), pos: st.pieces.map(p => [p.alive, p.sq, p.t]), last: st.last, turn: st.turn, moveN: st.moveN });
+    st.hist.push({ X: XS.slice(), T: st.T.slice(), S: st.S.slice(), pos: st.pieces.map(p => [p.alive, p.sq, p.t]), last: st.last, turn: st.turn, moveN: st.moveN });
     const u = makeMove(st.T, st.S, m);
     st.sel = -1; st.targets = []; st.last = [m[0], m[1]];
     logMove(m, capT, side); st.moveN++;
@@ -405,7 +407,7 @@ window.Chess = (() => {
     setTimeout(() => { if (!st || st.over) return; const T = st.T.slice(), S = st.S.slice(); const m = think(T, S, 1, st.lv); if (st.scene) st.scene.think = 0; st.busy = false; if (!m) { finish(0, '斯尼克无子可动'); return; } doMove(m); }, 450);
   }
   function undo() { if (!st || st.busy || !st.hist.length || st.over) return; let n = st.mode === 'pvp' ? 1 : 2; if (st.hist.length < n) n = st.hist.length; let h; for (let i = 0; i < n; i++) h = st.hist.pop();
-    st.T = h.T; st.S = h.S; st.turn = h.turn; st.last = h.last; st.moveN = h.moveN;
+    if (h.X) for (let i = 0; i < 64; i++) XS[i] = h.X[i]; st.T = h.T; st.S = h.S; st.turn = h.turn; st.last = h.last; st.moveN = h.moveN;
     st.pieces.forEach((p, i) => { const [alive, sq, t] = h.pos[i]; p.sq = sq; if (p.t !== t) { p.t = t; } if (alive && !p.alive) restore(p); p.alive = alive; const q = sqPos(sq); p.g.position.set(q.x, 0, q.z); });
     st.anims = st.anims.filter(a => a.dur < 99); st.sel = -1; st.targets = []; updTurn(); markTargets(); say('悔棋？嘿嘿，地精很大方的——这次。'); }
   function restore(p) { if (p.fallen && p.fallen !== p.g) { scene.remove(p.fallen); p.g.add(p.fallen); const hb = p.hb; const S = 2.6; hb.group.scale.setScalar(S); hb.group.quaternion.identity(); hb.group.position.copy(p.headPos); }
@@ -435,8 +437,8 @@ window.Chess = (() => {
   function start(opt) { // opt: {mode:'ai'|'pvp', lv, white:{list,leader}, black:{list,leader}|null(wood)}
     ensure(); hitList.length = 0; if (scene) dispose();
     st = { mode: opt.mode, lv: opt.lv || 1, T: new Array(64).fill(''), S: new Array(64).fill(-1), pieces: [], turn: 0, sel: -1, targets: [], anims: [], hist: [], moveN: 1, cam: { t: 0, tt: 0, tp: 0.62, d: 11 }, autoFlip: opt.mode === 'pvp', over: false, busy: false, last: null };
-    st.scene = buildScene();
-    const place = (pc, side) => { const sq = pc.r * 8 + pc.f; if (st.T[sq]) return; st.T[sq] = pc.t; st.S[sq] = side;
+    st.scene = buildScene(); XS.fill(null);
+    const place = (pc, side) => { const sq = pc.r * 8 + pc.f; if (st.T[sq]) return; st.T[sq] = pc.t; st.S[sq] = side; XS[sq] = pc.rec && window.HeadGame ? HeadGame.chessExtra(pc.rec).map(o => o.slice()) : null;
       const p = { t: pc.t, s: side, sq, rec: pc.rec || null, alive: true }; p.g = pc.rec ? headPiece(p) : woodPiece(pc.t, side); p.hb = p.g.userData.hb || null; if (p.hb) p.headPos = p.hb.group.position.clone();
       const q = sqPos(sq); p.g.position.copy(q); scene.add(p.g);
       const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 1.2, 8), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 0.6; hit.userData.p = p; p.g.add(hit); p.hit = hit; st.pieces.push(p); };

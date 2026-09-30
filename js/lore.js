@@ -162,7 +162,7 @@ window.Lore = (() => {
     const lookRace = Object.assign({}, R.look);
     lookRace.acc = Object.assign({}, R.look.acc || {}, ID_ACC[idk] || {});
     if (race === 'beast' && sub === '兔族') lookRace.feat = ['beast'];
-    return { race, raceN: R.n + (sub ? '（' + sub + '）' : ''), id: idk, idN: I.n, rar, name, age, traits, belief, goal, loc: loc.k, locN: loc.n, lookRace };
+    return { race, raceN: R.n + (sub ? '（' + sub + '）' : ''), id: idk, idN: I.n, rar, name, age, traits, belief, goal, loc: loc.k, locN: loc.n, lookRace, kn: {} }; // kn：回忆系统——她的哪些信息已经想起来了（旧存档的头没有这个字段 = 全部已知）
   }
 
   function appearance(c, look) {
