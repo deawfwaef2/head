@@ -470,16 +470,18 @@ window.Worlds = (() => {
     // 普通散布
     const area = Math.PI * R * R / 100;
     const stp = window.WTerrain && WTerrain.act() ? WTerrain.steep(H) : null;
+    const vg = window.WTerrain ? WTerrain.veg(node, R) : null; if (g && Array.isArray(g.tag) && vg && WTerrain.vegName(node)) g.tag.push(WTerrain.vegName(node)); // R46：每地点随机植被构图
     if (!LITE) for (const [list, dens, s0, s1, kind, fkind] of st.props) {
       if (kind === 'fire') { const n = Math.max(0, Math.round(dens * area * (0.6 + r() * 0.8))); for (let i = 0; i < n; i++) { const a = r() * 6.28, d = R * (0.2 + r() * 0.7), x = Math.cos(a) * d, z = Math.sin(a) * d; if (!free(x, z, 1.5)) continue; mark(x, z, 1.5); const y = H(x, z); if (window.Assets && Assets.has('stone_fire_pit')) { const f = Assets.fit('stone_fire_pit', { w: 0.9, x, y, z }); if (f) sc.add(f); const fl = Assets.flame(x, y + 0.12, z, 4); if (fl) sc.add(fl); const pl = new THREE.PointLight('#ff7a30', 1.6, 9, 2); pl.position.set(x, y + 0.8, z); sc.add(pl); } cols.push({ x, z, r: 0.6 }); } continue; }
       const vs = variants(list); if (!vs.length) continue;
       const LOV = {}; if (g && kind === 'tree') for (const v of vs) { const lo = templates(v.n + '_lo'); LOV[v.n] = lo && lo[0] || null; }
       const WMD = window.WorldMaster ? WorldMaster.dens(kind) : 1; // R46 world_master：高档位加密植被
       const cap = (kind === 'grass' ? (g ? 3200 : 2200) : kind === 'tree' ? (g ? 64 : 40) : 160) * (LP && LP.clump && kind !== 'grass' ? 1.5 : 1) * WMD;
-      const n = Math.min(cap, Math.round(dens * WMD * area * (LP ? WLayout.densK(LP, kind) : 1) * (0.7 + r() * 0.6)));
+      const n = Math.min(cap, Math.round(dens * WMD * (vg && (kind === 'tree' || kind === 'plant') ? 1.45 : 1) * area * (LP ? WLayout.densK(LP, kind) : 1) * (0.7 + r() * 0.6)));
       for (let i = 0; i < n; i++) {
         const a = r() * 6.28, d = RM * Math.sqrt(r()) * 0.97, x = Math.cos(a) * d, z = Math.sin(a) * d, v = pick(r, vs), s = s0 + r() * (s1 - s0);
         if (stp && (kind === 'grass' || kind === 'plant' || kind === 'tree') && stp(x, z) > (kind === 'tree' ? 0.8 : 1.05)) continue; // R46：陡坡不长草树
+        if (vg && r() > vg(kind, x, z)) continue;
         if (LP && (d > Rf(a) * 0.97 || !WLayout.keep(LP, x, z, kind, r))) continue;
         if (g && !WGen.keep(g, kind, x, z, r, fkind)) continue;
         if (g && g.wd && g.wd(x, z).d < 0.7) continue;
