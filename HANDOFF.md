@@ -1303,7 +1303,7 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   - `js/mods.js`：在 `head_qc` 后加 `recall_iw` 条目。
   - `game.js` 未改（主循环只看 `Recall.active`，原场景模式下保持 false；持头插值被 pre 覆盖）。
 - 测试工具：`bak/tools/riw.py`（按动作/时间截图，`FUNC=1` 跑按键功能测试），`mk_r.py`（保留手部资源的轻量测试页）。
-## R33 — 用户：“新发现的头很多太大，像大头娃娃；头在任何环境都偏暗、不感光，不要这个效果”
+## R33b — 用户：“新发现的头很多太大，像大头娃娃；头在任何环境都偏暗、不感光，不要这个效果”
 - **实测（tools 外的临时台 _tools/wv/fl.html，gitignore，同一身体挂 VRoid/GI/HSR/ZZZ/NTE/CLS 头，PBR 环境图+ACES，对标游戏渲染器）**：
   - 暗/不感光的根因 = 头是 `MeshToonMaterial`：4 级色阶、**拿不到天空环境图**（身体是 PBR + envMapIntensity 0.55）、无方向性层次 → 野外脸发灰（亮度 ≈ 身体的 70%），洞里只有“亮/补光下限”两档，对火光方向不敏感。R26j/R29 的 uEnvA/膝盖/补光下限都是在卡通材质上打补丁。
   - 尺寸：脸宽/眼距经 head_norm2 已对齐 VRoid，但 MMD 的发量/发饰/兽耳使整颗头包围盒仍比 VRoid 大 30~90%（VRoid 0.23，MMD 0.34~0.49，原始单位）→ 视觉上还是“大头”。
