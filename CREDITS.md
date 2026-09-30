@@ -110,3 +110,7 @@ models/GI_*.js：原神角色 MMD 模型（模型提供 miHoYo，各改造者见
 ## 人设语音 voice/voice.js（第二十四轮）
 - 全部为本项目用 AI 语音合成（TTS）自制的中文女声台词，13 套 × 22 句；文字表见 `tools/voice_lines.py`（与录音一一对应）。无第三方音频素材。
 - 环境音 `js/ambience.js`、脚步 `js/steps.js`、打击音 `js/combatfx.js` 为 WebAudio 现场合成，无音频文件。
+
+## MMD 头模包（第二十五轮，grp: mmd）— ⚠ 仅限私人使用
+models/HSR_*.js（崩坏：星穹铁道，miHoYo）、models/ZZZ_*.js（绝区零，miHoYo）、models/NTE_*.js（异环，Hotta Studio）：各游戏官方发布的 MMD 模型，取自 phoshco.github.io 镜像。
+原规约禁止二次配布与猎奇/血腥用途；用户已知悉并表示仓库将设为私人。**不得公开发布/商用。** 由 js/headpacks.js 按 MOD pack_hsr / pack_zzz / pack_nte 加载。
