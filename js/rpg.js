@@ -56,10 +56,12 @@ window.RPG = (() => {
     { k: 'bigpotion', n: '巨魔再生药', icon: '⚗️', cost: 400, desc: '立刻恢复全部生命。', heal: 1 }
   ];
 
+  // 强化加成：武器攻击 round(+15%/级)，其余部位每项 ceil(+15%/级)（至少 +1）
+  function plusAdd(sl, k, v, p) { const x = v * 0.15 * p; return sl === 'weapon' && k === 'atk' ? Math.round(x) : Math.ceil(x); }
   function eqSum(S) {
     const o = { atk: 0, def: 0, hp: 0, str: 0, con: 0, agi: 0, ter: 0, soul: 0, cap: 2 };
     for (const s of SLOTS) { const t = EQUIP[s].tiers[S.eq[s] || 0]; for (const k in t) if (typeof t[k] === 'number' && k !== 'cost') { if (k === 'cap') o.cap = t.cap; else o[k] += t[k]; } }
-    if (S.eqPlus && S.eqPlus.weapon) o.atk += Math.round(EQUIP.weapon.tiers[S.eq.weapon || 0].atk * 0.15 * S.eqPlus.weapon); // 第十九轮：附魔每级 +15% 武器攻击
+    if (S.eqPlus) for (const s of SLOTS) { const p = S.eqPlus[s] || 0; if (!p || s === 'bag') continue; const t = EQUIP[s].tiers[S.eq[s] || 0]; for (const k in t) if (typeof t[k] === 'number' && k !== 'cost' && k !== 'cap' && t[k] > 0) o[k] += plusAdd(s, k, t[k], p); } // 第十九轮：附魔每级 +15%（R26：全部四个部位都能强化）
     if (window.Play) o.cap += Play.cap();
     return o;
   }
@@ -245,5 +247,5 @@ window.RPG = (() => {
     const mem = Lore.memory(r, c, { weapon: wpn, q: 1, hurt: 0.1 });
     return { c, look, sig, mem, story: Lore.backstory(r, c), app: Lore.appearance(c, look), date: Date.now() };
   }
-  return { lvOf, lvBonus, addXp, lvNeed, STATS, EQUIP, SLOTS, CONSUM, TRAIN, AFF, AFF_CAT, AFF_WILD, AFF_LORE, affHTML, stats, eqSum, trainCost, expedition, sigOf, rollExtras, luckOf, forgeHead, bossHead, foe };
+  return { lvOf, lvBonus, addXp, lvNeed, STATS, EQUIP, SLOTS, CONSUM, TRAIN, AFF, AFF_CAT, AFF_WILD, AFF_LORE, affHTML, stats, eqSum, plusAdd, trainCost, expedition, sigOf, rollExtras, luckOf, forgeHead, bossHead, foe };
 })();

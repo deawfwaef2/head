@@ -1094,6 +1094,7 @@ window.startGame = function () {
   // ---------------- 装备 / 物品 ----------------
   function buyEquip(slot) {
     const E = RPG.EQUIP[slot]; const nt = (S.eq[slot] || 0) + 1; const t = E.tiers[nt];
+    if (window.Sack && Sack.on() && window.Mods && Mods.on('forge_buy') === false) { toast('装备不能用魂晶购买——只能野外搜刮；魂晶用来强化已有的装备', '#ffb070', 2.6); SFX.deny(); return false; }
     if (!t) return false; if (S.coins < t.cost) { SFX.deny(); return false; }
     const hpFrac = S.hp / st().maxHp;
     S.coins -= t.cost; S.eq[slot] = nt; SFX.metal(); SFX.levelup();

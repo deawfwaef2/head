@@ -63,7 +63,7 @@ window.Forge = (() => {
 
   // ---- 数值 ----
   const tierOf = (sl, i) => RPG.EQUIP[sl].tiers[i];
-  function statsOf(t, plus, sl) { const o = {}; for (const k of STK) if (typeof t[k] === 'number' && (t[k] || k === 'cap')) o[k] = t[k]; if (sl === 'weapon' && plus) o.atk = (o.atk || 0) + Math.round(t.atk * 0.15 * plus); return o; }
+  function statsOf(t, plus, sl) { const o = {}; for (const k of STK) if (typeof t[k] === 'number' && (t[k] || k === 'cap')) o[k] = t[k]; if (plus && sl !== 'bag') for (const k of STK) if (k !== 'cap' && o[k] > 0) o[k] += RPG.plusAdd(sl, k, t[k], plus); return o; }
   const chips = (o) => Object.keys(o).filter(k => o[k]).map(k => `<span>${SN[k]} ${k === 'cap' ? o[k] + ' 颗' : '+' + o[k]}</span>`).join('') || '<span style="opacity:.6">无属性</span>';
   function powerWith(sl, tier) { const s = S(), keep = s.eq[sl]; s.eq[sl] = tier; let p = 0; try { p = G().st().power; } catch (e) { } s.eq[sl] = keep; return p; }
   function icon(sl, tier) { const id = PRE[sl] + tier, u = window.ItemIcons && ItemIcons.url && ItemIcons.url(id); return u ? `<img src="${u}" alt="">` : `<i>${sl === 'weapon' ? (Sk().IT[id] ? Sk().IT[id].icon : '🗡️') : RPG.EQUIP[sl].icon}</i>`; }
@@ -71,7 +71,7 @@ window.Forge = (() => {
 
   function card(sl) {
     const s = S(), E = RPG.EQUIP[sl], ci = s.eq[sl] || 0, c = E.tiers[ci], n = E.tiers[ci + 1], rc = RARC[Math.min(6, ci)];
-    const plus = sl === 'weapon' ? (s.eqPlus.weapon || 0) : 0, cs = statsOf(c, plus, sl);
+    const plus = sl !== 'bag' ? (s.eqPlus[sl] || 0) : 0, cs = statsOf(c, plus, sl);
     const pips = E.tiers.map((t, i) => `<i class="${i <= ci ? 'd' : ''}${i === ci + 1 ? ' n' : ''}" title="${esc(t.n)}${t.cost ? ' · 🔮' + fmt(t.cost) : ''}"></i>`).join('');
     let up = '';
     if (!n) up = `<div class="fg-max">✦ 已是最强 ✦</div>`;
@@ -81,13 +81,14 @@ window.Forge = (() => {
       const pd = powerWith(sl, ci + 1) - (G().st().power), poor = s.coins < n.cost;
       up = `<div class="fg-up"><div class="nx">⬆ 下一阶：<b style="color:${RARC[Math.min(6, ci + 1)]}">${esc(n.n)}</b><div class="df">${df}</div>${pd > 0 ? `<div class="pd">⚔️ 战力 +${fmt(pd)}</div>` : ''}<div class="fg-desc">${esc(n.desc || '')}</div></div>
         <button class="sk-btn fg-go" data-fup="${sl}" ${poor ? 'disabled' : ''}>⬆ 升级 🔮 ${fmt(n.cost)}${poor ? `<small>还差 🔮 ${fmt(n.cost - s.coins)}</small>` : '<small>花魂晶直接升级</small>'}</button></div>`;
-    } else up = `<div class="fg-desc" style="margin-top:8px">下一阶「${esc(n.n)}」要去野外搜刮（铁匠台升级已关闭）。</div>`;
+    } else up = `<div class="fg-desc" style="margin-top:8px">🧭 更高阶的${E.n}必须<b>野外搜刮</b>（敌人尸体、容器、武器架、霸主）。铁匠台只负责${sl === 'bag' ? '——背篓只能靠搜刮升级。' : '把你身上这件强化得更强。'}</div>`;
     // 武器：内嵌附魔
     let ench = '';
-    if (sl === 'weapon') {
-      const p = plus, cc = Sk().enchCost(p), have = Sk().have, ok = s.coins >= cc.coin && have('iron') >= cc.iron && have('dust') >= cc.dust && have('gem') >= cc.gem;
-      ench = `<div class="fg-ench"><div class="nx">🔮 <b>附魔 +${p}</b>${p >= 10 ? ' · 已满' : ` → +${p + 1}`}　每级攻击 +15%（+5 起要血玉）<br>${p >= 10 ? '' : `<span class="fg-need ${s.coins >= cc.coin ? 'ok' : 'no'}">🔮 ${fmt(cc.coin)}</span>${need('iron', cc.iron, have('iron'))}${need('dust', cc.dust, have('dust'))}${need('gem', cc.gem, have('gem'))}`}</div>
-        <button class="sk-btn fg-go" data-ench="eq" ${p >= 10 || !ok ? 'disabled' : ''}>${p >= 10 ? '已满' : '附魔'}<small>${p >= 10 ? '' : ok ? '材料齐了' : '材料/魂晶不足'}</small></button></div>`;
+    if (sl !== 'bag') {
+      const p = plus, cc = Sk().enchCost(p, sl), have = Sk().have, ok = s.coins >= cc.coin && have('iron') >= cc.iron && have('dust') >= cc.dust && have('gem') >= cc.gem;
+      const nxt = statsOf(c, p + 1, sl), dd = Object.keys(nxt).filter(k => k !== 'cap' && nxt[k] !== cs[k]).map(k => `${SN[k]} ${cs[k] || 0}→<b style="color:#8fe88f">${nxt[k]}</b>`).join('　');
+      ench = `<div class="fg-ench"><div class="nx">🔮 <b>强化 +${p}</b>${p >= 10 ? ' · 已满' : ` → +${p + 1}`}　每级全部属性 +15%${sl === 'weapon' ? '' : '（向上取整）'}（+5 起要血玉）${p >= 10 || !dd ? '' : `<br><span style="color:#cfc2a8">${dd}</span>`}<br>${p >= 10 ? '' : `<span class="fg-need ${s.coins >= cc.coin ? 'ok' : 'no'}">🔮 ${fmt(cc.coin)}</span>${need('iron', cc.iron, have('iron'))}${need('dust', cc.dust, have('dust'))}${need('gem', cc.gem, have('gem'))}`}</div>
+        <button class="sk-btn fg-go" data-ench="eq:${sl}" ${p >= 10 || !ok || !Object.keys(cs).length ? 'disabled' : ''}>${p >= 10 ? '已满' : '强化'}<small>${p >= 10 ? '' : !Object.keys(cs).length ? '没有可强化的属性' : ok ? '材料齐了' : '材料/魂晶不足'}</small></button></div>`;
     }
     // 储物箱里的同部位装备
     const Ik = Sk().IT, list = Sk().inv().stash.filter(o => Ik[o.id] && Ik[o.id].kind === 'equip' && Ik[o.id].slot === sl);
@@ -103,7 +104,11 @@ window.Forge = (() => {
   }
 
   function goal() {
-    const s = S(); if (!on()) return '';
+    const s = S();
+    if (!on()) { // R26：装备只能搜刮，魂晶只做强化
+      const c = SL.filter(sl => sl !== 'bag').map(sl => { const p = s.eqPlus[sl] || 0, cs = statsOf(RPG.EQUIP[sl].tiers[s.eq[sl] || 0], 0, sl); return Object.keys(cs).length && p < 10 ? { sl, p, cost: Sk().enchCost(p, sl).coin } : null; }).filter(Boolean).sort((a, b) => a.cost - b.cost)[0];
+      return `<div class="fg-goal ${c && c.cost <= s.coins ? 'ok' : ''}">🧭 <b>装备只能靠搜刮</b>：敌人的尸体、容器、武器架、霸主都会掉；带着更好的装备回来“换上”。${c ? `<br>🔮 魂晶用来<b>强化</b>身上已有的装备——最便宜的是 ${RPG.EQUIP[c.sl].icon} ${RPG.EQUIP[c.sl].n} +${c.p}→+${c.p + 1}（🔮 ${fmt(c.cost)}${c.cost <= s.coins ? '，够了' : '，还差 ' + fmt(c.cost - s.coins)}）。` : ''}</div>`;
+    }
     const cand = SL.map(sl => { const ci = s.eq[sl] || 0, n = RPG.EQUIP[sl].tiers[ci + 1]; return n ? { sl, n, cost: n.cost, pd: powerWith(sl, ci + 1) - G().st().power } : null; }).filter(Boolean);
     if (!cand.length) return `<div class="fg-goal ok">✦ 全身装备已经是最强。剩下的路：附魔武器到 +10、去深处猎更稀有的首级。</div>`;
     const can = cand.filter(c => c.cost <= s.coins).sort((a, b) => b.pd / b.cost - a.pd / a.cost || b.pd - a.pd);
@@ -119,7 +124,7 @@ window.Forge = (() => {
       <div class="fg-st"><span>攻击</span><b>${st.atk}</b><span>防御</span><b>${st.def}</b><span>生命</span><b>${st.maxHp}</b><span>闪避</span><b>${(st.dodge * 100).toFixed(1)}%</b><span>背篓</span><b>${st.cap} 颗</b><span>产出</span><b>×${st.yieldMul.toFixed(2)}</b><span>麻袋</span><b>${(() => { const g = Sk().inv().sack; return g.w + '×' + g.h; })()}</b><span>魂晶</span><b>🔮 ${fmt(s.coins)}</b></div>
       <div class="fg-npc">🧌 <b>地精行商·斯尼克</b><br>${line}</div></div>
       ${goal()}<div class="fg-grid">${SL.map(card).join('')}</div>
-      <div class="sk-foot">装备有两条路：<b>花魂晶在这里直接升阶</b>，或在野外搜刮到高阶装备后回这里“换上”。花魂晶升阶时武器的附魔等级会保留；换上搜刮来的武器，附魔跟着那把武器走。</div></div>`;
+      <div class="sk-foot">${on() ? '装备有两条路：<b>花魂晶在这里直接升阶</b>，或在野外搜刮到高阶装备后回这里“换上”。花魂晶升阶时武器的附魔等级会保留；换上搜刮来的武器，附魔跟着那把武器走。' : '<b>装备不能买，只能搜刮</b>：野外的敌人尸体、容器、武器架、霸主。强化等级跟着那件装备走——换下来的装备会带着强化进储物箱。魂晶 + 铁/尘/血玉 = 强化身上的装备。'}</div></div>`;
   }
 
   function bind(root, rerender) {

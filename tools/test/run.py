@@ -18,5 +18,7 @@ with sync_playwright() as p:
         try: r = pg.evaluate(script); print('RESULT', json.dumps(r, ensure_ascii=False)[:3000])
         except Exception as e: print('EVALERR', str(e)[:600])
     for e in errs[:20]: print(e)
-    if len(sys.argv) > 4: pg.screenshot(path=sys.argv[4])
+    if len(sys.argv) > 4:
+        try: pg.screenshot(path=sys.argv[4])
+        except Exception as e: print('SHOTERR', str(e)[:100])
     b.close()

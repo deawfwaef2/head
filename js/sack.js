@@ -69,7 +69,7 @@ window.Sack = (() => {
       if (it.bigpotion) { S.inv.stash.push(mk('bigpotion', it.bigpotion)); it.bigpotion = 0; }
       S.inv.stash.push(mk('bandage', 2), mk('cloth', 3), mk('herb', 2));
     }
-    S.eqPlus = S.eqPlus || { weapon: 0 };
+    S.eqPlus = S.eqPlus || { weapon: 0 }; for (const k of ['weapon', 'helm', 'armor', 'charm']) S.eqPlus[k] = S.eqPlus[k] || 0;
     if (!(window.Worlds && Worlds.active)) S.inv.sack.items = S.inv.sack.items.filter(o => o.id !== 'head' || o.h); // 读档后失效的首级格子
     const [w, h] = BAGSZ[Math.min(BAGSZ.length - 1, S.eq.bag || 0)]; S.inv.sack.w = w; S.inv.sack.h = h;
     for (const L of [S.inv.sack.items, S.inv.stash, S.inv.pending]) for (const o of L) if (o && o.u >= uid) uid = o.u + 1;
@@ -101,19 +101,19 @@ window.Sack = (() => {
   function rollEquip(r, lv, bonus) {
     const k = r(), slot = k < 0.5 ? 'weapon' : k < 0.68 ? 'armor' : k < 0.84 ? 'helm' : 'charm';
     const mx = { weapon: 6, armor: 5, helm: 4, charm: 5 }[slot], t = Math.max(1, Math.min(mx, Math.floor(lv * 0.62 + r() * 1.7 + (bonus || 0))));
-    return mk({ weapon: 'w', armor: 'a', helm: 'h', charm: 'c' }[slot] + t, 1, slot === 'weapon' && r() < 0.15 + lv * 0.03 ? { plus: 1 + Math.floor(r() * Math.min(4, 1 + lv * 0.5)) } : null);
+    return mk({ weapon: 'w', armor: 'a', helm: 'h', charm: 'c' }[slot] + t, 1, r() < 0.16 + lv * 0.03 ? { plus: 1 + Math.floor(r() * Math.min(4, 1 + lv * 0.5)) } : null);
   }
   const rollW = (r, lv, b) => mk('w' + Math.max(1, Math.min(6, Math.floor(lv * 0.62 + r() * 1.6 + b))), 1, r() < 0.12 + lv * 0.03 ? { plus: 1 + Math.floor(r() * Math.min(4, 1 + lv * 0.5)) } : null);
   function roll(kind, lv, seed, extra) {
     let s = seed >>> 0; const r = () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
     const out = [], add = (id, a, b) => out.push(mk(id, a + Math.floor(r() * (b - a + 1))));
     const mats = (n, pool) => { for (let i = 0; i < n; i++) { const id = pool[Math.floor(r() * pool.length)]; add(id, 1, IT[id].st > 5 ? 3 : 2); } };
-    if (kind === 'chest') { mats(2 + Math.floor(r() * 2), ['iron', 'dust', 'dust', 'cloth', 'bone']); if (r() < 0.55) out.push(rollEquip(r, lv, 0.6)); if (r() < 0.35) add('potion', 1, 2); if (r() < 0.12 + lv * 0.03) add('gem', 1, 1); }
-    else if (kind === 'crate') { mats(1 + Math.floor(r() * 3), ['iron', 'wood', 'cloth', 'hide', 'bone']); if (r() < 0.18) out.push(rollEquip(r, lv, 0)); if (r() < 0.3) add(r() < 0.5 ? 'bandage' : 'whet', 1, 2); }
+    if (kind === 'chest') { mats(2 + Math.floor(r() * 2), ['iron', 'dust', 'dust', 'cloth', 'bone']); if (r() < 0.75) out.push(rollEquip(r, lv, 0.6)); if (r() < 0.35) add('potion', 1, 2); if (r() < 0.12 + lv * 0.03) add('gem', 1, 1); }
+    else if (kind === 'crate') { mats(1 + Math.floor(r() * 3), ['iron', 'wood', 'cloth', 'hide', 'bone']); if (r() < 0.3) out.push(rollEquip(r, lv, 0)); if (r() < 0.3) add(r() < 0.5 ? 'bandage' : 'whet', 1, 2); }
     else if (kind === 'barrel') { mats(1 + Math.floor(r() * 2), ['wood', 'herb', 'cloth', 'herb']); if (r() < 0.2) add('potion', 1, 1); }
     else if (kind === 'basket' || kind === 'bucket') { mats(1 + Math.floor(r() * 2), ['herb', 'cloth', 'herb', 'dust']); if (r() < 0.3) add('bandage', 1, 2); }
-    else if (kind === 'rack') { out.push(rollW(r, lv, 0.4)); if (r() < 0.4) add('whet', 1, 1); }
-    else if (kind === 'corpse') { mats(1 + Math.floor(r() * 2), ['cloth', 'cloth', 'bone', 'hide', 'iron', 'dust']); if (extra && extra.armed && r() < 0.4) out.push(rollW(r, lv, 0));
+    else if (kind === 'rack') { out.push(rollW(r, lv, 0.4)); if (r() < 0.35) out.push(rollEquip(r, lv, 0.2)); if (r() < 0.4) add('whet', 1, 1); }
+    else if (kind === 'corpse') { mats(1 + Math.floor(r() * 2), ['cloth', 'cloth', 'bone', 'hide', 'iron', 'dust']); if (extra && extra.armed && r() < 0.65) out.push(r() < 0.55 ? rollW(r, lv, 0) : rollEquip(r, lv, 0)); else if (r() < 0.1) out.push(rollEquip(r, lv, -0.4));
       if (r() < 0.12) add('potion', 1, 1); if (extra && extra.boss) { out.push(rollEquip(r, lv, 1.5)); out.push(rollW(r, lv, 1.5)); add('gem', 1, 2); add('dust', 6, 12); } }
     { const bkI = window.Books && Books.rollLoot(r, kind, lv, extra); if (bkI) out.push(bkI); } // 第二十二轮：书与笔记
     { const pr = window.Props && Props.rollLoot ? Props.rollLoot(r, kind, lv, extra) : null; if (pr) out.push(...pr); } // 续 4：道具原料
@@ -208,8 +208,8 @@ window.Sack = (() => {
   }
   function equip(o, putOld) { // 穿上 o；旧装备交给 putOld
     const S = G.S, d = IT[o.id], sl = d.slot, cur = S.eq[sl] || 0;
-    if (cur > 0 || sl === 'weapon') { const pre = { weapon: 'w', helm: 'h', armor: 'a', charm: 'c', bag: 'b' }[sl]; if (!(sl === 'bag' && cur === 0)) putOld(mk(pre + cur, 1, sl === 'weapon' && S.eqPlus.weapon ? { plus: S.eqPlus.weapon } : null)); }
-    S.eq[sl] = d.tier; if (sl === 'weapon') { S.eqPlus.weapon = o.plus || 0; G.refreshWeapon && G.refreshWeapon(); }
+    if (cur > 0 || sl === 'weapon') { const pre = { weapon: 'w', helm: 'h', armor: 'a', charm: 'c', bag: 'b' }[sl]; if (!(sl === 'bag' && cur === 0)) putOld(mk(pre + cur, 1, sl !== 'bag' && S.eqPlus[sl] ? { plus: S.eqPlus[sl] } : null)); }
+    S.eq[sl] = d.tier; if (sl !== 'bag') S.eqPlus[sl] = o.plus || 0; if (sl === 'weapon') { G.refreshWeapon && G.refreshWeapon(); }
     if (sl === 'bag') resizeSack();
     SFX.metal && SFX.metal(); toast(`装备了 ${nameOf(o)}`, RARC[d.rar], 1.5); G.save && G.save();
   }
@@ -229,14 +229,16 @@ window.Sack = (() => {
   function homeArrive(nHeads) { if (!on()) return; if (!nHeads) setTimeout(() => pourPending(), 400); }
 
   // ---- 附魔 / 分解 / 合成（洞里）----
-  function enchCost(p) { return { coin: Math.round(80 * Math.pow(1.75, p)), iron: p + 1, dust: 2 * p + 2, gem: p >= 5 ? p - 4 : 0 }; }
+  const ENF = { weapon: 1, armor: 0.9, helm: 0.7, charm: 0.8 };
+  function enchCost(p, sl) { return { coin: Math.round(80 * (ENF[sl] || 1) * Math.pow(1.75, p)), iron: p + 1, dust: 2 * p + 2, gem: p >= 5 ? p - 4 : 0 }; }
   const have = (id) => inv().stash.reduce((a, o) => a + (o.id === id ? o.n : 0), 0);
   function take(id, n) { const st = inv().stash; for (const o of st.slice()) { if (o.id !== id || n <= 0) continue; const k = Math.min(n, o.n); o.n -= k; n -= k; if (!o.n) st.splice(st.indexOf(o), 1); } }
-  function enchant(target) { // target: 'eq' 或储物箱里的武器
-    const S = G.S, p = target === 'eq' ? (S.eqPlus.weapon || 0) : (target.plus || 0); if (p >= 10) return;
-    const c = enchCost(p); if (S.coins < c.coin || have('iron') < c.iron || have('dust') < c.dust || have('gem') < c.gem) { SFX.deny && SFX.deny(); toast('魂晶或材料不足', '#f88'); return; }
+  function enchant(target, sl) { // target: 'eq'（sl = 部位，默认武器）或储物箱里的装备
+    const S = G.S; sl = sl || 'weapon'; const p = target === 'eq' ? (S.eqPlus[sl] || 0) : (target.plus || 0); if (p >= 10) return;
+    if (target !== 'eq') sl = (IT[target.id] || {}).slot || 'weapon';
+    const c = enchCost(p, sl); if (S.coins < c.coin || have('iron') < c.iron || have('dust') < c.dust || have('gem') < c.gem) { SFX.deny && SFX.deny(); toast('魂晶或材料不足', '#f88'); return; }
     S.coins -= c.coin; take('iron', c.iron); take('dust', c.dust); if (c.gem) take('gem', c.gem);
-    if (target === 'eq') { S.eqPlus.weapon = p + 1; G.refreshWeapon && G.refreshWeapon(); } else target.plus = p + 1;
+    if (target === 'eq') { S.eqPlus[sl] = p + 1; if (sl === 'weapon') G.refreshWeapon && G.refreshWeapon(); } else target.plus = p + 1;
     SFX.metal && SFX.metal(); SFX.levelup && SFX.levelup(); toast(`🔮 附魔成功：+${p + 1}`, '#c9a0ff', 2); G.save && G.save(); render();
   }
   function salvage(o) {
@@ -312,7 +314,7 @@ window.Sack = (() => {
   function sackHtml(I) {
     const g = I.sack, used = g.items.reduce((a, o) => { const [w, h] = dims(o); return a + w * h; }, 0);
     const belt = I.belt.map((o, i) => `<div class="sk-slot" data-belt="${i}">${o ? tile(o, '') : ''}</div>`).join('');
-    const S = G.S, E = RPG.EQUIP, eqn = (sl) => { const t = S.eq[sl] || 0; return E[sl].tiers[t].n + (sl === 'weapon' && S.eqPlus.weapon ? ` +${S.eqPlus.weapon}` : ''); };
+    const S = G.S, E = RPG.EQUIP, eqn = (sl) => { const t = S.eq[sl] || 0; return E[sl].tiers[t].n + (sl !== 'bag' && S.eqPlus[sl] ? ` +${S.eqPlus[sl]}` : ''); };
     return `<div class="sk-col"><h4>🎒 麻袋 <small>${g.w}×${g.h} · 已用 ${used}/${g.w * g.h} 格</small>${mode === 'wild' ? '<button class="sk-btn" data-act="pour">倒空麻袋</button>' : ''}</h4>
       <div class="sk-grid" id="skGrid" style="width:${g.w * CELL}px;height:${g.h * CELL}px">${g.items.map(o => tile(o)).join('')}</div>
       <div class="sk-belt"><span style="color:#cbb;white-space:nowrap">腰带</span>${belt}<small style="color:#998;white-space:nowrap">H 瞬间用药</small></div>
@@ -404,7 +406,7 @@ window.Sack = (() => {
     root.querySelectorAll('[data-ifilt]').forEach(b => b.onclick = () => { itemFilter = b.dataset.ifilt; SFX.page && SFX.page(); render(); });
     root.querySelectorAll('[data-wsub]').forEach(b => b.onclick = () => { caveTab = b.dataset.wsub; SFX.page && SFX.page(); render(); });
     root.querySelectorAll('[data-wonly]').forEach(b => b.onchange = () => { craftOnly = b.checked; render(); });
-    root.querySelectorAll('[data-ench]').forEach(b => b.onclick = () => { const k = b.dataset.ench; enchant(k === 'eq' ? 'eq' : inv().stash.find(o => o.u === +k)); });
+    root.querySelectorAll('[data-ench]').forEach(b => b.onclick = () => { const k = b.dataset.ench; if (k.indexOf('eq') === 0) enchant('eq', k.split(':')[1] || 'weapon'); else enchant(inv().stash.find(o => o.u === +k)); });
     root.querySelectorAll('[data-craft]').forEach(b => b.onclick = () => craft(RECIPES[+b.dataset.craft]));
     const dsb = root.querySelector('[data-act="dissect"]'); if (dsb) dsb.onclick = () => { if (!near(cont)) { toast('离尸体太远了', '#ccc'); return; } Organs.dissect(cont); render(); };
     const pour = root.querySelector('[data-act="pour"]'); if (pour) pour.onclick = () => pourWild();

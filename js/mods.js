@@ -80,7 +80,7 @@ window.Mods = (() => {
     { id: 'gesture_combat', cat: 'play', icon: '⚔️', n: '手势战斗', d: 'F 拔刀/收刀。按住左键用鼠标轨迹实时控制武器挥砍（上撩/下劈/横斩，越快伤害越高），连点左键刺击，按住右键格挡（轻移鼠标切换上下左右）。首级查看改为 I 键。', def: true },
     { id: 'crosshair_slash', cat: 'play', icon: '🎯', n: '刀尖锁准星（第十八轮）', d: '按住左键时刀尖固定在屏幕中心，转动视角就是挥砍，刀光＝准星轨迹；关闭则回到旧的“鼠标控制武器轨迹”。需要「手势战斗」。', def: true, requires: ['gesture_combat'] },
     { id: 'release_slash', cat: 'play', icon: '🗡️', n: '蓄势挥击（第二十二轮）', d: '拔刀后按住左键=蓄势（视角 1:1 跟手，刀向“趋势”反方向拉开，准星旁出现方向线）；松开左键=捕捉松手前的鼠标微趋势，沿该方向挥出一刀（14° 内吸附 8 方向）。没趋势：短按=刺、蓄满 0.7 秒=直劈。按住期间刀尖本身不伤人。关掉恢复第十八轮“刀尖锁准星”。', def: true, requires: ['gesture_combat'] },
-    { id: 'forge_buy', cat: 'play', icon: '⚔️', n: '铁匠台·花魂晶直接升阶（第二十二轮）', d: '洞窟「⚔️ 装备」页：5 个大装备卡，下一阶预览（每项 +Δ、战力 +Δ）、一键花魂晶升阶，武器附魔内嵌，搜刮到的装备在卡片下直接换上。关掉 = 第十九轮规则（魂晶只能附魔，装备靠野外搜刮）。', def: true },
+    { id: 'forge_buy', cat: 'play', icon: '⚔️', n: '铁匠台·花魂晶直接升阶（第二十二轮）', d: '【默认关，第二十六轮】开 = 铁匠台可以花魂晶直接买下一阶装备（旧规则）。关 = 装备只能野外搜刮（敌人/尸体/容器/霸主），魂晶只用来强化身上已有的装备（武器/头盔/护甲/护符都能 +1~+10）。', def: false },
     { id: 'combat_fx', cat: 'play', icon: '🔊', n: '战斗音效与命中反馈（第二十二轮）', d: '程序合成的一整套战斗音效：挥刀破风（按力度/方向/左右声道）、刺击、挥空、蓄力升调与满格提示、肉体/脖子/骨头/重击命中、斩首喷血、击杀低频、弹刀/格挡/破防/完美格挡、闪避、受伤闷响耳鸣、敌人起手吼声与预警、敌人脚步与出手破风（带方位）；命中十字准星（白=命中 黄=弱点 红=击杀 蓝=被挡）与轻微屏震。关掉恢复旧的采样音效。', def: true },
     { id: 'aim_assist', cat: 'play', icon: '🎯', n: '挥砍辅助瞄准（第二十二轮）', d: '减少“乱挥没打中”：出刀时自动选视野锥内最近的敌人，刀路会过其胸口；对 2 米外的敌人自动延长刃的有效射程并向前小步突进；命中判定对身体略宽容；挥空有音效与提示。不影响视角（没有镜头粘滞）。', def: true, requires: ['gesture_combat'] },
     { id: 'foe_roles', cat: 'play', icon: '🎭', n: '敌人职业（第二十二轮）', d: '敌人不再一个套路：蛮兵（高血量/慢/重击/硬吃轻击）· 游击（冲刺斩后撤步/翻滚闪避）· 盾卫（永远举盾，要绕背或蓄力破防）· 刺客（潜行绕背、背刺×1.6、有提示音）· 狂战（连击、半血狂暴）· 投掷手（远程掷刃，可格挡/打飞）。头顶首次发现时会显示职业名。关掉恢复所有敌人同一套逻辑。', def: true },
@@ -111,6 +111,7 @@ window.Mods = (() => {
   if (!st.__v || st.__v < 2) { for (const m of LIST) if (m.group === 'render') st[m.id] = (m.id === 'r_classic'); st.bloom = false; st.__v = 2; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
   if (st.__v < 3) { st.explore3d = false; st.__v = 3; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
   if (st.__v < 4) { for (const id of ['steady_save', 'ground_contact', 'head_repair', 'smooth_faces', 'cave_detail']) st[id] = true; st.__v = 4; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+  if (st.__v < 5) { st.forge_buy = false; st.__v = 5; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R26：装备不能买，只能搜刮 + 强化
   for (const m of LIST) if (st[m.id] === undefined) st[m.id] = !!m.def;
   // 修正非法状态（互斥组恰好一个；冲突；依赖）
   function normalize() {

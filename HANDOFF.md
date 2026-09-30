@@ -1099,3 +1099,12 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **MOD nape_fill（heads.js，默认开）**：MMD 脸模只是前面具，后脑/后颈空（从后下方看到脸的内侧、眼睛透过头发）。`napeGeo(t)` 用本头脸部皮肤顶点（取每个方向最内侧）+ 耳平面镜像 + 断面圆，建径向壳（横向 ×0.9，下半竖向 ×0.99），皮肤色卡通材质，名 `__NAPE__`，每模板缓存一次。仅 grp mmd。
 - **MOD tier_look（heads.js + headwear.js，默认开）**：`tierFace()` 按魂阶加权挑脸（MMD 权重 0.15→3.5，其它 1.5→0.45）；`tierLook()` 用 look.seed 独立随机（不打乱原有抽签）：凡魂朴素发色 90%、无挑染/异色瞳、acc 清空、更苍白；灵魂 acc 减半；圣魂 50% 额饰；神魂 75% 王冠/冠冕/额饰（MMD 头只加细额饰）、挑染/异色瞳/25% 发光瞳。headwear.roll 概率 ×[0.35,0.7,1,1.25,1.45]。只影响新生成的首级（look 已存档的不变）。
 - 测试工具（不在仓库）：hb2.py/hb3.py + headback.js/tier.js 渲染背面/魂阶对比。
+## R26b（装备规则 + 战斗测试台）
+- 用户反馈：基地不能用魂晶买装备；魂晶只能强化身上已有的装备，装备靠搜刮。
+- `js/mods.js`：`forge_buy` 默认 **关**（存档迁移 `__v=5` 强制关一次）；关 = 规则生效。
+- `js/game.js` `buyEquip`：Sack 开且 forge_buy 关时拒绝购买（旧 UI 入口也封死）。
+- `js/rpg.js`：新增 `RPG.plusAdd(slot,key,val,plus)`；`eqSum` 对 weapon/helm/armor/charm 都按 `S.eqPlus[slot]` 加成（每级 +15%，非武器向上取整）。
+- `js/sack.js`：`S.eqPlus` 四个部位；`equip()` 换下的旧装备带着自己的强化进储物箱；`enchant(target, slot)`、`enchCost(p, slot)`（头盔×0.7/护符×0.8/护甲×0.9）；掉落：敌人（持械）65% 掉装备、箱/架/尸体的装备率提高，任何部位都可能带 +N。
+- `js/forge.js`：规则模式（forge_buy 关）下每张卡只有「强化 +N→+N+1」（预览每项属性变化）和搜刮提示；`goal()` 给出最便宜的强化目标。`data-ench="eq:<slot>"`。
+- 战斗测试台 `tools/test/fight.html` + `tools/test/drive.py`：真实 foe.js/combat.js/VRM 身体，虚拟时钟，秒级跑完。`trial(kind,…)` 机器人（click/flick/hold/wave）见 `/var/work/bots.js`（已拷入 tools/test/bots.js）。
+- 实测结论（旧战斗）：点按/松手能命中；**按住左键+挥鼠标（教学写的玩法）伤害 = 0**；空挥把体力耗到 0 后完全不能攻击；命中依赖刃尖真实碰撞，瞄不准整刀落空且无提示。
