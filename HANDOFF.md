@@ -1531,3 +1531,12 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
  **R35 仍有效**：伤害/血量是 FoeAbs 绝对值，没有 %最大生命伤害、没有保底刀数。调数值只改 `balance.js` 的 `TUNE` 和 `sim.js` 的 `TUNES.new`（两处同值）。
  改动文件：combat.js(WK×TK)、foe_abs.js(power/conv)、talents.js(need)、worlds.js(gainXp)、wpnspec.js(q)、mods.js/mods_i18n.js、index.html(加载 hudfix.js / balance.js)。
  测试：tools/test/talents.html 加假 hint/kgBtn 等元素的截图对比（前后）；整机仍无法在沙箱里跑，请用户实机确认 F 拔刀后的底栏、前期战斗手感（太慢/太难可调 `TUNE.tempo[0]`、`earlyDmg[0]`）。
+
+## R42 统一菜单 Hub（用户：“UI 设计得非常屎，各种奇怪按键 UI 分类，有没有统一器？按 TAB 分类看到所有 UI；物品栏和装备 UI 放一起；其他大规模优化”）
+**MOD `ui_hub`（`js/hub.js`，默认开）**。Tab（洞里 / 野外都可）打开总菜单：左边固定导航栏，按 角色（总览 · 装备与背包 · 天赋技能）/ 挑战（精英 · 猎手）/ 收藏（首级收藏 · 图鉴展厅 · 灵契）/ 世界（狩猎日志 · 建造）/ 系统（按键一览 · MOD 设置）分组，一键切换；再按 Tab / Esc 关闭；记住上次页（localStorage `hub_last`）。
+- **只做导航与布局，不重写内容**：各页仍是原模块的面板（UI.openMenu 的 stats/equip/heads/codex/logs/build、TalUI、R35UI 的 elite/hunt、Spirits、KeyGuide、Mods）。`Hub.PAGES` 里每页有 `isOpen/open/close`；打开**任意**面板（T / O / F1 / C / U / K / L / B / Z / Y 原热键照常）导航栏都会自动出现（200ms 轮询），并把面板右移 `--hubW`（196px；<860px 缩成 64px 图标栏）。洞里专属页（首级/图鉴/灵契/建造）在野外自动隐藏。
+- **装备与背包合并页（`kit`）**：左 = Gear2 纸娃娃 + 属性（`Gear2.dollHTML/dollClick/dollMove`，点槽位卸下），右 = Sack（洞里 `Sack.mountCave`：装备/物品/工坊/典籍；野外新增 `Sack.mountWild(host)`，`panel._hub=1` 时 Sack 自己不抢 Tab/B/Esc，`Sack.unmount()` 在关菜单时复位）。Z 键（Gear2.toggle）和野外 B 键现在都进这一页。装备/卸下后 MutationObserver 自动刷新纸娃娃。
+- 面板打开时隐藏热键栏 / 玩家框 / 世界提示（天赋页除外，拖技能要用栏）。右下角「按键 F1」小按钮换成「☰ 菜单 Tab」（`#hubBtn`，热键栏出现时自动抬高）。KeyGuide 的 Tab / Z 说明已更新。
+- 新的公开接口：`UI.tab`、`UI.quiet()`、`R35UI.avail(id)`、`Mods.isOpen`、`Spirits.panelOpen/closePanel`、`Sack.mountWild/unmount`、`Gear2.dollHTML…`。ui.js `openMenu('equip')` 在 Hub 开时走 `Hub.kitBody/kitMount`。
+- 测试：`tools/test/hub.html`（真实 ui/sack/gear2/r35ui/keyguide/talents_ui/mods + 假 G）；Tab → 总览、go:kit（洞里 + 野外两种）、天赋、按键、MOD 都截图验证过。整机仍未在沙箱跑；请用户实机确认：Tab 打开/关闭、野外 Tab、装备页穿脱、Esc 行为（UI 菜单 Esc 仍是原来的 close(false)）。
+- 还没做：总览页仍是原「属性」页；图鉴/首级/建造各页内容没改版，只是被统一进了导航。

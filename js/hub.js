@@ -53,12 +53,13 @@ body.hubon #uiroot,body.hubon #r35root,body.hubon #tbPn,body.hubon #modbox,body.
 body.hubon #uiroot .modal,body.hubon #r35root .modal,body.hubon #tbPn>*,body.hubon #modbox>*,body.hubon #kg .box{max-width:calc(100vw - var(--hubW) - 18px)!important}
 body.hubon #uiroot .m-tabs,body.hubon #r35root .m-tabs{display:none!important}
 body.hubon #kgBtn,body.hub #kgBtn{display:none!important}
+body.hubon:not(.hubpg-talents) #tbBar,body.hubon:not(.hubpg-talents) #tbCol,body.hubon #tbCast,body.hubon #wStat,body.hubon #wHint,body.hubon #wRun,body.hubon #hud{visibility:hidden!important}
 #hubBtn{position:fixed;right:14px;bottom:46px;z-index:30;display:none;background:rgba(12,8,6,.9);border:1px solid #8a6a3a;color:#f3dfb4;padding:6px 12px;font:700 13px system-ui,sans-serif;cursor:pointer;border-radius:4px}
 #hubBtn:hover{border-color:#ffd27a;color:#fff}#hubBtn kbd{margin-left:6px;padding:1px 5px;border:1px solid #8a6a3a;border-bottom-width:2px;border-radius:3px;font-size:11px;color:#ffd98a}
 body.hudl.tbon #hubBtn{bottom:calc(var(--tbH) + 10px)!important}
 /* 装备与背包：左纸娃娃 + 右物品 */
-.hk{display:grid;grid-template-columns:372px minmax(0,1fr);gap:18px;align-items:start}.hk.one{grid-template-columns:1fr}
-.hk .g2grid{grid-template-columns:repeat(4,78px);grid-auto-rows:72px;gap:7px}.hk .g2s .i{font-size:26px}.hk .g2s .n{max-width:72px}
+.hk{display:grid;grid-template-columns:330px minmax(0,1fr);gap:18px;align-items:start}.hk.one{grid-template-columns:1fr}
+.hk .g2grid{grid-template-columns:repeat(4,68px);grid-auto-rows:64px;gap:6px}.hk .g2doll{padding:10px}.hk .g2s .i{font-size:22px}.hk .g2s .n{max-width:64px;font-size:10.5px}.hk .g2body .o{font-size:72px}.hk-r{min-width:0;overflow-x:auto}
 .hk-l{position:sticky;top:0}
 @media (max-width:1080px){.hk{grid-template-columns:1fr}.hk-l{position:static}}
 @media (max-width:860px){:root{--hubW:64px}#hubRail .nm,#hubRail .ky,#hubRail .gh,#hubRail .me,#hubRail .ft,#hubRail .ttl{display:none}#hubRail button{justify-content:center;padding:10px 4px}}`;
@@ -88,7 +89,7 @@ body.hudl.tbon #hubBtn{bottom:calc(var(--tbH) + 10px)!important}
   function sync() {
     if (!on()) { if (rail) rail.classList.remove('on'); document.body.classList.remove('hubon', 'hub'); if (btn) btn.style.display = 'none'; return; }
     build(); document.body.classList.add('hub');
-    const cur = openPage(); rail.classList.toggle('on', !!cur); document.body.classList.toggle('hubon', !!cur);
+    const cur = openPage(); rail.classList.toggle('on', !!cur); document.body.classList.toggle('hubon', !!cur); for (const c of [...document.body.classList]) if (c.startsWith('hubpg-') && (!cur || c !== 'hubpg-' + cur.id)) document.body.classList.remove(c); if (cur) document.body.classList.add('hubpg-' + cur.id);
     if (cur) { paint(cur); if (cur.id !== 'mods' && cur.id !== 'keys') { last = cur.id; } }
     const g = G0(), show = !cur && g && g.playing && !g.uiOpen && !(window.Worlds && Worlds._W && (Worlds._W.busy || Worlds._W.dead));
     btn.style.display = show ? 'block' : 'none'; if (show) { const L = curLang(); const t = (L === 'zh' ? '☰ 菜单' : L === 'ja' ? '☰ メニュー' : '☰ Menu'); if (btn._t !== L) { btn._t = L; btn.innerHTML = t + '<kbd>Tab</kbd>'; } }
