@@ -297,6 +297,7 @@ window.Foe = (() => {
     if (window.FaceFill) FaceFill.world(); // 第二十四轮：野外用更高的面部补光下限
     if (!CTX) return; const ctx = CTX, P = ctx.player;
     CLK += dt; if (window.FoeRoles) FoeRoles.update(dt, ctx);
+    if (window.Steps) Steps.foes(FOES, dt); // 第二十四轮：敌人脚步（用上一帧到这一帧的位移）
     if (slowT > 0) { slowT -= dt; dt *= slowK; if (slowT <= 0) slowK = 1; } // 击杀慢动作：只作用于敌人/尸体/头/血，玩家照常
     const SMART = !window.Mods || Mods.on('foe_smart'), DOORESC = !window.Mods || Mods.on('foe_door_escape');
     for (const fo of FOES) {

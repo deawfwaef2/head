@@ -820,7 +820,7 @@ window.Worlds = (() => {
     for (const c of B.cols) { const dx = W.pos.x - c.x, dz = W.pos.z - c.z, m = c.r + 0.35, d2 = dx * dx + dz * dz; if (d2 >= m * m) continue; const d = Math.sqrt(d2); if (d > 1e-5) { W.pos.x += dx / d * (m - d); W.pos.z += dz / d * (m - d); } }
     const gy = B.H(W.pos.x, W.pos.z); if (W.pos.y <= gy) { W.pos.y = gy; W.vel.y = 0; W.onGround = true; } else if (W.pos.y > gy + 0.05) W.onGround = false;
     const moving = Math.hypot(W.vel.x, W.vel.z);
-    if (W.onGround && moving > 1) { W.stepT -= dt * moving; if (W.stepT <= 0) { W.stepT = 1.7; SFX.step && SFX.step(); } }
+    if (W.onGround && moving > 1) { W.stepT -= dt * moving; if (W.stepT <= 0) { W.stepT = 1.7; const nd = W.graph && W.graph.nodes[W.cur], gs = nd && STYLES[nd.style]; if (window.Steps) Steps.ground = gs ? gs.ground : ''; if (!(window.Steps && Steps.player(Steps.ground))) SFX.step && SFX.step(); } } // 第二十四轮：按地面材质的沉重脚步
     const bob = W.onGround ? Math.sin(now * 9) * Math.min(1, moving / 3) * 0.03 : 0;
     const cam = G.camera; cam.position.set(W.pos.x, W.pos.y + P.h + bob, W.pos.z); cam.rotation.set(P.pitch, P.yaw, 0, 'YXZ');
     if (window.Combat && Combat.state && Combat.state.shake > 0) { cam.position.x += (Math.random() - 0.5) * Combat.state.shake * 0.08; cam.position.y += (Math.random() - 0.5) * Combat.state.shake * 0.08; }

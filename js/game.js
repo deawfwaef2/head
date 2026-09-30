@@ -1225,7 +1225,7 @@ window.startGame = function () {
       let fd = Math.hypot(player.pos.x - cave.firePos.x, player.pos.z - cave.firePos.z); if (fd < 1e-4) { player.pos.z += 0.01; fd = Math.hypot(player.pos.x - cave.firePos.x, player.pos.z - cave.firePos.z); } if (fd < 0.75) { player.pos.x = cave.firePos.x + (player.pos.x - cave.firePos.x) / fd * 0.75; player.pos.z = cave.firePos.z + (player.pos.z - cave.firePos.z) / fd * 0.75; }
     }
     const moving = Math.hypot(player.vel.x, player.vel.z);
-    if (playing && player.onGround && moving > 1) { stepT -= dt * moving; if (stepT <= 0) { stepT = 1.6; SFX.step(); } }
+    if (playing && player.onGround && moving > 1) { stepT -= dt * moving; if (stepT <= 0) { stepT = 1.6; if (!(window.Steps && Steps.player('cave'))) SFX.step(); } } // 第二十四轮：洞穴石地脚步
     const bob = playing && player.onGround ? Math.sin(now * 9) * Math.min(1, moving / 3) * 0.03 : 0;
     camera.position.set(player.pos.x, player.pos.y + player.h + bob, player.pos.z);
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
