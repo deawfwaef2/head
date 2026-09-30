@@ -2,14 +2,15 @@
 // 只读：把 combat.js / foe.js / foe_abs.js 里真实用到的公式（自重 WEIGHT、握长、前摇 wu、出刀时长、冷却、体力、命中倍率）算出来显示。
 // 改公式时请同步：combat.js mmAttack（wu/dur/cd/体力）、foe.js hit（12×q×速度系数×部位倍率）、foe_abs.js power()。
 window.WpnSpec = (() => {
-  const WT = [1.0, 1.3, 0.8, 1.5, 1.4, 0.9, 1.0];            // = combat.js WEIGHT
+  const CT = () => window.CombatTune || { WEIGHT: [1.0, 1.3, 0.8, 1.5, 1.4, 0.9, 1.0], WK: w => Math.sqrt(Math.max(0.6, w)), CDB: { light: 500, fin: 750, heavy: 950 }, WU: { light: 0.08, fin: 0.09, heavy: 0.05 }, SW: { light: 0.15, fin: 0.22, heavy: 0.25 } }; // R37（主管）：直接读 combat.js 导出的 CombatTune，改公式不再需要两边同步
+  const WT = CT().WEIGHT;
   const LEN = [0.8, 0.72, 0.72, 0.8, 0.85, 1.0, 1.08];       // = game.js WPN_ASSET 的握长（米）
   const KIND = ['钝击', '钝击 · 带钉', '砍刀', '链锤 · 甩击', '重斧', '长刀 · 镰', '刺剑'];
   const FEEL = [
     '普通手感：不快不慢，新手刀。',
-    '偏沉：前摇和收招都比普通慢约 14%，但单击更扎实。',
+    '略沉：比木棒慢一丝，但单击更扎实。',
     '最轻最快：前摇短、收招短，适合连击和抢破绽。',
-    '最沉：出手慢、收招慢，一下就是一片血雾——别被人抢了空档。',
+    '偏沉：出手稍慢，一下砸得很重——别被人抢了空档。',
     '很沉的重斧：重击和破防强，连击节奏慢。',
     '偏轻的长刀：触及远、节奏快，魂力加成。',
     '最长的刺剑：触及最远，凶威加成，节奏中等。'
@@ -24,13 +25,13 @@ window.WpnSpec = (() => {
   }
   function spec(tier, plus) {
     tier = clamp(tier | 0, 0, WT.length - 1); plus = plus || 0; const T = RPG.EQUIP.weapon.tiers[tier], st = stAt(tier, plus);
-    const wt = WT[tier], len = LEN[tier], ex = window.Stamina && Stamina.ex ? 1.3 : 1, kk = Math.sqrt(wt) * ex;
+    const wt = WT[tier], len = LEN[tier], ex = window.Stamina && Stamina.ex ? 1.3 : 1, kk = CT().WK(wt) * ex;
     const q = Math.pow(Math.max(5, st.power || 50) / 40, 0.8) * (window.Sack && Sack.dmgMul ? Sack.dmgMul() : 1);
-    const base = 12 * q, cdk = Math.sqrt(Math.max(0.6, wt)) * ex, sp = v => clamp(v / 8, 0.5, 1.8);
+    const base = 12 * q, cdk = CT().WK(wt) * ex, C = CT(), sp = v => clamp(v / 8, 0.5, 1.8);
     const mk = (wu, swing, cd, stam, spd, mult, reach) => ({ wu: Math.round(wu * 1000), swing: Math.round((wu + swing) * 1000), cd: Math.round(cd), stam, reach: +reach.toFixed(2), dmg: Math.round(base * sp(spd) * mult) });
-    const L = mk(0.08 * kk, 0.15 * kk, 500 * cdk, 4, 8.2, 1, 1.5 + len * 0.8);
-    const F = mk(0.09 * kk, 0.22 * kk, 750 * cdk, 6, 8.8, 1.3, 1.5 + len * 0.8);
-    const H = mk(0.05 * kk, 0.25 * kk, 950 * cdk, 12, 12.5, 2.2, 1.5 + len * 0.8 + 0.3);
+    const L = mk(C.WU.light * kk, C.SW.light * kk, C.CDB.light * cdk, 4, 8.2, 1, 1.5 + len * 0.8);
+    const F = mk(C.WU.fin * kk, C.SW.fin * kk, C.CDB.fin * cdk, 6, 8.8, 1.3, 1.5 + len * 0.8);
+    const H = mk(C.WU.heavy * kk, C.SW.heavy * kk, C.CDB.heavy * cdk, 12, 12.5, 2.2, 1.5 + len * 0.8 + 0.3);
     const cyc = cdOn() ? 2 * L.cd + F.cd : 2 * L.swing + F.swing, dps = Math.round((2 * L.dmg + F.dmg) / (cyc / 1000));
     const crit = Math.max(0, st.crit || 0), critD = st.critD || 150;
     return { tier, plus, name: T.n, atk: st.atk, power: Math.round(st.power || 0), wt, len, kind: KIND[tier], feel: FEEL[tier], L, F, H, dps, cyc: Math.round(cyc), crit, critD, ter: T.ter || 0, soul: T.soul || 0, base: Math.round(base), charge: 0.26 + 0.6, cdOn: cdOn(), ex: ex > 1, stat: st };
