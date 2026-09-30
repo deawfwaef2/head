@@ -3,7 +3,7 @@
 // 已经被照亮的脸不变；背光/阴天/夜里的脸不再黑成一团。全局共享一个 uniform：开关/强度改变都不会重编译着色器。
 window.FaceFill = (() => {
   let worldT = -1e9; const done = new WeakSet(); // 不能用 userData 标记：clone() 会复制 userData 却不复制 onBeforeCompile
-  const u = { get value() { if (window.Mods && !Mods.on('face_light')) return 0; const L = !window.Mods || Mods.on('char_lift'); return performance.now() - worldT < 600 ? (L ? 0.85 : 0.75) : (L ? 0.8 : 0.45); } }; /* R29 char_lift：洞里 0.45→0.8、野外 0.75→0.85 */ // 亮度下限（满光≈1.08；白天≈0.9–1.0 不受影响，夜里≈0.5 提到 0.75）：野外 0.75，洞穴 0.45
+  const u = { get value() { if ((window.Mods && !Mods.on('face_light')) || (window.CharLight && CharLight.on())) return 0; /* R47 char_unify：绝对亮度下限旁路 */ const L = !window.Mods || Mods.on('char_lift'); return performance.now() - worldT < 600 ? (L ? 0.85 : 0.75) : (L ? 0.8 : 0.45); } }; /* R29 char_lift：洞里 0.45→0.8、野外 0.75→0.85 */ // 亮度下限（满光≈1.08；白天≈0.9–1.0 不受影响，夜里≈0.5 提到 0.75）：野外 0.75，洞穴 0.45
   // 第二十六轮(j) MOD head_tone：野外 PBR 身体从天空环境图（scene.environment × envMapIntensity 0.55）得到间接光，卡通头拿不到 → 头比身体暗。
   // 给卡通材质补同量的天空平均辐亮度（worlds.js parseSky 算出 sky.amb）；洞里/关 MOD 为 0。共享 uniform，不重编译。
   const ZERO = new THREE.Color(0, 0, 0), envA = new THREE.Color(0, 0, 0);
@@ -18,7 +18,7 @@ window.FaceFill = (() => {
   // 思路：PBR 光照照旧算（天空/太阳/篝火/阴影都照常响应），但在 lights_fragment_end 之后把“受光比 lr”（= 光照亮度 / 反照率亮度，满光≈1）
   // 重新映射成二次元的两段式：亮面（平涂，几乎不随角度变）/ 暗面（抬高到 ~80%，并染上暖粉的阴影色）/ 之间 ~0.12 宽的软过渡；
   // 并彻底去掉高光与环境镜面反射（塑料感的来源）、再加一圈很淡的边缘光。极暗环境（洞里、夜里）仍然保持暗，不会被抬平。
-  const animeOn = () => !window.Mods || !Mods.on || Mods.on('anime_shade') !== false;
+  const animeOn = () => (!window.Mods || !Mods.on || Mods.on('anime_shade') !== false) && !(window.CharLight && CharLight.on());
   const ANIME_GLSL = `// ANIME_BLOCK
     { vec3 _litC = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse;
       float _alb = max(dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)), 1e-3) * 0.3183;
@@ -38,7 +38,7 @@ window.FaceFill = (() => {
   //  ① 明暗交界带染血红色散射（预积分皮肤的经典红晕：受光→背光过渡处偏红橙，而不是灰）；② 背光侧暖色填充（皮下散射回来的光，暗部不发灰发死）；
   //  ③ 掠射角红色透光边（耳廓/鼻翼/指尖的透光感，只在受光时出现）；④ 高光压到 50~80%、加一圈极淡的宽油脂光泽（去掉塑料硬高光，又保留皮肤的湿润感）。
   // 极暗环境（洞里/夜里）不抬亮。参数集中在 SSS_GLSL。关 MOD = 原来的 PBR（或 anime_shade）。
-  const sssOn = () => !window.Mods || !Mods.on || Mods.on('skin_sss') !== false;
+  const sssOn = () => (!window.Mods || !Mods.on || Mods.on('skin_sss') !== false) && !(window.CharLight && CharLight.on());
   const SSS_GLSL = `// SSS_BLOCK
     { vec3 _a = diffuseColor.rgb; float _l = dot(_a, vec3(0.299, 0.587, 0.114));
       float _mx = max(_a.r, max(_a.g, _a.b)), _mn = min(_a.r, min(_a.g, _a.b)), _st = (_mx - _mn) / max(_mx, 1e-3);
@@ -66,11 +66,12 @@ window.FaceFill = (() => {
       { vec3 litC = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse; float al = max(dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)), 1e-3) * 0.3183; // 与上面软膝盖同单位：满光≈1.08
         float lr = dot(litC, vec3(0.299, 0.587, 0.114)) / al; float fc = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
         totalEmissiveRadiance += diffuseColor.rgb * 0.3183 * max(0.0, uFill * ${k.toFixed(2)} - lr) * (0.45 + 0.55 * fc); }`);
+    if (window.CharLight) CharLight.patch(sh); // R47 char_unify
   }
   const HPBR_OBC = function (sh) { animePatch(sh); sssPatch(sh); sh.uniforms.uHeadK = hk; sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform float uHeadK;\nvoid main() {').replace('#include <lights_physical_fragment>', 'diffuseColor.rgb *= uHeadK;\n#include <lights_physical_fragment>'); }; // R33：head_pbr 头材质的默认注入（hair/skin 自带 onBeforeCompile 的由 wrap 注入同一句）
   function wrap(m, k) { // 包一层 onBeforeCompile（clone() 不会复制它：克隆后要重新包）
-    if (!m || !(m.isMeshToonMaterial || (m.isMeshStandardMaterial && window.Mods && Mods.on('char_lift'))) || done.has(m)) return m; /* R29 char_lift：身体默认是 PBR 标准材质（foe_toon 关）→ 以前完全没补光，洞里发黑 */ const prev = m.customProgramCacheKey(), o = m.onBeforeCompile;
-    const toon = !!m.isMeshToonMaterial, hp = !!(m.userData && m.userData.hpbr) && o !== HPBR_OBC; m.onBeforeCompile = function (sh, r) { o.call(this, sh, r); inject(sh, k, toon, hp); }; m.customProgramCacheKey = () => prev + '|ff' + k + (toon ? 'e' : '') + (hp ? 'h' : '') + (animeOn() ? 'A' : '') + (sssOn() ? 'S' : ''); done.add(m); return m;
+    if (!m || !(m.isMeshToonMaterial || (m.isMeshStandardMaterial && window.Mods && (Mods.on('char_lift') || Mods.on('char_unify')))) || done.has(m)) return m; /* R29 char_lift：身体默认是 PBR 标准材质（foe_toon 关）→ 以前完全没补光，洞里发黑 */ const prev = m.customProgramCacheKey(), o = m.onBeforeCompile;
+    const toon = !!m.isMeshToonMaterial, hp = !!(m.userData && m.userData.hpbr) && o !== HPBR_OBC; m.onBeforeCompile = function (sh, r) { o.call(this, sh, r); inject(sh, k, toon, hp); }; m.customProgramCacheKey = () => prev + '|ff' + k + (toon ? 'e' : '') + (hp ? 'h' : '') + (animeOn() ? 'A' : '') + (sssOn() ? 'S' : '') + (window.CharLight && CharLight.on() ? 'U' : ''); done.add(m); return m;
   }
   return { u, wrap, tune, hk, HPBR_OBC, animeOn, sssOn, world() { worldT = performance.now(); }, env(c) { if (c) envA.copy(c).multiplyScalar(0.55); else envA.setRGB(0, 0, 0); } };
 })();

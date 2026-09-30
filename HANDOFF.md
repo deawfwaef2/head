@@ -1707,3 +1707,12 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **MOD `foe_press`（默认开）**：`foe.js atkStep`：出招（非远程、非定格蓄力帧）时朝玩家迈步，普通 1.9m/s、重击 3.0m/s（霸主 ×1.15）；命中距离 +0.3（重击 +0.55）；落空且玩家仍在 3.2m 内、iq>0.45 → cd 缩到 0.3–0.6s 立刻补刀，最多连 2 次（`fo.chain`）。已有的“预判走位 lead”保持。bench：玩家以 2m/s 倒退 8 秒，开启时被追上打中，关闭时永远追不上。
 - 补了 R41/R43 MOD 的英日文（mods_i18n.js）。
 - 待用户确认：“大头娃娃有时候还有-”后半句没发全；“单位弱智”具体表现。
+## R41（主管）e —— R47 第 3 项：二次元人物逆光难看 / 恐怖谷
+- 病因：heads.js FaceFill 的 anime_shade（暗面抬到满日照 80%）/ face_light+char_lift（绝对亮度下限 uFill）/ skin_sss（交界处染红）都是**绝对尺度** → 逆光/阴天里脸发泥棕、红交界、或像自发光纸片人，且比环境亮。
+- 新 MOD `char_unify`（默认开，mods.js 在 anime_shade 前一行）：新文件 `js/charlight.js`（`CharLight.patch(sh)` 插在 aomap_fragment 前）。
+  环境相对明暗：full = 反照率×太阳色 + 间接光；暗面只抬到 full×0.4×上下体积项，亮面不动、点光原样；逆光轮廓太阳色边缘光；高光 ×0.2。`CharLight.tune({shade,rim,spec})` 可调。
+- heads.js 最小改动（6 处，均带 R47 注释）：uFill getter、animeOn、sssOn 在 char_unify 开时旁路；inject 末尾调 CharLight.patch；wrap 在 char_unify 开时也接管身体 PBR；program cache key 加 'U'。
+- index.html：heads.js 前加 `<script src="js/charlight.js">`。
+- js/mods_i18n.js：加 char_unify 英/日译文。
+- tools/test/world.html：载入 mods.js（`?mods=id:0,id:1` 覆盖）、master/worldmaster/wterrain 后处理（`?post=0` 关）、`view:'face'` 特写（`sun:'back'|'front'|'side'`、`se` 仰角、`si` 太阳倍率、`cd` 距离），info 里带灯光清单。
+- 验证截图（逆光/强逆光/暗场景，开关对比）：关=脸泥棕+红交界；开=脸干净、衣服有体积、轮廓有逆光边；暗场景开 MOD 不比环境亮。
