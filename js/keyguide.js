@@ -13,6 +13,7 @@ window.KeyGuide = (() => {
       [['W', 'A', 'S', 'D'], { zh: '前后左右走动', ja: '前後左右に移動', en: 'Walk' }],
       [['Shift'], { zh: '按住疾跑（耗体力）', ja: '押している間ダッシュ（スタミナ消費）', en: 'Hold to sprint (uses stamina)' }],
       [['C'], { zh: '按住下蹲', ja: '押している間しゃがむ', en: 'Hold to crouch' }],
+      [['V'], { zh: '第一 / 第三人称切换（手里没拿首级时）', ja: '一人称／三人称の切り替え（首を持っていない時）', en: 'Toggle first / third person (when not holding a head)' }],
       [['Space'], { zh: '跳跃', ja: 'ジャンプ', en: 'Jump' }],
       [['Mouse'], { zh: '转动视角', ja: '視点を動かす', en: 'Look around' }],
     ] },

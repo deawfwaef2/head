@@ -177,7 +177,7 @@ window.FPV = (() => {
       const wpn = G.weapon, on = active();
       if (T.body) { T.body.visible = on; const sc = curScene(); if (sc && T.body.parent !== sc) sc.add(T.body); }
       if (T.wclone) T.wclone.visible = on;
-      if (!on) { T.init = false; return; }
+      if (!on) { T.init = false; if (T.hid) { T.hid = false; if (vm) vm.visible = true; } return; }
       const P = G.player, C = window.Combat, S = C && C.state, drawn = !!(C && C.drawn);
       cam.updateMatrixWorld(true);
       // 第一人称（眼睛）相机位姿：本帧 Combat 已按它算完
@@ -222,7 +222,7 @@ window.FPV = (() => {
       return true;
     }
     function preTP(dt, now) {
-      const on = active(); if (on) { vm.visible = false; if (rig) rig.g.visible = false; }
+      const on = active(); if (on) { vm.visible = false; T.hid = true; if (rig) rig.g.visible = false; }
       if (!on) return;
       const eye = T.fpPos, ex = T.fpEuler; const q = T.fpQuat;
       const desired = new V3(0.6, 0.32, 3.0);

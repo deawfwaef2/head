@@ -1561,3 +1561,11 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **技能栏放大**（`talents_ui.js` CSS）：`--u` 由 clamp(46,4.4vw,68) 改为 clamp(60,5.4vw,88)；键位角标改成黑底大号徽章；魂能消耗数字 ≥13px。`body.tbcave` 时 `#hint/#propHint/#bkHeld` 抬到栏上方。
 - **技能特效**（新 MOD `skill_vfx`，`js/skillfx.js`，默认开）：`TalUI.cast` 成功后调 `SkillFX.cast(id)`：屏幕边缘门派色闪光（大招：冲击波环 + 速度线 + 屏震）、那一格爆光环 + 火花、大图标+技能名横幅（替代 `#tbCast`，`body.sfxon` 时隐藏旧的）；3D：面前迸发的加法火花、脚下双层冲击环、前方光柱，按门派（id 首字母 b/w/s/r/m/h）加新月刃光 / 护盾壳 / 魂火螺旋 / 残影线。**不碰各技能原有的环/弹道逻辑**。教训：光柱/护盾壳不能包住相机（DoubleSide 加法混合会糊屏），光柱放在前方 3.4m。
 - 测试：`tools/test/talents.html`（已加载 skillfx.js，背景改暗）；无头 Chromium + swiftshader 里加了 WebGLRenderer 看 3D 特效（见本轮脚本思路：往页面里 `new THREE.WebGLRenderer` 并把 `r.render(scene,camera)` 推进 `G.HOOK.frame`）。未在真机验证。
+## R41（本 agent）：战斗特效 3D 化 + 第一人称兽人手 + 第一/第三人称切换（V）
+用户原话：战斗效果/质感/动作很劣质；要能切第一/第三人称，第一人称要能看见兽人的手。
+- **新文件**：`js/cfx3d.js`（MOD `cfx3d`，3D 命中特效：新月斩光、火花、血雾、冲击环、刀光拖尾；包了 `CombatFX.event`，不碰 foe/worlds 逻辑；无 hit-stop/慢动作）、`js/fpv.js`（MOD `fp_hands` 第一人称兽人双手 + 武器动感；MOD `view_toggle` 第三人称，按 V）、`assets/ogre_body.js`（第三人称身体 = Quaternius「Goblin Animated」CC0，FBX→GLB，**按材质拆成 6 个 mesh**——直接导出会把每个 material group 都导成整身副本，会叠成一团）。
+- **第一人称手**：`assets/limb_hand_avatar.js` 的皮肤手，手指程序化弯曲握住武器柄；右手握柄，双手武器/右键格挡时左手也上。`combat.js` 的 `IDLE_H` 抬高一点让手在待机时可见。
+- **第三人称**：战斗判定始终按第一人称（眼睛）算；第三人称只在渲染前把相机挪到身后（过肩，带墙/地面/柱子碰撞），微任务里还原。武器按真实位置画在世界里，右臂（双手武器时左臂）做两段 IK 够握柄；Idle/Walk/Run 随速度，出刀时叠加上半身 Attack/Attack2。持首级 / UI 打开 / 回忆 / 未开始时强制第一人称。偏好存 `localStorage soulhead_view`。
+- **重要接线**：出猎世界（`Worlds.frame`）不走 `G.HOOK`，所以在 `js/worlds.js` 的渲染前加了一行直接调 `CFX3D.frame` / `FPV.frame` / `FPV.pre`（洞窟里仍走 HOOK）。以后新增每帧系统要注意两条循环。
+- 按键一览（`js/keyguide.js`）已加 V；i18n：`tools/i18n/d_r41.py`。
+- 测试：`tools/test/fight.html`（已加载 ogre_body）、`tools/test/ogre.html`（哥布林骨骼/动作查看）。真实游戏冒烟：`_tools/mk_t.py 3` 生成 `_t.html`；启动要先选语言（按 1 + Enter），`G.S.intro=true` 跳过序章，F9 关教程。
