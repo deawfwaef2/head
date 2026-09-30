@@ -202,7 +202,7 @@ window.UI = (() => {
       <input id="hvQ" class="hv-q" placeholder="🔍 名字 / 种族 / 地点" value="${esc(HV.q)}"></div>
       <div class="hv-bar"><button class="hv-chip" data-a="storeAll">📥 一键收纳：散落在地上的首级全部存入魂库</button><span class="hint2">共 ${list.length} 颗 · 魂库上限 ${G.VAULT_MAX} · 入库的首级不占洞内名额、不耗性能，随时可取出。</span></div>`;
     const pager = pages > 1 ? `<div class="hv-pg"><button class="hv-chip" data-a="hpg" data-v="-1" ${HV.page ? '' : 'disabled'}>◀</button><b>${HV.page + 1} / ${pages}</b><button class="hv-chip" data-a="hpg" data-v="1" ${HV.page < pages - 1 ? '' : 'disabled'}>▶</button></div>` : '';
-    return bar + pager + `<div class="hd-grid">` + shown.map(r => `<div class="hd" data-a="card" data-v="${r.id}" style="--c:${RC[r.c.rar]}"><div class="hd-r">${RN[r.c.rar]}${r.c.shiny ? ' ✨' : ''} ${where(r)}</div><div class="hd-n">${esc(NM(r.c))}</div><div class="hd-i">${window.Recall && !Recall.known(r.c, 'race') ? '？？？' : esc(r.c.raceN) + ' · ' + esc(r.c.idN)}</div><div class="hd-l">${esc(r.c.locN)}</div></div>`).join('') + '</div>' + pager;
+    return bar + pager + `<div class="hd-grid">` + shown.map(r => `<div class="hd" data-a="card" data-v="${r.id}" style="--c:${RC[r.c.rar]}"><div class="hd-r">${RN[r.c.rar]}${r.c.shiny ? ' ✨' : ''} ${where(r)}</div><div class="hd-n">${esc(NM(r.c))}</div>${window.Ranks ? `<div class="hd-i" style="color:${Ranks.of(r.c).col}">${esc(Ranks.short(r.c))}</div>` : ''}<div class="hd-i">${window.Recall && !Recall.known(r.c, 'race') ? '？？？' : esc(r.c.raceN) + ' · ' + esc(r.c.idN)}</div><div class="hd-l">${esc(r.c.locN)}</div></div>`).join('') + '</div>' + pager;
   }
   function bindHeads() { const el = document.getElementById('hvQ'); if (!el) return; el.onchange = () => { HV.q = el.value; HV.page = 0; openMenu('heads'); }; el.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') el.onchange(); }; el.onkeyup = e => e.stopPropagation(); }
   function logsBody() {
@@ -229,10 +229,12 @@ window.UI = (() => {
     cardRec = rec; const c = rec.c; const K = window.Recall && Recall.on() ? Recall.card(rec) : null, Q = '<span style="opacity:.5">？？？</span>';
     open('card', `<div class="card" style="--c:${RC[c.rar]}">
       <div class="card-r">【${RN[c.rar]}】${c.shiny ? ' <span class="shiny">✨异色</span>' : ''}${rec.calm ? ' <span class="calm">🕊️已安息</span>' : ''}${rec.seance ? ' <span class="calm">🔮已通灵</span>' : ''}</div>${c.title ? `<div class="card-t">『${esc(c.title)}』</div>` : ''}<h2>${esc(NM(c))}</h2>
+      ${window.Ranks ? `<div class="card-rk">${Ranks.badge(c)}</div>` : ''}
       <div class="card-id">${K ? esc(K.idLine) : `${esc(c.raceN)} · ${esc(c.idN)} · ${c.age} 岁 · 得自 ${esc(c.locN)}`}</div>
       <div class="kv"><span>性格</span><b>${K ? K.trait : esc((c.traits || []).join('、'))}</b><span>信仰</span><b>${K ? K.belief : esc(c.belief)}</b><span>生前目的</span><b>${K ? K.goal : esc(c.goal)}</b><span>魂晶产出</span><b>${K && !K.yield ? Q : '×' + +G.yieldOf(rec).toFixed(1)}</b></div>
       ${K && !K.aff ? '<div class="affs none">🔰 魂印：想不起来（回忆「魂印与产出」——鉴定 / 通灵）</div>' : (c.aff || []).length ? `<div class="affh">🔰 魂印 <b>${c.aff.length}</b><small>${[...new Set(c.aff.map(k => RPG.AFF[k] && RPG.AFF_CAT[RPG.AFF[k].cat].n))].filter(Boolean).join(' · ')}</small></div><div class="affs">${c.aff.map(k => RPG.affHTML(k, 'card')).join('')}</div>` : '<div class="affs none">无魂印 · 读到写着她名字的书或笔记，带到洞里对证，可以为她添上魂印</div>'}
       ${window.HeadWear && HeadWear.names(rec.look.hw).length ? `<div class="hwl">🎀 ${HeadWear.names(rec.look.hw).join(' · ')}</div>` : ''}
+      ${window.Ranks ? Ranks.ladderHTML(c) : ''}${K && K.bio && window.Overhear ? `<h3>小习惯与秘密</h3>${Overhear.bioHTML(c)}` : ''}
       <h3>外貌</h3>${K && !K.app ? para('（你还没有好好看过她的脸。按 F 进入回忆。）') : para(rec.app)}${modelNote(rec)}
       <h3>生平</h3>${K && !K.story ? para('（她的一生你还想不起来——回忆 / 通灵可以拼出来。）') : para(rec.story)}
       <div id="memBox"></div>

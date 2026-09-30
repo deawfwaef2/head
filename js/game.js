@@ -614,7 +614,7 @@ window.startGame = function () {
     const c = rec.c, R = RAR[c.rar];
     const el = document.createElement('div'); el.className = 'gcard r' + c.rar + (c.shiny ? ' shiny' : ''); el.style.setProperty('--c', R.c);
     el.innerHTML = `<div class="gstars">${'★'.repeat(c.rar + 1)}</div>${isNew ? '<div class="gnew">NEW</div>' : ''}
-      <div class="grar">【${R.n}】${c.shiny ? ' ✨异色' : ''}</div>${c.title ? `<div class="gtitle">『${c.title}』</div>` : ''}<div class="gname">${NM(c)}</div>
+      <div class="grar">【${R.n}】${c.shiny ? ' ✨异色' : ''}</div>${c.title ? `<div class="gtitle">『${c.title}』</div>` : ''}<div class="gname">${NM(c)}</div>${window.Ranks ? `<div class="gsub" style="color:${Ranks.of(c).col}">${Ranks.text(c)}</div>` : ''}
       <div class="gsub">${c.raceN} · ${c.idN} · ${c.age}岁</div>${(c.aff || []).length ? `<div class="gaff">${c.aff.map(k => RPG.AFF[k] ? `${RPG.affHTML(k, 'pill')}` : '').join('')}</div>` : ''}`;
     gachaBox.appendChild(el); requestAnimationFrame(() => el.classList.add('in'));
     while (gachaBox.children.length > 3) gachaBox.firstChild.remove();

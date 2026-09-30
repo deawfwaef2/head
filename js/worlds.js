@@ -762,6 +762,7 @@ window.Worlds = (() => {
     tp('total', tg0); W.dom.load.style.display = 'none'; hud(); banner(node);
     if (window.Mods && Mods.on && Mods.on('loc_story')) { const enter = await nodeStory(node, true); if (!W) return; if (!enter) { leaveHome(); return; } try { G.lockPointer(); } catch (e) {} } // 第二十一轮：用户不要进场冻结剧情卡 → MOD loc_story 默认关
     await wait(60); fadeTo(0); W.busy = false;
+    if (window.Overhear) try { Overhear.enter(node, { log: t => W && W.trip && W.trip.log.push({ t, cls: 'note' }) }); } catch (e) { console.warn(e); } // 第二十七轮：进场偷听对话框
     if (W.boss) setTimeout(() => { if (W && W.boss) bossSay(W.boss.B.say, 5); }, 1500);
   }
   function disposeNode() {
@@ -1058,7 +1059,7 @@ window.Worlds = (() => {
     { const w = (clamp(G.S.hp / s.maxHp, 0, 1) * 100).toFixed(1) + '%'; if (DOM.statHp._w !== w) { DOM.statHp._w = w; DOM.statHp.style.width = w; } }
     setH(DOM.statTx, `${lvOn ? `<span title="食人魔等级" style="color:#ffd27a">Lv.${LVI.lv}</span> <span style="opacity:.6;font-size:.85em">${LVI.need ? LVI.cur + '/' + LVI.need : 'MAX'}</span> · ` : ''}❤️ ${Math.round(G.S.hp)}/${s.maxHp} · ${(window.Sack && Sack.on()) ? (() => { const u = Sack.usage(), b = Sack.inv().belt.filter(Boolean); return `🩹${b.reduce((a, o) => a + o.n, 0)}<br>🎒 ${u[0]}/${u[1]}格 · 💀${u[2]}`; })() : `🧪${G.S.items.potion || 0}<br>🧺 ${W.trip.res.heads.length}/${s.cap}`} · 🔮 +${W.trip.coins}${W.stats && W.stats.kill ? `<br>⚔️ 放倒 ${W.stats.kill} · 🩸 斩首 ${W.stats.decap} · 连击 ${W.stats.maxCombo}` : ''}${left ? `<br><span style="color:#9fd0ff">✨ 此地还有 ${left} 缕魂光</span>` : ''}`);
     let h = 'WASD 走动 · <b>F</b> 拔刀（按住左键挥砍 / 连点刺 / 右键格挡）· <b>M</b> 地图 · <b>H</b> 喝药';
-    if (W.headNear) h = `<b>E</b> 拾取首级 · 【${RN[W.headNear.h.c.rar]}】${esc(NM(W.headNear.h.c))}`;
+    if (W.headNear) h = `<b>E</b> 拾取首级 · 【${RN[W.headNear.h.c.rar]}】${esc(NM(W.headNear.h.c))}${window.Ranks ? ' · ' + esc(Ranks.short(W.headNear.h.c)) : ''}`;
     else if (W.interNear) { const it = W.interNear, L = it.kind === 'loot' ? it.L : null; h = L ? `<b>E</b> ${L.kind === 'corpse' ? '搜身' : L.kind === 'pile' ? '翻' : '搜刮'} · ${esc(L.name)}${L.items && !L.items.length ? ' <span style="color:#999">（空）</span>' : ''}` : '<b>E</b> 打开宝箱'; }
     if ((window.Sack && Sack.on()) && !W.headNear && !W.doorNear) h += ' · <b>Tab</b> 麻袋';
     if (W.doorNear && !W.headNear && !W.interNear) { const d = W.doorNear, cn = W.graph.nodes[W.cur]; h = d.home ? '<b>E</b> 回到魂首窟（结束狩猎，带回首级）' : `<b>E</b> 穿过门 → ${esc(doorName(cn, d))}` + (W.graph.nodes[d.to].region !== cn.region ? ` <span style="color:#f0a060">（推荐战力 ${W.graph.nodes[d.to].loc.rec}）</span>` : ''); }

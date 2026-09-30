@@ -11,9 +11,9 @@ window.Recall = (() => {
   const modOn = () => !window.Mods || Mods.on('recall') !== false;
   const hash = s => { s = String(s); let h = 2166136261 >>> 0; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h >>> 0; };
   // ================= 知识 =================
-  const known = (c, k) => !modOn() || !c || c.kn === undefined || !!c.kn[k];
+  const known = (c, k) => !modOn() || !c || c.kn === undefined || k === 'name' || !!c.kn[k]; // 名字/魂阶/阶位不需要回忆（用户要求）
   const tag = c => '#' + (hash((c && c.name) || '') % 4096).toString(16).toUpperCase().padStart(3, '0');
-  const nm = c => !c ? '？' : known(c, 'name') ? c.name : '无名首级·' + tag(c);
+  const nm = c => !c ? '？' : c.name;
   const adorn = rec => { const L = rec.look || {}, out = []; if (window.HeadWear && L.hw) out.push(...HeadWear.names(L.hw)); if (L.scar) out.push('脸上有一道旧伤疤'); if (L.feat && window.Lore && Lore.FEAT_TXT && Lore.FEAT_TXT[L.feat]) out.push(Lore.FEAT_TXT[L.feat]); if (L.glowEye) out.push('瞳孔深处仍燃着魂火'); if (L.shiny) out.push('异色的发光泽'); return out.length ? out.join(' · ') : '没有什么特别的饰物，也没有伤疤'; };
   const FAC = [
     { k: 'trait', ic: '🎭', n: '性格', v: r => (r.c.traits || []).join('、') },
@@ -22,9 +22,10 @@ window.Recall = (() => {
     { k: 'belief', ic: '🕯', n: '信仰', v: r => r.c.belief },
     { k: 'adorn', ic: '🎀', n: '饰物与印记', v: adorn },
     { k: 'fight', ic: '⚔', n: '那一战', v: r => fightBrief(r) },
-    { k: 'name', ic: '🏷', n: '名字', v: r => r.c.name + (r.c.title ? '『' + r.c.title + '』' : '') },
+    { k: 'rank', ic: '🎖', n: '阶位传承', v: r => window.Ranks ? Ranks.text(r.c) + ' · ' + Ranks.of(r.c).B.d : '—' },
     { k: 'goal', ic: '🎯', n: '生前目的', v: r => r.c.goal },
     { k: 'story', ic: '📜', n: '生平', v: r => r.story || '（一片空白）' },
+    { k: 'bio', ic: '🗝', n: '小习惯与秘密', v: r => window.Overhear ? (b => `爱${b.quirk}；喜欢${b.like}；讨厌${b.hate}；最怕${b.fear}；秘密：${b.secret}`)(Overhear.bio(r.c)) : '—' },
     { k: 'stat', ic: '💠', n: '魂印与产出', v: r => statText(r) },
     { k: 'chess', ic: '♟', n: '棋路', v: r => window.HeadGame ? HeadGame.profile(r).chess.style : '—' },
     { k: 'card', ic: '🃏', n: '牌面', v: r => window.HeadGame ? HeadGame.profile(r).card.name : '—' }
@@ -37,8 +38,8 @@ window.Recall = (() => {
     const G = GG(); let coins = Math.round(8 * (1 + c.rar * c.rar * 0.6)); if (G.addCoins && coins > 0) G.addCoins(coins);
     if (!quiet && G.toast) G.toast(`🧠 想起了她的${FK[k].n}　+${coins}🔮`, RC[c.rar], 1.8);
     // 自动回想：4 项之后想起名字；7 项之后想起目的；全部想起 → 完全回忆
-    const others = FAC.filter(f => f.k !== 'name' && f.k !== 'goal' && known(c, f.k)).length;
-    if (!c.kn.name && others >= 4) { c.kn.name = 1; note('名字忽然浮了上来——「' + c.name + '」。'); if (S.open) S.dirty = 1; }
+    const others = FAC.filter(f => f.k !== 'rank' && f.k !== 'goal' && known(c, f.k)).length;
+    if (!c.kn.rank && others >= 4) { c.kn.rank = 1; note('她的来路渐渐清楚了——' + (window.Ranks ? Ranks.text(c) : '') + '。'); if (S.open) S.dirty = 1; }
     if (!c.kn.goal && others >= 7) { c.kn.goal = 1; note('拼凑到这里，她生前最想做的事也清晰了：' + c.goal + '。'); }
     if (!c.kn.done && FAC.every(f => known(c, f.k))) { c.kn.done = 1; rec.recalled = true; const b = Math.round(60 * (1 + c.rar * c.rar)); G.addCoins && G.addCoins(b); G.toast && G.toast(`🧠 完全回忆了「${c.name}」　+${b}🔮`, '#ffe070', 3); }
     G.saveSoon ? G.saveSoon() : (G.save && G.save()); if (S.open) S.dirty = 1; return true;
@@ -73,7 +74,7 @@ window.Recall = (() => {
   function card(rec) { // 返回 { name, idLine, kv, aff, app, story, hide }
     const c = rec.c, u = k => known(c, k), Q = '<span class="rc-q">？？？</span>';
     return { name: nm(c), title: u('name') && c.title ? c.title : '', idLine: u('race') ? `${c.raceN} · ${c.idN} · ${c.age} 岁 · 得自 ${c.locN}` : `？？？ · 得自 ${c.locN}`,
-      trait: u('trait') ? (c.traits || []).join('、') : Q, belief: u('belief') ? c.belief : Q, goal: u('goal') ? c.goal : Q, yield: u('stat'), aff: u('stat'), app: u('face'), story: u('story'), n: nKnown(c), total: FAC.length, all: modOn() ? (c.kn !== undefined ? FAC.every(f => u(f.k)) : true) : true };
+      trait: u('trait') ? (c.traits || []).join('、') : Q, belief: u('belief') ? c.belief : Q, goal: u('goal') ? c.goal : Q, yield: u('stat'), rank: u('rank'), bio: u('bio'), aff: u('stat'), app: u('face'), story: u('story'), n: nKnown(c), total: FAC.length, all: modOn() ? (c.kn !== undefined ? FAC.every(f => u(f.k)) : true) : true };
   }
   // ================= 动作 =================
   const hasB = keys => { const S_ = GG().S, bs = (S_ && S_.builds) || []; return keys.some(k => bs.some(b => b.type === k)); };
@@ -81,13 +82,13 @@ window.Recall = (() => {
   const ACT = {
     stare: { ic: '👁', n: '对视', d: '把她的脸举到眼前，直直地看进她的眼睛', fac: 'trait', dur: 3.6 },
     stroke: { ic: '🤚', n: '抚摸头发', d: '用手指慢慢梳理她的发丝', fac: 'face', dur: 3.2 },
-    sniff: { ic: '👃', n: '嗅闻', d: '凑近她的颈口与发间，深深吸一口气', fac: 'race', dur: 2.8 },
+    sniff: { ic: '👃', n: '嗅闻', d: '凑近她的颈口与发间，深深吸一口气', fac: 'race', fac2: 'rank', dur: 2.8 },
     listen: { ic: '👂', n: '贴耳倾听', d: '把耳朵贴到她冰凉的嘴唇上', fac: 'belief', dur: 3.4 },
     handle: { ic: '🤲', n: '把玩 · 捏脸', d: '自己来：拖动转头，点她的脸颊（捏 + 转满 8 下）', fac: 'adorn', free: true },
     battle: { ic: '⚔', n: '回忆战斗', d: '重温你和她的那一战——她打了你多少？', fac: 'fight', dur: 2.2 },
     seance: { ic: '🔮', n: '通灵', d: '在通灵台上回溯她生前的记忆', fac: 'story', need: ['seance'], dur: 0 },
     tea: { ic: '☕', n: '茶话', d: '请她「喝」一杯茶，听她聊聊往事', fac: 'goal', need: ['tea_party'], dur: 3.6 },
-    mirror: { ic: '🪞', n: '照魔镜', d: '让魔镜照出她生前的样子', fac: 'goal', need: ['gothic_commode'], dur: 3.6 },
+    mirror: { ic: '🪞', n: '照魔镜', d: '让魔镜照出她生前的样子，和藏在镜子里的小秘密', fac: 'bio', need: ['gothic_commode'], dur: 3.6 },
     dress: { ic: '💄', n: '梳妆', d: '给她梳头、点朱唇，换几种表情', fac: 'adorn', need: ['dresser'], dur: 3.4 },
     appraise: { ic: '💠', n: '鉴魂', d: '投入熔魂炉的火光中，试探她的魂印与产出', fac: 'stat', need: ['forge', 'appraisal', 'auction'], dur: 3 },
     chess: { ic: '♟', n: '翻阅棋谱', d: '看她在头棋里会怎么走', fac: 'chess', need: ['chess'], dur: 2.2 },
@@ -102,12 +103,12 @@ window.Recall = (() => {
     switch (a) {
       case 'stare': return { t: `你把她举到和你的眼睛一样高。她的瞳孔里没有光，却像在回看你……看得久了，她是个什么样的人，从眉梢、唇角一点点透了出来——<b>${esc(tr)}</b>。<br><span class="rc-dim">她的嘴唇动了动，像在说：「${esc(trLine(c))}」</span>` };
       case 'stroke': return { t: `指尖顺着发丝滑下去，每一缕都带着旧日的气味。你一点点看清了她的样子——<br>${esc(rec.app || '')}` };
-      case 'sniff': return { t: `你把鼻尖凑到她的颈口和发间，深深吸了一口气：血、铁锈，和一点<b>${esc(c.raceN)}</b>特有的味道。这是一个<b>${c.age}</b> 岁的<b>${esc(c.idN)}</b>，来自${esc(c.locN)}。` };
+      case 'sniff': return { t: `你把鼻尖凑到她的颈口和发间，深深吸了一口气：血、铁锈，和一点<b>${esc(c.raceN)}</b>特有的味道。这是一个<b>${c.age}</b> 岁的<b>${esc(c.idN)}</b>，来自${esc(c.locN)}。`, panel: window.Ranks ? `<div class="rc-p-h">阶位 · 传承</div>${Ranks.ladderHTML(c)}` : '' };
       case 'listen': return { t: `你把耳朵贴到她的嘴唇上。什么声音也没有……接着，像是很远很远的地方，有人在低声念着：「${esc(c.belief)}……」——那是她信的东西。` };
       case 'handle': return { t: `你把她的脸翻来覆去地看：${esc(adorn(rec))}。` };
       case 'battle': return { t: '你闭上眼，那一战的每一个细节重新涌上来……', panel: fightHTML(rec) };
       case 'tea': return { t: `你把一杯茶放在她的下巴底下，假装她在喝。蒸汽里，她的脸渐渐软下来，开始断断续续地讲自己的事……最后说到：「${esc(c.goal)}」。` };
-      case 'mirror': return { t: `魔镜里映出的，是她还活着时的样子——眼睛有光，脸颊带血色。她望着镜子，像在对谁发誓：「${esc(c.goal)}」。` };
+      case 'mirror': return { t: '魔镜里映出的，是她还活着时的样子——眼睛有光，脸颊带血色。镜面深处，一些她从没对人说过的小事慢慢浮了上来。', panel: window.Overhear ? `<div class="rc-p-h">镜中的她</div>${Overhear.bioHTML(c)}` : '' };
       case 'dress': return { t: `你笨拙地给她梳头、点上一点朱红。她的脸在你手里换了几种表情——像每一种她曾是的样子。<br>${esc(adorn(rec))}` };
       case 'appraise': return { t: '火光映在她的脸上，魂晶在颅骨深处一闪一闪地亮着。你数清了它们。', panel: `<div class="rc-p-h">鉴魂</div><p>${esc(statText(rec))}</p><p class="rc-dim">${(c.aff || []).map(k => window.RPG && RPG.affHTML ? RPG.affHTML(k, 'card') : esc(k)).join('')}</p>` };
       case 'chess': { const p = pr.chess; return { t: `你翻开一本浸过血的棋谱。她下棋的路数是「<b>${esc(p.style)}</b>」。`, panel: chessHTML(rec) }; }
@@ -226,11 +227,11 @@ window.Recall = (() => {
   // ---------- 文本 / 面板 ----------
   function msg(html) { const n = $q('.rc-nt'); n._full = html; n._i = 0; n.innerHTML = html; }
   function panel(html) { const p = $q('.rc-panel'); if (!html) { p.classList.remove('on'); return; } $q('.rc-pb').innerHTML = html; p.classList.add('on'); }
-  function showFacet(k) { const f = FK[k]; msg(`<b>${f.ic} ${f.n}</b>：${esc(f.v(S.rec))}`); if (k === 'fight') panel(fightHTML(S.rec)); else if (k === 'chess' && window.HeadGame) panel(chessHTML(S.rec)); else if (k === 'card' && window.HeadGame) panel(cardHTML(S.rec)); else if (k === 'story') panel(`<div class="rc-p-h">生平</div><p>${esc(S.rec.story || '')}</p>`); else if (k === 'face') panel(`<div class="rc-p-h">外貌</div><p>${esc(S.rec.app || '')}</p>`); else panel(null); }
+  function showFacet(k) { const f = FK[k]; msg(`<b>${f.ic} ${f.n}</b>：${esc(f.v(S.rec))}`); if (k === 'fight') panel(fightHTML(S.rec)); else if (k === 'chess' && window.HeadGame) panel(chessHTML(S.rec)); else if (k === 'card' && window.HeadGame) panel(cardHTML(S.rec)); else if (k === 'rank' && window.Ranks) panel(`<div class="rc-p-h">阶位 · 传承</div>${Ranks.ladderHTML(S.rec.c)}`); else if (k === 'bio' && window.Overhear) panel(`<div class="rc-p-h">小习惯与秘密</div>${Overhear.bioHTML(S.rec.c)}`); else if (k === 'story') panel(`<div class="rc-p-h">生平</div><p>${esc(S.rec.story || '')}</p>`); else if (k === 'face') panel(`<div class="rc-p-h">外貌</div><p>${esc(S.rec.app || '')}</p>`); else panel(null); }
   function refresh() {
     const c = S.rec.c, n = nKnown(c); $q('.rc-rar').innerHTML = `<span style="color:${RC[c.rar]}">【${RN[c.rar]}】${c.shiny ? ' ✨异色' : ''}</span>`;
-    $q('.rc-name').textContent = nm(c); $q('.rc-name').style.color = known(c, 'name') ? RC[c.rar] : '#d8cbbb';
-    $q('.rc-sub').textContent = `得自 ${c.locN}` + (known(c, 'name') && c.title ? ` · 『${c.title}』` : '');
+    $q('.rc-name').textContent = nm(c); $q('.rc-name').style.color = RC[c.rar];
+    $q('.rc-sub').innerHTML = esc(`得自 ${c.locN}` + (c.title ? ` · 『${c.title}』` : '')) + (window.Ranks ? ' · ' + Ranks.badge(c) : '');
     $q('.rc-cnt').textContent = `${n} / ${FAC.length}`; $q('.rc-prog i').style.width = (n / FAC.length * 100) + '%';
     $q('.rc-facets').innerHTML = FAC.map(f => { const k = known(c, f.k); return `<div class="rc-f ${k ? 'k' : 'u'}${S.fresh === f.k ? ' new' : ''}" data-k="${f.k}"><b>${f.ic} ${f.n}</b><span>${k ? esc(f.v(S.rec)) : '？？？'}</span></div>`; }).join('');
     if (S.fresh) { const fk = S.fresh; setTimeout(() => { S.fresh = ''; const e = el && el.querySelector(`.rc-f[data-k="${fk}"]`); e && e.classList.remove('new'); }, 1800); }
@@ -257,7 +258,7 @@ window.Recall = (() => {
   }
   function finish(k) {
     const a = ACT[k], r = V.pending && V.act === k ? V.pending : narrate(k, S.rec); V.pending = null; V.mode = ''; V.act = ''; V.glowT = 0; V.aliveT = 0; $q('.rc-flash').style.opacity = 0;
-    const first = reveal(S.rec, a.fac); if (first) S.fresh = a.fac;
+    const first = reveal(S.rec, a.fac); if (first) S.fresh = a.fac; if (a.fac2) reveal(S.rec, a.fac2, true);
     msg(r.t + (first ? `<br><span style="color:#ffd27a">— 想起了她的${FK[a.fac].n} —</span>` : ''));
     if (r.panel) panel(r.panel); else panel(null);
     while (S.notes.length) msg($q('.rc-nt')._full + `<br><span style="color:#ffd27a">${esc(S.notes.shift())}</span>`);
