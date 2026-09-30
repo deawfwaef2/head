@@ -996,3 +996,24 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   职业：🪓蛮兵（血×1.9、慢、重击长前摇、poise 累计≥26/蓄力/破绽才硬直）· 💨游击（快、冲刺斩后撤、你挥刀时翻滚闪避——翻滚中刃穿过去）· 🛡️盾卫（永远举盾，盾朝向每 ~0.5s 才跟上你的刀；被弹刀立刻反击）· 🗡️刺客（只给持武器敌人；绕到玩家背后，背刺 ×1.6 + 0.42s 预警 + 拔刀声，得手后撤）· 🔥狂战（连击、不后退、半血狂暴）· 🎯投掷手（只给持武器敌人；拉开距离掷刃，用 `fo.wpn.clone(true)` 做飞行物（无自制模型），可格挡/可挥刀打回去伤害投掷者）。职业色调用 `mat.color` 乘系数（不新建材质），首次发现时头顶显示职业名，每种职业首次出现 toast 一次打法提示。
   **未验证**：整套游戏（OOM）、VRM 身体实机里的翻滚/潜行动画观感、掷刃克隆武器的朝向与大小、`OverhandThrow` 出手帧。已用假 Foe 的 `_tools/wv/roles.html` 验证各职业 tick/tune/hurt/掷刃命中/打回的逻辑无异常。
 - 给后续 agent：新增敌人行为请加在 `foe_roles.js`，不要再往 foe.js 的 update 里堆；需要新音效请加在 `combatfx.js`。
+
+## 第二十四轮（人设 / 语音 / 脚步 / 面部补光）— Arena Agent
+用户反馈：动作太单一；要脚步声、女角色说话声、各种声音；敌人同质化没有人设；很多角色脸还是很黑。全部是可开关 MOD（js/mods.js）。
+- **`persona` / `persona_voice`** → `js/persona.js`（`window.Persona`）+ `js/persona_lines.js`（由 `tools/voice_lines.py` 生成，**勿手改**；改台词请改 py 再生成，并重录语音保证文字=声音）。
+  - 8 种性格原型，由 lore 的 `c.traits` 推出（45 个特质全覆盖；首个命中的特质决定）：高傲 proud / 冷静 cold / 温柔 gentle / 胆小 timid / 好战 fierce / 毒舌 sharp / 狡黠 sly / 开朗 cheerful。
+  - 与 `foe_roles`（职业=怎么打）互补，**不分配职业**；`apply(fo,r)` 在 `FoeRoles.assign` 之后调用，标题“【性格·职业】名字”。
+  - 性格影响：`brave`（见人打还是逃）、`iq` 微调、高傲/好战不撤退、胆小者血量 <55% 逃向门、挑衅频率 `tauntK`、对峙姿态（Yes 点头 / Idle_No_Loop 摇头 / FoldArms / Talking）。
+  - 手势：`fo.f.play` 被包了一层，`fo.gestT>0` 时忽略非 once 的循环请求；手势期间 spd/strafe=0；出手或硬直立即取消。
+  - 日常作息（未发现你时，foe.js idle 分支 → `Persona.idle`）：职业 idleClip + 性格动作池（Farm_Harvest / Crouch_Idle / Consume / PickUp_Table / Interact / FoldArms…）轮换；在出生点 1.5–5.5m 内闲逛（高傲/毒舌用 Walk_Formal，狡黠用 Crouch_Fwd）；健谈的会走到最近的同伴旁面对面聊天（Idle_Talking + 22m 内偶尔冒闲聊气泡）。**没用 Sitting_Idle（没有椅子会悬空）**。
+  - foe.js 台词点 → `sayP(fo,key,fallback)`：see/fear（初见）、fight、taunt/pack、hit（打中你 35%）、block、hurt（挨打 50%，否则只痛呼 pain）、back、lost、run、low、door、flee、atk（出手喝声）、die（倒下时最后一句）。Persona 关闭时回落到原来的通用 SAY。
+  - **语音**：`voice/voice.js`（`window.VOICE_DATA={原型:[22 条 base64 mp3，按 KEYS 顺序]}`，1.36MB，进场后用 script 标签异步加载，file:// 可用）。单条按需 `decodeAudioData` 缓存；立体声方位 + 距离衰减（>20m 不响）；同时最多 2 条（痛呼/临终优先）、同一人 ≥1.2s、全局 ≥0.35s；每人音高 = 原型语速 × 名字哈希 0.95–1.05。
+  - 已有语音：proud / cold / gentle / timid / sharp（AI 语音合成，Vosk ASR 对齐切句，抽检 15 条全部正确）。**fierce / sly / cheerful 暂时只有文字**（TTS 审核挡掉了含“刀/剑/打中/一击/偷袭”的版本；台词已软化，下一轮录）。
+  - CombatFX：有真人语音的敌人在 `windup` 不再叠合成“哈”（`pv` 判断），其它提示音不变。
+  - 录音工具链（/tmp，重置即丢）：`tools/voice_lines.py tts` 打印 TTS 文本；Vosk small-cn + pypinyin DP 对齐（按 ASR 锚点切，**不要**按最大静音切——会切在字中间）；ffmpeg 单声道 22050Hz 40kbps、loudnorm −16 LUFS。
+- **`footsteps`** → `js/steps.js`（`window.Steps`，全合成无新资源）：你的脚步 = 低频体重“咚” + 地面材质层（worlds.js 按 `STYLES[node.style].ground` 判断：草/落叶/碎石/石板/泥/灰烬/雪；洞穴 game.js = 石地），替代原来单一 step 采样（MOD 关时回落）；敌人脚步在 `Foe.update` 开头用逐帧位移计步，方位+距离（>16m 不响，每秒 ≤16 个），跑动步幅大更响，盾卫/蛮兵甲片叮当，已发现你的刺客无声。OfflineAudioContext 测过 8 种地面响度一致、峰值≈旧采样。
+- **`face_light`** → `js/heads.js` 顶部 `window.FaceFill`：MeshToon 光照算完后（`aomap_fragment` 之后，与已有软膝盖同单位：满光≈1.08），把“已受光程度”低于下限的地方补到下限，偏向朝相机的面（0.45+0.55·facing）。脸 ×1.0、头发 ×0.6、敌人身体 ×0.85，**共享一个 uniform（getter），开关/强度变化不重编译**。下限：野外 0.75（`Foe.update` 每帧 `FaceFill.world()`）、洞穴 0.45。实测：白天/黄昏像素不变，夜里/暗洞 +10–15%。
+  - 注意：r147 的 `material.clone()` **不复制 onBeforeCompile**，所以 foe.js 克隆身体材质后、以及 `prewarm` 的克隆都要再 `FF()` 包一次（已做），否则预热编的程序和实际不一致。`FaceFill.wrap` 用 WeakSet 记已包，**不能用 userData 标记**（clone 会复制 userData）。
+  - 结论：脸与脖子早已按同光照校准，头的肤色取自身体贴图；“脸黑”主要是整体受光低（夜/暗场景），不是肤色采样。若仍有个别角色偏黑，请记下名字给后续 agent 看贴图本身。
+- 顺手修：index.html 仍引用 R23 已删除的 `models/GI_Klee.js`、`GI_Nahida.js`（404），已移除这两个 script 标签。
+- **未验证**：整套游戏（2GB 内存沙箱里完整页面必 OOM）。已验证：着色器在 WebGL 里编译通过且数值正确（`/tmp/t/ff.html`）；110 条语音全部可解码、冷却/优先级/方位正确（`vo.html`）；人设逻辑 Node 仿真（作息分布、手势锁、45 特质映射）；脚步 OfflineAudioContext 渲染。
+- **警告给后续 agent**：在这个 partial clone 里不要跑 `git log -S` / `git log -p` 之类会拉历史 blob 的命令——会把 /tmp（tmpfs）写满。
