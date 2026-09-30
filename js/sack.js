@@ -390,7 +390,7 @@ window.Sack = (() => {
     else if (o.g2 && window.Gear2) body = Gear2.tipBody(o); /* R35 gear2 */
     else if (d.kind === 'equip' && window.RPG) {
       const E = RPG.EQUIP[d.slot], t = E.tiers[d.tier], c = E.tiers[G.S.eq[d.slot] || 0], K = ['atk', 'def', 'hp', 'str', 'con', 'agi', 'ter', 'soul', 'cap'], NM = { atk: '攻击', def: '防御', hp: '生命', str: '力量', con: '体魄', agi: '敏捷', ter: '凶威', soul: '魂力', cap: '背篓' };
-      body = K.filter(k => t[k] || c[k]).map(k => { const a = t[k] || 0, b = c[k] || 0, df = a - b; return `${NM[k]} <b>${a}</b> <span style="color:${df > 0 ? '#8fe88f' : df < 0 ? '#ff8f86' : '#998'}">${df > 0 ? '▲+' + df : df < 0 ? '▼' + df : '＝'}</span>`; }).join('<br>') + `<br><span style="color:#a99">${esc(t.desc || '')}</span>`;
+      body = K.filter(k => t[k] || c[k]).map(k => { const a = t[k] || 0, b = c[k] || 0, df = a - b; return `${NM[k]} <b>${a}</b> <span style="color:${df > 0 ? '#8fe88f' : df < 0 ? '#ff8f86' : '#998'}">${df > 0 ? '▲+' + df : df < 0 ? '▼' + df : '＝'}</span>`; }).join('<br>') + `<br><span style="color:#a99">${esc(t.desc || '')}</span>` + (d.slot === 'weapon' && window.WpnSpec ? WpnSpec.tip(d.tier, o.plus || 0, G.S.eq.weapon || 0, (G.S.eqPlus || {}).weapon || 0) : '');
     } else body = esc(d.desc || '');
     return `<div class="tn" style="color:${RARC[r]}">${d.icon || ''} ${esc(nameOf(o))}${o.n > 1 ? ' ×' + o.n : ''}</div><div class="tr" style="color:${RARC[r]}">${RARN[r]} · ${({ equip: '装备', use: '消耗品', head: '首级', organ: '人体器官', book: '典籍', prop: '摆件' })[d.kind] || '材料'}${d.st > 1 ? ' · 可堆叠 ' + d.st : ''} · ${dims(o).join('×')} 格</div><div class="tb">${body}</div>`;
   }

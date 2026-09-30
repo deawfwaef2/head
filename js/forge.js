@@ -79,7 +79,7 @@ window.Forge = (() => {
       const ns = statsOf(n, plus, sl), keys = STK.filter(k => ns[k] !== undefined || cs[k] !== undefined);
       const df = keys.map(k => { const a = cs[k] || 0, b = ns[k] || 0; if (a === b) return ''; return `<span>${SN[k]} ${a} → <b>${b}</b> <u style="color:${b > a ? '#8fe88f' : '#ff8f86'}">${b > a ? '+' : ''}${b - a}</u></span>`; }).join('');
       const pd = powerWith(sl, ci + 1) - (G().st().power), poor = s.coins < n.cost;
-      up = `<div class="fg-up"><div class="nx">⬆ 下一阶：<b style="color:${RARC[Math.min(6, ci + 1)]}">${esc(n.n)}</b><div class="df">${df}</div>${pd > 0 ? `<div class="pd">⚔️ 战力 +${fmt(pd)}</div>` : ''}<div class="fg-desc">${esc(n.desc || '')}</div></div>
+      up = `<div class="fg-up"><div class="nx">⬆ 下一阶：<b style="color:${RARC[Math.min(6, ci + 1)]}">${esc(n.n)}</b><div class="df">${df}</div>${pd > 0 ? `<div class="pd">⚔️ 战力 +${fmt(pd)}</div>` : ''}<div class="fg-desc">${esc(n.desc || '')}</div>${sl === 'weapon' && window.WpnSpec ? `<details class="wsp-d" style="margin-top:6px"><summary style="cursor:pointer;color:#ffd27a">📊 下一阶完整武器属性（与当前对比）</summary>${WpnSpec.html(ci + 1, plus, ci, plus)}</details>` : ''}</div>
         <button class="sk-btn fg-go" data-fup="${sl}" ${poor ? 'disabled' : ''}>⬆ 升级 🔮 ${fmt(n.cost)}${poor ? `<small>还差 🔮 ${fmt(n.cost - s.coins)}</small>` : '<small>花魂晶直接升级</small>'}</button></div>`;
     } else up = `<div class="fg-desc" style="margin-top:8px">🧭 更高阶的${E.n}必须<b>野外搜刮</b>（敌人尸体、容器、武器架、霸主）。铁匠台只负责${sl === 'bag' ? '——背篓只能靠搜刮升级。' : '把你身上这件强化得更强。'}</div>`;
     // 武器：内嵌附魔
@@ -100,7 +100,7 @@ window.Forge = (() => {
           <button class="sk-btn" data-fwear="${o.u}">换上</button><button class="sk-btn" data-fsal="${o.u}">分解</button></div>`; }).join('') : ''}</div>`;
     }
     return `<div class="fg-card ${sl}${flash === sl ? ' flash' : ''}" style="--rc:${rc}"><div class="fg-row"><div class="fg-ic">${icon(sl, ci)}</div><div class="fg-main"><div class="fg-top"><span>${E.icon} ${E.n}</span><span>阶 ${ci + 1} / ${E.tiers.length}</span></div>
-      <div class="fg-name" style="color:${rc}">${esc(c.n)}${plus ? `<em>+${plus}</em>` : ''}</div><div class="fg-chips">${chips(cs)}</div><div class="fg-desc">${esc(c.desc || '')}</div><div class="fg-pips">${pips}</div></div></div>${up}${ench}${swap}</div>`;
+      <div class="fg-name" style="color:${rc}">${esc(c.n)}${plus ? `<em>+${plus}</em>` : ''}</div><div class="fg-chips">${chips(cs)}</div><div class="fg-desc">${esc(c.desc || '')}</div><div class="fg-pips">${pips}</div>${sl === 'weapon' && window.WpnSpec ? WpnSpec.html(ci, plus) : ''}</div></div>${up}${ench}${swap}</div>`;
   }
 
   function goal() {
