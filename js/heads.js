@@ -285,6 +285,22 @@ window.ModelHeads = (() => {
       return Array.from(out.values());
     };
     let pts = gather(0.0008); if (pts.length < 8) pts = gather(0.0035);
+    // R37：部分模型颈圈只有半圈皮肤顶点（后半是空的）→ 凸包成了 D 形半圆盘，断面盖不住颈口、露出里面的皮肤碎片。
+    // 最小二乘拟合圆；若点在圆周上的最大空缺 > 100°，就在空缺处补上圆周点再求凸包。
+    entry._cutDbg = { n: pts.length, gap: 0, R: 0, filled: false };
+    if (pts.length >= 8) try {
+      let mx = 0, mz = 0; pts.forEach(p => { mx += p.x; mz += p.z; }); mx /= pts.length; mz /= pts.length;
+      let Sxx = 0, Sxz = 0, Szz = 0, Sxr = 0, Szr = 0; pts.forEach(p => { const x = p.x - mx, z = p.z - mz, r2 = x * x + z * z; Sxx += x * x; Sxz += x * z; Szz += z * z; Sxr += x * r2; Szr += z * r2; });
+      const det = Sxx * Szz - Sxz * Sxz;
+      if (Math.abs(det) > 1e-14) {
+        const ux = (Sxr * Szz - Szr * Sxz) / (2 * det), uz = (Szr * Sxx - Sxr * Sxz) / (2 * det);
+        const fx = mx + ux, fz = mz + uz; let R = 0; pts.forEach(p => R += Math.hypot(p.x - fx, p.z - fz)); R /= pts.length;
+        const ang = pts.map(p => Math.atan2(p.z - fz, p.x - fx)).sort((a, b) => a - b); let gap = 0, g0 = 0;
+        for (let i = 0; i < ang.length; i++) { const nx = i + 1 < ang.length ? ang[i + 1] : ang[0] + Math.PI * 2, d = nx - ang[i]; if (d > gap) { gap = d; g0 = ang[i]; } }
+        entry._cutDbg.gap = Math.round(gap * 180 / Math.PI); entry._cutDbg.R = +R.toFixed(4);
+        if (gap > 1.75 && R > 0.012 && R < maxR) { const K = Math.ceil(gap / (Math.PI / 18)); for (let k = 1; k < K; k++) { const a = g0 + gap * k / K; pts.push({ x: fx + Math.cos(a) * R, z: fz + Math.sin(a) * R }); } entry._cutDbg.filled = true; }
+      }
+    } catch (e) { console.warn('cut circle fit', e); }
     let hull = [];
     if (pts.length >= 8) {
       pts.sort((a, b) => a.x - b.x || a.z - b.z);
@@ -294,6 +310,7 @@ window.ModelHeads = (() => {
       for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (hi.length > 1 && turn(hi[hi.length - 2], hi[hi.length - 1], p) <= 1e-12) hi.pop(); hi.push(p); }
       hull = lo.slice(0, -1).concat(hi.slice(0, -1));
     }
+    entry._cutDbg.r0 = r0; entry._cutDbg.ex = +expected.x.toFixed(4); entry._cutDbg.ez = +expected.z.toFixed(4); entry._cutDbg.pb = pts.length ? [Math.min(...pts.map(p => p.x)), Math.max(...pts.map(p => p.x)), Math.min(...pts.map(p => p.z)), Math.max(...pts.map(p => p.z))].map(v => +v.toFixed(3)) : null; entry._cutDbg.hull = hull.length;
     let g = null, cx = expected.x, cz = expected.z, meanR = r0;
     if (hull.length >= 6) {
       const contour = hull.map(p => new THREE.Vector2(p.x, p.z));
@@ -302,11 +319,16 @@ window.ModelHeads = (() => {
         let a2 = 0, sx = 0, sz = 0;
         for (let i = 0; i < hull.length; i++) { const a = hull[i], b = hull[(i + 1) % hull.length], k = a.x * b.z - b.x * a.z; a2 += k; sx += (a.x + b.x) * k; sz += (a.z + b.z) * k; }
         if (Math.abs(a2) > 1e-8) { cx = sx / (3 * a2); cz = sz / (3 * a2); }
+        // R37：凸包必须“像个颈口”——面积接近原断面圆盘、且近似圆形；否则（点里混入下巴/衣领顶点 → 楔形/扇形断面）退回原圆盘（压到切平面）
+        const area = Math.abs(a2) / 2; let rr = 0; hull.forEach(p => rr += Math.hypot(p.x - cx, p.z - cz)); rr /= hull.length;
+        const k0 = area / (Math.PI * r0 * r0), kr = area / (Math.PI * rr * rr); entry._cutDbg.ar = [+k0.toFixed(2), +kr.toFixed(2)];
+        const bad = k0 < 0.2 || k0 > 2.2 || kr < 0.87; entry._cutDbg.bad = bad;
+        if (!bad) {
         const pos = new Float32Array(hull.length * 3), nor = new Float32Array(hull.length * 3), ids = [];
         let rs = 0;
         for (let i = 0; i < hull.length; i++) { const x = cx + (hull[i].x - cx) * 1.002, z = cz + (hull[i].z - cz) * 1.002; pos[i * 3] = x; pos[i * 3 + 1] = ly; pos[i * 3 + 2] = z; nor[i * 3 + 1] = -1; rs += Math.hypot(x - cx, z - cz); }
         faces.forEach(f => ids.push(f[0], f[1], f[2]));
-        g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setIndex(ids); meanR = rs / hull.length;
+        g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setIndex(ids); meanR = rs / hull.length; }
       }
     }
     if (!g) {
@@ -1268,6 +1290,7 @@ window.ModelHeads = (() => {
     // 第十六轮（总管理师）：某个外观会用到的脸/发型贴图 —— 倒袋前逐帧 renderer.initTexture 预上传，避免首次渲染时同步解码大贴图卡顿
     mapsFor(look) { const out = new Set(); for (const k of [look.f, look.h]) { let i = idxOf(k); if (i < 0) i = 0; const t = T[i]; if (t) t.meshes.forEach(m => { const s = SRC.get(m) || m.material; if (s && s.map) out.add(s.map); }); } return [...out]; },
     meta: (file) => { const i = idxOf(file); return i >= 0 ? T[i].meta : null; },
+    cutDbg: () => T.map(t => t.meta.file + ' ' + JSON.stringify(t.meta._cutDbg || null)),
     credits: () => T.map(t => t.meta.name + ' — ' + t.meta.credit)
   };
 })();
