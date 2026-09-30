@@ -1,6 +1,6 @@
 // R35 MOD elite_bosses（默认开）：13 名精英BOSS + 最终BOSS「月之魔女」。
 //   每人有：身份/主题（不与地区霸主、小BOSS、四名猎手重复）、解锁条件（带剧情的“传闻”）、推荐战力、预估胜率。
-//   解锁后在「精英挑战」面板（C 键 / 洞里）点“挑战” → 出猎到她所在的地区 → 进入「决斗场」节点（门封锁，直到她倒下或你倒下）。
+//   解锁后在「精英挑战」面板（探索地图里每个地区的「精英挑战」栏）点“挑战” → 出猎到她所在的地区 → 进入「决斗场」节点（门封锁，直到她倒下或你倒下）。
 //   精英不是霸主（不走 fo.boss 流程）：强化精英怪 = 2~3 个 R34 词缀 + 限定技能池 + 职业 + fo.absRec（FoeAbs 按她的战力算血量/伤害）。
 // R35 MOD victory2（默认开）：胜利条件改为 任意 7 个地区霸主 + 13 名精英 + 4 名食人魔猎手 + 月之魔女（包裹 Explore.checkVictory）。
 window.Elites = (() => {
@@ -205,12 +205,12 @@ ${dead ? '' : `<div class="r3-act"><button class="red" data-ch="${d.id}" ${wild 
   if (window.R35UI) R35UI.reg('elite', { n: '👑 精英挑战', title: '征服之路', on, html: panelHTML, click: e => { const b = e.target.closest('[data-ch]'); if (b && !b.disabled) challenge(b.dataset.ch); } });
   // 探索地图（出洞狩猎窗口）里的挑战按钮
   document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('.rq-det [data-ch]'); if (!b || b.disabled) return; e.stopPropagation(); e.preventDefault(); try { UI.close(false); } catch (e2) { } challenge(b.dataset.ch); }, true);
-  addEventListener('keydown', e => { if (!on() || !window.G || !G.S) return; if (e.code === 'KeyC' && !e.repeat && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) { if (window.UI && UI.open) return; e.preventDefault(); toggle(); } }, true);
+  /* R36b：C 键还给下蹲——精英挑战只在探索地图（出洞选地点）里看/发起；面板仍可从 U/Z 窗口的页签进入 */
   // 新解锁提示（剧情传闻）
   let known = null;
   setInterval(() => {
     if (!on() || !window.G || !G.S) return; const s = SS(); s.seen = s.seen || {};
-    for (const d of ALL) if (!s.seen[d.id] && !s.dead[d.id] && (() => { try { return d.cond(G.S); } catch (e) { return false; } })()) { s.seen[d.id] = Date.now(); banner('📜 新的挑战：' + d.n, '「' + d.t + '」', d.rumor + '（C 打开精英挑战）', d.col); try { G.save(); } catch (e) { } break; }
+    for (const d of ALL) if (!s.seen[d.id] && !s.dead[d.id] && (() => { try { return d.cond(G.S); } catch (e) { return false; } })()) { s.seen[d.id] = Date.now(); banner('📜 新的挑战：' + d.n, '「' + d.t + '」', d.rumor + '（探索地图里可以看到她）', d.col); try { G.save(); } catch (e) { } break; }
   }, 3000);
 
   wrap(); setTimeout(wrap, 0); addEventListener('load', wrap);

@@ -114,7 +114,7 @@ body.arr2 #rqCard{display:none!important}
     const el = window.Elites && Elites.on() ? Elites.ALL.filter(d => d.loc === k && !Elites.SS().dead[d.id] && Elites.unlocked(d)) : [];
     return `<div class="ar-th">${B ? `<div>👑 霸主 <b>${esc(B.title)}·${esc(B.n)}</b> ${won ? '<span class="ok">✓ 已被你斩杀</span>' : '<span class="bad">· 在最深处</span>'}</div>` : ''}
 ${minis.length ? `<div>⚔️ 小BOSS：${minis.map(m => `<b>${esc(m.title)}·${esc(m.n)}</b>`).join('、')}</div>` : ''}${hu}
-${el.length ? `<div>👑 可挑战的精英：${el.map(d => `<b style="color:${d.col}">${esc(d.n)}</b>`).join('、')}（回洞后按 C）</div>` : ''}</div>`;
+${el.length ? `<div>👑 可挑战的精英：${el.map(d => `<b style="color:${d.col}">${esc(d.n)}</b>`).join('、')}（出洞选地点时在该地区栏里发起）</div>` : ''}</div>`;
   }
   function html() {
     const k = T.k, L = LOC(k), X = TX[k] || GEN, D = window.RegionQuest && RegionQuest.DATA && RegionQuest.DATA[k], img = window.RegionArt && RegionArt[k], st = G.st(), q = (L.rec ? st.power / L.rec : 1);

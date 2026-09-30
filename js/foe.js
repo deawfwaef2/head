@@ -624,7 +624,10 @@ window.Foe = (() => {
   function brokenNear(pos, yaw) { let best = null, bd = 2.6; for (const fo of FOES) { if (fo.dead || !(fo.broken > 0)) continue; const dx = fo.pos.x - pos.x, dz = fo.pos.z - pos.z, d = Math.hypot(dx, dz); if (d < bd && Math.abs(ang(Math.atan2(-dx, -dz) - yaw)) < 1.1) { bd = d; best = fo; } } return best; }
   function execute(fo, dir) { // 处决：破绽中按 E
     const nb = fo.f.bones.neck, p = nb.getWorldPosition(new V3()); const v = (dir || new V3(1, 0, 0)).clone().normalize().multiplyScalar(9);
-    const info = { point: p, vel: v, speed: 9, kind: 'slash', dir: 'right' }; fo.hp = 0; die(fo, info, true); decapitate(fo, info); slowmo(0.5, 0.3);
+    const info = { point: p, vel: v, speed: 9, kind: 'slash', dir: 'right' };
+    if ((fo.boss || fo.hunter || fo.eliteId) && fo.hp > fo.maxHp * 0.25) { /* R36b：强敌不能被处决秒杀：破绽中吃一记 15% 重击，血量 ≤25% 才能真正处决 */
+      const dm = Math.max(1, Math.round(fo.maxHp * 0.15)); fo.hp = Math.max(1, fo.hp - dm); fo.broken = 0; fo.atk = null; fo.stag = Math.max(fo.stag || 0, 0.9); fo.flash = 0.15; if (CTX && CTX.floatDmg) CTX.floatDmg(fo.anchor.pos, dm, true); if (CTX && CTX.bossHp && fo.boss) CTX.bossHp(fo); CTX.shake && CTX.shake(0.5); CTX.toast && CTX.toast('处决被她挡住了要害——重创！（血量 ≤ 25% 才能处决）', '#ffc0a0', 1.6); sfx().thud && sfx().thud(0.9); return; }
+    fo.hp = 0; die(fo, info, true); decapitate(fo, info); slowmo(0.5, 0.3);
     CTX.shake && CTX.shake(0.7); CTX.event && CTX.event('execute', fo); sfx().roar && sfx().roar(0.4);
   }
   function aoe(center, r, mult, kind) { // 旋风斩：周围一圈
@@ -709,7 +712,7 @@ window.Foe = (() => {
     let dealt = Math.max(1, Math.round((fo.boss ? 11 : 12) * q * sp * mult * (slash ? 1 : 0.8) * (0.85 + Math.random() * 0.3)));
     if (!(window.FoeAbs && FoeAbs.on)) dealt = Math.max(dealt, Math.round(fo.maxHp * (fo.boss ? 0.09 : 0.17) * (fo.floorK || 1) * (info.fmul || 1) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：一记正常的砍至少削掉 ~17% 血（≈6 刀），霸主 ~9%（≈11 刀）——实力差距再大也不会出现“砍 20 刀不死”
     if (!(window.FoeAbs && FoeAbs.on)) { fo.nHit = (fo.nHit || 0) + 1; const cap = Math.round((fo.boss ? 12 : 6) * (fo.capK || 1)); /* R34：区域强度大时保险刀数按比例增加 */ if (fo.nHit >= cap - 2) dealt = Math.max(dealt, Math.ceil(fo.hp / (cap + 1 - Math.min(fo.nHit, cap)))); } // 第二十六轮保险（用户：永远打不死）：不管护甲/角色/回血，普通敌人第 6 刀必死、霸主第 12 刀必死
-    if (window.Talents) dealt = Talents.outDmg(fo, info, dealt, zone, brk); // R36：属性/天赋/暴击/背刺/印记
+    if (window.Talents) dealt = Talents.outDmg(fo, info, dealt, zone, brk); /* R36b：霸主/精英/猎手单刀上限 = 最大血量 10%，不可能再被一击秒杀 */ if (fo.boss || fo.hunter || fo.eliteId) dealt = Math.min(dealt, Math.max(1, Math.ceil(fo.maxHp * 0.1))); // R36：属性/天赋/暴击/背刺/印记
     const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.12; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk || !!info.crit);
     { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp); fo.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退：0.16 秒内推完（以前是一帧内整段位移 = “瞬移”）
     ctx.event && ctx.event('hit', fo, { dealt, zone, brk, kind: info.kind, spd, charged: info.charged, crit: info.crit, skill: info.skill, spell: info.spell, proc: info.proc });
@@ -717,7 +720,7 @@ window.Foe = (() => {
     if (!fo.brave && Math.random() < 0.65) { fo.brave = true; fo.state = 'chase'; } // 第二十六轮：挨打后更容易回头拼命（0.35→0.65）
     if (fo.boss) ctx.bossHp(fo);
     // 斩首：够快的横砍砍中脖子，且这一刀后她剩不到一半血（霸主要剩不到 25%）
-    if (slash && zone === 'neck' && spd > 4.5 && (brk || fo.hp <= fo.maxHp * (fo.boss ? 0.25 : 0.5))) { // 破绽中 = 处决，不看血量
+    if (slash && zone === 'neck' && spd > 4.5 && ((brk && !(fo.boss || fo.hunter || fo.eliteId)) || fo.hp <= fo.maxHp * (fo.boss || fo.hunter || fo.eliteId ? 0.25 : 0.5))) { // 破绽中 = 处决，不看血量（R36b：霸主/精英/猎手除外，必须先打到 25% 以下）
       const one = first && !brk; fo.hp = 0; die(fo, info, true); decapitate(fo, info); ctx.event && ctx.event(brk ? 'execute' : one ? 'onecut' : 'decapAlive', fo); return true; }
     if (fo.hp <= 0) {
       die(fo, info, false); if (CTX && CTX.shake) CTX.shake(0.35); // 第十八轮：击杀不再慢放
