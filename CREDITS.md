@@ -139,3 +139,7 @@ models/CLS_*.js，由 js/headpacks.js 按 MOD pack_voc / pack_touhou / pack_cls 
 | `big/body/Q_Witch / Q_Medieval / Q_Adventurer / Q_Formal / Q_Soldier` | Ultimate Modular Women Pack（quaternius.com，经 Cinevva 镜像 cdn.cinevva.com/assets/packs/quaternius/ultimate-modular-women/） | Quaternius，CC0 | 自带头已删，换动漫头；`tools/glb2body.py` 转换（IK 骨架重挂到 FK） |
 | `big/body/Q_Ranger / Q_Peasant` | Modular Character Outfits – Fantasy [Standard]（quaternius.itch.io，免费版 Female_Ranger / Female_Peasant） | Quaternius，CC0（License_Standard.txt） | 只取 baseColor 贴图（1024 WebP）；兜帽随头删除 |
 - 尝试并否决：Ultimate Animated Characters 的 *_Female（Knight_Golden/Viking/Pirate/Soldier/BlueSoldier/Cowboy，身高 ~1.35m、Q 版粗短，像大头娃娃）；pixiv AvatarSample_E（身高 1.17m 幼态）/F/G（与已有 Vita 系同款）；Kenney 迷你角色（Q 版）；Quaternius RPG Characters（Q 版）。
+
+### R51 身体
+- `big/body/V_KF.js`（AvatarSample K·F）：pixiv VRoid Project 官方样本，VRM 内嵌 meta = VRM Public License 1.0、avatarPermission everyone、allowExcessivelyViolentUsage true、allowRedistribution true、modification allowModificationRedistribution、creditNotation unnecessary。文件取自 github.com/temuulen1221/Bodify（assets/models/AvatarSample_K_F.vrm），tools/vrm2body.py 转换。
+- 已删除 `big/body/Q_*.js`（Quaternius Ultimate Modular Women，R43b 引入）——用户要求只用 VRoid 女性身体。

@@ -190,7 +190,7 @@ window.Foe = (() => {
   const SKIN_FIX = {"Jean":[0.613,0.652,0.764],"Noelle":[0.991,1.214,1.484],"Amber":[0.749,0.898,1.13],"Rosaria":[0.777,1.044,1.039],"Lisa":[1.272,1.554,1.757],"Sucrose":[2.954,2.213,2.941],"Xiangling":[1.607,1.518,1.406],"Ningguang":[1.019,1.205,1.436],"Furina":[0.849,0.949,1.125],"Kokomi":[0.82,0.839,0.784],"YaeMiko":[1.566,2.149,2.172],"Shenhe":[1.507,1.32,1.558],"Mona":[2.583,2.373,2.564],"Eula":[0.783,0.965,1.236],"Beidou":[0.747,0.767,0.855],"HikariCape":[0.97,1.115,1.302],"HikariScholar":[0.804,0.824,0.806],"AvatarSample_A":[1.04,0.986,1.08]};
   const LIFT = 1.04; // 第十八轮：角色整体稍提亮
   function bodyGain(name) { const f = SKIN_FIX[name]; if (!f) return LIFT; const L = f[0] * 0.3 + f[1] * 0.59 + f[2] * 0.11; return (L < 1 ? Math.min(1.7, 1 / L) : 1) * LIFT; }
-  const TINT = { HikariCape: 1, HikariScholar: 1, AvatarSample_A: 1, Vita: 1, Victoria_Rubin: 1, Darkness_Shibu: 1, HairSample_Female: 1, AvatarSample_B: 1 }; // 皮肤是独立材质、能跟头同色的身体
+  const TINT = { V_KF: 1, HikariCape: 1, HikariScholar: 1, AvatarSample_A: 1, Vita: 1, Victoria_Rubin: 1, Darkness_Shibu: 1, HairSample_Female: 1, AvatarSample_B: 1 }; // 皮肤是独立材质、能跟头同色的身体
   // 第二十四轮 MOD vroid_bodies：pixiv VRoid 官方 CC0 模型的原装身体（非原神），按衣服风格追加到身份候选
   const VB = {
     Vita: ['ranger', 'archer', 'assassin', 'shadow', 'merc', 'crossbow', 'dragonslayer', 'wolfwarrior', 'dragonknight', 'huntress'],
@@ -225,17 +225,23 @@ window.Foe = (() => {
     Victoria_Rubin: ['princess', 'lady', 'queen', 'countess', 'duchess', 'elfprincess', 'singer', 'musician', 'choir', 'saint', 'archangel', 'moonpriest', 'abbess', 'avatar', 'dragonmiko', 'foxmiko', 'dragonprincess'],
     Darkness_Shibu: ['courtmage', 'abyssqueen', 'succubus', 'shaman'],
     HairSample_Female: ['novice', 'medic', 'druid', 'nun'],
-    // R43b：Quaternius CC0 低模身体（头换成动漫头），按身份穿真正的职业服
-    Q_Witch: ['witch', 'hexer', 'covenlady', 'bogwitch', 'alchemist'],
-    Q_Ranger: ['huntress', 'ranger', 'archer', 'falconer'],
-    Q_Adventurer: ['merc', 'dragonslayer', 'catthief'],
-    Q_Medieval: ['knight', 'paladin', 'general', 'dragonknight', 'inquisitor', 'fallen', 'assassin', 'shadow'],
-    Q_Soldier: ['guard'],
-    Q_Peasant: ['villager', 'shepherd', 'herbalist'],
-    Q_Formal: ['barmaid'] };
+    }; // R51：Q_* 条目随文件删除
   const OUTFIT_ID = {}; for (const b in OUTFIT) for (const id of OUTFIT[b]) OUTFIT_ID[id] = b;
-  const OUTFIT_BOSS = { village: 'HairSample_Female', forest: 'Q_Ranger', wilds: 'Q_Adventurer', abbey: 'Victoria_Rubin', swamp: 'Q_Witch', fortress: 'Q_Medieval', capital: 'Victoria_Rubin', abyss: 'Darkness_Shibu', peak: 'Victoria_Rubin' };
+  const OUTFIT_BOSS = { village: 'HairSample_Female', forest: 'Vita', wilds: 'Vita', abbey: 'Victoria_Rubin', swamp: 'Darkness_Shibu', fortress: 'Vita', capital: 'Victoria_Rubin', abyss: 'Darkness_Shibu', peak: 'Victoria_Rubin' };
+  // R51 MOD vroid_only：按身份在 8 具 VRoid 女性身体里挑衣服合适的（同一种子稳定）
+  const VR_ID = {
+    Vita: ['ranger', 'archer', 'assassin', 'shadow', 'merc', 'crossbow', 'dragonslayer', 'wolfwarrior', 'dragonknight', 'huntress', 'knight', 'paladin', 'guard', 'general', 'falconer', 'chieftess', 'inquisitor'],
+    Victoria_Rubin: ['princess', 'lady', 'queen', 'countess', 'duchess', 'elfprincess', 'singer', 'musician', 'choir', 'saint', 'archangel', 'moonpriest', 'abbess', 'avatar', 'dragonprincess'],
+    Darkness_Shibu: ['witch', 'hexer', 'covenlady', 'bogwitch', 'courtmage', 'abyssqueen', 'succubus', 'shaman', 'fallen', 'alchemist', 'duchess', 'inquisitor'],
+    HairSample_Female: ['novice', 'medic', 'druid', 'nun', 'villager', 'shepherd', 'herbalist', 'choir', 'saint', 'abbess'],
+    AvatarSample_A: ['bard', 'alchemist', 'medic', 'novice', 'lady', 'musician', 'courtmage', 'herbalist'],
+    AvatarSample_B: ['catthief', 'bard', 'engineer', 'smithgirl', 'merc', 'singer'],
+    Osage: ['foxmiko', 'dragonmiko', 'villager', 'singer', 'barmaid', 'musician', 'herbalist', 'shepherd'],
+    V_KF: ['assassin', 'shadow', 'crossbow', 'engineer', 'merc', 'catthief', 'guard', 'smithgirl', 'huntress'] };
+  const VR_IDX = {}; for (const b in VR_ID) for (const id of VR_ID[b]) (VR_IDX[id] = VR_IDX[id] || []).push(b);
+  const VR_BOSS = { village: 'HairSample_Female', forest: 'Vita', wilds: 'V_KF', abbey: 'Victoria_Rubin', swamp: 'Darkness_Shibu', fortress: 'Vita', capital: 'Victoria_Rubin', abyss: 'Darkness_Shibu', peak: 'Victoria_Rubin' };
   function bodyFor(h, r, bossK, used) {
+    if (window.CC0 && CC0.vroidOnly && CC0.vroidOnly()) { if (bossK) return VR_BOSS[bossK] || 'Vita'; const L = VR_IDX[h && h.c && h.c.id] || CC0.VRF; const sd = (h && h.look && h.look.seed) || Math.floor(r() * 1e9); return L[CC0.hash(String(sd)) % L.length]; }
     if (window.CC0 && CC0.on() && window.Mods && Mods.on('id_outfit')) { const o = bossK ? OUTFIT_BOSS[bossK] : OUTFIT_ID[h && h.c && h.c.id]; if (o && (!window.BODY_LIST || BODY_LIST.includes(o))) return o; }
     const b = bodyFor0(h, r, bossK, used); return window.CC0 ? CC0.body(b, (h && h.look && h.look.seed) || 0) : b; } /* R38 CC0 模式：只用 CC0 身体 */
   function bodyFor0(h, r, bossK, used) {

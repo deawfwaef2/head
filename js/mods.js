@@ -54,7 +54,7 @@ window.Mods = (() => {
     { id: 'cs_real', cat: 'look', group: 'cstyle', icon: '📷', n: '人物风格：写实相对光（R47）', d: '上一版：PBR 光照，只把暗面抬到此处满受光的 40%，加逆光边。无勾线。' },
     { id: 'char_outline', cat: 'look', icon: '✒️', n: '人物勾线（R47）', d: '身体和头的外轮廓描一圈细线（反向外壳，远处自动变细）；线色取自贴图并随环境变暗/变色，不是死黑。需开“人物统一光影”。', def: true },
     { id: 'world_cel', cat: 'look', icon: '🏞️', n: '环境二次元阴影（R47）', d: '场景保留 3D 贴图材质感，但阴影边缘收硬、阴影染上天空色、亮面略平——和二次元人物的阴影对齐。', def: true },
-    { id: 'body_qc50', cat: 'look', icon: '🧍', n: '停用怪异低模身体（R50）', d: '逐个渲染质检后停用 5 具 Quaternius 纯色低模身体（Q_Witch / Q_Medieval / Q_Adventurer / Q_Formal / Q_Soldier：无贴图、爪形手、手臂姿势坏、肤色和动漫头对不上），按身份换成风格相近的 VRoid 身体或有贴图的 Q_Ranger / Q_Peasant。文件保留，关掉即恢复。', def: true },
+    { id: 'vroid_only', cat: 'look', icon: '🧍', n: '身体只用 VRoid 女性模型（R51）', d: '所有人物身体只从 8 具 VRoid 女性身体里按身份挑（Vita / Victoria Rubin / Darkness Shibu / HairSample Female / AvatarSample A / AvatarSample B / 浴衣 Osage / 新增 AvatarSample K·F），不管 CC0 模式开没开。Quaternius 低模身体已删除；原神 MMD 身体和身高幼态的光莉不再出现。', def: true },
     { id: 'hunter_calm', cat: 'play', icon: '🏹', n: '猎手感应放慢（R50）', d: '击倒 +2.5（原 7）、斩首 +1.5（原 4）；出猎前 2 分钟不随时间增长，之后约 4.5→8%/分钟（原 15%+）；满后每 12 秒判定一次、概率 6%→50%（原每 5 秒 15%→90%）；遭遇结束后冷却 150 秒（原 40 秒）。', def: true },
     { id: 'hunter_hud2', cat: 'look', icon: '🎯', n: '猎手 HUD 重做 · 紧凑统一（R50）', d: '猎手感应改为顶部小型黑曜石面板（分段细条 + 仇恨/U 提示一行），不再是屏幕中间的大字和糊状阴影；猎手血条、横幅同风格（血金、切角、30% 逃跑刻度）。', def: true },
     { id: 'npc_locomo', cat: 'look', icon: '🚶', n: '人物移动自然化 · 不再像 GMod（R47）', d: '走/慢跑/疾跑按实际移速相位同步混合，播放速率匹配步幅（脚不打滑）；起步/刹车有加速度；转身有角加速度、跑动时弧线转弯并向内侧倾身；还在滑行时不会瞬间站定。', def: true },
