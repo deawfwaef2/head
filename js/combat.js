@@ -84,12 +84,12 @@ window.Combat = (() => {
       vm.userData.rest = vm.userData.rest || { p: vm.position.clone(), r: vm.rotation.clone() };
       vm.position.set(0, 0, 0); vm.rotation.set(0, 0, 0); if (fist) fist.visible = false;
       S.hand.set(0.2, -0.55, -0.35); S.hv.set(0, 0, 0); S.blade.copy(IDLE_B); S.lastTip = null; trail.pts.length = 0; S.stam = Math.max(S.stam, 30);
-      SFX.play('draw', 0.7); G.toast && G.toast((RS() ? '⚔️ 拔刀：按住左键＝蓄势（刀向反方向拉开）· 微微带一下鼠标定方向 · 松开＝沿该方向挥出（蓄满 0.7 秒=重斩，不带方向=直劈）· 点一下=刺' : '⚔️ 拔刀：按住左键＝刀尖锁在准星上，转动视角挥砍（不动 0.7 秒=蓄力重斩）· 连点刺') + ' · 右键格挡并转动鼠标对准红色来刀弧 · Q 闪身 · 破绽时 E 处决 · F 收刀', '#ffd27a', 4);
+      if (window.CombatFX && CombatFX.on) CombatFX.draw(true); else SFX.play('draw', 0.7); G.toast && G.toast((RS() ? '⚔️ 拔刀：按住左键＝蓄势（刀向反方向拉开）· 微微带一下鼠标定方向 · 松开＝沿该方向挥出（蓄满 0.7 秒=重斩，不带方向=直劈）· 点一下=刺' : '⚔️ 拔刀：按住左键＝刀尖锁在准星上，转动视角挥砍（不动 0.7 秒=蓄力重斩）· 连点刺') + ' · 右键格挡并转动鼠标对准红色来刀弧 · Q 闪身 · 破绽时 E 处决 · F 收刀', '#ffd27a', 4);
     } else {
       const r = vm.userData.rest; if (r) { vm.position.copy(r.p); vm.rotation.copy(r.r); }
       if (wpn && wpn.userData.rest) { wpn.position.copy(wpn.userData.rest.p); wpn.rotation.copy(wpn.userData.rest.r); }
       if (fist) fist.visible = !(wpn && wpn.userData.asset);
-      S.lmb = S.rmb = false; trail.m.visible = false; hud.d.style.display = 'none'; SFX.play('draw', 0.45, 0.8);
+      S.lmb = S.rmb = false; trail.m.visible = false; hud.d.style.display = 'none'; if (window.CombatFX && CombatFX.on) CombatFX.draw(false); else SFX.play('draw', 0.45, 0.8);
     }
     return true;
   }
@@ -118,11 +118,35 @@ window.Combat = (() => {
     else queueThrust();
     RH.length = 0;
   }
+  // ---------- 第二十二轮（续 9）：挥砍辅助瞄准（MOD aim_assist）----------
+  // 出刀瞬间在视野锥内挑最近的活敌人；刀路的圆心挪到其胸口、刃的有效射程延长到够得着、2 米外再向前小步突进。不碰镜头（没有粘滞）。
+  const AA = () => !window.Mods || Mods.on('aim_assist');
+  const _av = new V3(), _al = new V3();
+  function assistPick() {
+    if (!AA() || !G || !G.player) return null;
+    const center = G.player.pos; let list = [];
+    for (const p of providers) { try { list = list.concat(p(center) || []); } catch (e) {} }
+    cam.updateMatrixWorld(); const foes = (window.Foe && Foe.foes) || []; let best = null, bs = 1e9;
+    for (const tg of list) {
+      if (tg.kind !== 'foe' && tg.kind !== 'boss') continue;
+      const fo = foes.find(f => f.id2 === tg.id); if (fo && fo.dead) continue; if (fo && fo.escaped) continue;
+      _av.copy(tg.pos); if (fo) _av.y += 0.3; cam.worldToLocal(_av); const d = _av.length(); if (_av.z > -0.35 || d > 3.6) continue; // 身后/太远
+      const ax = Math.atan2(Math.abs(_av.x), -_av.z), ay = Math.atan2(Math.abs(_av.y), -_av.z), lim = 0.6 + Math.max(0, 2.6 - d) * 0.3; // 远处 ≈35° · 近处最宽 ≈ 55°
+      if (ax > lim || ay > 0.62) continue; const sc = ax + ay * 0.6 + d * 0.07; if (sc < bs) { bs = sc; best = { fo, wp: tg.pos.clone(), d }; }
+    }
+    return best;
+  }
+  function asLocal(as, out) { if (as.fo && as.fo.f && as.fo.f.bones.hips) { as.fo.f.bones.hips.getWorldPosition(out); out.y += 0.42; } else out.copy(as.wp); return cam.worldToLocal(out); } // 活目标每帧跟踪
+  function asLunge(as, total, w, dt) { // 向目标小步突进（只动水平位置；世界自己会把玩家推出碰撞体）
+    const W = window.Worlds && Worlds.active && Worlds._W; if (!W || !as.fo || w.lunged >= total) return;
+    const dx = as.fo.pos.x - W.pos.x, dz = as.fo.pos.z - W.pos.z, d = Math.hypot(dx, dz); if (d < 1.45) return;
+    const step = Math.min(total - w.lunged, total * dt / (w.dur * 0.6), d - 1.4); W.pos.x += dx / d * step; W.pos.z += dz / d * step; w.lunged += step;
+  }
   function startSwing(dx, dy, hold, charged, mag) {
     const pw = 0.7 + 0.3 * Math.min(1, hold / 450), tired = S.stam <= 0 ? 0.6 : 1;
-    S.sw = { t: 0, dur: 0.15 * Math.sqrt(S.wt) / (charged ? 1.0 : 1) / tired, dx, dy, pw: pw * tired, charged, v: new V3(dx, dy, 0), hit: false, h0: S.hand.clone() };
+    S.sw = { t: 0, dur: 0.15 * Math.sqrt(S.wt) / (charged ? 1.0 : 1) / tired, dx, dy, pw: pw * tired, charged, v: new V3(dx, dy, 0), hit: false, h0: S.hand.clone(), as: assistPick(), lunged: 0, rk: 1 };
     S.stam = Math.max(0, S.stam - (charged ? 16 : 10)); S.thrust = 0; S.thrustQ = 0; S.hitCd.clear();
-    SFX.play('draw', Math.min(0.65, 0.3 + pw * 0.3), charged ? 0.9 : 1.25 + Math.random() * 0.2);
+    if (window.CombatFX && CombatFX.on) CombatFX.swing(dx, dy, pw, charged); else SFX.play('draw', Math.min(0.65, 0.3 + pw * 0.3), charged ? 0.9 : 1.25 + Math.random() * 0.2);
   }
   // 挥击动画：刀尖从“趋势反方向”一侧扫过准星到趋势方向一侧；直接摆姿态（不过弹簧），速度由位置差得出 → 走原有扫掠命中
   const HAND0 = new V3(0.2, -0.3, -0.36), _st = new V3();
@@ -131,8 +155,12 @@ window.Combat = (() => {
     let sgn; if (u < 0.2) sgn = -1 - 0.12 * Math.sin(u / 0.2 * Math.PI / 2); else { const k = (u - 0.2) / 0.8, ez = 1 - Math.pow(1 - k, 2.0); sgn = -1.12 + 2.24 * ez; } // 前 20% 回拉，其后 80% 挥出
     const A = 0.62 * (S.len / 0.8) * (0.85 + 0.25 * w.pw) * (w.charged ? 1.2 : 1), dist = 0.82;
     S.hand.set(HAND0.x + w.dx * sgn * 0.09, HAND0.y + w.dy * sgn * 0.07, HAND0.z - (u > 0.2 ? 0.04 : 0)); S.hv.set(0, 0, 0); S.tgt.copy(S.hand);
-    _st.set(w.dx * sgn * A, w.dy * sgn * A * 0.9, -dist); S.bladeT.copy(_st).sub(S.hand).normalize();
-    if (u >= 1) { S.sw = null; S.tgt.copy(S.hand); }
+    let cxo = 0, cyo = 0, dd = dist; w.rk = 1;
+    if (w.as) { const l = asLocal(w.as, _al); const ln = l.length(); cxo = Math.max(-1.3, Math.min(1.3, l.x * 0.92)); cyo = Math.max(-0.9, Math.min(0.9, l.y * 0.92)); dd = Math.max(dist, -l.z);
+      if (w.lt == null) w.lt = Math.max(0, Math.min(1.0, ln - 1.75)); if (w.lt > 0 && u < 0.7) asLunge(w.as, w.lt, w, dt); }
+    _st.set(cxo + w.dx * sgn * A, cyo + w.dy * sgn * A * 0.9, -dd); S.bladeT.copy(_st).sub(S.hand).normalize();
+    if (w.as) w.rk = Math.max(1, Math.min(2.4, _st.distanceTo(S.hand) / (S.len * 0.95)));
+    if (u >= 1) { if (!w.hit && window.CombatFX) CombatFX.whiff(); S.sw = null; S.tgt.copy(S.hand); }
   }
   // 第二十一轮（用户）：挥砍（按住左键）灵敏度不降低，但镜头按武器重量带惯性（越重越"拖"、松手前会继续滑一点）；不按住没有惯性；
   //   格挡（按住右键）灵敏度更低 ×0.3。MOD wpn_feel（默认开）；关掉恢复第二十轮的 ×0.42/×0.45。
@@ -161,7 +189,7 @@ window.Combat = (() => {
     if (S.rmb) { S.guard.x += dx * 0.022; S.guard.y -= dy * 0.022; const r = Math.hypot(S.guard.x, S.guard.y); if (r > 1) { S.guard.x /= r; S.guard.y /= r; } return FEEL() ? 0.3 : (window.Mods && Mods.on('guard_slowlook') ? 0.45 : 1); } // 第十九轮：用户要求格挡时降灵敏度
     return 1;
   }
-  function queueThrust() { if (S.thrust > 0.55 || S.thrust === 0) { S.thrust = 0.0001; S.thrustSide = -S.thrustSide; S.stam -= 9; SFX.play('draw', 0.35, 1.5); } else S.thrustQ = Math.min(2, S.thrustQ + 1); }
+  function queueThrust() { if (S.thrust > 0.55 || S.thrust === 0) { S.thrust = 0.0001; S.thrustSide = -S.thrustSide; S.tas = assistPick(); S.tasLung = 0; S.stam -= 9; if (window.CombatFX && CombatFX.on) CombatFX.thrust(); else SFX.play('draw', 0.35, 1.5); } else S.thrustQ = Math.min(2, S.thrustQ + 1); }
 
   // 控制点 → 手的目标位置（前方一个椭球面）
   function ctrlToHand(cx, cy, out) { const r2 = Math.min(1, cx * cx + cy * cy); return out.set(cx * 0.42, cy * 0.34 - 0.08, -0.42 - 0.2 * (1 - r2)); }
@@ -198,6 +226,7 @@ window.Combat = (() => {
   const _tipW = new V3(), _baseW = new V3(), _vel = new V3(), _seg = new V3(), _cp = new V3();
   function update(dt, now) {
     drainLook(dt, !drawn || !wpn || G.uiOpen);
+    if (window.CombatFX) { CombatFX.tick(dt); if (drawn && wpn) CombatFX.charge(S.lmb && !S.rmb && S.thrust === 0 && !S.sw && !G.uiOpen ? (S.charged > 0 ? 1 : S.charge) : 0); if (drawn && wpn) { const ex = S.stam <= 0; if (ex && !S._ex) CombatFX.stamina(); S._ex = ex; } }
     if (!drawn || !wpn) { if (hud && hud.d.style.display !== 'none' && !drawn) hud.d.style.display = 'none'; if (threatSrc && !G.uiOpen) drawOverlay(now); else if (ov) { if (ovDirty) { ov.g.clearRect(0, 0, 560, 560); ovDirty = false; } ov.eKey = ''; ov.edge.style.opacity = 0; } return; } // 第十九轮：没拔刀也提示来刀
     if (G.uiOpen) { S.lmb = S.rmb = false; }
     // 顿帧：武器冻结一小会，屏震衰减
@@ -207,6 +236,7 @@ window.Combat = (() => {
       if (!S.lmb || S.rmb || sp < 160) S.arc *= Math.exp(-dt * 7);
       else { _t.copy(S.mv).multiplyScalar(1 / sp); const c = _t.dot(S.swD); if (c < 0.2) { S.arc *= 0.08; S.swD.copy(_t); if (S.arc < 5) S.flip = (S.flip || 0) + 1; } else S.swD.lerp(_t, Math.min(1, dt * 5)).normalize(); S.arc = Math.min(900, S.arc + sp * dt); }
       S.flipT = (S.flipT || 0) + dt; if (S.flipT > 1) { S.flipT = 0; S.wiggle = (S.flip || 0) >= 5; S.flip = 0; } }
+    S.shake *= Math.exp(-dt * 12); // 第二十二轮：屏震逐帧衰减（原来只在顿帧里衰减）
     if (S.stop > 0) { S.stop -= dt; S.shake *= 0.85; placeWeapon(); return; }
     const tired = S.stam <= 0 ? 0.5 : 1;
     let omega = 22 / Math.sqrt(S.wt) * tired; // 第十六轮：整体节奏放慢一点
@@ -226,6 +256,8 @@ window.Combat = (() => {
     } else if (S.thrust > 0) {
       S.thrust += dt / (0.28 * Math.sqrt(S.wt)); const k = S.thrust < 0.45 ? S.thrust / 0.45 : Math.max(0, 1 - (S.thrust - 0.45) / 0.55);
       const e = 1 - (1 - k) * (1 - k); S.tgt.set(0.05 * S.thrustSide + 0.1, -0.2 + e * 0.06, -0.4 - e * 0.5); S.bladeT.set(-S.tgt.x, -S.tgt.y, -(S.len * 0.95 + 0.4 + e * 0.5) - S.tgt.z).normalize(); omega *= 1.6; // 第十八轮：刺向准星
+      S.trk = 1; if (S.tas) { const l = asLocal(S.tas, _al), ln = l.distanceTo(S.tgt); S.bladeT.copy(l).sub(S.tgt).normalize(); S.trk = 1 + (Math.max(1, Math.min(2.4, ln / (S.len * 0.95))) - 1) * Math.min(1, e * 1.3); // 第二十二轮：突刺也瞄向目标胸口
+        const w = S.tw || (S.tw = { dur: 0.3, lunged: 0, lt: 0 }); if (S.tasLung === 0) { S.tasLung = 1; w.lunged = 0; w.lt = Math.max(0, Math.min(0.8, ln - 1.75)); } if (w.lt > 0 && S.thrust < 0.4) asLunge(S.tas, w.lt, w, dt); }
       if (S.thrust >= 1) { S.thrust = 0; if (S.thrustQ > 0) { S.thrustQ--; queueThrust(); } }
     } else if (S.lmb) {
       if (S.drag < 0.1 && S.charged <= 0) { S.charge += dt / 0.7; if (S.charge >= 1) { S.charged = 9; S.charge = 1; SFX.play('draw', 0.6, 0.7); G.toast && G.toast('⚡ 蓄力完成：挥出重斩（破防）', '#ffd24a', 1); } }
@@ -259,13 +291,14 @@ window.Combat = (() => {
     placeWeapon();
     // 世界坐标刃线 + 扫掠命中
     const L = S.len; cam.updateMatrixWorld();
-    _baseW.copy(S.hand).addScaledVector(S.blade, L * 0.3); _tipW.copy(S.hand).addScaledVector(S.blade, L * 0.95);
+    const rkx = S.sw ? S.sw.rk : (S.thrust > 0 && S.tas ? (S.trk || 1) : 1); S.rk = rkx; _baseW.copy(S.hand).addScaledVector(S.blade, L * 0.3); _tipW.copy(S.hand).addScaledVector(S.blade, L * 0.95 * rkx);
     cam.localToWorld(_baseW); cam.localToWorld(_tipW);
     if (S.lastTip && S.lastTip.distanceToSquared(_tipW) > 2.25) { S.lastTip = null; trail.pts.length = 0; } // 瞬移/传送：不把跳变当成挥砍
     if (S.lastTip) {
-      _vel.copy(_tipW).sub(S.lastTip).divideScalar(Math.max(1e-3, dt)); S.tipSpeed = S.tipSpeed * 0.6 + _vel.length() * 0.4; if (S.sw) S.tipSpeed = Math.min(22, Math.max(S.tipSpeed, _vel.length() * 0.9));
+      _vel.copy(_tipW).sub(S.lastTip).divideScalar(Math.max(1e-3, dt)); if (rkx > 1) _vel.divideScalar(1 + (rkx - 1) * 0.9); // 延长射程不该让伤害也变大：按延长比例折回刀尖速度
+      S.tipSpeed = S.tipSpeed * 0.6 + _vel.length() * 0.4; if (S.sw) S.tipSpeed = Math.min(22, Math.max(S.tipSpeed, _vel.length() * 0.9));
       if (S.tipSpeed > 3 && !S.rmb) { S.stam = Math.max(0, S.stam - dt * S.tipSpeed * 2.2); }
-      if (S.tipSpeed > 6.5 && now - S.swingSnd > 0.28) { S.swingSnd = now; SFX.play('draw', Math.min(0.5, S.tipSpeed / 30), 1.6 + Math.random() * 0.3); }
+      if (S.tipSpeed > 6.5 && now - S.swingSnd > 0.28 && !S.sw && S.thrust === 0) { S.swingSnd = now; if (window.CombatFX && CombatFX.on) CombatFX.swing(Math.sign(S.mv.x) || 1, Math.sign(S.mv.y) || 0, Math.min(1, S.tipSpeed / 14), false); else SFX.play('draw', Math.min(0.5, S.tipSpeed / 30), 1.6 + Math.random() * 0.3); }
       if (!S.rmb) sweep(now);
       trail.col.set(S.charged > 0 ? '#ffc040' : '#ffe2b0'); pushTrail(_baseW, _tipW, S.rmb ? 0 : S.tipSpeed * (S.charged > 0 ? 1.4 : 1));
     }
@@ -297,17 +330,18 @@ window.Combat = (() => {
       const f = k / 5; const p0 = _cp.copy(S.lastBase).lerp(S.lastTip, f); const p1 = _seg.copy(_baseW).lerp(_tipW, f);
       for (const tg of list) {
         if (S.hitCd.has(tg.id)) continue;
-        const d = segPointDist(p0, p1, tg.pos); if (d > tg.r) continue;
+        const aa = (S.sw || S.thrust > 0) && AA() && (tg.kind === 'foe' || tg.kind === 'boss'); const d = segPointDist(p0, p1, tg.pos); if (d > tg.r * (aa ? 1.3 : 1)) continue;
         const commit = commitK();
-        const speed = S.thrust > 0 ? Math.max(S.tipSpeed, 5) : S.tipSpeed * f * commit;
+        const speed = S.thrust > 0 ? Math.max(S.tipSpeed, 5) : S.tipSpeed * (aa ? Math.max(f, 0.8) : f) * commit; // 辅助瞄准命中算“刃中段以上”，不因为靠近刀根而掉伤害
         if (speed < 2) { if (S.wiggle && tg.kind !== 'head' && now - (S.wigT || 0) > 2.5) { S.wigT = now; G.toast && G.toast('🌀 来回乱晃没有冲力——大幅度挥砍 / 连点刺击才有伤害', '#9fd0ff', 1.8); } continue; }
         const info = { point: p1.clone(), vel: _vel.clone().multiplyScalar(f), speed, kind: S.thrust > 0 ? 'thrust' : 'slash', dir: dirName(), frac: f,
-          commit, seg: { b0: S.lastBase.clone(), t0: S.lastTip.clone(), b1: _baseW.clone(), t1: _tipW.clone() }, from: fromAng(), charged: S.charged > 0 && S.thrust === 0, tipSpeed: S.thrust > 0 ? Math.max(S.tipSpeed, 5) : S.tipSpeed };
+          commit, seg: { b0: S.lastBase.clone(), t0: S.lastTip.clone(), b1: _baseW.clone(), t1: _tipW.clone() }, from: fromAng(), assist: aa, charged: S.charged > 0 && S.thrust === 0, tipSpeed: S.thrust > 0 ? Math.max(S.tipSpeed, 5) : S.tipSpeed };
         const res = tg.onHit ? tg.onHit(info) : true;
         if (res === false) continue; // 目标说“刃其实没碰到身体”：不进冷却，这一刀继续扫
-        S.hitCd.set(tg.id, now); if (info.charged && tg.kind !== 'head') S.charged = 0;
+        S.hitCd.set(tg.id, now); if (S.sw) S.sw.hit = true; if (info.charged && tg.kind !== 'head') S.charged = 0;
         const heavy = Math.min(1, speed / 10);
-        S.stop = 0.015 + heavy * 0.035; // 第十八轮：顿帧缩短（长顿帧像卡顿） S.shake = 0.004 + heavy * 0.012; if (G.kick) G.kick(heavy * 0.6);
+        S.stop = 0.015 + heavy * 0.035; // 第十八轮：顿帧缩短（长顿帧像卡顿）
+        S.shake = 0.004 + heavy * 0.012; if (G.kick) G.kick(heavy * 0.6); // 第二十二轮：这行原来被上面的注释吞掉了，屏震一直没生效
       }
     }
   }

@@ -516,6 +516,7 @@ window.Foe = (() => {
       if (A.lunge && ct < h.t && d > 1.1 && sc > 0) spd = A.lunge;
       const left = atkLeft(A); if (left > A.tot) A.tot = left;
       if (ct >= h.t) { A.hi++; A.tot = 0;
+        if (window.CombatFX) CombatFX.enemySwing(fo, h);
         if (d < A.reach && Math.abs(ang(face - fo.yaw)) < 0.9) CTX.hitPlayer(fo, Math.round(A.dmg * (h.heavy ? 1.6 : 1)), h);
         else if (fo.sayT <= 0 && Math.random() < 0.3) talk(fo, '……躲开了？'); }
     }
@@ -592,12 +593,12 @@ window.Foe = (() => {
     for (const [z, r] of ZN) { const bo = fo.f.bones[z]; if (!bo || (fo.gone && fo.gone.has(z)) || (z === 'head' && fo.decap)) continue;
       const a = bo.getWorldPosition(new V3()), cb = CHILD[z] && fo.f.bones[CHILD[z]]; const b = cb ? cb.getWorldPosition(new V3()) : a.clone().add(new V3(0, z === 'head' ? 0.18 : 0.1, 0));
       if (z === 'head') { const up = a.clone().sub(fo.f.bones.neck.getWorldPosition(new V3())).normalize(); a.addScaledVector(up, 0.06); b.copy(a).addScaledVector(up, 0.1); }
-      segs.push([z, a, b, r + (z === 'neck' ? 0.06 : 0.035)]); }
+      segs.push([z, a, b, r * (info.assist ? 1.4 : 1) + (z === 'neck' ? 0.06 : 0.035)]); } // 第二十二轮：辅助瞄准时身体判定略宽
     let best = null, bd = 1, neckB = null, nd = 1;
     for (let i = 0; i <= 6; i++) { const u = i / 6; _s0.copy(sg.b0).lerp(sg.t0, u); _s1.copy(sg.b1).lerp(sg.t1, u);
       for (let j = 0; j <= 4; j++) { _sp.copy(_s0).lerp(_s1, j / 4);
         for (const [z, a, b, r] of segs) { _sa.subVectors(b, a); const t = Math.max(0, Math.min(1, _sb.subVectors(_sp, a).dot(_sa) / Math.max(1e-6, _sa.lengthSq()))); const d = _sb.copy(a).addScaledVector(_sa, t).distanceTo(_sp) / r;
-          if (d < bd || (z === 'neck' && d < nd)) { const hit = { zone: z, point: _sp.clone(), speed: info.kind === 'thrust' ? info.speed : Math.max(2, info.tipSpeed * (0.3 + 0.65 * u) / 0.95) }; if (d < bd) { bd = d; best = hit; } if (z === 'neck' && d < nd) { nd = d; neckB = hit; } } } } }
+          if (d < bd || (z === 'neck' && d < nd)) { const hit = { zone: z, point: _sp.clone(), speed: info.kind === 'thrust' ? info.speed : Math.max(2, info.tipSpeed * (0.3 + 0.65 * (info.assist ? Math.max(u, 0.75) : u)) / 0.95) }; if (d < bd) { bd = d; best = hit; } if (z === 'neck' && d < nd) { nd = d; neckB = hit; } } } } }
     return neckB || best; // 刃确实扫过脖子（在脖子半径内）就算脖子：斩首要好砍
   }
   function targets() {
@@ -639,7 +640,7 @@ window.Foe = (() => {
     const dealt = Math.max(1, Math.round((fo.boss ? 11 : 12) * q * sp * mult * (slash ? 1 : 0.8) * (0.85 + Math.random() * 0.3)));
     const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.12; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk);
     { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp); fo.pos.add(kv); } } // 击退
-    ctx.event && ctx.event('hit', fo, { dealt, zone, brk });
+    ctx.event && ctx.event('hit', fo, { dealt, zone, brk, kind: info.kind, spd, charged: info.charged });
     if (!fo.seen) { fo.seen = true; fo.state = fo.brave ? 'chase' : 'flee'; if (fo.boss) ctx.bossMeet(fo); }
     if (!fo.brave && Math.random() < 0.35) { fo.brave = true; fo.state = 'chase'; }
     if (fo.boss) ctx.bossHp(fo);
@@ -660,7 +661,7 @@ window.Foe = (() => {
     if (poiseBrk) fo.poise = 0;
     if (!fo.boss || poiseBrk) { fo.atk = null; fo.stag = fo.boss ? 0.35 : 0.55; fo.f.play(zone === 'head' || zone === 'neck' ? 'Hit_Head' : sp > 1.3 ? 'Hit_Knockback' : 'Hit_Chest', { once: true, fade: 0.06, restart: true }); }
     if (fo.sayT <= 0 && Math.random() < 0.5) talk(fo, fo.boss ? '' : pickR(Math.random, SAY.hit), '#ffb0a0');
-    sfx().chop && sfx().chop(); sfx().squish && sfx().squish(0.5);
+    if (!(window.CombatFX && CombatFX.on)) { sfx().chop && sfx().chop(); sfx().squish && sfx().squish(0.5); } // 有 combat_fx 时由 CombatFX 合成更丰富的受击音
     return true;
   }
   function die(fo, info, quiet) {

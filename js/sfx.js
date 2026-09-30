@@ -73,7 +73,7 @@ window.SFX = (() => {
   function toggleSfx() { sfxOn = !sfxOn; return sfxOn; }
 
   return {
-    get musicOn() { return musicOn; }, get ctx() { return ctx; }, get out() { return master; }, duck(d) { if (cur) fade(cur, d ? 0 : vol, 700); }, init, play, soul, squish, roar, thud, levelup, heartbeat, fanfare, music, toggleMusic, toggleSfx,
+    get musicOn() { return musicOn; }, get on() { return sfxOn; }, get ctx() { return ctx; }, get out() { return master; }, duck(d) { if (cur) fade(cur, d ? 0 : vol, 700); }, init, play, soul, squish, roar, thud, levelup, heartbeat, fanfare, music, toggleMusic, toggleSfx,
     punch: () => play('punch', 0.6), coins: () => play('coins', 0.6), chop: () => play('chop', 0.8), wood: () => play('wood', 0.7), mine: () => play('mine', 0.8),
     click: () => play('click', 0.5), select: () => play('select', 0.5), confirm: () => play('confirm', 0.6), deny: () => play('error', 0.6), open: () => play('open', 0.5), close: () => play('close', 0.5),
     page: () => play('page', 0.6), book: () => play('book', 0.6), step: () => play('step', 0.25, 1, 0.15), sack: () => play('sack', 0.8), latch: () => play('latch', 0.6), metal: () => play('metal', 0.6), bell: () => play('bell', 0.5), plate: () => play('plate', 0.5)
