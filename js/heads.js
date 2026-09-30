@@ -590,7 +590,13 @@ window.ModelHeads = (() => {
       LOOK.hn3 = { pony: '马尾', twin: '双马尾', drill: '钻头卷', bun: '丸子头', odango: '双丸子', braid: '麻花辫', braid2: '双麻花辫' }[LOOK.hx.s];
     } else if (grp !== 'godette' && !acc.includes('witchhat') && r() < 0.12) LOOK.hx = { s: null, ahoge: 1, seed: 1 + Math.floor(r() * 9999) };
     // face_morph 已按用户要求删除（恐怖谷）
-    if (grp === 'mmd') { LOOK.h = LOOK.f; delete LOOK.hx; delete LOOK.hn3; LOOK.skinHex = '#fbe6da'; LOOK.pale = 0.04; LOOK.acc = []; } // MMD 成品头：原发型原配色
+    if (grp === 'mmd') { // MMD 成品头：原发型原配色，一半保留程序化饰品
+      const mh = T.map((t, i) => i).filter(i => T[i].meta.grp === 'mmd' && T[i].hairMeshes.length && i !== faceIdx);
+      const rr = r(), ra = r();
+      LOOK.h = LOOK.f; // 发型移植对 MMD 头失真（尺寸/头皮不匹配），保持原发型
+      delete LOOK.hx; delete LOOK.hn3; LOOK.skinHex = '#fbe6da'; LOOK.pale = 0.04;
+      if (ra < 0.5) LOOK.acc = LOOK.acc.filter(a => a !== 'witchhat' && a !== 'crown'); else LOOK.acc = [];
+    }
     return LOOK;
   }
 
