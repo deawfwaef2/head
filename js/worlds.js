@@ -549,9 +549,9 @@ window.Worlds = (() => {
         return Math.atan2(CS.hand.y + 0.1, CS.hand.x - 0.04); },
       clang: (p, type) => { Foe.spark(p, type === 'break' ? 26 : 14, type === 'break' ? 'blue' : null); if (window.CombatFX && CombatFX.on) CombatFX.clang(type, p); else { SFX.play && SFX.play('bell', type === 'break' ? 0.5 : 0.3, type === 'break' ? 1.6 : 2.4); SFX.thud && SFX.thud(0.9); }
         if (type === 'block' && window.Combat) { Combat.recoil(1); G.toast && G.toast('🛡️ 被她挡住了——换个方向砍，或蓄力重斩破防', '#9fd0ff', 1.1); } if (type === 'break') { W.shake = Math.max(W.shake || 0, 0.35); G.toast && G.toast('💥 破防！', '#9fd0ff', 1.1); } },
-      power: (fo) => { const q = G.st().power / ((fo.boss ? node.loc.rec * (fo.boss.pow || 2) : node.loc.rec * [0.7, 0.9, 1.15, 1.5, 2.1][fo.rar])); return Math.pow(clamp(q, 0.25, 3), 0.7) * (window.Sack ? Sack.dmgMul() : 1); },
+      power: (fo) => { if ((window.FoeAbs && FoeAbs.on)) return FoeAbs.power(); const q = G.st().power / ((fo.boss ? node.loc.rec * (fo.boss.pow || 2) : node.loc.rec * [0.7, 0.9, 1.15, 1.5, 2.1][fo.rar])); return Math.pow(clamp(q, 0.25, 3), 0.7) * (window.Sack ? Sack.dmgMul() : 1); },
       rec: (fo) => node.loc.rec * (fo.boss ? (fo.boss.pow || 2) : [0.7, 0.9, 1.15, 1.5, 2.1][fo.rar]), // R34：这个敌人的“推荐战力”（foe_ai2 按它缩放血量/伤害）
-      hitPlayer: (fo, n, h = {}) => { const s = G.st(); n = Math.max(1, Math.round(n * (1 - s.dodge * 0.5) * (1 - Math.min(0.5, s.def / (s.def + 300)))));
+      hitPlayer: (fo, n, h = {}) => { const s = G.st(); if ((window.FoeAbs && FoeAbs.on)) n = FoeAbs.conv(fo, n, s, node.loc.rec); n = Math.max(1, Math.round(n * (1 - s.dodge * 0.5) * (1 - Math.min(0.5, s.def / (s.def + 300)))));
         const now = performance.now() / 1000, CS = window.Combat && Combat.drawn && !(window.Stamina && Stamina.ex) && Combat.state; // 力竭：格挡失效
         // 闪身无敌帧
         if (W.dodgeT > now) { const perfect = now - W.dodgeAt < 0.22; if (perfect) { W.shake = Math.max(W.shake || 0, 0.25); fo.broken = Math.max(fo.broken || 0, 1.1); fo.stag = Math.max(fo.stag || 0, 0.9); G.toast && G.toast('💨 完美闪避！她露出了破绽', '#c8f0ff', 1.4); foeEvent('perfectdodge', fo); } else foeEvent('dodge', fo); return; }

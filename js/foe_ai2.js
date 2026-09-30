@@ -39,7 +39,7 @@ window.FoeAI2 = (() => {
     return { t: window.__foeThreat || 1, tier: window.__foeTier || 0 }; // 测试台：可用 window.__foeThreat / __foeTier 指定
   }
   function dmgK(fo) {
-    if (!M('foe_scale')) return 1; const C = F_() && Foe.ctx && Foe.ctx(); const x = thrOf(fo, C);
+    if (!M('foe_scale') || (window.FoeAbs && FoeAbs.on)) return 1; /* R35：foe_abs 下伤害由 hitPlayer 按地区绝对换算 */ const C = F_() && Foe.ctx && Foe.ctx(); const x = thrOf(fo, C);
     return clamp(Math.pow(x.t, 0.42), 0.9, fo.boss ? 2.6 : 3.0) * (1 + 0.2 * x.tier);
   }
   function packBonus(ri, r) {
@@ -52,8 +52,8 @@ window.FoeAI2 = (() => {
     fo.aff = {}; fo.sk = null; fo.skCd = 2 + Math.random() * 4; fo.dodgeCd = 1.5 + Math.random() * 2;
     wrapHit(ctx);
     const x = thrOf(fo, ctx); fo.thr = x.t; fo.tier = x.tier;
-    if (M('foe_scale')) {
-      const hpK = clamp(Math.pow(x.t, 0.4), 0.9, fo.boss ? 1.8 : 2.4) * (1 + 0.25 * x.tier);
+    if (M('foe_scale') || (window.FoeAbs && FoeAbs.on)) {
+      const hpK = (window.FoeAbs && FoeAbs.on) ? FoeAbs.hpK(ctx && ctx.rec ? ctx.rec(fo) : 40) : clamp(Math.pow(x.t, 0.4), 0.9, fo.boss ? 1.8 : 2.4) * (1 + 0.25 * x.tier);
       fo.hpK = hpK; fo.maxHp = fo.hp = Math.max(8, Math.round(fo.maxHp * hpK)); fo.floorK = 1 / Math.max(1, hpK); fo.capK = Math.max(1, hpK);
       fo.iq = Math.min(1.3, fo.iq + 0.25 * x.tier); fo.spdMul = (fo.spdMul || 1) * (1 + 0.1 * x.tier);
     }
@@ -284,7 +284,8 @@ window.FoeAI2 = (() => {
       if (d >= 4 && d <= 10) pool.push('charge');
       if (d < 2.7 && fo.armed) pool.push('whirl');
       if (d < 2.6) pool.push('breaker', 'breaker');
-      if (fo.role === 'mage' || fo.role === 'healer' || fo.role === 'ranged' || fo.role === 'guard') { fo.skCd = 3; return null; }
+      if (fo.skPool) { for (let i = pool.length - 1; i >= 0; i--) if (!fo.skPool.includes(pool[i])) pool.splice(i, 1); } /* R35：猎手/精英限定技能池 */
+      if (!fo.skPool && (fo.role === 'mage' || fo.role === 'healer' || fo.role === 'ranged' || fo.role === 'guard')) { fo.skCd = 3; return null; }
       if (!pool.length) { fo.skCd = 0.6; return null; }
       const forced = window.__forceSkill; const k = forced && pool.includes(forced) ? forced : forced ? forced : pool[Math.floor(Math.random() * pool.length)];
       if (startSkill(fo, k, d, P, ctx, face)) return fo.sk ? { turnTo: face, spd: 0 } : null;

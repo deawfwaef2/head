@@ -53,6 +53,8 @@ window.Mods = (() => {
     { id: 'head_qc', cat: 'look', icon: '🔍', n: '怪异头模屏蔽（R31）', d: '逐个目检后仍显怪异、暂不能修的头模（八云紫、黑鸟）不再随机出现，也不借给别的头当发型。已拥有的不受影响。', def: true },
     { id: 'recall_iw', cat: 'look', icon: '🤲', n: '原场景回忆（R33）', d: 'F 回忆不再开新的 3D 界面：就在洞里拉近镜头，主角双手捧着她做动作（对视/抚摸/嗅闻/贴耳/那一战 + 把玩：抛接/转圈/戳脸/拍头），首级不再变表情，每个动作有音效；信息卡与动作栏重做。', def: true },
     { id: 'dev_mode', cat: 'play', icon: '🛠', n: '开发者模式（R34）', d: '资源无限（魂晶/材料/药剂自动补满）、全部建筑解锁、无敌、体力无限；F8 或右下角 DEV 按钮打开面板：刷首级（可选稀有度）、装备满阶、等级拉满、回忆全开。关掉即恢复正常玩法。', def: true },
+    { id: 'foe_abs', cat: 'play', icon: '⚖️', n: '按地区的绝对强度（R35）', d: '删除两套保险：①敌人伤害不再按你的最大生命百分比算，而是按地区强度的绝对数值（越深越疼）；②删除每刀保底伤害与“普通敌人第 6 刀必死”。新手装备去深处会被秒——要刷装备、练级。', def: true },
+    { id: 'hunters2', cat: 'play', icon: '🏹', n: '四名食人魔猎手（R35）', d: '勇者艾琳、追迹者诺薇、守誓人葛温、魔导士米娅。你放倒的人越多仇恨越高，她们全员升级（每 15 仇恨 +1 级）；出猎时猎手感应满了就可能穿越到你所在的地图（洞穴除外），在场时门全部封锁；血量 30% 会逃跑，逃掉就变强。U 查看等级/战力差距/胜率。', def: true, conflicts: ['ogre_hunters'] },
     { id: 'eye_white', cat: 'look', icon: '👁️', n: '眼白提亮（第二十四轮）', d: '洞窟火光很暗时眼白被压成灰黑。改为一半受光、一半自身亮度：暗处仍是白的，亮处不比脸亮。', def: true },
     { id: 'feel_bubble', cat: 'play', icon: '💬', n: '把玩旁白（第二十一轮）', d: '低频打字机小字卡：描述你正在怎么摆弄首级（拿起的分量、长传几米、弹了几下、叠罗汉……）。第三人称旁白，首级不说话。', def: true },
     { id: 'feel_impact', cat: 'play', icon: '💥', n: '落地手感（第二十一轮）', d: '首级落地按速度扬起尘土圈；按落点材质发声（石地闷响/木面/落在另一颗首级上的软声）；近处重摔镜头轻踢。', def: true },
@@ -109,7 +111,7 @@ window.Mods = (() => {
     { id: 'head_support', cat: 'play', icon: '🧲', n: '首级不悬空（第二十六轮 l）', d: '所有放头建筑：每个位置往下探测模型表面，首级正好落在台面/尖桩/桶沿上；下面是液体就泡进去一点。关掉 = 用各建筑原来手写的高度。', def: true },
     { id: 'region_pick', cat: 'ui', icon: '🗺️', n: '地图卡片选地点（第二十六轮 m）', d: '出洞狩猎改成左侧预览图 + 右侧地区档案：霸主、两名小BOSS、居民、特产、到达后的任务，一键出发。关掉 = 旧的卡片列表。', def: true },
     { id: 'region_quest', cat: 'play', icon: '📜', n: '到达简介 + 任务 + 小BOSS（第二十六轮 m）', d: '进入地区弹出一张不挡操作的简介卡并领一个任务（讨伐小BOSS / 斩首 / 放倒 / 讨伐霸主），完成给魂晶和地区材料。每个地区有两名有名有姓的小BOSS，讨伐后永久记录。', def: true },
-    { id: 'ogre_hunters', cat: 'play', icon: '🏹', n: '食人魔猎手（第二十六轮 n）', d: '在地区里放倒/斩首/停留越久，追踪热度越高；满了 15 秒倒计时后被拖进生成的「猎手围场」，猎手全灭才开门。每次活下来，下一批更多更强。', def: true },
+    { id: 'ogre_hunters', cat: 'play', icon: '🏹', n: '食人魔猎手（第二十六轮 n）', d: '在地区里放倒/斩首/停留越久，追踪热度越高；满了 15 秒倒计时后被拖进生成的「猎手围场」，猎手全灭才开门。每次活下来，下一批更多更强。', def: false, conflicts: ['hunters2'] },
     { id: 'release_slash', cat: 'play', icon: '🗡️', n: '蓄势挥击（第二十二轮）', d: '拔刀后按住左键=蓄势（视角 1:1 跟手，刀向“趋势”反方向拉开，准星旁出现方向线）；松开左键=捕捉松手前的鼠标微趋势，沿该方向挥出一刀（14° 内吸附 8 方向）。没趋势：短按=刺、蓄满 0.7 秒=直劈。按住期间刀尖本身不伤人。关掉恢复第十八轮“刀尖锁准星”。', def: true, requires: ['gesture_combat'] },
     { id: 'forge_buy', cat: 'play', icon: '⚔️', n: '铁匠台·花魂晶直接升阶（第二十二轮）', d: '【默认关，第二十六轮】开 = 铁匠台可以花魂晶直接买下一阶装备（旧规则）。关 = 装备只能野外搜刮（敌人/尸体/容器/霸主），魂晶只用来强化身上已有的装备（武器/头盔/护甲/护符都能 +1~+10）。', def: false },
     { id: 'combat_fx', cat: 'play', icon: '🔊', n: '战斗音效与命中反馈（第二十二轮）', d: '程序合成的一整套战斗音效：挥刀破风（按力度/方向/左右声道）、刺击、挥空、蓄力升调与满格提示、肉体/脖子/骨头/重击命中、斩首喷血、击杀低频、弹刀/格挡/破防/完美格挡、闪避、受伤闷响耳鸣、敌人起手吼声与预警、敌人脚步与出手破风（带方位）；命中十字准星（白=命中 黄=弱点 红=击杀 蓝=被挡）与轻微屏震。关掉恢复旧的采样音效。', def: true },
@@ -148,6 +150,7 @@ window.Mods = (() => {
   if (st.__v < 3) { st.explore3d = false; st.__v = 3; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
   if (st.__v < 4) { for (const id of ['steady_save', 'ground_contact', 'head_repair', 'smooth_faces', 'cave_detail']) st[id] = true; st.__v = 4; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
   if (st.__v < 5) { st.forge_buy = false; st.__v = 5; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R26：装备不能买，只能搜刮 + 强化
+  if (st.__v < 6) { st.ogre_hunters = false; st.hunters2 = true; st.__v = 6; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R35：旧食人魔猎手 → 四名主角式猎手
   for (const m of LIST) if (st[m.id] === undefined) st[m.id] = !!m.def;
   // 修正非法状态（互斥组恰好一个；冲突；依赖）
   function normalize() {

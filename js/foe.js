@@ -266,7 +266,7 @@ window.Foe = (() => {
   }
   // ---- 生成：worlds.js 进入地点时调用 ----
   async function populate(ctx, list) { // list = [{h, pos, boss}]
-    CTX = ctx; clear(); await loadAnim();
+    const keep = !!(arguments[2] && arguments[2].keep); /* R35：keep = 中途追加（猎手/精英），不清场 */ CTX = ctx; if (!keep) clear(); await loadAnim();
     const out = [], used = new Set(), mx = +(location.search.match(/[?&]foemax=(\d+)/) || [])[1]; if (mx) list = list.slice(-mx);
     for (const it of list) {
       const r = mulberry32(((it.h.look.seed || 7) * 2654435761) >>> 0);
@@ -290,7 +290,7 @@ window.Foe = (() => {
       if (window.Persona) Persona.apply(fo, r); // 第二十四轮：人设（在职业之后：标题里带职业名）
       FOES.push(fo); out.push(fo);
     }
-    evict(used, 5); prewarm(ctx); { const seenB = new Set(); for (const fo of FOES) if (!seenB.has(fo.f.bodyName)) { seenB.add(fo.f.bodyName); sevWarm(fo); } }
+    if (!keep) evict(used, 5); prewarm(ctx); { const seenB = new Set(); for (const fo of FOES) if (!seenB.has(fo.f.bodyName)) { seenB.add(fo.f.bodyName); sevWarm(fo); } }
     return out;
   }
   function warnMat() { if (warnMat.m) return warnMat.m; const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
@@ -706,8 +706,8 @@ window.Foe = (() => {
     if (window.FoeAI2 && FoeAI2.preHit(fo, info, c, zone, slash)) return true; // R34：词缀（护盾等）吸收
     const q = ctx.power(fo), brk = fo.broken > 0, mult = (zone === 'head' ? 1.6 : zone === 'neck' ? 1.8 : /Arm|Leg/.test(zone) ? 0.7 : 1) * (brk ? 2 : 1) * side * (info.charged ? 2.2 : 1) * (info.mult || 1);
     let dealt = Math.max(1, Math.round((fo.boss ? 11 : 12) * q * sp * mult * (slash ? 1 : 0.8) * (0.85 + Math.random() * 0.3)));
-    dealt = Math.max(dealt, Math.round(fo.maxHp * (fo.boss ? 0.09 : 0.17) * (fo.floorK || 1) * (info.fmul || 1) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：一记正常的砍至少削掉 ~17% 血（≈6 刀），霸主 ~9%（≈11 刀）——实力差距再大也不会出现“砍 20 刀不死”
-    { fo.nHit = (fo.nHit || 0) + 1; const cap = Math.round((fo.boss ? 12 : 6) * (fo.capK || 1)); /* R34：区域强度大时保险刀数按比例增加 */ if (fo.nHit >= cap - 2) dealt = Math.max(dealt, Math.ceil(fo.hp / (cap + 1 - Math.min(fo.nHit, cap)))); } // 第二十六轮保险（用户：永远打不死）：不管护甲/角色/回血，普通敌人第 6 刀必死、霸主第 12 刀必死
+    if (!(window.FoeAbs && FoeAbs.on)) dealt = Math.max(dealt, Math.round(fo.maxHp * (fo.boss ? 0.09 : 0.17) * (fo.floorK || 1) * (info.fmul || 1) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：一记正常的砍至少削掉 ~17% 血（≈6 刀），霸主 ~9%（≈11 刀）——实力差距再大也不会出现“砍 20 刀不死”
+    if (!(window.FoeAbs && FoeAbs.on)) { fo.nHit = (fo.nHit || 0) + 1; const cap = Math.round((fo.boss ? 12 : 6) * (fo.capK || 1)); /* R34：区域强度大时保险刀数按比例增加 */ if (fo.nHit >= cap - 2) dealt = Math.max(dealt, Math.ceil(fo.hp / (cap + 1 - Math.min(fo.nHit, cap)))); } // 第二十六轮保险（用户：永远打不死）：不管护甲/角色/回血，普通敌人第 6 刀必死、霸主第 12 刀必死
     const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.12; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk);
     { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp); fo.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退：0.16 秒内推完（以前是一帧内整段位移 = “瞬移”）
     ctx.event && ctx.event('hit', fo, { dealt, zone, brk, kind: info.kind, spd, charged: info.charged });

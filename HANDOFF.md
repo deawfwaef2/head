@@ -1343,3 +1343,20 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **新 MOD `dev_mode`（默认开）/ 新文件 `js/devmode.js`（`window.DevMode`）**：资源无限（魂晶≥999999、Sack 所有 mat/use 物品补满 999、药剂 99）、全解锁（包裹 `Unlocks.has`，并写入 `S.unl`）、无敌（hp 自动回满）、体力无限（包裹 `Stamina.spend/drain`）、`RegEcon.can` 放行。F8 / 右下角「🛠 DEV」按钮打开面板：刷首级（随机×10/×3 放面前/×50、按稀有度×5）、装备满阶、等级拉满、+100 万魂晶、材料补满、立即全解锁、全部首级回忆全开。面板开关存 `localStorage.hs_dev_opts`。
 - 改动他人文件：`index.html` 在 recall_iw.js 后加 `<script src="js/devmode.js">`；`js/mods.js` 在 recall_iw 后加 `dev_mode` 条目。game.js/sack.js/unlocks.js 未改（全部外部包裹）。
 - 测试：`bak/tools/flow.py`（真实流程：`G.lockPointer()` 开局 → DEV 刷头 → 准星对准首级按 F → 数字键 → F 关 → 魂库临时首级 → F8 面板）。
+
+---
+## R35（用户：删除“伤害按玩家最大血百分比”和“保底伤害/第6刀必死”；精英BOSS挑战+月之魔女；传奇式装备；新胜利条件；食人魔猎手重做为 4 名主角式猎手）
+### S1 `foe_abs`（新文件 js/foe_abs.js，window.FoeAbs，默认开）
+- 敌人伤害：原公式仍按 `玩家maxHp×百分比` 算出 n，worlds.js `hitPlayer` 开头用 `FoeAbs.conv(fo,n,s,node.loc.rec)` 换算成 `n/maxHp × REF(敌人推荐战力)`，REF(r)=140×(r/40)^0.65 → 与玩家血量无关、只与地区/稀有度有关。
+- 保险删除：foe.js hit() 的 17% 伤害下限 + 第6/12刀必死、beasts.js 同类代码，全部 `if (!(window.FoeAbs && FoeAbs.on))` 跳过。
+- 血量：foe_ai2 init 在 foe_abs 下 hpK = (推荐战力/40)^0.8（不再是 rec/玩家战力 的相对值），dmgK=1；野兽 hpM 同理；regionquest 小BOSS 固定 100 血 → FoeAbs 定时按地区×1.5 放大一次。
+- 你的伤害：worlds.js ctx.power 在 foe_abs 下 = (你的战力/40)^0.8 × Sack.dmgMul（去掉 0.25~3 夹紧）。
+- 实体 `fo.absRec` 可覆盖推荐战力（猎手/精英用）。
+### S2 `hunters2`（新文件 js/hunters2.js，window.Hunters2，默认开；旧 `ogre_hunters` 改 def:false + 互斥，mods.js __v 6 迁移关闭）
+- 四人：艾琳·晨星（勇者/duelist/连斩/跃斩冲锋破防）、诺薇·灰隼（追迹者/skirm/幽影/跃斩旋风）、葛温·铁砧（守誓人/juggernaut/铁壁+再生）、米娅·星语（魔导士/mage/再生，魔弹）。
+- 等级（确定性）= 基础 + floor(仇恨/15) + 逃脱次数；战力 = 38×1.16^Lv。仇恨（永久 S.h2.hate）：放倒+1、斩首+0.5。
+- 本趟「猎手感应」：放倒+7%、斩首+4%、时间 (0.25+0.06×分钟)%/秒；满 100 后每 5 秒掷骰 p=0.15+0.12×满后分钟（≤0.9）→ 随机活着的猎手 `Foe.populate(ctx,[{h,pos}],{keep:true})` 出现在玩家 9–14m 处。洞口节点/霸主战/围场/精英擂台不触发。
+- 在场：包裹 Worlds.onKey 封锁所有门（E）；血≤30% 逃跑 3.2 秒后传送消失（S.h2.L[id].esc++ → +1 级；逃脱 ≥2 次加「狂热」词缀）；150 秒未分胜负撤退（不成长）；在逃跑前打死 = 永久斩杀（S.h2.L[id].dead）。
+- UI：左侧感应条 #h2Sense、顶部猎手血条 #h2Bar（战力对比/胜率/逃跑倒计时）、U 键档案面板 #h2Pn（等级构成、差距、预估胜率、几刀/几下）。
+- foe.js 改动：populate 第 3 参数 `{keep:true}` 不 clear()/不 evict；foe_ai2.js：`fo.skPool` 限定技能池（有 skPool 的 mage 也允许技能）。
+- 测试：tools/test/hunters2.html（桩测试，console RES 行）。真实出猎在无头 swiftshader 下 10 分钟加载不完，未做实机测试。

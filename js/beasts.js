@@ -62,7 +62,7 @@ window.Beasts = (() => {
       const tn = T.tints[e.tint], mats = []; root.traverse(o => { if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m.color) { m.color.setRGB(Math.min(1, m.color.r * tn[0]), Math.min(1, m.color.g * tn[1]), Math.min(1, m.color.b * tn[2])); m.metalness = 0; m.roughness = 0.85; if (m.emissive) m.emissive.setRGB(0.02, 0.02, 0.02); mats.push(m); } }); });
       g.position.set(x, C.H(x, z), z); g.rotation.y = rr() * 6.28; gRoot.add(g);
       const mixer = new THREE.AnimationMixer(root), acts = {}; M.clips.forEach(c => { acts[c.name] = mixer.clipAction(c); });
-      const hpM = 1 + Math.min(2.2, Math.sqrt(rec / 60) * 0.55);
+      const hpM = (window.FoeAbs && FoeAbs.on) ? FoeAbs.hpK(rec * 0.9) : 1 + Math.min(2.2, Math.sqrt(rec / 60) * 0.55); /* R35 foe_abs：野兽血量按地区绝对缩放 */
       const b = { id: 'bst' + (++IDS), e, k: e.k, T, g, model, mixer, acts, mats, pos: g.position, yaw: g.rotation.y, hp: Math.round(T.hp * hpM), maxHp: Math.round(T.hp * hpM), alive: true, state: 'idle', t: rnd(0, 2), cd: rnd(0.5, 2), stun: 0, broken: 0, flash: 0, cur: '', lookT: rnd(1, 4), tgt: null, side: rr() < 0.5 ? 1 : -1, stuck: 0, lastP: new V3(x, 0, z), provoked: false, noticed: false, hitDone: false, lootAt: 0, tint: e.tint,
         stub: { pos: g.position, boss: null, broken: 0, stag: 0, rar: 1, h: { c: { name: T.n } }, f: { play() { } }, anchor: { pos: g.position }, dead: false, sayT: 99, atk: null, seen: true, state: 'chase', hp: 1, maxHp: 1 } };
       play(b, 'Idle', { fade: 0 }); if (acts.Idle) acts.Idle.time = rnd(0, 2); BS.push(b);
@@ -187,8 +187,8 @@ window.Beasts = (() => {
     if (!b.alive || !C) return false; const slash = info.kind !== 'thrust', sp = Math.max(0.5, Math.min(1.8, (info.speed || 5) / 8));
     const q = C.power(b.stub), mult = (b.broken > 0 ? 2 : 1) * (info.charged ? 2.2 : 1) * (info.mult || 1);
     let dealt = Math.max(1, Math.round(12 * q * sp * mult * (slash ? 1 : 0.8) * rnd(0.85, 1.15)));
-    dealt = Math.max(dealt, Math.round(b.maxHp * (b.k === 'bull' ? 0.15 : b.k === 'stag' ? 0.2 : 0.25) * (info.fmul || 1) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：狼/狐约 4 刀、鹿 5 刀、野牛 7 刀（以前野牛要 20+ 刀）
-    { b.nHit = (b.nHit || 0) + 1; const cap = b.k === 'bull' ? 8 : 6; if (b.nHit >= cap - 2) dealt = Math.max(dealt, Math.ceil(b.hp / (cap + 1 - Math.min(b.nHit, cap)))); } // 保险：第 6 刀（野牛 8 刀）必死
+    if (!(window.FoeAbs && FoeAbs.on)) dealt = Math.max(dealt, Math.round(b.maxHp * (b.k === 'bull' ? 0.15 : b.k === 'stag' ? 0.2 : 0.25) * (info.fmul || 1) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：狼/狐约 4 刀、鹿 5 刀、野牛 7 刀（以前野牛要 20+ 刀）
+    if (!(window.FoeAbs && FoeAbs.on)) { b.nHit = (b.nHit || 0) + 1; const cap = b.k === 'bull' ? 8 : 6; if (b.nHit >= cap - 2) dealt = Math.max(dealt, Math.ceil(b.hp / (cap + 1 - Math.min(b.nHit, cap)))); } // 保险：第 6 刀（野牛 8 刀）必死
     b.hp -= dealt; b.flash = 0.12; b.provoked = true; const fp = b.pos.clone(); fp.y += b.T.h * 0.8; C.floatDmg(fp, dealt, sp > 1.2 || b.broken > 0);
     { const kv = (info.vel || new V3()).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((b.k === 'bull' ? 0.1 : 0.28) * sp); b.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退分 0.16 秒推完（以前一帧瞬移）
     C.event && C.event('hit', b.stub, { dealt, zone: 'body', brk: b.broken > 0 });

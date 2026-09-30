@@ -1,0 +1,33 @@
+<!doctype html><html><head><meta charset="utf-8"><title>h2</title>
+<style>body{margin:0;background:linear-gradient(#3a4a5a,#2a3020);height:100vh;color:#eee;font-family:system-ui,"Noto Sans CJK SC",sans-serif}</style></head><body>
+<script src="../../lib/three.min.js"></script>
+<script>
+// R35 Hunters2 逻辑测试（桩：Worlds / Foe / G）。用法：打开后看 console 里的 RES 行。
+const V=THREE.Vector3, toasts=[];
+window.G={S:{hp:100,eq:{},base:{str:5,con:5,agi:5,ter:5,soul:5}},st:()=>({power:window.__pw||58,maxHp:140,def:0}),addCoins:c=>(window.__coins=(window.__coins||0)+c),save(){},toast:t=>toasts.push(t),usedNames:new Set(),usedSig:new Set(),setUI(){},burst(){}};
+window.RPG={foe:(S,loc,seed)=>({c:{name:'x',rar:2,seed},look:{seed}})};
+window.SFX={roar(){}};
+const FOES=[];let lastPop=null;
+window.Foe={foes:FOES,ctx:()=>({R:24}),say(){},populate:async(ctx,list,opt)=>{lastPop={opt,role:window.__forceRole,aff:window.__forceAff};const out=list.map(it=>({h:it.h,pos:it.pos,dead:false,hp:50,maxHp:50,aff:{},f:{root:{position:new V(),parent:null}}}));FOES.push(...out);return out;}};
+const loc={k:'village',rec:40};
+window.Worlds={active:true,_W:null,start(trip){this._W={graph:{trip:true,nodes:[{i:0,home:true,loc},{i:1,loc}]},cur:1,stats:{decap:0,kill:0},busy:false,pos:new V(),trip:{coins:0},foes:[],doorNear:null};return 1;},onKey(e){return 'orig'}};
+</script>
+<script src="../../js/mods.js"></script><script src="../../js/foe_abs.js"></script><script src="../../js/hunters2.js"></script>
+<script>
+const errs=[];window.onerror=(m,s,l)=>errs.push(m+'@'+l);const W8=ms=>new Promise(r=>setTimeout(r,ms));
+setTimeout(async()=>{
+ Worlds.start({loc}); const W=Worlds._W; const H=Hunters2;
+ console.log('RES lv0='+JSON.stringify(H.D.map(d=>[d.id,H.lvOf(d.id),H.powOf(H.lvOf(d.id)),Math.round(H.odds(d.id).p*100)+'%'])));
+ W.stats.kill=15; await W8(300); console.log('RES hate='+H.SS().hate+' aerinLv='+H.lvOf('aerin')+' sense='+Math.round(H.T.m));
+ await H.spawn('aerin'); await W8(200); const f=H.T.fo;
+ console.log('RES spawn role='+lastPop.role+' aff='+lastPop.aff+' keep='+JSON.stringify(lastPop.opt)+' hp='+f.maxHp+' rec='+f.absRec+' skPool='+f.skPool+' inW='+W.foes.includes(f)+' restoredRole='+window.__forceRole);
+ W.doorNear={to:0}; console.log('RES doorBlocked='+(Worlds.onKey({code:'KeyE'})===true)); W.doorNear=null;
+ f.hp=f.maxHp*0.2; await W8(300); console.log('RES fleeing='+!!H.T.fleeAt+' state='+f.state);
+ await W8(3500); console.log('RES escaped esc='+H.SS().L.aerin.esc+' lv='+H.lvOf('aerin')+' fo='+!!H.T.fo+' foesLeft='+FOES.length+' door='+Worlds.onKey({code:'KeyE'}));
+ H.T.cool=0; await H.spawn('mia'); await W8(200); H.T.fo.dead=true; await W8(300);
+ console.log('RES killed miaDead='+(H.SS().L.mia.dead>0)+' alive='+H.alive().length+' coins='+window.__coins);
+ H.T.cool=0; H.T.m=100; H.T.rollT=0; H.T.armedAt=performance.now()-10*60000; await W8(1200); console.log('RES autoSpawn='+(H.T.fo?H.T.fo.hunter2:'none'));
+ H.toggle(true);
+ console.log('RES errs='+JSON.stringify(errs)+' toasts='+toasts.length); document.title='done';
+},300);
+</script></body></html>
