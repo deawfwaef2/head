@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8"><base href="/"><body style="margin:0;background:#222"><canvas id="cv" width="960" height="540"></canvas>
+<script src="/lib/three.min.js"></script><script src="/lib/GLTFLoader.js"></script><script src="/assets/limb_hand_avatar.js"></script>
+<script>
+function b64buf(s){const b=atob(s),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u.buffer;}
+async function info(){
+ const g=await new Promise((r,j)=>new THREE.GLTFLoader().parse(b64buf(ASSETS.limb_hand_avatar),'',r,j));
+ const out=[];g.scene.traverse(o=>{if(o.isMesh){o.geometry.computeBoundingBox();out.push([o.name,o.geometry.attributes.position.count,o.geometry.boundingBox.min.toArray().map(v=>+v.toFixed(3)),o.geometry.boundingBox.max.toArray().map(v=>+v.toFixed(3)),o.material.type])}});
+ return out;}
+</script>
+<script>
+function curl(geo,total,u0,Lf){ // 手指沿圆弧卷向掌心（掌心 -Y，手指 -Z）
+  const p=geo.attributes.position;
+  for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i);const u=-z,s=u-u0;if(s<=0)continue;
+    const th=total*Math.min(1,s/Lf),R=Lf/total; const sc=Math.min(s,Lf); const t=sc/R; const ex=s-sc;
+    const h=y; const nu=R*Math.sin(t)+h*Math.sin(t), ny=-R*(1-Math.cos(t))+h*Math.cos(t);
+    // 超出部分沿切线延伸
+    const tu=Math.cos(t),ty=-Math.sin(t);
+    p.setZ(i,-(u0+nu+ex*tu)); p.setY(i,ny+ex*ty);}
+  p.needsUpdate=true;geo.computeVertexNormals();}
+async function show(tots){
+ const renderer=new THREE.WebGLRenderer({canvas:document.getElementById('cv'),antialias:true});renderer.setSize(960,540,false);renderer.setClearColor(0x333844);
+ const sc=new THREE.Scene();sc.add(new THREE.HemisphereLight(0xffffff,0x555555,1.4));const dl=new THREE.DirectionalLight(0xffffff,1.2);dl.position.set(1,3,2);sc.add(dl);
+ const cam=new THREE.PerspectiveCamera(35,16/9,0.05,5);cam.position.set(0,0.35,0.1);cam.lookAt(0,-0.03,-0.1);
+ let i=0;for(const tt of tots){
+  const g=await new Promise((r,j)=>new THREE.GLTFLoader().parse(b64buf(ASSETS.limb_hand_avatar),'',r,j));
+  g.scene.traverse(o=>{if(o.isMesh){o.material=new THREE.MeshStandardMaterial({color:'#5a7a3a',roughness:.7});if(o.name==='skin'&&tt>0)curl(o.geometry,tt,0.06,0.07);}});
+  g.scene.position.x=(i-(tots.length-1)/2)*0.17; sc.add(g.scene); i++;}
+ renderer.render(sc,cam);}
+</script>

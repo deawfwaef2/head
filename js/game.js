@@ -1400,5 +1400,7 @@ window.startGame = function () {
   window.__game = G;
   if (window.Play) try { Play.init(); } catch (e) { console.warn('Play.init', e); }
   if (window.Combat) try { Combat.init(G); HOOK.frame.push((dt, now) => Combat.update(dt, now)); HOOK.pre.push(() => Combat.prerender()); } catch (e) { console.warn('Combat.init', e); }
+  if (window.CFX3D) try { CFX3D.init(G); } catch (e) { console.warn('CFX3D.init', e); } // R41：3D 战斗特效（在 Combat.update 之后更新）
+  if (window.FPV) try { FPV.init(G); } catch (e) { console.warn('FPV.init', e); } // R41：第一人称双手 / 第三人称
   if (window.UI) UI.init();
 };

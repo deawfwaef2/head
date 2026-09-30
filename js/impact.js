@@ -86,15 +86,15 @@ window.Impact = (() => {
     const heavy = !!(d.charged || d.brk), P = posOf(fo), s = P && proj(P[0], P[1]);
     if (t === 'hit') {
       freeze(mixerOf(fo), heavy ? 115 : 60);
-      if (s) streak(s[0], s[1], swingAng(), heavy ? 330 : 230, heavy ? 'hv' : '');
+      if (s && !(window.CFX3D && CFX3D.trailOwn)) streak(s[0], s[1], swingAng(), heavy ? 330 : 230, heavy ? 'hv' : ''); /* R41：3D 弧光接管 */
       thump(heavy ? 1.25 : 0.85);
       if (heavy) pulse('#ffffff55', 1);
     } else if (t === 'kill' || t === 'decap' || t === 'execute' || t === 'onecut' || t === 'decapAlive') {
       freeze(mixerOf(fo), 150);
-      if (s && t !== 'decap') streak(s[0], s[1], swingAng(), 380, 'hv');
+      if (s && t !== 'decap' && !(window.CFX3D && CFX3D.trailOwn)) streak(s[0], s[1], swingAng(), 380, 'hv');
       thump(1.5); pulse('#c0101088', 1);
     } else if (t === 'blocked' || t === 'guard' || t === 'parry') {
-      if (s) streak(s[0], s[1], swingAng() + Math.PI / 2, 120, 'bk');
+      if (s && !(window.CFX3D && CFX3D.trailOwn)) streak(s[0], s[1], swingAng() + Math.PI / 2, 120, 'bk');
     }
   }
   function wrap() {

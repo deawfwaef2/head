@@ -16,7 +16,7 @@ window.Combat = (() => {
   const CDB = { light: 380, fin: 560, heavy: 800 }; /* R37：冷却基数（以前 500/750/950） */
   window.CombatTune = { WEIGHT, WK, CDB, WU: { light: 0.06, fin: 0.08, heavy: 0.05 }, SW: { light: 0.14, fin: 0.2, heavy: 0.24 } };
   // 相机空间：x 右，y 上，-z 前
-  const IDLE_H = new V3(0.26, -0.3, -0.5), IDLE_B = new V3(-0.22, 0.92, -0.32).normalize();
+  const IDLE_H = new V3(0.24, -0.23, -0.5), IDLE_B = new V3(-0.22, 0.92, -0.32).normalize();
   const PIVOT = new V3(0.06, -0.38, 0.22); // 右肩/胸口：刃从这里向外辐射
   const S = {
     hand: IDLE_H.clone(), hv: new V3(), mv: new V3(), mAcc: new V3(), tgt: IDLE_H.clone(), blade: IDLE_B.clone(), bladeT: IDLE_B.clone(),
@@ -56,7 +56,7 @@ window.Combat = (() => {
       const k = Math.max(0, Math.min(1, (p.s - 2.5) / 6)) * (1 - i / TN) ** 1.6; if (k > 0.01) any = true;
       ca.setXYZ(i * 2, t.col.r * k * 0.15, t.col.g * k * 0.15, t.col.b * k * 0.15); ca.setXYZ(i * 2 + 1, t.col.r * k, t.col.g * k, t.col.b * k);
     }
-    pa.needsUpdate = ca.needsUpdate = true; t.m.visible = any;
+    pa.needsUpdate = ca.needsUpdate = true; t.m.visible = any && !(window.CFX3D && CFX3D.trailOwn); // R41：cfx3d 开着时用它的拖尾 v2
   }
 
   // ---------- 体力条 ----------
@@ -485,7 +485,7 @@ window.Combat = (() => {
         if (speed < 2) { if (S.wiggle && tg.kind !== 'head' && now - (S.wigT || 0) > 2.5) { S.wigT = now; G.toast && G.toast('🌀 来回乱晃没有冲力——大幅度挥砍 / 连点刺击才有伤害', '#9fd0ff', 1.8); } continue; }
         const info = { point: p1.clone(), vel: _vel.clone().multiplyScalar(f), speed, kind: S.thrust > 0 ? 'thrust' : 'slash', dir: dirName(), frac: f,
           commit, seg: { b0: S.lastBase.clone(), t0: S.lastTip.clone(), b1: _baseW.clone(), t1: _tipW.clone() }, from: fromAng(), assist: aa, charged: S.charged > 0 && S.thrust === 0, tipSpeed: S.thrust > 0 ? Math.max(S.tipSpeed, 5) : S.tipSpeed };
-        let res = true; try { res = tg.onHit ? tg.onHit(info) : true; } catch (e) { console.warn('onHit', e); } // 第二十六轮(i)：出错也进冷却
+        if (window.CFX3D) try { CFX3D.pre(info, tg); } catch (e) { } let res = true; try { res = tg.onHit ? tg.onHit(info) : true; } catch (e) { console.warn('onHit', e); } // 第二十六轮(i)：出错也进冷却
         if (res === false) continue; // 目标说“刃其实没碰到身体”：不进冷却，这一刀继续扫
         S.hitCd.set(tg.id, now); if (S.sw) S.sw.hit = true; if (info.charged && tg.kind !== 'head') S.charged = 0;
         const heavy = Math.min(1, speed / 10);
