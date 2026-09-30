@@ -334,7 +334,8 @@ window.Worlds = (() => {
     const tr = (G.S.stats && G.S.stats.trips) || 0, r = mulberry((node.seed ^ Math.imul(tr + 7, 0x9E3779B1)) >>> 0), ri = Math.max(0, Lore.LOCS.findIndex(l => l.k === node.region));
     node.prey = []; node.chests = [];
     if (node.home) return;
-    const x = r(), n = W && W.graph && W.graph.trip ? (node.boss ? 0 : x < 0.15 ? 0 : x < 0.55 ? 1 : x < 0.88 ? 2 : 3) : (x < 0.3 ? 0 : x < 0.72 ? 1 : x < 0.93 ? 2 : 3);
+    let x = r(), n = W && W.graph && W.graph.trip ? (node.boss ? 0 : x < 0.15 ? 0 : x < 0.55 ? 1 : x < 0.88 ? 2 : 3) : (x < 0.3 ? 0 : x < 0.72 ? 1 : x < 0.93 ? 2 : 3);
+    if (n > 0 && !node.boss && window.FoeAI2 && FoeAI2.packBonus) n += FoeAI2.packBonus(ri, r); // R34 MOD foe_pack：越深的地区，敌人成群出现
     for (let k = 0; k < n; k++) {
       let h = null;
       if (window.RPG && RPG.foe) try { h = RPG.foe(G.S, node.loc, (r() * 4294967296) >>> 0, G.usedNames, G.usedSig); } catch (e) { console.warn('foe', e); }
@@ -549,12 +550,13 @@ window.Worlds = (() => {
       clang: (p, type) => { Foe.spark(p, type === 'break' ? 26 : 14, type === 'break' ? 'blue' : null); if (window.CombatFX && CombatFX.on) CombatFX.clang(type, p); else { SFX.play && SFX.play('bell', type === 'break' ? 0.5 : 0.3, type === 'break' ? 1.6 : 2.4); SFX.thud && SFX.thud(0.9); }
         if (type === 'block' && window.Combat) { Combat.recoil(1); G.toast && G.toast('🛡️ 被她挡住了——换个方向砍，或蓄力重斩破防', '#9fd0ff', 1.1); } if (type === 'break') { W.shake = Math.max(W.shake || 0, 0.35); G.toast && G.toast('💥 破防！', '#9fd0ff', 1.1); } },
       power: (fo) => { const q = G.st().power / ((fo.boss ? node.loc.rec * (fo.boss.pow || 2) : node.loc.rec * [0.7, 0.9, 1.15, 1.5, 2.1][fo.rar])); return Math.pow(clamp(q, 0.25, 3), 0.7) * (window.Sack ? Sack.dmgMul() : 1); },
+      rec: (fo) => node.loc.rec * (fo.boss ? (fo.boss.pow || 2) : [0.7, 0.9, 1.15, 1.5, 2.1][fo.rar]), // R34：这个敌人的“推荐战力”（foe_ai2 按它缩放血量/伤害）
       hitPlayer: (fo, n, h = {}) => { const s = G.st(); n = Math.max(1, Math.round(n * (1 - s.dodge * 0.5) * (1 - Math.min(0.5, s.def / (s.def + 300)))));
         const now = performance.now() / 1000, CS = window.Combat && Combat.drawn && !(window.Stamina && Stamina.ex) && Combat.state; // 力竭：格挡失效
         // 闪身无敌帧
         if (W.dodgeT > now) { const perfect = now - W.dodgeAt < 0.22; if (perfect) { W.shake = Math.max(W.shake || 0, 0.25); fo.broken = Math.max(fo.broken || 0, 1.1); fo.stag = Math.max(fo.stag || 0, 0.9); G.toast && G.toast('💨 完美闪避！她露出了破绽', '#c8f0ff', 1.4); foeEvent('perfectdodge', fo); } else foeEvent('dodge', fo); return; }
         const tip = CS && CS.lastTip ? CS.lastTip.clone() : W.pos.clone().add(new V3(0, 1.3, 0));
-        if (CS && CS.rmb && guardFacing(fo.pos)) {
+        if (CS && CS.rmb && !h.unblock && guardFacing(fo.pos)) { // R34：h.unblock = 破防技，格挡无效（只能闪身/躲开）
           const gA = CS.gAng, diff = h.thrust ? 0 : Math.abs(Math.atan2(Math.sin(gA - h.ang), Math.cos(gA - h.ang)));
           const aligned = diff < 0.7, partial = diff < 1.25;
           const pressed = CS.guardT && now - CS.guardT < 0.3, swung = aligned && !h.thrust && Combat.guardWas(0.25, h.ang) > 1.0; // 刚按下 / 最后一刻转对方向

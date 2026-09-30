@@ -286,6 +286,7 @@ window.Foe = (() => {
       f.root.position.copy(it.pos); f.root.position.y = ctx.H(it.pos.x, it.pos.z); f.root.rotation.y = fo.yaw;
       ctx.sc.add(f.root); f.play(fo.idleClip, { fade: 0 }); f.mixer.setTime(r() * 3);
       if (window.FoeRoles) FoeRoles.assign(fo, r, it); // 第二十二轮（续 9）：敌人职业
+      if (window.FoeAI2) FoeAI2.init(fo, r, it, ctx); // R34：区域强度缩放 + 词缀
       if (window.Persona) Persona.apply(fo, r); // 第二十四轮：人设（在职业之后：标题里带职业名）
       FOES.push(fo); out.push(fo);
     }
@@ -321,7 +322,7 @@ window.Foe = (() => {
   }
   function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function clear() {
-    NAV = null; if (window.FoeRoles) FoeRoles.clear();
+    NAV = null; if (window.FoeRoles) FoeRoles.clear(); if (window.FoeAI2) FoeAI2.clear();
     for (const fo of FOES) { fo.anchor.gone = true; if (fo.warn && fo.warn.parent) fo.warn.parent.remove(fo.warn); if (fo.gs && fo.gs.parent) fo.gs.parent.remove(fo.gs); if (fo.f.root.parent) fo.f.root.parent.remove(fo.f.root); try { fo.f.hb.dispose(); } catch (e) {} }
     for (const h of HEADS) { if (h.g.parent) h.g.parent.remove(h.g); }
     for (const p of PIECES) { if (p.g.parent) p.g.parent.remove(p.g); }
@@ -333,7 +334,7 @@ window.Foe = (() => {
   function update(dt, now) {
     if (window.FaceFill) FaceFill.world(); // 第二十四轮：野外用更高的面部补光下限
     if (!CTX) return; const ctx = CTX, P = ctx.player;
-    CLK += dt; if (window.FoeRoles) FoeRoles.update(dt, ctx);
+    CLK += dt; if (window.FoeRoles) FoeRoles.update(dt, ctx); if (window.FoeAI2) FoeAI2.update(dt, ctx); /* R34：敌人强化（词缀/技能/区域强度） */
     if (window.Steps) Steps.foes(FOES, dt); // 第二十四轮：敌人脚步（用上一帧到这一帧的位移）
     if (slowT > 0) { slowT -= dt; dt *= slowK; if (slowT <= 0) slowK = 1; } // 击杀慢动作：只作用于敌人/尸体/头/血，玩家照常
     const SMART = !window.Mods || Mods.on('foe_smart'), DOORESC = !window.Mods || Mods.on('foe_door_escape');
@@ -356,6 +357,7 @@ window.Foe = (() => {
       let strafe = 0, goal = null;
       if (fo.atk) { const r = atkStep(fo, dt, d, face); turnTo = r.turnTo; spd = r.spd; } // 攻击：定格蓄力 → 慢起手 → 快出手（按实测命中帧判定）
       else if (fo.stag > 0) { /* 受击硬直 */ }
+      else if (window.FoeAI2 && fo.seen && fo.state === 'chase' && (rr = FoeAI2.tick(fo, dt, d, face, dx, dz, P, ctx))) { turnTo = rr.turnTo; spd = rr.spd || 0; } // R34：额外技能 / 战术层（先于职业）
       else if (fo.role && fo.seen && fo.state === 'chase' && window.FoeRoles && (rr = FoeRoles.tick(fo, dt, d, face, dx, dz, P, ctx))) { turnTo = rr.turnTo; spd = rr.spd || 0; } // 第二十二轮（续 9）：职业接管移动
       else if (fo.block > 0) { turnTo = face; }
       else if (!SMART && fo.state === 'chase') {
@@ -457,7 +459,7 @@ window.Foe = (() => {
         if (pd < mn && pd > 1e-4) { const push = Math.min(mn - pd, 9 * dt); fo.pos.x += (fo.pos.x - P.pos.x) / pd * push; fo.pos.z += (fo.pos.z - P.pos.z) / pd * push; } // 软推开（以前一帧硬弹到 1.05m = 瞬移）
       }
       if (fo.state === 'chase') guardAI(fo, dt, d); guardShow(fo);
-      collide(fo.pos, 0.35); fo.pos.y = ctx.H(fo.pos.x, fo.pos.z); f.root.rotation.y = fo.yaw;
+      collide(fo.pos, 0.35); fo.pos.y = ctx.H(fo.pos.x, fo.pos.z) + (fo.yOff || 0); f.root.rotation.y = fo.yaw;
       f.mixer.update(dt);
       fo.f.bones.head.getWorldPosition(fo.anchor.pos); fo.anchor.pos.y -= 0.3;
       { // 受击闪红 + 第十九轮：蓄力时身体渐亮（红=普通，橙=重击），出手瞬间最亮 —— 只改 uniform，不新建材质
@@ -543,7 +545,7 @@ window.Foe = (() => {
   // 第十九轮：攻击令牌 —— 同一时间最多 1 人出手（有霸主时 2 人），两次出手之间至少隔 0.6s；霸主总能出手
   let lastAtkAt = -9, CLK = 0;
   function tokenOK(fo) { if (fo.boss) return true; if (CLK - lastAtkAt < 0.6) return false;
-    let n = 0, boss = false; for (const o of FOES) { if (o.dead) continue; if (o.boss) boss = true; if (o !== fo && o.atk) n++; } return n < (boss ? 2 : 1); }
+    let n = 0, boss = false; for (const o of FOES) { if (o.dead) continue; if (o.boss) boss = true; if (o !== fo && (o.atk || o.sk)) n++; } return n < (boss ? 2 : 1); }
   function attack(fo, d, force) {
     const f = fo.f, s = CTX.st(), r = Math.random();
     let clip;
@@ -563,6 +565,7 @@ window.Foe = (() => {
       holdAt: Math.min(0.1, hits[0].t * 0.4), hold: fo.boss ? 0.3 : 0.26 - Math.min(0.1, fo.iq * 0.08), feint: !fo.boss && fo.iq > 0.8 && Math.random() < 0.14,
       reach: fo.armed ? 1.8 : 1.35, tot: 0, dmg: Math.max(1, Math.round(s.maxHp * base * (0.85 + Math.random() * 0.3))) };
     if (fo.role && window.FoeRoles) FoeRoles.tune(fo, fo.atk, d);
+    if (window.FoeAI2) FoeAI2.tune(fo, fo.atk, d); // R34：强度缩放 / 节奏扰乱
     if (fo.sayT <= 0 && Math.random() < 0.25) { if (fo.boss) talk(fo, '', '#ffb0a0'); else sayP(fo, 'fight', SAY.fight, '#ffb0a0'); } else if (!fo.boss && window.Persona && Math.random() < 0.5) Persona.line(fo, 'atk', true); // 第二十四轮：出手喝声
   }
   // 当前这一刀还要多久（真实秒）
@@ -583,7 +586,7 @@ window.Foe = (() => {
         else if (fo.sayT <= 0 && Math.random() < 0.3) talk(fo, '……躲开了？'); }
     }
     act.timeScale = sc;
-    if (!A.hits[A.hi] && (ct >= A.end - 1e-3 || ct >= act.getClip().duration - 1e-3)) { fo.atk = null; fo.cd = (fo.boss ? (fo.rage ? 1.0 : 1.5) : 1.15) + Math.random() * (fo.boss ? Math.max(0.6, 2.4 - fo.iq) : Math.max(0.5, 1.6 - fo.iq)); fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); if (fo.role && window.FoeRoles) FoeRoles.after(fo); }
+    if (!A.hits[A.hi] && (ct >= A.end - 1e-3 || ct >= act.getClip().duration - 1e-3)) { fo.atk = null; fo.cd = (fo.boss ? (fo.rage ? 1.0 : 1.5) : 1.15) + Math.random() * (fo.boss ? Math.max(0.6, 2.4 - fo.iq) : Math.max(0.5, 1.6 - fo.iq)); fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); if (fo.role && window.FoeRoles) FoeRoles.after(fo); if (window.FoeAI2) FoeAI2.after(fo); }
     return { turnTo, spd };
   }
   // 给 HUD：正在蓄力/出手的敌人 → 来刀方向 + 进度（1 = 命中那一刻）
@@ -679,7 +682,7 @@ window.Foe = (() => {
     if (fo.sayT <= 0 || true) talk(fo, pickR(Math.random, ['什……！', '怎么可能……', '呃——！']), '#ffe0a0');
   }
   function hit(fo, info) {
-    if (fo.role && window.FoeRoles && !fo.dead && FoeRoles.evade(fo, info)) return false; // 翻滚中：刃穿过去
+    if ((fo.role && window.FoeRoles && !fo.dead && FoeRoles.evade(fo, info)) || (window.FoeAI2 && FoeAI2.evade(fo, info))) return false; // 翻滚中：刃穿过去
     const ctx = CTX; const c = contact(fo, info); if (!c) return false; // 刃没碰到身体：不算
     const zone = c.zone, slash = info.kind !== 'thrust', spd = c.speed, sp = Math.max(0.5, Math.min(1.8, spd / 8));
     info = Object.assign({}, info, { point: c.point, speed: spd });
@@ -700,10 +703,11 @@ window.Foe = (() => {
         if (fo.sayT <= 0) sayP(fo, 'block', SAY.block); sfx().thud && sfx().thud(0.8); ctx.clang && ctx.clang(c.point, 'block'); fo.block = Math.max(fo.block, 0.5); fo.cd = Math.min(fo.cd, 0.25); ctx.event && ctx.event('blocked', fo); return true;
       } else { fo.block = 0; side = 1.35; ctx.event && ctx.event('outflank', fo); } // 绕开格挡：破绽伤害
     }
+    if (window.FoeAI2 && FoeAI2.preHit(fo, info, c, zone, slash)) return true; // R34：词缀（护盾等）吸收
     const q = ctx.power(fo), brk = fo.broken > 0, mult = (zone === 'head' ? 1.6 : zone === 'neck' ? 1.8 : /Arm|Leg/.test(zone) ? 0.7 : 1) * (brk ? 2 : 1) * side * (info.charged ? 2.2 : 1) * (info.mult || 1);
     let dealt = Math.max(1, Math.round((fo.boss ? 11 : 12) * q * sp * mult * (slash ? 1 : 0.8) * (0.85 + Math.random() * 0.3)));
-    dealt = Math.max(dealt, Math.round(fo.maxHp * (fo.boss ? 0.09 : 0.17) * (info.fmul || 1) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：一记正常的砍至少削掉 ~17% 血（≈6 刀），霸主 ~9%（≈11 刀）——实力差距再大也不会出现“砍 20 刀不死”
-    { fo.nHit = (fo.nHit || 0) + 1; const cap = fo.boss ? 12 : 6; if (fo.nHit >= cap - 2) dealt = Math.max(dealt, Math.ceil(fo.hp / (cap + 1 - Math.min(fo.nHit, cap)))); } // 第二十六轮保险（用户：永远打不死）：不管护甲/角色/回血，普通敌人第 6 刀必死、霸主第 12 刀必死
+    dealt = Math.max(dealt, Math.round(fo.maxHp * (fo.boss ? 0.09 : 0.17) * (fo.floorK || 1) * (info.fmul || 1) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：一记正常的砍至少削掉 ~17% 血（≈6 刀），霸主 ~9%（≈11 刀）——实力差距再大也不会出现“砍 20 刀不死”
+    { fo.nHit = (fo.nHit || 0) + 1; const cap = Math.round((fo.boss ? 12 : 6) * (fo.capK || 1)); /* R34：区域强度大时保险刀数按比例增加 */ if (fo.nHit >= cap - 2) dealt = Math.max(dealt, Math.ceil(fo.hp / (cap + 1 - Math.min(fo.nHit, cap)))); } // 第二十六轮保险（用户：永远打不死）：不管护甲/角色/回血，普通敌人第 6 刀必死、霸主第 12 刀必死
     const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.12; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk);
     { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp); fo.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退：0.16 秒内推完（以前是一帧内整段位移 = “瞬移”）
     ctx.event && ctx.event('hit', fo, { dealt, zone, brk, kind: info.kind, spd, charged: info.charged });
@@ -735,7 +739,7 @@ window.Foe = (() => {
   }
   function die(fo, info, quiet) {
     if (!fo.boss && window.Persona) { const t = Persona.line(fo, 'die'); if (t) talk(fo, t, '#c8c8d0'); } // 第二十四轮：最后一句
-    fo.dead = true; fo.atk = null; fo.anchor.gone = true;
+    fo.dead = true; fo.atk = null; fo.anchor.gone = true; if (window.FoeAI2) FoeAI2.onDie(fo, info);
     ragStart(fo, info); // 先按当前动作姿势建粒子，再停动画（停动画会把骨骼还原成 T 姿势）
     fo.f.mixer.stopAllAction(); ragPose(fo);
     CTX.onDeath && CTX.onDeath(fo); CTX.event && CTX.event('kill', fo);

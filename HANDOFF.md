@@ -1328,3 +1328,10 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   - 测试：`tools/test/region_pick.html#sel=abbey`、`tools/test/region_trip.html#ph=1|2`。
 - **R26n `ogre_hunters`（js/hunters.js）**：热度 = 放倒×1 + 斩首×1.5 + 分钟×0.8（洞口节点不计时），阈值 10+2·lv+4·本趟次数 → 15 秒红色预警"食人魔猎手正在猎杀你！" → 在 `W.graph.nodes` 追加一个 `huntArena` 节点（沿用当前 style、lay:'plain'、adj=[来处]、预置 prey=猎手）并 `Worlds._debug.goto`。猎手 = RPG.foe + 武装身份 + 称号，hp 70+14·lv。全灭前包装 `Worlds.onKey` 封门。胜利：`G.S.hunt.lv++`，魂晶 + 该区稀有材料×1。霸主战中不触发。测试：`tools/test/hunters.html#ph=2`。
 - 下一步（未做）：S5 地区种族外观差异加大；S6 精灵独有技能（魔法洞穴壁纸、地面施法特效更干净）——另开文件，spirits.js 归别的 agent。
+
+## R34（敌人大改：更强、更聪明、更多样）— 新文件 js/foe_ai2.js（window.FoeAI2）
+- 用户反馈：AI 太弱智，种类/技能/多样性太少，新手装到最深地区也随便吊打。根因：敌人血量/伤害不随区域变化（伤害按玩家最大血百分比，血量 26+rar*16），且 hit() 有“17% 血下限 + 第 6 刀必死”保险。
+- 五个 MOD（默认开）：`foe_scale`（按 rec/power 缩放血量/伤害/iq，同时放大保险下限/刀数 fo.floorK/capK）、`foe_pack`（深处成群，worlds.populate 调 FoeAI2.packBonus）、`foe_affix`（7 种精英词缀：狂热/铁壁/噬血/爆裂/幽影/连斩/再生）、`foe_skills`（跃斩/冲锋/旋风斩/破防击，全部有红色预警 + 收招破绽）、`foe_tactics`（惩罚挥空、侧翻、绕背偷袭、拖拍、连击）。
+- foe.js 新增钩子：FoeAI2.init/tune/after/evade/preHit/onDie/update/tick/clear，fo.yOff（跃斩高度），tokenOK 计入 fo.sk。worlds.js ctx 新增 rec(fo)；hitPlayer 里 h.unblock 跳过格挡。
+- 测试覆盖变量：window.__foeThreat/__foeTier/__forceSkill/__skillP/__forceAff/__foeAffixP（tools/test/fight.html 已加载 foe_ai2.js）。
+- 教训：在 foe.js 这种长行代码里插 `//` 注释会吃掉同一行后面的代码，要用 /* */。
