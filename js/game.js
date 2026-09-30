@@ -23,12 +23,13 @@ window.startGame = function () {
   document.getElementById('game').appendChild(renderer.domElement);
   const canvas = renderer.domElement;
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#0e0a08');
-  scene.fog = new THREE.FogExp2('#140e0a', 0.045);
+  const CZ = !window.Mods || Mods.on('cave_cozy') !== false; // R49e：洞穴舒适化（暖色抬亮、降低雾密度与闪烁）
+  scene.background = new THREE.Color(CZ ? '#2c2119' : '#0e0a08');
+  scene.fog = new THREE.FogExp2(CZ ? '#3a2c21' : '#140e0a', CZ ? 0.026 : 0.045);
   const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.03, 80);
   scene.add(camera);
-  const hemi = new THREE.HemisphereLight(0x8a7a6a, 0x201510, 0.55); scene.add(hemi);
-  const moon = new THREE.DirectionalLight(0xaab4ff, 0.18); moon.position.set(-3, 8, 2); scene.add(moon);
+  const hemi = CZ ? new THREE.HemisphereLight(0xffe2c0, 0x6a5240, 1.0) : new THREE.HemisphereLight(0x8a7a6a, 0x201510, 0.55); scene.add(hemi);
+  const moon = new THREE.DirectionalLight(CZ ? 0xc8d8ff : 0xaab4ff, CZ ? 0.32 : 0.18); moon.position.set(-3, 8, 2); scene.add(moon);
   const LIGHTS = []; for (let i = 0; i < 6; i++) { const l = new THREE.PointLight(0xff8a3a, 0, 9, 1.6); scene.add(l); LIGHTS.push(l); }
   // 篝火主光投射柔和阴影（立方体阴影贴图 + PCF 半径模糊）
   LIGHTS[0].castShadow = true; LIGHTS[0].shadow.mapSize.set(1024, 1024); LIGHTS[0].shadow.bias = -0.0025; LIGHTS[0].shadow.normalBias = 0.025; LIGHTS[0].shadow.radius = 5; LIGHTS[0].shadow.camera.near = 0.15; LIGHTS[0].shadow.camera.far = 16;
@@ -42,7 +43,7 @@ window.startGame = function () {
     for (const h of shadowHeads) if (!want.has(h) || !heads.includes(h)) { h.g.traverse(m => { if (m.isMesh) m.castShadow = false; }); shadowHeads.delete(h); if (h.blob) h.blob.material = blobMat; }
     for (const h of want) if (!shadowHeads.has(h)) { h.hb.group.traverse(m => { if (m.isMesh && !/_mask$/.test(m.name)) m.castShadow = true; }); shadowHeads.add(h); }
   }
-  const exitLight = new THREE.PointLight(0xfff0d0, 1.4, 10, 1.5); scene.add(exitLight);
+  const exitLight = CZ ? new THREE.PointLight(0xfff4dc, 2.6, 14, 1.4) : new THREE.PointLight(0xfff0d0, 1.4, 10, 1.5); scene.add(exitLight);
   let lodStat = null; let fpsHi = 0; const _rayP = new V3();
   const lod = LOD_ON ? HeadLOD.create(renderer, scene) : null; // 远处静止首级 → 图集替身，一次 draw call
 
@@ -61,7 +62,7 @@ window.startGame = function () {
     if (window.Assets) Assets.env(renderer);
     cave = Cave.build(scene, R, S.depth);
     exitLight.position.set(cave.exitPos.x, 2.2, cave.exitPos.z - 1.5);
-    scene.fog.density = 0.05 - S.depth * 0.004;
+    scene.fog.density = (0.05 - S.depth * 0.004) * (CZ ? 0.52 : 1);
   }
   buildCave();
 
@@ -301,7 +302,7 @@ window.startGame = function () {
 
   // 灯光分配
   function lightSources() {
-    const L = [{ p: cave.firePos, c: '#ff8a3a', k: 2.4, fire: true }];
+    const L = [{ p: cave.firePos, c: CZ ? '#ffb468' : '#ff8a3a', k: CZ ? 2.7 : 2.4, fire: true }];
     for (const b of builds) { const d = CAT[b.type]; if (d.light) L.push({ p: new V3(b.x, 1.2, b.z), c: d.light, k: d.type === 'torch' ? 1.2 : 1.1, fire: /ff/.test(d.light), b }); }
     return L;
   }
@@ -310,7 +311,7 @@ window.startGame = function () {
     const src = lightSources(); const cp = camera.position;
     src.sort((a, b) => a.p.distanceToSquared(cp) - b.p.distanceToSquared(cp));
     lightList = src.slice(0, LIGHTS.length);
-    LIGHTS.forEach((l, i) => { const s = lightList[i]; if (!s) { l.intensity = 0; return; } l.position.copy(s.p); if (i === 0 && s.fire) l.position.y = Math.max(l.position.y, 0.95); l.color.set(s.c); l.userData.k = s.k; l.userData.fire = s.fire; l.distance = s === src[0] && s.fire ? 12 : 7; });
+    LIGHTS.forEach((l, i) => { const s = lightList[i]; if (!s) { l.intensity = 0; return; } l.position.copy(s.p); if (i === 0 && s.fire) l.position.y = Math.max(l.position.y, 0.95); l.color.set(s.c); l.userData.k = s.k; l.userData.fire = s.fire; l.distance = CZ ? (s === src[0] && s.fire ? 16 : 9) : (s === src[0] && s.fire ? 12 : 7); });
   }
 
   // ---------------- 视角模型（食人魔的手+武器） ----------------
@@ -1336,7 +1337,7 @@ window.startGame = function () {
     updateParticles(dt); updateWisps(dt); updateGhost();
     // 灯光闪烁
     lightTimer -= dt; if (lightTimer <= 0) { assignLights(); lightTimer = 0.7; }
-    LIGHTS.forEach((l, i) => { if (!lightList[i]) return; const k = l.userData.k || 1; l.intensity = l.userData.fire ? k * (0.85 + Math.sin(now * 13 + i) * 0.08 + Math.sin(now * 29 + i * 3) * 0.05 + (Math.random() - 0.5) * 0.06) : k; });
+    LIGHTS.forEach((l, i) => { if (!lightList[i]) return; const k = l.userData.k || 1; l.intensity = l.userData.fire ? k * (CZ ? 1.08 + Math.sin(now * 5 + i) * 0.04 + Math.sin(now * 11 + i * 3) * 0.02 : 0.85 + Math.sin(now * 13 + i) * 0.08 + Math.sin(now * 29 + i * 3) * 0.05 + (Math.random() - 0.5) * 0.06) : k * (CZ ? 1.15 : 1); });
     if (cave.update) cave.update(now); else cave.flames.forEach((f, i) => { f.scale.y = 1 + Math.sin(now * 12 + i * 2) * 0.25 + Math.sin(now * 31 + i) * 0.1; f.scale.x = f.scale.z = 1 + Math.sin(now * 17 + i) * 0.08; f.rotation.y = now * 2 + i; });
     if (Math.random() < dt * 14) burst(new V3(cave.firePos.x + (Math.random() - 0.5) * 0.3, 0.25, cave.firePos.z + (Math.random() - 0.5) * 0.3), Math.random() < 0.5 ? '#ff7a20' : '#ffb040', 1, 0.5, 1.4, 1.2);
     scene.traverseVisible && null;

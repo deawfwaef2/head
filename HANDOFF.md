@@ -1871,3 +1871,9 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   - **坑**：UAL 重定向不给部分体型的 spine/chest 写轨道，mixer 不会每帧覆盖 → 程序化偏移会逐帧累积（整个人转过去）。stance.js 的 restore()/commit() 记录每根被改骨骼的改前/改后值，下一帧若未被 mixer 覆盖先还原。以后谁在 mixer 后改骨骼都要注意这一点。
 - 改动他处（最小）：`js/locomo.js` tick 多记平滑速度 L.vx/L.vz、相对移动角 L.rel、后退判定 L.bk（滞回），npc_strafe 开时 back 取 L.bk；`js/foe.js` animate() 末尾 `Stance.install(f)`、`f.mixer.update(dt)` 之后 `Stance.post(fo, dt)`；`index.html` 与 `tools/test/world.html` 在 locomo.js 后加 `<script src="js/stance.js">`；`js/mods.js`/`js/mods_i18n.js` 两条 MOD。
 - 验证：横移胶片（关/开/后退）、5 人对峙截图对比，ai.py / index 启动无报错。
+## R49e — 舒适洞穴 (MOD `cave_cozy`, default on) — cave.js / game.js / cavecozy.js / mods*.js / index.html
+User: cave was pitch dark + sealed → brain reads it as unsafe/disgusting. Fix from perception psychology (prospect–refuge, warm/cool colour contrast, no pure black, slow soft flicker, dry/clean look).
+- cave.js: dome apex triangles removed → ~1.5m oculus directly over the fire (smoke hole), bright HDR sky disc above, daylight SpotLight onto floor, faint additive light shaft (fades near camera to avoid wash-out), 70 drifting dust motes; brighter wall/floor vertex colours, less burn/edge darkening.
+- game.js (`CZ` flag): hemi 1.0 warm cream/brown, moon .32, exitLight 2.6, fog #3a2c21 density ~half, fire colour #ffb468, slower/smoother flicker (no random jitter), bigger light distance.
+- cavecozy.js: post grade only in cave (exposure 1.42, vig .17, contrast 1.0, lifted shadow tint); original values restored when a world is active.
+- NOT yet verified visually in the real game (sandbox renderer tooling reset). Toggle off via Mods `cave_cozy` to compare.

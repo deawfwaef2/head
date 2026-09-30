@@ -101,6 +101,7 @@ window.Cave = (() => {
     const useA = !!(A() && A().has('stone_fire_pit') && A().tex('dark_rock'));
     if (!useA) textures();
     const g = new THREE.Group(); g.name = 'cave';
+    const cz = !window.Mods || Mods.on('cave_cozy') !== false; // R49e：洞穴舒适化（提亮暖光、屋顶天窗、柔光柱、灰尘微粒）
     const H = 3.6 + R * 0.28;
     const rand = rnd(9173 + Math.round(R * 100));
     const floorAt = (x, z) => { const d = Math.hypot(x, z) / R; return d > 0.85 ? (d - 0.85) * 2.5 * fbm(x * 0.5, 0, z * 0.5) : 0; };
@@ -109,7 +110,7 @@ window.Cave = (() => {
       for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); p.setY(i, floorAt(x, z));
         // 宏观明暗变化：打破贴图平铺感；火坑周围焦黑，墙根更暗
         const n = fbm(x * 0.35 + 3, 0.5, z * 0.35 - 7), d = Math.hypot(x, z); const burn = Math.max(0, 1 - d / 1.8);
-        const c = (0.62 + n * 0.55) * (1 - burn * 0.55) * (1 - Math.max(0, d / R - 0.7) * 0.9);
+        const c = (cz ? 0.8 + n * 0.45 : 0.62 + n * 0.55) * (1 - burn * (cz ? 0.3 : 0.55)) * (1 - Math.max(0, d / R - 0.7) * (cz ? 0.5 : 0.9));
         col[i * 3] = c; col[i * 3 + 1] = c * 0.95; col[i * 3 + 2] = c * 0.9; }
       fg.setAttribute('color', new THREE.BufferAttribute(col, 3)); fg.computeVertexNormals();
       const uv = fg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, p.getX(i) / 3, p.getZ(i) / 3); }
@@ -118,9 +119,10 @@ window.Cave = (() => {
     const floor = new THREE.Mesh(fg, floorMat); floor.receiveShadow = true; g.add(floor);
     // 穹顶岩壁
     const dg = new THREE.SphereGeometry(1, 128, 48, 0, Math.PI * 2, 0, Math.PI * 0.62);
+    const rawY = cz ? new Float32Array(dg.attributes.position.count) : null;
     { const p = dg.attributes.position; const col = new Float32Array(p.count * 3);
       for (let i = 0; i < p.count; i++) {
-        let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+        let x = p.getX(i), y = p.getY(i), z = p.getZ(i); if (rawY) rawY[i] = y;
         const n = fbm(x * 3 + 10, y * 3, z * 3 + 5), n2 = fbm(x * 9 - 4, y * 9, z * 9 + 2);
         const k = 0.82 + n * 0.36 + (n2 - 0.5) * 0.06;
         let X = x * R * k, Z = z * R * k, Y = y * H * (0.85 + n * 0.3);
@@ -128,10 +130,13 @@ window.Cave = (() => {
         const ang = Math.atan2(x, -z);
         if (Math.abs(ang) < 0.16 && Y < 2.6) { X *= 1.6; Z *= 1.6; }
         p.setXYZ(i, X, Math.max(-1, Y), Z);
-        const c = 0.5 + n * 0.6; col[i * 3] = c * 1.0; col[i * 3 + 1] = c * 0.93; col[i * 3 + 2] = c * 0.86;
+        const c = cz ? 0.78 + n * 0.42 : 0.5 + n * 0.6; col[i * 3] = c * 1.0; col[i * 3 + 1] = c * (cz ? 0.95 : 0.93); col[i * 3 + 2] = c * (cz ? 0.88 : 0.86);
       }
       dg.setAttribute('color', new THREE.BufferAttribute(col, 3)); dg.computeVertexNormals();
       const uv = dg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * R * 1.2, uv.getY(i) * H / 2); }
+    // 天窗（烟孔）：挖掉穹顶顶端的几圈三角面，像传统居所的烟孔——头顶有光、有天，是“能看到外面”的安全信号
+    const hr = Math.min(1.7, R * 0.2); let Ytop = H;
+    if (cz) { const thr = Math.cos(Math.asin(Math.min(0.5, hr / (R * 0.92)))), ia = dg.index.array, keep = []; for (let t = 0; t < ia.length; t += 3) { const a1 = ia[t], b1 = ia[t + 1], c1 = ia[t + 2]; if (rawY[a1] > thr && rawY[b1] > thr && rawY[c1] > thr) continue; keep.push(a1, b1, c1); } dg.setIndex(keep); Ytop = H * (0.85 + fbm(10, 3, 5) * 0.3); }
     const wallMat = useA ? A().triplanar(A().tex('dark_rock'), { scale: 0.3, side: THREE.BackSide, vertexColors: true, normal: 1.6, env: 0.75, color: '#ffe6c8' })
       : new THREE.MeshStandardMaterial({ map: rockTex, vertexColors: true, roughness: 0.95, side: THREE.BackSide, color: '#c8b8a8' });
     const wall = new THREE.Mesh(dg, wallMat); wall.receiveShadow = true; g.add(wall);
@@ -216,6 +221,22 @@ window.Cave = (() => {
       const sg = makeSign('地精行商·斯尼克 [E]'); sg.position.set(0, 2.1, 0.5); merchant.add(sg);
     }
     if (window.Mods && Mods.on('cave_detail')) scatterSmallProps(stal, R, floorAt, rand, merchant.position);
+    let cozyUpd = null;
+    if (cz) {
+      const sk = new THREE.Mesh(new THREE.CircleGeometry(8, 28), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.75, 3.3), fog: false, side: THREE.DoubleSide })); sk.rotation.x = Math.PI / 2; sk.position.y = Ytop + 2.4; sk.userData.noShadow = true; g.add(sk);
+      const sp = new THREE.SpotLight(0xfff0d8, 3.2, 0, Math.min(0.6, Math.atan((hr + 1.4) / (Ytop + 1.8))), 0.9, 1.0); sp.position.set(0, Ytop + 1.8, 0); sp.target.position.set(0, 0, 0); g.add(sp, sp.target);
+      const cg2 = new THREE.CylinderGeometry(hr * 0.95, hr * 1.9, Ytop + 0.2, 28, 1, true); cg2.translate(0, (Ytop + 0.2) / 2 - 0.1, 0);
+      const shaft = new THREE.Mesh(cg2, new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.9, 0.7), transparent: true, opacity: 0.06, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false })); shaft.userData.noShadow = true; g.add(shaft);
+      // 灰尘微粒（柱内缓慢飘，给静止空间一点“活着”的信号）
+      const N = 70, pos = new Float32Array(N * 3), ph = []; for (let i = 0; i < N; i++) { const a = Math.random() * 6.28, r0 = Math.sqrt(Math.random()) * hr * 1.5; pos[i * 3] = Math.cos(a) * r0; pos[i * 3 + 1] = Math.random() * Ytop; pos[i * 3 + 2] = Math.sin(a) * r0; ph.push(Math.random() * 6.28); }
+      const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const dc = document.createElement('canvas'); dc.width = dc.height = 32; const dx = dc.getContext('2d'), gr = dx.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, 'rgba(255,240,210,1)'); gr.addColorStop(1, 'rgba(255,240,210,0)'); dx.fillStyle = gr; dx.fillRect(0, 0, 32, 32);
+      const pts = new THREE.Points(pg, new THREE.PointsMaterial({ map: new THREE.CanvasTexture(dc), size: 0.07, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, sizeAttenuation: true })); pts.frustumCulled = false; g.add(pts);
+      cozyUpd = (now) => {
+        const cam = window.G && G.camera; if (cam) { const dxx = cam.position.x, dzz = cam.position.z, d = Math.hypot(dxx, dzz); const k = Math.max(0, Math.min(1, (d - hr * 1.0) / (hr * 1.6))); shaft.material.opacity = 0.06 * k * k * (3 - 2 * k); pts.material.opacity = 0.2 + 0.4 * k; }
+        const a = pg.attributes.position; for (let i = 0; i < N; i++) { let y = a.getY(i) - 0.02 * 0.016 * 60 * 0.12 - 0.0006; if (y < 0) y += Ytop; a.setY(i, y); a.setX(i, a.getX(i) + Math.sin(now * 0.4 + ph[i]) * 0.0007); a.setZ(i, a.getZ(i) + Math.cos(now * 0.35 + ph[i]) * 0.0007); } a.needsUpdate = true;
+      };
+    }
     scene.add(g);
     const FR = 25;
     function update(now) {
@@ -226,7 +247,7 @@ window.Cave = (() => {
         const k = 1 + Math.sin(now * 7 + d.ph) * 0.07 + Math.sin(now * 19 + d.ph * 2) * 0.04; f.scale.set(d.sc * 0.72 * (2 - k), d.sc * k, 1);
       }
     }
-    return { group: g, R, H, exitPos: new THREE.Vector3(0, 0, exitZ + 0.3), merchantPos: merchant.position.clone(), flames, firePos: new THREE.Vector3(0, 0.4, 0), sky, floorAt, pillars, update: useA ? update : null };
+    return { group: g, R, H, exitPos: new THREE.Vector3(0, 0, exitZ + 0.3), merchantPos: merchant.position.clone(), flames, firePos: new THREE.Vector3(0, 0.4, 0), sky, floorAt, pillars, update: useA ? (cozyUpd ? (now) => { update(now); cozyUpd(now); } : update) : null };
   }
 
   function makeSign(text) {
