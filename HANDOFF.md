@@ -1133,3 +1133,4 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 测试钩子：`window.__forceRole`（字符串或按 `Foe.foes.length` 索引的数组）。`tools/test/fight.html` 与 `bots.js`（新增 `o.delay`）已更新；harness 的 `playerSwinging/handAng` 现与游戏一致。
 - 验证（light harness）：五个角色均无 JS 报错；duelist 会 `blocked`；mage 法球命中玩家（站桩 70 伤害）；healer 回血（F✚）；warcaller 给 buf；老角色矩阵回归全部 1.3–2.9s 击杀。踩坑：新角色必须 `fo.brave=true` 且 `fo.retreated=true`，否则被打后进 flee 状态，role.tick 不再被调用；healer/mage 后退速度必须低于玩家走速（1.8/1.9）否则打不到。
 - 待做：野兽变体、HUD 连击点、教程文本更新。
+- R26d 补：`js/worlds.js` 进场提示文字在 `combat_master` 开启时改为新操作说明（点左键出刀/三连斩/甩鼠标/蓄力/右键格挡）。
