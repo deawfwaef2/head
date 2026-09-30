@@ -65,45 +65,103 @@ window.Chess = (() => {
   const kingSq = (T, S, side) => { for (let i = 0; i < 64; i++) if (T[i] === 'K' && S[i] === side) return i; return -1; };
   function attacked(T, S, sq, bySide) { return gen(T, S, bySide, true).some(m => m[1] === sq); }
   const PST_C = [0, 1, 2, 3, 3, 2, 1, 0];
-  function evalSide(T, S) { // 相对 side 0（白）
-    let v = 0;
-    for (let i = 0; i < 64; i++) { const t = T[i]; if (!t) continue; const f = i & 7, r = i >> 3; let s = VAL[t];
-      if (t === 'P') s += (S[i] === 0 ? r - 1 : 6 - r) * 9 + PST_C[f] * 2; else if (t !== 'K') s += (PST_C[f] + PST_C[r]) * (t === 'N' ? 6 : 3);
-      v += S[i] === 0 ? s : -s; }
+  function evalSide(T, S) { // 相对 side 0（白）。R49：加入兵形、开放线、双象、王安全、残局王活跃、特殊走法加成
+    let v = 0; const pf = [new Array(8).fill(0), new Array(8).fill(0)], pr = [[], []], bish = [0, 0], mat = [0, 0]; let k0 = -1, k1 = -1;
+    for (let i = 0; i < 64; i++) { const t = T[i]; if (!t) continue; const sd = S[i], f = i & 7, r = i >> 3; if (t === 'P') { pf[sd][f]++; pr[sd].push(i); } else if (t === 'K') { if (sd) k1 = i; else k0 = i; } else { mat[sd] += VAL[t]; if (t === 'B') bish[sd]++; } }
+    const endg = mat[0] + mat[1] < 2600;
+    for (let i = 0; i < 64; i++) { const t = T[i]; if (!t) continue; const sd = S[i], f = i & 7, r = i >> 3; let s = VAL[t]; const rr = sd === 0 ? r : 7 - r; // rr = 向前推进的行数
+      if (t === 'P') {
+        s += (rr - 1) * 9 + PST_C[f] * 2;
+        if (pf[sd][f] > 1) s -= 12;
+        if (!(f > 0 && pf[sd][f - 1]) && !(f < 7 && pf[sd][f + 1])) s -= 9;
+        let passed = true; for (const j of pr[1 - sd]) { const jf = j & 7, jr = j >> 3, ar = sd === 0 ? jr > r : jr < r; if (ar && Math.abs(jf - f) <= 1) { passed = false; break; } }
+        if (passed) s += 12 + rr * rr * 2 + (endg ? rr * 6 : 0);
+        const sdir = sd === 0 ? -1 : 1, bj = (r + sdir) * 8; if (r + sdir >= 0 && r + sdir < 8) { if ((f > 0 && T[bj + f - 1] === 'P' && S[bj + f - 1] === sd) || (f < 7 && T[bj + f + 1] === 'P' && S[bj + f + 1] === sd)) s += 6; }
+      } else if (t === 'K') {
+        if (endg) { const cd = Math.abs(f - 3.5) + Math.abs(r - 3.5); s += (7 - cd) * 6; }
+        else { let sh = 0; const fw = sd === 0 ? 1 : -1; for (let df = -1; df <= 1; df++) { const f1 = f + df, r1 = r + fw; if (f1 >= 0 && f1 < 8 && r1 >= 0 && r1 < 8) { const j = r1 * 8 + f1; if (T[j] && S[j] === sd) sh += T[j] === 'P' ? 10 : 5; } } s += sh; s -= rr * 10; /* 王别乱跑 */ }
+      } else {
+        s += (PST_C[f] + PST_C[r]) * (t === 'N' ? 6 : 3);
+        if ((t === 'N' || t === 'B') && rr === 0) s -= 14; /* 没出动 */
+        if (t === 'R') { if (!pf[sd][f]) s += pf[1 - sd][f] ? 10 : 18; if (rr === 6) s += 14; }
+        if (t === 'B' && bish[sd] >= 2) s += 14;
+        if (!endg && (t === 'Q' || t === 'A') && rr === 0 && false) s += 0;
+      }
+      if (XS[i] && t !== 'K') s += 18 + 5 * XS[i].length;
+      v += sd === 0 ? s : -s; }
+    // 王危险：对方重子离我方王近（本变体「首领被吃即输」）
+    if (!endg) for (const sd of [0, 1]) { const ks = sd ? k1 : k0; if (ks < 0) continue; const kf = ks & 7, kr = ks >> 3; let d = 0; for (let i = 0; i < 64; i++) { const t = T[i]; if (!t || S[i] === sd || t === 'P' || t === 'K') continue; if (t !== 'Q' && t !== 'A' && t !== 'R' && t !== 'N') continue; const dist = Math.max(Math.abs((i & 7) - kf), Math.abs((i >> 3) - kr)); if (dist <= 3) d += (t === 'Q' || t === 'A' ? 26 : 12) * (4 - dist) / 3; } v += sd === 0 ? -d : d; }
     return v;
   }
   function makeMove(T, S, m) { const [a, b] = m; const cap = [T[b], S[b]]; const cx = XS[b]; XS[b] = XS[a]; XS[a] = null; T[b] = T[a]; S[b] = S[a]; T[a] = ''; S[a] = -1; let promo = false; if (T[b] === 'P' && ((S[b] === 0 && b >> 3 === 7) || (S[b] === 1 && b >> 3 === 0))) { T[b] = 'Q'; promo = true; } return [cap, promo, cx]; }
   function unmake(T, S, m, u) { const [a, b] = m; XS[a] = XS[b]; XS[b] = u[2] || null; T[a] = u[1] ? 'P' : T[b]; S[a] = S[b]; T[b] = u[0][0]; S[b] = u[0][1]; }
-  let nodes = 0, deadline = 0;
-  function order(T, ms) { return ms.sort((x, y) => (T[y[1]] ? VAL[T[y[1]]] * 10 - VAL[T[y[0]]] : 0) - (T[x[1]] ? VAL[T[x[1]]] * 10 - VAL[T[x[0]]] : 0)); }
+  // ---------------- R49：更强的棋 AI（迭代加深 + 置换表 + 杀手/历史启发 + PVS/LMR + 静态搜索 + 更好的评估）----------------
+  let nodes = 0, deadline = 0, stopped = false;
+  const TI = { P: 1, N: 2, B: 3, R: 4, Q: 5, A: 6, K: 0 };
+  const rnd32 = () => (Math.random() * 4294967296) >>> 0;
+  const Z1 = new Uint32Array(64 * 7 * 2 + 4).map(rnd32), Z2 = new Uint32Array(64 * 7 * 2 + 4).map(rnd32), ZX1 = new Uint32Array(64).map(rnd32), ZX2 = new Uint32Array(64).map(rnd32);
+  const ZS1 = rnd32(), ZS2 = rnd32();
+  let H1 = 0, H2 = 0;
+  function hashOf(T, S, side) { let a = side ? ZS1 : 0, b = side ? ZS2 : 0; for (let i = 0; i < 64; i++) { const t = T[i]; if (!t) continue; const k = (i * 7 + TI[t]) * 2 + S[i]; a ^= Z1[k]; b ^= Z2[k]; if (XS[i]) { a ^= ZX1[i]; b ^= ZX2[i]; } } H1 = a >>> 0; H2 = b >>> 0; }
+  let TT = new Map(), HIST = new Int32Array(4096); const KIL = []; for (let i = 0; i < 40; i++) KIL.push([-1, -1]);
+  function order(T, ms, tm, ply) {
+    const k = ply >= 0 ? KIL[ply] : null;
+    for (const m of ms) { const v = T[m[1]]; m.s = tm && m[0] === tm[0] && m[1] === tm[1] ? 1e9 : v ? 1e6 + VAL[v] * 10 - VAL[T[m[0]]] / 10 : k && ((m[0] === k[0][0] && m[1] === k[0][1]) ? 9e5 : (m[0] === k[1][0] && m[1] === k[1][1]) ? 8e5 : 0) || HIST[m[0] * 64 + m[1]]; }
+    return ms.sort((x, y) => y.s - x.s);
+  }
   function qs(T, S, side, a, b, d) {
     const sp = (side === 0 ? 1 : -1) * evalSide(T, S); if (sp >= b) return sp; if (sp > a) a = sp; if (d <= 0) return sp;
-    for (const m of order(T, gen(T, S, side, true))) { if (T[m[1]] === 'K') return 50000; const u = makeMove(T, S, m); const v = -qs(T, S, 1 - side, -b, -a, d - 1); unmake(T, S, m, u); if (v >= b) return v; if (v > a) a = v; }
+    for (const m of order(T, gen(T, S, side, true), null, -1)) { if (T[m[1]] === 'K') return 50000; const u = makeMove(T, S, m); const v = -qs(T, S, 1 - side, -b, -a, d - 1); unmake(T, S, m, u); if (v >= b) return v; if (v > a) a = v; }
     return a;
   }
-  function nega(T, S, side, depth, a, b, q) {
-    nodes++;
-    if (depth <= 0) return q ? qs(T, S, side, a, b, 3) : (side === 0 ? 1 : -1) * evalSide(T, S);
-    const ms = order(T, gen(T, S, side));
-    if (!ms.length) return -20000;
-    let best = -1e9;
-    for (const m of ms) {
-      if (T[m[1]] === 'K') return 50000 + depth;
-      const u = makeMove(T, S, m); const v = -nega(T, S, 1 - side, depth - 1, -b, -a, q); unmake(T, S, m, u);
-      if (v > best) best = v; if (v > a) a = v; if (a >= b) break;
-      if (nodes > 400000 || performance.now() > deadline) break;
+  function nega(T, S, side, depth, a, b, q, ply) {
+    if ((++nodes & 1023) === 0 && performance.now() > deadline) stopped = true; if (stopped) return 0;
+    if (depth <= 0) return q ? qs(T, S, side, a, b, 6) : (side === 0 ? 1 : -1) * evalSide(T, S);
+    hashOf(T, S, side); const h1 = H1, h2 = H2; const e = TT.get(h1); let tm = null;
+    if (e && e.h2 === h2) { tm = e.m; if (e.d >= depth && ply > 0) { if (e.f === 0) return e.v; if (e.f === 1 && e.v >= b) return e.v; if (e.f === 2 && e.v <= a) return e.v; } }
+    const ms = order(T, gen(T, S, side), tm, ply); if (!ms.length) return -20000 + ply;
+    let best = -1e9, bm = null; const a0 = a, K = KIL[ply] || KIL[39], cap = {};
+    for (let i = 0; i < ms.length; i++) {
+      const m = ms[i]; if (T[m[1]] === 'K') return 50000 + depth;
+      const isCap = !!T[m[1]], u = makeMove(T, S, m); let v;
+      if (i === 0) v = -nega(T, S, 1 - side, depth - 1, -b, -a, q, ply + 1);
+      else {
+        const red = (i >= 4 && depth >= 3 && !isCap && m.s < 8e5) ? 1 : 0;
+        v = -nega(T, S, 1 - side, depth - 1 - red, -a - 1, -a, q, ply + 1);
+        if (v > a && (red || v < b)) v = -nega(T, S, 1 - side, depth - 1, -b, -a, q, ply + 1);
+      }
+      unmake(T, S, m, u); if (stopped) return 0;
+      if (v > best) { best = v; bm = m; } if (v > a) a = v;
+      if (a >= b) { if (!isCap) { if (!(K[0][0] === m[0] && K[0][1] === m[1])) { K[1] = K[0]; K[0] = [m[0], m[1]]; } HIST[m[0] * 64 + m[1]] += depth * depth; } break; }
     }
+    if (TT.size > 400000) TT.clear();
+    TT.set(h1, { h2, d: depth, v: best, f: best <= a0 ? 2 : best >= b ? 1 : 0, m: bm ? [bm[0], bm[1]] : null });
     return best;
   }
   function think(T, S, side, lv) {
-    const L = LEVELS[Math.min(LEVELS.length - 1, lv - 1)]; nodes = 0; deadline = performance.now() + (L.time || 1800);
-    const ms = order(T, gen(T, S, side)); if (!ms.length) return null;
-    let best = null, bv = -1e9;
-    const scored = [];
-    for (const m of ms) {
-      if (T[m[1]] === 'K') return m;
-      const u = makeMove(T, S, m); let v = -nega(T, S, 1 - side, L.depth - 1, -1e9, 1e9, L.q); unmake(T, S, m, u);
-      v += (Math.random() - 0.5) * 2 * L.noise; scored.push([v, m]); if (v > bv) { bv = v; best = m; }
+    const L = LEVELS[Math.min(LEVELS.length - 1, lv - 1)]; nodes = 0; stopped = false; deadline = performance.now() + (L.time || 1800); HIST.fill(0);
+    for (const k of KIL) { k[0] = [-1, -1]; k[1] = [-1, -1]; } if (TT.size > 150000) TT.clear();
+    let ms = gen(T, S, side); if (!ms.length) return null;
+    for (const m of ms) if (T[m[1]] === 'K') return m;
+    for (let i = ms.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ms[i], ms[j]] = [ms[j], ms[i]]; }
+    if (!L.md) { // 入门档：固定深度 + 噪声（让新手有赢面）
+      let best = null, bv = -1e9;
+      for (const m of order(T, ms, null, -1)) { const u = makeMove(T, S, m); let v = -nega(T, S, 1 - side, L.depth - 1, -1e9, 1e9, L.q, 1); unmake(T, S, m, u); v += (Math.random() - 0.5) * 2 * L.noise; if (v > bv) { bv = v; best = m; } }
+      return best || ms[0];
+    }
+    let best = ms[0], pv = null;
+    for (let d = 1; d <= L.md; d++) {
+      const list = order(T, ms.slice(), pv, -1); let a = -1e9, itBest = null, done = true;
+      for (let i = 0; i < list.length; i++) {
+        const m = list[i], u = makeMove(T, S, m); let v;
+        if (i === 0) v = -nega(T, S, 1 - side, d - 1, -1e9, -a, true, 1);
+        else { v = -nega(T, S, 1 - side, d - 1, -a - 1, -a, true, 1); if (v > a && !stopped) v = -nega(T, S, 1 - side, d - 1, -1e9, -a, true, 1); }
+        unmake(T, S, m, u); if (stopped) { done = false; break; }
+        if (v > a) { a = v; itBest = m; }
+      }
+      if (itBest && (done || itBest === pv)) { best = itBest; pv = itBest; }
+      else if (itBest && !done) { best = itBest; pv = itBest; } // 本层已搜出比上一层 PV 更好的着法时也采用
+      if (stopped || a > 40000 || a < -40000) break;
     }
     return best;
   }
@@ -112,16 +170,16 @@ window.Chess = (() => {
   const LEVELS = [
     { n: '见习·斯尼克', depth: 1, noise: 180, q: false, army: 'K8P' },
     { n: '认真的斯尼克', depth: 1, noise: 70, q: false, army: 'K8P2N' },
-    { n: '算计的斯尼克', depth: 2, noise: 60, q: false, army: 'K8P2N2B' },
-    { n: '标准棋局', depth: 2, noise: 25, q: true, army: 'STD' },
-    { n: '斯尼克·全神贯注', depth: 3, noise: 15, q: true, army: 'STD' },
-    { n: '木马奇兵', depth: 3, noise: 10, q: true, army: 'STD+2N' },
-    { n: '双后之局', depth: 3, noise: 8, q: true, army: 'STD+Q' },
-    { n: '魂后降临', depth: 3, noise: 6, q: true, army: 'STD+A' },
-    { n: '地精棋会', depth: 3, noise: 4, q: true, army: 'STD+Q+A', time: 2200 },
-    { n: '斯尼克·不眠之夜', depth: 4, noise: 3, q: true, army: 'STD+Q+A', time: 2600 },
-    { n: '木之王庭', depth: 4, noise: 2, q: true, army: 'STD+2Q+A', time: 3000 },
-    { n: '地精棋圣', depth: 4, noise: 0, q: true, army: 'STD+2A+2Q', time: 3500 }
+    { n: '算计的斯尼克', depth: 2, noise: 50, q: true, army: 'K8P2N2B' },
+    { n: '标准棋局', depth: 3, noise: 14, q: true, army: 'STD' },
+    { n: '斯尼克·全神贯注', md: 5, time: 1800, army: 'STD' },
+    { n: '木马奇兵', md: 5, time: 2200, army: 'STD+2N' },
+    { n: '双后之局', md: 6, time: 2600, army: 'STD+Q' },
+    { n: '魂后降临', md: 6, time: 3000, army: 'STD+A' },
+    { n: '地精棋会', md: 7, time: 3400, army: 'STD+Q+A' },
+    { n: '斯尼克·不眠之夜', md: 8, time: 3800, army: 'STD+Q+A' },
+    { n: '木之王庭', md: 9, time: 4300, army: 'STD+2Q+A' },
+    { n: '地精棋圣', md: 10, time: 4800, army: 'STD+2A+2Q' }
   ];
   const reward = lv => Math.round(150 * Math.pow(1.85, lv - 1));
   function woodArmy(code) { // 返回 [{t, sq}]（以黑方视角：rank 7 为底线）
@@ -601,7 +659,7 @@ window.Chess = (() => {
       const cur = side === 0 ? army : armyB;
       L.innerHTML = `<div class="box"><h2>♟ 头棋殿</h2><div class="sub">用你的首级组成军团：<b>魂阶决定走法</b>，选一颗当<b>首领</b>（被吃即输）。最多 16 颗，最强的上底线。</div>
       <div class="row"><button data-a="mode" data-v="ai" class="${mode === 'ai' ? 'on' : ''}">🧌 挑战斯尼克</button><button data-a="mode" data-v="pvp" class="${mode === 'pvp' ? 'on' : ''}">👥 同屏双人（自己和自己下）</button></div>
-      ${mode === 'ai' ? `<h3>难度阶梯 <small style="color:#b09070">已击败 ${S.chess.best}/${LEVELS.length} 级 · 胜 ${S.chess.wins} 场</small></h3><div class="lv">${LEVELS.map((l, i) => { const n = i + 1, lock = n > S.chess.best + 1; return `<div class="lvi ${n === lv ? 'on' : ''} ${lock ? 'lock' : ''}" data-a="${lock ? '' : 'lv'}" data-v="${n}"><b>${n}. ${l.n}</b>${lock ? '🔒 击败上一级解锁' : `搜索深度 ${l.depth} · 🔮${G.fmtN ? G.fmtN(reward(n)) : reward(n)}${n > S.chess.best ? ' (首胜×3)' : ''}`}</div>`; }).join('')}</div>`
+      ${mode === 'ai' ? `<h3>难度阶梯 <small style="color:#b09070">已击败 ${S.chess.best}/${LEVELS.length} 级 · 胜 ${S.chess.wins} 场</small></h3><div class="lv">${LEVELS.map((l, i) => { const n = i + 1, lock = n > S.chess.best + 1; return `<div class="lvi ${n === lv ? 'on' : ''} ${lock ? 'lock' : ''}" data-a="${lock ? '' : 'lv'}" data-v="${n}"><b>${n}. ${l.n}</b>${lock ? '🔒 击败上一级解锁' : `搜索深度 ${(l.md || l.depth)} · 🔮${G.fmtN ? G.fmtN(reward(n)) : reward(n)}${n > S.chess.best ? ' (首胜×3)' : ''}`}</div>`; }).join('')}</div>`
         : `<div class="row"><span>蓝方（上方）：</span><button data-a="bm" data-v="heads" class="${blackMode === 'heads' ? 'on' : ''}">另一队首级</button><button data-a="bm" data-v="wood" class="${blackMode === 'wood' ? 'on' : ''}">斯尼克的木棋（第 ${lv} 级阵容）</button></div>
            ${blackMode === 'heads' ? `<div class="row"><button data-a="side" data-v="0" class="${side === 0 ? 'on' : ''}">编辑红方</button><button data-a="side" data-v="1" class="${side === 1 ? 'on' : ''}">编辑蓝方</button></div>` : ''}`}
       <h3>${side === 0 || mode === 'ai' || blackMode === 'wood' ? '你的军团' : '蓝方军团'} ${cur.list.length}/16 · 首领：${cur.leader ? esc(NM(cur.leader.c)) : '（未选）'}</h3>

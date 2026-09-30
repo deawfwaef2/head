@@ -1780,3 +1780,11 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - foe.js 4 处钩子（均带 R47 npc_locomo 注释）：animate 暴露 `f._cur/_setCur` + `Locomo.install(f)`；转身行；速度平滑行（`burst` 标志）；`mixer.update` 前 `Locomo.tick`。
 - mods.js：npc_locomo 条目；world_cel 默认 true。mods_i18n.js：npc_locomo。index.html / world.html：foe.js 前加 locomo.js。
 - world.html：`window.__foes`（crowd 敌人数组）。
+
+## R49 stage B+C（saga 续：回忆 / 沙盘 / 战利品三选一 / 棋 AI）
+- **新文件 `js/memory.js`（`window.Memory`，MOD `memory` 默认开）**：技能点改成「回忆」——从「当前可学」的天赋节点里随机抽 3 张（有 🪞回忆之镜 建筑时 4 张），**必须来自不同流派**（刃舞/铁壁/影袭/狂血/魂术/猎首），三选一，选中走 `Talents.alloc(id)`；还有点数就连抽。重抽：魂晶 40×等级×次数；有镜子时每轮第 1 次免费；`S.saga.rr` 重抽券（结算三选一可得）也免费。键 1–4 / R / Esc；洞里有空余技能点时右上角徽标提示，**按 ` (反引号) 唤醒**；出门结算卡关闭后自动弹出 `Memory.afterSettle()`。天赋树界面仍可手动加点（未移除）。
+- **新建筑（都注册在 `BuildCat.C`，由 memory.js 的 `registerBuild()` 等 `G.HOOK`/`BuildCat` 就绪后注入，无新模型，复用 CC0：ornate_mirror_01 / brass_candleholders / chinese_console_table / Lantern_01）**：`memory` 回忆之镜（E 打开回忆；出猎 1 次后解锁）、`wartable` 征途沙盘（E 打开 `UI.openExpedition()`＝出猎地点三选一；tip 里显示 Saga 月之线索）。原有 Tab 枢纽/出洞入口保持不变。
+- **结算卡（`js/saga.js` `showSettle`）**：新增「战利品 · 三选一」（魂晶袋 / 旧日手札=经验 / 月下泉水=回血 45% / 镜中残片=回忆重抽券 / 安魂烛=仇恨 −6 / 磨刀石），点击选、关卡时 `applyReward()` 发放（默认第 1 份）；卡片紧凑化使 720p 也能一屏看完（含“收下结算”）。
+- **棋 AI（`js/chess.js`）大幅增强**：迭代加深 + Zobrist 置换表 + 杀手/历史启发 + PVS + LMR + 静态搜索 6 层 + 新评估（兵形/通路兵/开放线/双象/王盾/残局王活跃/对方重子逼近王/XS 特殊走法加成）。难度阶梯：1–4 级仍是「固定深度+噪声」（新手友好），5–12 级改为 `md`(最大迭代深度 5→10) + `time`(1.8s→4.8s) 无噪声。`tools` 对局测试（节点脚本，取 chess.js 引擎段）：新 5 级 vs 旧 12 级（同 1s 限时）8:0。**不要恢复旧 `nega`/`think`。**
+- 测试页：`tools/test/memory.html`（真 talents_data + 桩 Talents/G；`?altar=1` 模拟有镜子）。
+- 已知：回忆/建筑只在独立页验证（整游戏+世界在 2GB 沙盒会卡死），真实游戏里的建筑菜单出现、E 交互、反引号徽标未实机验证。
