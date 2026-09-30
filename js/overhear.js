@@ -103,28 +103,71 @@
     return { who: cs, lines, facts, rel };
   }
 
-  // ---------- 弹框 UI（不冻结、自动消失）----------
+  // ---------- 半身像（R41b）：把说话人的活体（身体 + 头）单独渲染成透明底半身像 ----------
+  // 做法：主渲染器 + 离屏 RenderTarget；临时只留这个人（其余顶层物体 visible=false），背景/雾去掉，补一盏柔光；渲完立刻还原。
+  const PORT = new Map();
+  function foeOf(c) { try { return window.Foe && Foe.foes && Foe.foes.find(f => f && f.h && f.h.c === c && f.f && f.f.root); } catch (e) { return null; } }
+  function portraitOf(c) {
+    if (PORT.has(c)) return PORT.get(c);
+    const G = window.G, fo = foeOf(c); if (!G || !G.renderer || !fo || !window.THREE) return null;
+    const R = G.renderer, root = fo.f.root, hb = fo.f.bones && fo.f.bones.head; if (!hb) return null;
+    let top = root, sc = null; while (top.parent && top.parent.type !== 'Scene') top = top.parent; sc = top.parent; if (!sc) return null;
+    const W = 240, H = 280, rt = new THREE.WebGLRenderTarget(W, H); rt.texture.encoding = THREE.sRGBEncoding;
+    const saved = { rt: R.getRenderTarget(), bg: sc.background, fog: sc.fog, ov: sc.overrideMaterial, ca: R.getClearAlpha(), cc: R.getClearColor(new THREE.Color()).clone(), vis: [], rv: root.visible, tv: top.visible };
+    try {
+      hb.updateWorldMatrix(true, false); const hp = new THREE.Vector3(); hb.getWorldPosition(hp);
+      const q = new THREE.Quaternion(); root.getWorldQuaternion(q); const fw = new THREE.Vector3(0, 0, 1).applyQuaternion(q); fw.y = 0; fw.normalize();
+      // 朝向：取“脸朝的方向”——头模型的 +Z；若脸朝反了，Foe 的根朝向约定不同，用 headBone 的世界朝向兜底
+      const hq = new THREE.Quaternion(); hb.getWorldQuaternion(hq); const hf = new THREE.Vector3(0, 0, 1).applyQuaternion(hq); hf.y = 0; if (hf.lengthSq() > 0.05) fw.copy(hf.normalize()); fw.negate();
+      const cam = new THREE.PerspectiveCamera(26, W / H, 0.05, 30), tgt = hp.clone(); tgt.y -= 0.06;
+      const side = new THREE.Vector3(-fw.z, 0, fw.x); cam.position.copy(tgt).addScaledVector(fw, 1.75).addScaledVector(side, 0.2); cam.position.y = hp.y + 0.08; cam.lookAt(tgt); cam.updateMatrixWorld(true);
+      for (const o of sc.children) { if (o === top || o.isLight) continue; saved.vis.push([o, o.visible]); o.visible = false; }
+      top.visible = true; root.visible = true;
+      sc.background = null; sc.fog = null; sc.overrideMaterial = null;
+      const L1 = new THREE.DirectionalLight(0xfff0dd, 0.9), L2 = new THREE.HemisphereLight(0xffffff, 0x665544, 0.55); L1.position.copy(cam.position).add(new THREE.Vector3(0.6, 1.2, 0.4)); L1.target.position.copy(tgt); sc.add(L1, L1.target, L2);
+      R.setRenderTarget(rt); R.setClearColor(0x000000, 0); R.clear(); R.render(sc, cam);
+      const buf = new Uint8Array(W * H * 4); R.readRenderTargetPixels(rt, 0, 0, W, H, buf);
+      sc.remove(L1, L1.target, L2);
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const cx = cv.getContext('2d'), im = cx.createImageData(W, H);
+      for (let y = 0; y < H; y++) im.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4);
+      cx.putImageData(im, 0, 0); let cnt = 0; for (let k = 3; k < buf.length; k += 400) if (buf[k] > 20) cnt++;
+      const url = cnt > 12 ? cv.toDataURL('image/png') : null; PORT.set(c, url); return url;
+    } catch (e) { console.warn('portrait', e); return null; }
+    finally {
+      R.setRenderTarget(saved.rt); R.setClearColor(saved.cc, saved.ca); sc.background = saved.bg; sc.fog = saved.fog; sc.overrideMaterial = saved.ov;
+      for (const [o, v] of saved.vis) o.visible = v; top.visible = saved.tv; root.visible = saved.rv; rt.dispose();
+    }
+  }
+
+  // ---------- 弹框 UI：屏幕中上的长条（不冻结、不挡视野、自动消失）----------
   let el = null, timers = [], hist = [];
-  const CSS = '#ohear{position:fixed;left:50%;bottom:17vh;width:min(780px,88vw);z-index:66;pointer-events:none;opacity:0;transform:translate(-50%,24px) scale(.96);transition:opacity .45s,transform .45s cubic-bezier(.2,.9,.25,1.2);font-family:"Noto Serif SC","Songti SC",serif;color:#f3e8d2}#ohear.on{opacity:1;transform:translate(-50%,0) scale(1)}'
-    + '#ohear .oh-box{background:linear-gradient(160deg,#241710f5,#0c0807f5);border:2px solid #e0ad5a;border-radius:14px;box-shadow:0 0 0 1px #000,0 14px 60px #000c,0 0 40px #e0ad5a30;padding:14px 20px 16px;position:relative}'
-    + '#ohear .oh-box::before{content:"";position:absolute;left:50%;bottom:-11px;width:20px;height:20px;background:#0c0807;border-right:2px solid #e0ad5a;border-bottom:2px solid #e0ad5a;transform:translateX(-50%) rotate(45deg)}'
-    + '#ohear .oh-h{display:flex;justify-content:space-between;align-items:baseline;font-size:19px;font-weight:700;color:#ffd890;letter-spacing:3px;border-bottom:1px solid #ffffff22;padding-bottom:8px;margin-bottom:10px;text-shadow:0 2px 8px #000}#ohear .oh-h small{opacity:.75;font-size:14px;font-weight:400;letter-spacing:1px}'
-    + '#ohear .oh-who{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}#ohear .oh-w{flex:1 1 180px;padding:7px 12px;border-left:5px solid var(--c);background:#00000070;border-radius:6px;font-size:14px;line-height:1.55;animation:ohpop .5s cubic-bezier(.2,1.4,.3,1) backwards}#ohear .oh-w:nth-child(2){animation-delay:.12s}#ohear .oh-w:nth-child(3){animation-delay:.24s}#ohear .oh-w b{color:var(--c);font-size:18px;text-shadow:0 0 10px var(--c)}#ohear .oh-w i{font-style:normal;opacity:.8;display:block;font-size:13px}@keyframes ohpop{from{transform:scale(.6) translateY(10px);opacity:0}}'
-    + '#ohear .oh-l{max-height:min(34vh,300px);overflow:hidden;display:flex;flex-direction:column;gap:9px}#ohear .oh-ln{font-size:clamp(17px,1.5vw,21px);line-height:1.6;opacity:0;animation:ohin .4s forwards;padding:2px 0}#ohear .oh-ln b{color:var(--c);margin-right:10px;font-size:.92em;text-shadow:0 0 8px var(--c)}@keyframes ohin{from{transform:translateY(8px)}to{opacity:1;transform:none}}'
-    + '#ohear .oh-f{margin-top:10px;font-size:14px;color:#ffd27a;opacity:0;transition:opacity .5s}#ohear .oh-f.on{opacity:1}';
+  const CSS = '#ohear{position:fixed;left:50%;top:clamp(46px,9vh,110px);bottom:auto!important;width:min(1040px,92vw);z-index:66;pointer-events:none;opacity:0;transform:translate(-50%,-18px);transition:opacity .4s,transform .45s cubic-bezier(.2,.9,.25,1.15);font-family:"Noto Serif SC","Songti SC",serif;color:#f3e8d2}#ohear.on{opacity:1;transform:translate(-50%,0)}'
+    + '#ohear .oh-box{display:flex;align-items:stretch;gap:0;min-height:112px;background:linear-gradient(90deg,#1c120cf0 0%,#120b08e6 70%,#120b08b0 100%);border:1.5px solid var(--c,#e0ad5a);border-radius:12px;box-shadow:0 0 0 1px #000,0 10px 36px #000a,0 0 26px #0008;overflow:hidden;position:relative}'
+    + '#ohear .oh-p{flex:0 0 118px;position:relative;background:radial-gradient(ellipse at 50% 35%,color-mix(in srgb,var(--c,#e0ad5a) 38%,#20140e),#0c0706 78%);border-right:1.5px solid var(--c,#e0ad5a);display:flex;align-items:flex-end;justify-content:center}#ohear .oh-p img{height:132px;margin-top:-14px;margin-bottom:-2px;filter:drop-shadow(0 4px 8px #000c);transition:opacity .25s}#ohear .oh-p i{font:700 44px/112px "Noto Serif SC",serif;font-style:normal;color:var(--c);text-shadow:0 0 18px var(--c);position:absolute;inset:0;text-align:center}'
+    + '#ohear .oh-m{flex:1;min-width:0;padding:8px 18px 9px 16px;display:flex;flex-direction:column;justify-content:center;gap:3px}'
+    + '#ohear .oh-h{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:13px;color:#d9b676;opacity:.85;letter-spacing:1px;white-space:nowrap;overflow:hidden}#ohear .oh-h em{font-style:normal;color:#ffd890;font-weight:700;letter-spacing:2px}#ohear .oh-h span:last-child{overflow:hidden;text-overflow:ellipsis}#ohear .oh-h u{text-decoration:none;opacity:.45;margin-left:8px}#ohear .oh-h u.cur{opacity:1;color:var(--c);font-weight:700}'
+    + '#ohear .oh-n{font-size:15px;color:var(--c);font-weight:700;text-shadow:0 0 8px var(--c);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#ohear .oh-n small{color:#cdbb99;font-weight:400;margin-left:10px;text-shadow:none;font-size:13px}'
+    + '#ohear .oh-t{font-size:clamp(18px,1.55vw,22px);line-height:1.5;min-height:1.5em;text-shadow:0 2px 6px #000;transition:opacity .2s}'
+    + '#ohear .oh-f{font-size:13.5px;color:#ffd27a;height:0;opacity:0;overflow:hidden;transition:opacity .5s,height .3s}#ohear .oh-f.on{opacity:1;height:1.4em}';
   function build() {
     if (el) return; const s = document.createElement('style'); s.textContent = CSS; document.head.appendChild(s);
-    el = document.createElement('div'); el.id = 'ohear'; el.innerHTML = '<div class="oh-box"><div class="oh-h"><span>🎧 偷听</span><small></small></div><div class="oh-who"></div><div class="oh-l"></div><div class="oh-f"></div></div>'; document.body.appendChild(el);
+    el = document.createElement('div'); el.id = 'ohear'; el.innerHTML = '<div class="oh-box"><div class="oh-p"><img alt=""><i></i></div><div class="oh-m"><div class="oh-h"><span><em>🎧 偷听</em></span><span></span></div><div class="oh-n"></div><div class="oh-t"></div><div class="oh-f"></div></div></div>'; document.body.appendChild(el);
   }
   const clear = () => { timers.forEach(clearTimeout); timers = []; if (el) el.classList.remove('on'); };
   function show(conv, node, ctx) {
     build(); clear(); const q = s => el.querySelector(s), cs = conv.who;
-    q('.oh-h small').textContent = `「${node.name}」 · ${conv.rel}`;
-    q('.oh-who').innerHTML = cs.map(c => { const r = window.Ranks ? Ranks.of(c) : null, b = bio(c); return `<div class="oh-w" style="--c:${RCOL[c.rar]}"><b>${esc(c.name)}</b> <small>【${RN[c.rar]}】</small><i>${r ? esc(r.S.ic + ' ' + r.S.n + '·' + r.B.n + ' ' + r.tn + '「' + r.name + '」') : ''}</i><i>口头禅：「${esc(b.catch)}」</i></div>`; }).join('');
-    q('.oh-l').innerHTML = ''; q('.oh-f').className = 'oh-f'; q('.oh-f').textContent = '';
+    const pics = cs.map(c => { try { return portraitOf(c); } catch (e) { return null; } });
+    const setWho = i => {
+      const c = cs[i], r = window.Ranks ? Ranks.of(c) : null, col = RCOL[c.rar] || '#e0ad5a';
+      el.style.setProperty('--c', col); const im = q('.oh-p img'), bd = q('.oh-p i');
+      if (pics[i]) { im.style.display = ''; im.src = pics[i]; bd.textContent = ''; } else { im.style.display = 'none'; bd.textContent = sh(c).slice(0, 1); }
+      q('.oh-n').innerHTML = `${esc(c.name)}<small>【${RN[c.rar]}】${r ? esc(r.S.ic + ' ' + r.S.n + '·' + r.B.n + ' ' + r.tn + '「' + r.name + '」') : ''}</small>`;
+      q('.oh-h span:last-child').innerHTML = `「${esc(node.name)}」· ${esc(conv.rel)}` + cs.map((x, k) => `<u class="${k === i ? 'cur' : ''}">${esc(sh(x))}</u>`).join('');
+    };
+    setWho(cs[conv.lines[0] ? conv.lines[0].i : 0] ? (conv.lines[0] ? conv.lines[0].i : 0) : 0); q('.oh-t').textContent = ''; q('.oh-f').className = 'oh-f'; q('.oh-f').textContent = '';
     requestAnimationFrame(() => el.classList.add('on'));
     let t = 900; conv.lines.forEach((ln, n) => {
-      timers.push(setTimeout(() => { const c = cs[ln.i], d = document.createElement('div'); d.className = 'oh-ln'; d.style.setProperty('--c', RCOL[c.rar]); d.innerHTML = `<b>${esc(sh(c))}</b>「${esc(ln.t)}」`; q('.oh-l').appendChild(d); if (window.SFX && SFX.play) try { SFX.play('click', 0.12, 1.4 + ln.i * 0.25); } catch (e) { } }, t));
+      timers.push(setTimeout(() => { const tt = q('.oh-t'); tt.style.opacity = 0; setTimeout(() => { setWho(ln.i); tt.textContent = '「' + ln.t + '」'; tt.style.opacity = 1; }, 120); if (window.SFX && SFX.play) try { SFX.play('click', 0.12, 1.4 + ln.i * 0.25); } catch (e) { } }, t));
       t += 1500 + ln.t.length * 70;
     });
     if (conv.facts.length) timers.push(setTimeout(() => { const f = q('.oh-f'); f.textContent = '📝 你从她们的话里听出了：' + conv.facts.join('、'); f.classList.add('on'); }, t));
@@ -137,5 +180,5 @@
     if (!on() || !node || node._heard) return; const cs = (node.prey || []).map(h => h && h.c).filter(Boolean); if (!cs.length) return; node._heard = 1;
     setTimeout(() => { try { show(compose(cs, node), node, ctx); } catch (e) { console.warn('Overhear', e); } }, 1600);
   }
-  window.Overhear = { enter, compose, bio, bioHTML, hist: () => hist, clear, AN, arche, T, MONO };
+  window.Overhear = { portraitOf, enter, compose, bio, bioHTML, hist: () => hist, clear, AN, arche, T, MONO };
 })();

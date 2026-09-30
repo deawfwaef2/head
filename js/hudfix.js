@@ -18,7 +18,6 @@ body.hudl.tbon #tbCast{bottom:calc(var(--tbH) + 160px)!important}
 body.hudl.tbon #skHud{bottom:calc(var(--tbH) + 126px)!important}
 body.hudl.tbon #propHint{bottom:calc(var(--tbH) + 92px)!important}
 body.hudl.tbon #gacha{bottom:calc(var(--tbH) + 20px)!important}
-body.hudl.tbon #ohear{bottom:max(17vh,calc(var(--tbH) + 14px))!important}
 body.hudl.tbon #bkHeld{bottom:calc(var(--tbH) + 12px)!important}
 body.hudl.tbon #kgBtn{bottom:calc(var(--tbH) + 10px)!important}
 body.hudl.tbon #spchip{bottom:calc(var(--tbH) + 50px)!important}
