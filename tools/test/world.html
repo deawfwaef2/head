@@ -80,8 +80,9 @@
 <script src="/assets/limb_foot_amber.js"></script>
 <script src="/assets/limb_foot_jean.js"></script>
 <script src="/assets/limb_foot_mona.js"></script>
-<script src="/js/lore.js"></script><script src="/js/wgen.js"></script><script src="/js/wlayout.js"></script>
-<script src="/js/worlds.js"></script><script src="/js/beasts.js"></script><script src="/js/beasts_reg.js"></script><script src="/js/wsites.js" onerror="this.remove()"></script>
+<script src="/js/lore.js"></script><script src="/js/rpg.js"></script><script src="/models/Vivi.js"></script><script src="/js/hair_cover.js"></script><script src="/js/cc0mode.js"></script><script src="/js/heads.js"></script><script src="/js/headwear.js"></script><script src="/js/foe.js"></script><script src="/js/foe_roles.js"></script><script src="/js/foe_roles2.js"></script><script src="/js/foe_roles3.js"></script><script src="/js/foe_ai2.js"></script><script src="/js/foe_mind.js"></script><script src="/js/foe_abs.js"></script><script src="/js/talents_data.js"></script><script src="/js/talents.js"></script><script src="/js/persona_lines.js"></script><script src="/js/persona.js"></script>
+<script src="/js/wsites.js"></script><script src="/js/wgen.js"></script><script src="/js/wlayout.js"></script>
+<script src="/js/worlds.js"></script><script src="/js/beasts.js"></script><script src="/js/beasts_reg.js"></script>
 <script>
 const q = new URLSearchParams(location.search);
 const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('cv'), antialias: false, preserveDrawingBuffer: true });
@@ -101,7 +102,8 @@ window.__node = async (i, o = {}) => {
   if (o.bst) nd.bst = { list: o.bst.map((k, j) => ({ k, tint: 0, alive: true, seed: 1234 + j * 77 })) };
   const B = cur = window.__B = Worlds._debug.buildNode(nd);
   let nb = 0; window.__P = new THREE.Vector3(999, 0, 999);
-  if (window.Beasts && o.beasts !== false) {
+  let crowd = null; if (o.crowd) { window.__P = new THREE.Vector3(999, 0, 999); crowd = await window.__crowd(B, nd, o); }
+  if (window.Beasts && o.beasts !== false && !o.crowd) {
     const ctx = { sc: B.sc, H: B.H, cols: B.cols, R: B.R, doors: B.doors, spot: () => { const a = Math.random() * 6.28, d = B.R * (0.2 + Math.random() * 0.5); return new THREE.Vector3(Math.cos(a) * d, 0, Math.sin(a) * d); }, pos: () => window.__P, st: () => ({ maxHp: 100 }), sees: () => !!o.sees, hitPlayer() {}, power: () => 1, toast() {}, floatDmg() {}, W: () => null };
     try { nb = await Beasts.spawn(ctx, nd); Beasts.list.forEach(b => b.mixer.update(0.5)); } catch (e) { console.warn('beasts', e); }
   }
@@ -116,11 +118,24 @@ window.__node = async (i, o = {}) => {
     return { url: renderer.domElement.toDataURL('image/jpeg', 0.85), info: { i, style: nd.style, beasts: L.map(b => b.k + ':' + b.state + ':' + b.cur + ':' + b.model.position.y.toFixed(2)) } };
   }
   const v = o.view || 'eye', d0 = B.doors[0];
+  if (v === 'site' && B.site) { const P = B.site, a = o.ca != null ? o.ca : Math.atan2(d0.z - P.cz, d0.x - P.cx), dd = o.cd || P.rad + 3.5; const x = P.cx + Math.cos(a) * dd, z = P.cz + Math.sin(a) * dd; camera.position.set(x, B.H(x, z) + (o.camY || 2.2), z); camera.lookAt(P.cx, B.H(P.cx, P.cz) + 0.6, P.cz);
+    B.sc.add(camera); renderer.render(B.sc, camera); return { url: renderer.domElement.toDataURL('image/jpeg', 0.85), info: { i, lay: nd.lay, site: nd.site, slots: P.slots.length, foes: crowd ? crowd.map(f => f.idleClip + '/' + (f.f.cur || '')) : null } }; }
   if (v === 'top') { camera.position.set(0, B.R * 1.9, B.R * 0.9); camera.lookAt(0, 0, 0); }
   else if (v === 'beast' && Beasts.list.length) { const b = Beasts.list[o.bi || 0]; const p = b.pos; camera.position.set(p.x + 3.2, B.H(p.x + 3.2, p.z + 3.2) + 1.8, p.z + 3.2); camera.lookAt(p.x, p.y + 0.6, p.z); }
   else { const ins = new THREE.Vector3(-Math.cos(d0.a), 0, -Math.sin(d0.a)); const x = d0.x + ins.x * 2.4, z = d0.z + ins.z * 2.4; camera.position.set(x, B.H(x, z) + (v === 'low' ? 3.5 : 1.45), z); camera.lookAt(x + ins.x * 10, B.H(x, z) + (v === 'low' ? 0.5 : 1.2), z + ins.z * 10); }
   B.sc.add(camera); renderer.render(B.sc, camera);
   return { url: renderer.domElement.toDataURL('image/jpeg', 0.85), info: { i, style: nd.style, lay: nd.lay, size: nd.size, R: B.R, tag: B.tag, name: nd.name, beasts: window.Beasts ? Beasts.list.map(b => b.k) : [], site: nd.site || null } };
 };
-window.__ready = true;
+// R41：集会测试——?crowd=1 时 __node 会按站位刷出真实敌人（RPG.foe + Foe.populate）并跑几帧 idle
+window.__crowd = async (B, nd, o) => {
+  if (!window.__hinit) { await ModelHeads.init(); window.__hinit = 1; }
+  const S = G.S; S.eq = S.eq || { weapon: 0 }; S.stats = S.stats || {}; G.usedNames = new Set(); G.usedSig = new Set();
+  const SL = (B.site && B.site.slots) || [], n = Math.min(o.n || SL.length, SL.length || 3), list = [];
+  for (let k = 0; k < n; k++) { const h = RPG.foe(S, nd.loc, (777 + k * 131) >>> 0, G.usedNames, G.usedSig); const sl = SL[k]; list.push({ h, pos: sl ? new THREE.Vector3(sl.x, 0, sl.z) : new THREE.Vector3(k, 0, 0) }); }
+  const ctx = { sc: B.sc, H: B.H, cols: B.cols, R: B.R, doors: B.doors, pvel: new THREE.Vector3(), escaped() {}, player: { pos: window.__P, get yaw() { return 0; }, get crouch() { return 0; } }, st: G.st, sees: () => !!o.sees, say() {}, floatDmg() {}, renderer, camera, event() {}, windup() {}, playerSwinging: () => false, playerAiming: () => false, handAng: () => 0, clang() {}, power: () => 1, toast() {}, shake() {}, bossMeet() {}, bossHp() {}, onDeath() {}, hitPlayer() {} };
+  const foes = await Foe.populate(ctx, list); if (B.site) WSites.seat(foes, B.site);
+  for (let t = 0; t < (o.settle || 1.5); t += 1 / 30) Foe.update(1 / 30, performance.now() / 1000 + t);
+  return foes;
+};
+(async () => { try { if (window.Assets && Assets.init) { const KEEP = new Set(['stone_fire_pit','img_fire','brass_pot_01','brass_candleholders','brass_goblets','tea_set_01','carved_wooden_plate','wooden_bucket_02','vintage_oil_lamp','wicker_basket_01','standing_chalkboard_01','wine_barrel_01','wooden_ladder','katana_stand_01','kite_shield','wooden_axe_02','wooden_crate_01','treasure_chest','large_castle_door','large_iron_gate','Lantern_01','wooden_lantern_01','rock_face_01','namaqualand_boulder_02','namaqualand_boulder_05','rock_moss_set_02','tex_rock_ground','tex_dark_rock']); for (const k of Object.keys(window.ASSETS || {})) if (!KEEP.has(k)) delete ASSETS[k]; await Assets.init(); } } catch (e) { console.warn(e); } window.__ready = true; })();
 </script></body></html>

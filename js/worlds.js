@@ -81,9 +81,11 @@ window.Worlds = (() => {
     ravine: { n: '峡谷小径', st: ['wilds', 'peak', 'abyss', 'fortress', 'forest'], need: ['rock_face_01', 'rock_face_02', 'namaqualand_boulder_04'] },
     market: { n: '废弃集市', st: ['capital', 'meadow', 'fortress'], need: ['wooden_picnic_table', 'painted_wooden_bench', 'wooden_barrels_01', 'wooden_crate_02', 'wicker_basket_01', 'wooden_bucket_01', 'street_lamp_01'] }
   };
+  if (window.WSites) WSites.register(LAYOUTS); // R41：特殊地点（人群聚集）注册成 site_* 布局（st 为空 = 不参与随机，只由 WSites.pick 指定）
   function layOf(node) {
-    if (window.__forceLay && !node.home) return (node.lay = window.__forceLay);
+    if (window.__forceLay && !node.home) { if (/^site_/.test(window.__forceLay)) node.site = window.__forceLay.slice(5); return (node.lay = window.__forceLay); }
     if (node.lay) return node.lay; if (node.home || (window.Mods && Mods.on('worldlay') === false)) return (node.lay = 'plain');
+    if (window.WSites) { const sk = WSites.pick(node); if (sk) return (node.lay = 'site_' + sk); }
     const r = mulberry((node.seed ^ 0x2c1b3c6d) >>> 0), ok = Object.keys(LAYOUTS).filter(k => LAYOUTS[k].st.includes(node.style));
     return (node.lay = !ok.length || r() < 0.12 ? 'plain' : ok[Math.floor(r() * ok.length)]);
   }
@@ -109,6 +111,7 @@ window.Worlds = (() => {
       P.skip = (kind, x, z) => (kind === 'tree' || kind === 'rock') && Math.hypot(x, z) < P.rc * 0.92; }
     else if (k === 'camp' || k === 'market') { const a = r() * 6.28, d = R * 0.15; P.cx = Math.cos(a) * d; P.cz = Math.sin(a) * d;
       P.skip = (kind, x, z) => kind !== 'grass' && Math.hypot(x - P.cx, z - P.cz) < (k === 'camp' ? 6.5 : 8); }
+    else if (/^site_/.test(k) && window.WSites) WSites.plan(P, node, doorList, far);
     return P;
   }
   // 阶段二：摆放（在算好高度、建好网格之后）
@@ -116,6 +119,7 @@ window.Worlds = (() => {
     const { sc, H, put, variants, mark, cols, doorList, spots, st } = C, r = P.r, R = P.R, k = P.k;
     const one = (names) => { const vs = variants(names); return vs.length ? vs[Math.floor(r() * vs.length)] : null; };
     const face = (x, z, tx, tz) => Math.atan2(tx - x, tz - z); // 让模型 +Z 朝向目标
+    if (/^site_/.test(k) && window.WSites) { try { WSites.place(P, Object.assign({ r, face }, C)); } catch (e) { console.warn('site', k, e); } return; }
     const fire = (x, z, w, light) => { const y = H(x, z); if (window.Assets && Assets.has('stone_fire_pit')) { const f = Assets.fit('stone_fire_pit', { w, x, y, z }); if (f) sc.add(f); } const fl = window.Assets && Assets.flame(x, y + 0.15, z, 5); if (fl) sc.add(fl); if (light) { const pl = new THREE.PointLight('#ff9a50', 2.2, 12, 2); pl.position.set(x, y + 0.9, z); sc.add(pl); sc.userData.fire = pl; } cols.push({ x, z, r: w * 0.6 }); };
     if (k === 'camp') {
       fire(P.cx, P.cz, 1.3, true); mark(P.cx, P.cz, 6.5);
@@ -336,6 +340,7 @@ window.Worlds = (() => {
     if (node.home) return;
     let x = r(), n = W && W.graph && W.graph.trip ? (node.boss ? 0 : x < 0.15 ? 0 : x < 0.55 ? 1 : x < 0.88 ? 2 : 3) : (x < 0.3 ? 0 : x < 0.72 ? 1 : x < 0.93 ? 2 : 3);
     if (n > 0 && !node.boss && window.FoeAI2 && FoeAI2.packBonus) n += FoeAI2.packBonus(ri, r); // R34 MOD foe_pack：越深的地区，敌人成群出现
+    const site = window.WSites && (layOf(node), node.site) ? node.site : null; if (site) n = WSites.count(node, n, r); // R41：集会 = 5–8 人
     for (let k = 0; k < n; k++) {
       let h = null;
       if (window.RPG && RPG.foe) try { h = RPG.foe(G.S, node.loc, (r() * 4294967296) >>> 0, G.usedNames, G.usedSig); } catch (e) { console.warn('foe', e); }
@@ -343,6 +348,7 @@ window.Worlds = (() => {
       if (h) node.prey.push(h);
     }
     if (r() < 0.3 + (node.size === 'l' ? 0.3 : 0)) { const lo = node.loc.loot || [10, 30]; node.chests.push({ coin: Math.round((lo[0] + r() * (lo[1] - lo[0])) * (1.5 + r() * 2)), potion: r() < 0.25 + ri * 0.02 }); }
+    if (site) WSites.bonusLoot(node, r);
     node.loot = window.Sack ? Sack.genLoot(node, r) : []; // 第十九轮：可搜刮容器（MOD sack_grid）
   }
   // 第十四轮 14c（用户改回）：每次出门选地区，这一趟随机生成这个地区的地点图（入口=回洞门，最深处=霸主）
@@ -390,7 +396,7 @@ window.Worlds = (() => {
     const LY = layPlan(node, Rmin, doorList); // 第十八轮（总管理师）：布局原型，与 wlayout 叠加；用不规则边界的最小半径
     // R41：门口视线走廊——进门后朝里 ~12m、宽 ~4m 的带子里压平起伏（以前土丘/土墩常正好挡在门口，一进门只看见一面土坡）
     const corL = Math.min(13, Rmin * 0.55), corOn = !(window.Mods && Mods.on && Mods.on('wfix41') === false);
-    const flat = (x, z) => { let f = 1; for (const d of doorList) { f = Math.min(f, sstep(2.5, 6, Math.hypot(x - d.x, z - d.z)));
+    const flat = (x, z) => { let f = LY.flat ? LY.flat(x, z) : 1; for (const d of doorList) { f = Math.min(f, sstep(2.5, 6, Math.hypot(x - d.x, z - d.z)));
       if (corOn) { const ux = -Math.cos(d.a), uz = -Math.sin(d.a), px = x - d.x, pz = z - d.z, t = px * ux + pz * uz; if (t > -2 && t < corL) { const perp = Math.abs(px * uz - pz * ux), w = 2.2 + t * 0.22; f = Math.min(f, Math.max(sstep(w, w + 4, perp), sstep(corL * 0.5, corL, t))); } } }
       return f; };
     const H0 = (x, z) => { const rr = Math.hypot(x, z), ang = Math.atan2(z, x);
@@ -417,7 +423,7 @@ window.Worlds = (() => {
     if (sky) {
       const sm = new THREE.ShaderMaterial({ uniforms: { map: { value: sky.bg }, k: { value: g ? g.skyK * Math.pow(g.sunK, 0.5) : (st.night ? 0.9 : 1.1) }, tint: { value: g ? g.skyTint : new THREE.Color(1, 1, 1) }, fogC: { value: new THREE.Color(0, 0, 0) }, hz: { value: 0 } }, depthWrite: false, side: THREE.BackSide, fog: false,
         vertexShader: 'varying vec3 vD; void main(){ vD = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }',
-        fragmentShader: 'uniform sampler2D map; uniform float k; uniform vec3 tint; uniform vec3 fogC; uniform float hz; varying vec3 vD; void main(){ vec3 d = normalize(vD); vec2 uv = vec2(atan(d.z, d.x) * 0.1591549 + 0.5, asin(clamp(d.y, -1.0, 1.0)) * 0.3183099 + 0.5); vec3 c = texture2D(map, uv).rgb * k * tint; if (hz > 0.0) { vec3 f = linearToOutputTexel(vec4(toneMapping(fogC), 1.0)).rgb; c = mix(c, f, (1.0 - smoothstep(-0.02, hz, d.y)) * 0.92); } gl_FragColor = vec4(c, 1.0); }' });
+        fragmentShader: 'uniform sampler2D map; uniform float k; uniform vec3 tint; uniform vec3 fogC; uniform float hz; varying vec3 vD; void main(){ vec3 d = normalize(vD); vec2 uv = vec2(atan(d.z, d.x) * 0.1591549 + 0.5, asin(clamp(d.y, -1.0, 1.0)) * 0.3183099 + 0.5); vec3 c = texture2D(map, uv).rgb * k * tint; if (hz > 0.0) { vec3 f = fogC;\n#ifdef TONE_MAPPING\n f = toneMapping(fogC);\n#endif\n f = linearToOutputTexel(vec4(f, 1.0)).rgb; c = mix(c, f, (1.0 - smoothstep(-0.02, hz, d.y)) * 0.92); } gl_FragColor = vec4(c, 1.0); }' });
       // R41：地平线雾带——天空下缘渐变到（经色调映射的）雾色，远处被雾吃掉的地形边缘与天空照片接起来，不再是一圈“纸板墙”，也盖住 HDRI 里拍到的地面景物
       const skyM = new THREE.Mesh(new THREE.SphereGeometry(300, 48, 24), sm); skyM.frustumCulled = false; skyM.renderOrder = -10; if (g) skyM.rotation.y = g.yaw; skyM.userData.sky = 1; sc.add(skyM); sc.userData.skyM = skyM;
       sc.environment = sky.env; if (window.FaceFill && FaceFill.env) FaceFill.env(sky.amb); sc.fog = g ? new THREE.FogExp2(sky.horizon.clone().multiplyScalar(st.night ? 0.6 : 0.78).multiply(g.fogMul), Math.max(0.006, Math.min(st.fog * (R > 30 ? 0.7 : 1) * (LP ? LP.fog : 1) * g.fk, (st.night ? 1.5 : 1.15) / (R + 14)))) : new THREE.FogExp2(sky.horizon.clone().multiplyScalar(st.night ? 0.6 : 0.78), Math.min(st.fog * (R > 30 ? 0.7 : 1) * (LP ? LP.fog : 1), Math.max(st.fog, 0.032)));
@@ -440,7 +446,7 @@ window.Worlds = (() => {
     const variants = (list) => list.flatMap(n => templates(n).map(t => ({ t, n })));
     // 地标（先放，保证有空间）
     const spots = []; try { layPlace(LY, { sc, H, put, variants, mark, cols, doorList, spots, st, sky, node }); } catch (e) { console.warn('layout', LY.k, e); }
-    const mk = pick(r, st.marks.filter(m => !(LY.k === 'camp' && m === 'campfire') && !(LY.k === 'henge' && m === 'stones'))); let mx = (r() - 0.5) * R * 0.5, mz = (r() - 0.5) * R * 0.5; for (let t = 0; t < 25 && !free(mx, mz, 4.5); t++) { const a = r() * 6.28, d = R * (0.25 + r() * 0.55); mx = Math.cos(a) * d; mz = Math.sin(a) * d; } sc.userData.mark = mk; placeMark(mk, mx, mz);
+    const mk = pick(r, st.marks.filter(m => !(LY.k === 'camp' && m === 'campfire') && !(LY.k === 'henge' && m === 'stones'))); let mx = (r() - 0.5) * R * 0.5, mz = (r() - 0.5) * R * 0.5; for (let t = 0; t < 25 && !free(mx, mz, 4.5); t++) { const a = r() * 6.28, d = R * (0.25 + r() * 0.55); mx = Math.cos(a) * d; mz = Math.sin(a) * d; } sc.userData.mark = mk; if (!(LY.slots && window.WSites && WSites.on())) placeMark(mk, mx, mz);
     const LPX = LP ? WLayout.dress(LP, { sc, H, R, cols, free, mark, put, variants }) : null;
     const GD = g ? (() => { try { return WGen.dress(g, { sc, H, R, cols, put, variants, mark, free, spots, doorList, LP, sky, sunDir, inst }); } catch (e) { console.warn('wgen dress', e); return null; } })() : null;
     function placeMark(k, x, z) {
@@ -527,7 +533,7 @@ window.Worlds = (() => {
       cols.push({ x: d.x + Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z + Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 }, { x: d.x - Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z - Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 });
       return Object.assign(d, { g, label, home });
     });
-    return { sc, H, R, Rf: LP ? Rf : null, wx: (LPX && LPX.wx) || GD ? (dt, p, now) => { if (LPX && LPX.wx) LPX.wx(dt, p, now); if (GD) GD.update(dt, p, now); } : null, tag: [LP ? LP.tag : '', g ? g.tag.join(' · ') : ''].filter(Boolean).join(' · '), lp: LP, cols, doors, inter, sun, sunDir, terr, style: st, spots, lay: LY.k, bossAt: LY.boss ? new V3(LY.boss.x, 0, LY.boss.z) : null };
+    return { site: LY.slots ? LY : null, sc, H, R, Rf: LP ? Rf : null, wx: (LPX && LPX.wx) || GD ? (dt, p, now) => { if (LPX && LPX.wx) LPX.wx(dt, p, now); if (GD) GD.update(dt, p, now); } : null, tag: [LP ? LP.tag : '', g ? g.tag.join(' · ') : ''].filter(Boolean).join(' · '), lp: LP, cols, doors, inter, sun, sunDir, terr, style: st, spots, lay: LY.k, bossAt: LY.boss ? new V3(LY.boss.x, 0, LY.boss.z) : null };
   }
   // 画布文字 → 精灵（门牌/气泡）
   function makeLabel(text, col) {
@@ -719,6 +725,7 @@ window.Worlds = (() => {
     if (d.home) return node.home ? '🕳️ 回魂首窟' : '🌀 魂门 · 回洞';
     const m = W.graph.nodes[d.to]; let t = m.visited ? m.name : m.name + ' ？';
     if (m.boss && m.visited) t += ' 👑';
+    if (window.WSites && WSites.ico(m)) t += ' ' + WSites.ico(m) + (m.visited ? '' : ' ' + WSites.label(m)); // R41：集会隔着门就能听见
     if (m.region !== node.region) { const L = m.loc, weak = G.st && G.st().power < L.rec * 0.8; t = `${weak ? '⚠️' : ''}${L.icon}${L.n} · ${t}`; }
     return t;
   }
@@ -762,11 +769,12 @@ window.Worlds = (() => {
     if (window.Foe && !/[?&]nofoe=1/.test(location.search) && !(window.Mods && !Mods.on('foe_bodies'))) {
       try {
         const r = mulberry(node.seed ^ 0x5bd1e995), list = [];
-        node.prey.forEach(h => { list.push({ h, pos: spot(B, r) }); });
+        const SL = B.site && B.site.slots; node.prey.forEach((h, k) => { const sl = SL && SL[k]; list.push({ h, pos: sl ? new V3(sl.x, 0, sl.z) : spot(B, r) }); }); // R41：集会里各就各位
         if (wantBoss) { const Bo = Explore.BOSSES[node.region]; node.bossH = node.bossH || RPG.bossHead(G.S, G.st(), node.loc, Bo, G.usedNames, G.usedSig); list.push({ h: node.bossH, pos: B.bossAt || new V3(0, 0, 0), boss: Bo, bossK: node.region }); }
         W.dom.loadT.textContent = `「${node.name}」里有人……`;
         W.foes = await Foe.populate(foeCtx(B, node), list);
         if (W.foes && !W.foes.length && list.length) W.foes = null;
+        if (W.foes && B.site && window.WSites) WSites.seat(W.foes, B.site);
       } catch (e) { console.warn('Foe', e); W.foes = null; }
     }
     if (!W.foes) { W.prey = spawnPrey(B, node); W.boss = wantBoss ? spawnBoss(B, node) : null; }
@@ -1069,15 +1077,16 @@ window.Worlds = (() => {
   }
   function fadeTo(v) { if (DOM) DOM.fade.style.opacity = v; }
   function banner(node) {
-    const st = STYLES[node.style], b = DOM.banner; b.querySelector('.n').textContent = node.name; b.querySelector('.s').textContent = `${node.loc.icon} ${node.loc.n} · ${st.n}${LAYOUTS[layOf(node)] ? ' · ' + LAYOUTS[layOf(node)].n : ''} · ${SIZES[node.size].n}${node.home ? ' · 回洞的门在这里' : ''}${W.B && W.B.tag ? ' · ' + W.B.tag : ''}`;
+    const st = STYLES[node.style], b = DOM.banner; b.querySelector('.n').textContent = node.name; b.querySelector('.s').textContent = `${node.loc.icon} ${node.loc.n} · ${st.n}${node.site && window.WSites ? ' · ' + WSites.KINDS[node.site].ico + ' ' + WSites.label(node) : LAYOUTS[layOf(node)] ? ' · ' + LAYOUTS[layOf(node)].n : ''} · ${SIZES[node.size].n}${node.home ? ' · 回洞的门在这里' : ''}${W.B && W.B.tag ? ' · ' + W.B.tag : ''}`;
     b.style.opacity = 1; clearTimeout(banner._t); banner._t = setTimeout(() => { b.style.opacity = 0; }, 2600);
+    if (node.site && window.WSites && W.foes && W.foes.some(f => f.slot && !f.dead)) setTimeout(() => { if (W && W.B && G.toast) G.toast(WSites.hint(node), '#ffe2a8', 6); }, 2800);
     const bo = W.boss; if (bo) DOM.boss.querySelector('.bn').innerHTML = `👑 ${esc(bo.B.title)} · ${esc(bo.B.n)}`; DOM.boss.style.display = 'none';
   }
   function runBar() { let b = document.getElementById('wRun'); if (!b) { b = document.createElement('div'); b.id = 'wRun'; b.style.cssText = 'position:fixed;left:50%;bottom:74px;transform:translateX(-50%);width:180px;height:4px;border-radius:2px;background:rgba(0,0,0,.5);z-index:20;pointer-events:none;transition:opacity .3s'; b.innerHTML = '<i style="display:block;height:100%;border-radius:2px;background:#8fe08a"></i>'; document.body.appendChild(b); }
     const w = Math.round(W.run); if (w !== W.runW) { W.runW = w; b.firstChild.style.width = w + '%'; b.firstChild.style.background = W.runTired ? '#e07a5a' : '#8fe08a'; b.style.opacity = w >= 100 || (window.Combat && Combat.drawn) ? 0 : 1; } }
   function hud() {
     if (!W || !W.B || !DOM) return; const node = W.graph.nodes[W.cur], st = STYLES[node.style], s = G.st();
-    setT(DOM.tn || (DOM.tn = DOM.top.querySelector('.n')), node.name); setT(DOM.ts || (DOM.ts = DOM.top.querySelector('.s')), `${node.loc.icon} ${node.loc.n} · ${st.n}${LAYOUTS[layOf(node)] ? ' · ' + LAYOUTS[layOf(node)].n : ''} · ${SIZES[node.size].n} · 已探索 ${W.graph.nodes.filter(n => n.visited).length}/${W.graph.nodes.length}`);
+    setT(DOM.tn || (DOM.tn = DOM.top.querySelector('.n')), node.name); setT(DOM.ts || (DOM.ts = DOM.top.querySelector('.s')), `${node.loc.icon} ${node.loc.n} · ${st.n}${node.site && window.WSites ? ' · ' + WSites.KINDS[node.site].ico + ' ' + WSites.label(node) : LAYOUTS[layOf(node)] ? ' · ' + LAYOUTS[layOf(node)].n : ''} · ${SIZES[node.size].n} · 已探索 ${W.graph.nodes.filter(n => n.visited).length}/${W.graph.nodes.length}`);
     const left = W.foes ? W.foes.filter(f => !f.dead).length : W.prey.filter(p => !p.gone).length;
     const LVI = RPG.lvOf(G.S.xp), lvOn = s.lv > 1 || G.S.xp > 0;
     if (!DOM.statHp) { DOM.stat.innerHTML = '<div class="hp"><i></i></div><div class="stx"></div>'; DOM.statHp = DOM.stat.querySelector('.hp i'); DOM.statTx = DOM.stat.querySelector('.stx'); }

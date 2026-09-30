@@ -438,7 +438,8 @@ window.Foe = (() => {
         } else turnTo = Math.atan2(-dx, -dz);
         if (d < 1.9 && fo.cd <= 0 && Math.random() < 0.02 + fo.iq * 0.02) { fo.state = 'chase'; fo.brave = true; sayP(fo, 'fight', SAY.fight); } // 被追上：困兽之斗
         else if (fo.sayT <= 0 && Math.random() < 0.006) sayP(fo, 'flee', SAY.flee);
-      } else if (window.Persona && fo.state === 'idle' && Persona.idle(fo, dt, FOES)) { turnTo = fo.pidle.turnTo; spd = fo.pidle.spd; } // 第二十四轮：日常作息
+      } else if (fo.slot && fo.state === 'idle' && window.WSites && WSites.idle(fo, dt)) { turnTo = fo.slotT; spd = fo.slotS; } // R41：集会里守着自己的位置（坐着/跪着/摆摊）
+      else if (window.Persona && fo.state === 'idle' && Persona.idle(fo, dt, FOES)) { turnTo = fo.pidle.turnTo; spd = fo.pidle.spd; } // 第二十四轮：日常作息
       else { f.play(fo.idleClip, { fade: 0.3 }); }
       if (fo.spdMul && fo.spdMul !== 1 && spd > 0.5 && !fo.atk && fo.state !== 'flee') spd *= fo.spdMul;
       if (fo.slowK && fo.slowK < 1 && spd > 0.5) spd *= fo.slowK; // R36：减速（魂爆/毒雾）
