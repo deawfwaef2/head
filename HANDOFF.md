@@ -1367,3 +1367,13 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 血量 = 130×FoeAbs.hpK(rec)×(1.2+0.1×词缀数)（月之魔女 ×1.6）。战力=推荐值时预估胜率约 50%。
 - victory2：包裹 Explore.checkVictory → 霸主≥7 且 精英 13 且 猎手 4（S.h2.L.*.dead）且月之魔女。ui.js 洞内“征服目标”一行改为显示四项进度（仅 victory2 开启时；否则原文）。
 - 测试：tools/test/elites.html（桩）。
+### S5 `gear2`（新文件 js/gear2.js，window.Gear2，默认开）
+- **按键更正**：精英挑战面板从 L 改为 **C**（L 原本是 ui.js 的日志菜单，冲突）。上文 S3 里写的“L 键”一律按 C 理解。新按键：Z 装备、C 精英挑战/胜利进度、U 猎手档案（首次进游戏弹一次提示）。
+- 8 个饰品槽存在 `S.g2.eq`：neck / ring1 / ring2 / brace1 / brace2 / belt / boots / medal。物品是 Sack 物品，`id = g2_<slot>_<tier>`（Sack.def 注册，slot:'g2'），`o.g2 = {s,t,rar,aff:[[k,v]],req,lore,pre,suf,un}`。
+- 词条 17 种：属性×5、攻击、防御、生命、伤害%、暴击%（×1.8）、减伤%、每秒回血、放倒回血%、魂晶%、魂力产出%、猎手仇恨−%、猎手感应−%（暴击≤45、减伤≤55、仇恨/感应≤70）。词条数 = 稀有度（0~5）。需要等级 = (阶−1)×7 + 稀有度×2 − 4（专属装备 1）。
+- 掉落：Sack.roll 里加 Gear2.rollLoot（宝箱 40%、武器架 12%、木箱 10%、尸体 5~12%、霸主尸体 2 件）；精英击杀 → 专属神话装备（UNQ 表 14 件，固定词条+典故）；猎手真正斩杀 → 传说饰品。
+- 接入：包裹 RPG.stats（属性/攻防血/战力/魂力产出）；worlds.js ctx.power 乘 `Gear2.hitMul()`（伤害%+暴击）；包裹 FoeAbs.conv（减伤）；包裹 G.addCoins（出猎中魂晶%）；hunters2 仇恨/感应乘 hateMul/senseMul；elites/hunters2 胜率计入 avgMul 和减伤。
+- 包裹 G.buyEquip：gear2 开启时武器/头盔/护甲/护符不能买（背篓可以）；原 `forge_buy` MOD 仍然有效。
+- Z 面板（传奇风纸娃娃）：左边 5 个原槽位 + 8 个饰品槽，右边双列属性表（含全部特殊词条），下面是麻袋/储物箱里的装备，点击穿上；悬停显示完整词条和等级要求。
+- **sack.js 改动（5 处，都带 `R35 gear2` 注释）**：nameOf / rarOf 识别 o.g2；tipHtml 调用 Gear2.tipBody；equip() 开头转交 Gear2.equip；roll() 加 Gear2.rollLoot。
+- 测试：tools/sc_g2.py 流程在真实游戏（洞内）跑过：专属腰带战力 58→64、生命 140→390；等级不够时拒绝穿戴；Z/C/U/Esc 真实按键开关，没有误开其他菜单。

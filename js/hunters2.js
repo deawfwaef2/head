@@ -35,8 +35,8 @@ window.Hunters2 = (() => {
   function myPow() { try { return G_().st().power; } catch (e) { return 50; } }
   function odds(id) { // 预估胜率：你几刀砍死她 vs 她几下打死你
     const rec = powOf(lvOf(id)); if (!window.FoeAbs) return { p: 0.5, my: 0, her: 0 };
-    const st = G_().st(), myD = 12 * FoeAbs.power(), herHp = HP0 * FoeAbs.hpK(rec) * (BY[id].aff.length ? 1.3 : 1);
-    const herD = FoeAbs.REF(rec) * 0.12 * (1 - Math.min(0.5, (st.def || 0) / ((st.def || 0) + 300))), my = Math.max(1, Math.ceil(herHp / myD)), her = Math.max(1, Math.ceil(st.maxHp / Math.max(1, herD)));
+    const st = G_().st(), myD = 12 * FoeAbs.power() * (window.Gear2 ? Gear2.avgMul() : 1), herHp = HP0 * FoeAbs.hpK(rec) * (BY[id].aff.length ? 1.3 : 1);
+    const herD = FoeAbs.REF(rec) * 0.12 * (1 - Math.min(0.5, (st.def || 0) / ((st.def || 0) + 300))) * (1 - ((window.Gear2 && Gear2.sum().dr) || 0) / 100), my = Math.max(1, Math.ceil(herHp / myD)), her = Math.max(1, Math.ceil(st.maxHp / Math.max(1, herD)));
     const ratio = her * 2 / my, p = Math.max(0.01, Math.min(0.99, ratio * ratio / (1 + ratio * ratio)));
     return { p, my, her, rec, hp: Math.round(herHp) };
   }
@@ -96,11 +96,11 @@ window.Hunters2 = (() => {
     const now = performance.now(), dt = Math.min(1, (now - T.last) / 1000); T.last = now;
     const st = W.stats || {}, k = st.kill || 0, dc = st.decap || 0, s = SS();
     // 仇恨（永久） + 感应（本趟）
-    if (k > T.kH) { s.hate += (k - T.kH); T.m += (k - T.kH) * 7; T.kH = k; }
-    if (dc > T.dH) { s.hate += (dc - T.dH) * 0.5; T.m += (dc - T.dH) * 4; T.dH = dc; }
+    if (k > T.kH) { s.hate += (k - T.kH) * (window.Gear2 ? Gear2.hateMul() : 1); T.m += (k - T.kH) * 7 * (window.Gear2 ? Gear2.senseMul() : 1); T.kH = k; }
+    if (dc > T.dH) { s.hate += (dc - T.dH) * 0.5 * (window.Gear2 ? Gear2.hateMul() : 1); T.m += (dc - T.dH) * 4 * (window.Gear2 ? Gear2.senseMul() : 1); T.dH = dc; }
     const node = W.graph.nodes[W.cur], quiet = !node || node.home || node.huntArena || node.eliteArena || (W.boss && !W.boss.dead) || W.busy || W.dead;
     const mins = (now - (T.t0 || (T.t0 = now))) / 60000;
-    if (!T.fo && !quiet && now > T.cool) T.m += dt * (0.25 + mins * 0.06); // 每分钟约 15%，停得越久涨得越快
+    if (!T.fo && !quiet && now > T.cool) T.m += dt * (0.25 + mins * 0.06) * (window.Gear2 ? Gear2.senseMul() : 1); // 每分钟约 15%，停得越久涨得越快
     T.m = Math.min(100, T.m);
     const al = alive();
     if (!T.fo && !quiet && T.m >= 100 && al.length && now > T.cool) {
@@ -112,7 +112,7 @@ window.Hunters2 = (() => {
     if (fo) {
       const d = BY[T.id];
       if (fo.dead && !fo.escaped) { // 真正斩杀
-        s.L[T.id].dead = Date.now(); const c = Math.round(powOf(lvOf(T.id)) * 12); try { G.addCoins && G.addCoins(c); if (W.trip) W.trip.coins += c; } catch (e) { }
+        s.L[T.id].dead = Date.now(); const c = Math.round(powOf(lvOf(T.id)) * 12); try { G.addCoins && G.addCoins(c); if (W.trip) W.trip.coins += c; } catch (e) { } try { window.Gear2 && Gear2.dropFor(powOf(lvOf(T.id)), 4); } catch (e) { }
         banner('☠ 猎手陨落', d.n + ' · ' + d.t, `她再也不会回来了（剩余猎手 ${alive().length}/4） · +${c}🔮 · 别忘了带走她的首级`, '#ff8a70'); try { G.save(); } catch (e) { } endEncounter();
       } else if (!fo.dead) {
         T.sayT -= dt; if (T.sayT <= 0) { T.sayT = 7 + Math.random() * 6; say(fo, d.lines[1 + Math.floor(Math.random() * (d.lines.length - 2))]); }

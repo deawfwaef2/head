@@ -1,6 +1,6 @@
 // R35 MOD elite_bosses（默认开）：13 名精英BOSS + 最终BOSS「月之魔女」。
 //   每人有：身份/主题（不与地区霸主、小BOSS、四名猎手重复）、解锁条件（带剧情的“传闻”）、推荐战力、预估胜率。
-//   解锁后在「精英挑战」面板（L 键 / 洞里）点“挑战” → 出猎到她所在的地区 → 进入「决斗场」节点（门封锁，直到她倒下或你倒下）。
+//   解锁后在「精英挑战」面板（C 键 / 洞里）点“挑战” → 出猎到她所在的地区 → 进入「决斗场」节点（门封锁，直到她倒下或你倒下）。
 //   精英不是霸主（不走 fo.boss 流程）：强化精英怪 = 2~3 个 R34 词缀 + 限定技能池 + 职业 + fo.absRec（FoeAbs 按她的战力算血量/伤害）。
 // R35 MOD victory2（默认开）：胜利条件改为 任意 7 个地区霸主 + 13 名精英 + 4 名食人魔猎手 + 月之魔女（包裹 Explore.checkVictory）。
 window.Elites = (() => {
@@ -67,7 +67,7 @@ window.Elites = (() => {
   const HPOf = d => Math.round((window.FoeAbs && FoeAbs.on ? HP0 * FoeAbs.hpK(d.rec) : HP0) * (1.2 + 0.1 * d.aff.length) * (d.final ? 1.6 : 1));
   function odds(d) {
     if (!window.FoeAbs) return { p: 0.5, my: 0, her: 0 };
-    const st = G_().st(), myD = 12 * FoeAbs.power(), herHp = HPOf(d), herD = FoeAbs.REF(d.rec) * 0.13 * (1 - Math.min(0.5, (st.def || 0) / ((st.def || 0) + 300)));
+    const st = G_().st(), myD = 12 * FoeAbs.power() * (window.Gear2 ? Gear2.avgMul() : 1), herHp = HPOf(d), herD = FoeAbs.REF(d.rec) * 0.13 * (1 - Math.min(0.5, (st.def || 0) / ((st.def || 0) + 300))) * (1 - ((window.Gear2 && Gear2.sum().dr) || 0) / 100);
     const my = Math.max(1, Math.ceil(herHp / myD)), her = Math.max(1, Math.ceil(st.maxHp / Math.max(1, herD))), ratio = her * 2 / my;
     return { p: Math.max(0.01, Math.min(0.99, ratio * ratio / (1 + ratio * ratio))), my, her, hp: herHp };
   }
@@ -135,7 +135,7 @@ window.Elites = (() => {
       const d = BY[E.id], fo = E.fo;
       if (fo.dead && !fo.escaped) {
         E.done = true; SS().dead[d.id] = Date.now(); const c = Math.round(d.rec * 15); try { G.addCoins && G.addCoins(c); if (W.trip) W.trip.coins += c; } catch (e) { }
-        let loot = ''; try { if (window.Gear2 && Gear2.dropFor) loot = Gear2.dropFor(d.rec, d.final ? 5 : 4, fo.pos); } catch (e) { }
+        let loot = ''; try { if (window.Gear2 && Gear2.dropFor) loot = Gear2.dropFor(d.rec, 5, fo.pos, d.id); } catch (e) { }
         banner('☠ ' + d.n + ' 倒下了', d.lines[d.lines.length - 1], `+${c}🔮${loot ? ' · 掉落 ' + loot : ''} · 精英 ${nEl(S_())}/13 · 带走她的首级`, d.col); try { G.save(); } catch (e) { }
       }
       drawHud(W, d, fo);
@@ -192,12 +192,12 @@ ${dead ? '' : `<button data-ch="${d.id}" ${window.Worlds && Worlds.active ? 'dis
     const open = v == null ? !pn.classList.contains('on') : v; if (open) pn.innerHTML = panelHTML(); pn.classList.toggle('on', open);
     try { if (open) G.setUI(true); else { G.setUI(false); if (!(window.Worlds && Worlds.active)) G.lockPointer && G.lockPointer(); } } catch (e) { }
   }
-  addEventListener('keydown', e => { if (!on() || !window.G || !G.S) return; if (e.code === 'KeyL' && !e.repeat) { e.preventDefault(); toggle(); } else if (e.code === 'Escape' && pn && pn.classList.contains('on')) { e.stopImmediatePropagation(); toggle(false); } }, true);
+  addEventListener('keydown', e => { if (!on() || !window.G || !G.S) return; if (e.code === 'KeyC' && !e.repeat) { e.preventDefault(); toggle(); } else if (e.code === 'Escape' && pn && pn.classList.contains('on')) { e.stopImmediatePropagation(); toggle(false); } }, true);
   // 新解锁提示（剧情传闻）
   let known = null;
   setInterval(() => {
     if (!on() || !window.G || !G.S) return; const s = SS(); s.seen = s.seen || {};
-    for (const d of ALL) if (!s.seen[d.id] && !s.dead[d.id] && (() => { try { return d.cond(G.S); } catch (e) { return false; } })()) { s.seen[d.id] = Date.now(); banner('📜 新的挑战：' + d.n, '「' + d.t + '」', d.rumor + '（L 打开精英挑战）', d.col); try { G.save(); } catch (e) { } break; }
+    for (const d of ALL) if (!s.seen[d.id] && !s.dead[d.id] && (() => { try { return d.cond(G.S); } catch (e) { return false; } })()) { s.seen[d.id] = Date.now(); banner('📜 新的挑战：' + d.n, '「' + d.t + '」', d.rumor + '（C 打开精英挑战）', d.col); try { G.save(); } catch (e) { } break; }
   }, 3000);
 
   wrap(); setTimeout(wrap, 0); addEventListener('load', wrap);

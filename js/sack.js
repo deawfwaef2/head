@@ -92,8 +92,8 @@ window.Sack = (() => {
   const canAdd = (g, o) => addTo({ w: g.w, h: g.h, items: g.items.map(q => Object.assign({}, q)) }, Object.assign({}, o), false);
   const stashAdd = (o) => { const st = inv().stash, d = IT[o.id]; if (d.st > 1) for (const q of st) if (q.id === o.id && !q.plus) { q.n += o.n; return; } delete o.x; delete o.y; delete o.r; st.push(o); };
   const RN = ['凡魂', '灵魂', '英魂', '圣魂', '神魂'];
-  const nameOf = (o) => o.og && window.Organs ? Organs.name(o) : o.bk ? `《${o.bk.ti}》` : o.id === 'head' && o.h ? `【${RN[o.h.c.rar] || ''}】${NM(o.h.c)}` : (IT[o.id] ? IT[o.id].n : o.id) + (o.plus ? ` +${o.plus}` : '');
-  const rarOf = (o) => o.og ? (o.og.rar | 0) : o.id === 'head' && o.h ? o.h.c.rar : (IT[o.id] ? IT[o.id].rar : 0);
+  const nameOf = (o) => o.g2 && window.Gear2 ? Gear2.name(o) : o.og && window.Organs ? Organs.name(o) : o.bk ? `《${o.bk.ti}》` : o.id === 'head' && o.h ? `【${RN[o.h.c.rar] || ''}】${NM(o.h.c)}` : (IT[o.id] ? IT[o.id].n : o.id) + (o.plus ? ` +${o.plus}` : '');
+  const rarOf = (o) => o.g2 ? (o.g2.rar | 0) : o.og ? (o.og.rar | 0) : o.id === 'head' && o.h ? o.h.c.rar : (IT[o.id] ? IT[o.id].rar : 0);
 
   // ---- 掉落 ----
   function lvOf(node) { const L = window.Lore && Lore.LOCS; const i = L ? Math.max(0, L.findIndex(l => l.k === (node.loc && node.loc.k))) : 0; return i + (node.depth || 0) * 0.15; }
@@ -117,6 +117,7 @@ window.Sack = (() => {
       if (r() < 0.12) add('potion', 1, 1); if (extra && extra.boss) { out.push(rollEquip(r, lv, 1.5)); out.push(rollW(r, lv, 1.5)); add('gem', 1, 2); add('dust', 6, 12); } }
     { const bkI = window.Books && Books.rollLoot(r, kind, lv, extra); if (bkI) out.push(bkI); } // 第二十二轮：书与笔记
     { const pr = window.Props && Props.rollLoot ? Props.rollLoot(r, kind, lv, extra) : null; if (pr) out.push(...pr); } // 续 4：道具原料
+    { const g2 = window.Gear2 && Gear2.rollLoot ? Gear2.rollLoot(r, kind, lv, extra) : null; if (g2) out.push(...g2); } /* R35 gear2：饰品掉落 */
     { const rg = window.RegEcon && RegEcon.rollLoot ? RegEcon.rollLoot(r, kind, lv, extra) : null; if (rg) out.push(...rg); } /* 第二十六轮(k) region_econ：地区材料 */
     return out;
   }
@@ -209,6 +210,7 @@ window.Sack = (() => {
     toast('腰带里没有药（从麻袋里翻一下就好）', '#f99', 1.6); return false;
   }
   function equip(o, putOld) { // 穿上 o；旧装备交给 putOld
+    if (o.g2 && window.Gear2) return Gear2.equip(o, putOld); /* R35 gear2 饰品 */
     const S = G.S, d = IT[o.id], sl = d.slot, cur = S.eq[sl] || 0;
     if (cur > 0 || sl === 'weapon') { const pre = { weapon: 'w', helm: 'h', armor: 'a', charm: 'c', bag: 'b' }[sl]; if (!(sl === 'bag' && cur === 0)) putOld(mk(pre + cur, 1, sl !== 'bag' && S.eqPlus[sl] ? { plus: S.eqPlus[sl] } : null)); }
     S.eq[sl] = d.tier; if (sl !== 'bag') S.eqPlus[sl] = o.plus || 0; if (sl === 'weapon') { G.refreshWeapon && G.refreshWeapon(); }
@@ -385,6 +387,7 @@ window.Sack = (() => {
     if (o.og && window.Organs) body = esc(Organs.info(o)).replace(/\n/g, '<br>');
     else if (o.h) body = `${esc(RN[o.h.c.rar] || '')} · ${esc(o.h.c.raceN || o.h.c.race || '')}<br>回洞倒袋时滚出来`;
     else if (o.bk) body = esc(`${o.bk.sub || ''}（${o.bk.names.length} 个名字）`);
+    else if (o.g2 && window.Gear2) body = Gear2.tipBody(o); /* R35 gear2 */
     else if (d.kind === 'equip' && window.RPG) {
       const E = RPG.EQUIP[d.slot], t = E.tiers[d.tier], c = E.tiers[G.S.eq[d.slot] || 0], K = ['atk', 'def', 'hp', 'str', 'con', 'agi', 'ter', 'soul', 'cap'], NM = { atk: '攻击', def: '防御', hp: '生命', str: '力量', con: '体魄', agi: '敏捷', ter: '凶威', soul: '魂力', cap: '背篓' };
       body = K.filter(k => t[k] || c[k]).map(k => { const a = t[k] || 0, b = c[k] || 0, df = a - b; return `${NM[k]} <b>${a}</b> <span style="color:${df > 0 ? '#8fe88f' : df < 0 ? '#ff8f86' : '#998'}">${df > 0 ? '▲+' + df : df < 0 ? '▼' + df : '＝'}</span>`; }).join('<br>') + `<br><span style="color:#a99">${esc(t.desc || '')}</span>`;
