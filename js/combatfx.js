@@ -187,6 +187,7 @@ window.CombatFX = (() => {
     const P = posOf(fo), s = spatial(P); if (s.d > 14 || !au()) return; const t = c.currentTime, o = bus(Math.min(1, s.v * 1.2), [s.p - 0.2, s.p + 0.2], 0.15), hv = h && h.heavy;
     nz(o, t, hv ? 0.36 : 0.22, hv ? 0.7 : 0.62, 'bandpass', 450, hv ? 1200 : 2200, 1.2, 0.03); if (hv) tn(o, 'sine', 150, 60, t, 0.3, 0.3, 0.01); if (!hv) nz(o, t, 0.09, 0.06, 'highpass', 4000, 6500, 0.7, 0.02);
     if (fo && fo.armed) ring(o, t + 0.02, 2600, 0.03, 0.2, [[1, 1, 1], [1.5, 0.5, 0.8]]);
+    if (hv && fo && fo.role === 'brute' && s.d < 6) roleCue(fo, 'slam'); // 蛮兵重击：地面一震
   }
   function roleCue(fo, kind) { // 角色专属提示：刺客绕背 / 投掷出手 / 翻滚闪避 / 狂暴
     const P = posOf(fo), s = spatial(P); if (!au()) return; const t = c.currentTime, o = bus(Math.min(1, s.v * 1.1), s.p, 0.2);

@@ -983,3 +983,16 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   - 导出增加 `equip, enchant, enchCost, salvage, resizeSack, nameOf, RARC`。
 - `js/ui.js`：主菜单标签改为「⚔️ 装备·物品·工坊」；`js/mods.js` 新增 `forge_buy`。
 - 测试：`_tools/wv/cave.html`（gitignored；真实 css + rpg.js + sack.js + forge.js + 假 G）。验证：升阶扣魂晶、换上武器（旧武器带 +3 回储物箱）、附魔、三页渲染；整机未跑（OOM）。未做：野外麻袋面板（wild）仍是旧布局，仅获得悬停详情卡和更大格子。
+
+### 第二十二轮（续 9）：战斗音效 / 命中反馈 / 挥砍辅助瞄准 / 敌人职业（Arena UI Agent）
+用户反馈：战斗没音效、反馈不足；老是乱挥打不中；敌人逻辑都差不多。三个新 MOD（都在 `js/mods.js`，默认开）：
+- **`combat_fx`** → 新文件 `js/combatfx.js`（`window.CombatFX`，全部 WebAudio 现场合成，零新增音频资源；有自制小混响 + 立体声方位 + 按距离衰减）。
+  接口：`event(type,fo,data)`（worlds.js `foeEvent` 首行转发：hit/kill/decap/execute/sever/halve/parry/guard/dodge/perfectdodge/outflank）、`swing/thrust/whiff/charge/draw/stamina`（combat.js 调用）、`windup/enemySwing/roleCue`（foe.js / worlds.js 调用）、`clang`（worlds.js `clang`）、`hurt`（worlds.js `hitPlayer` 扣血前）、`tick`（每帧：敌人脚步、刺客潜行声）、`marker`（命中十字：白=命中 黄=弱点 红=击杀 蓝=被挡）、`demo()`（控制台试听全部）。
+  `js/sfx.js` 只加了 `get on()`。foe.js 在 combat_fx 开时不再播旧的 chop/squish（由 CombatFX 合成受击音）。
+  `js/combat.js` 里 `S.shake = …; G.kick…` 那行原来被行尾注释吞掉（屏震从没生效），现已恢复并加了逐帧衰减。
+  响度已用 OfflineAudioContext 量过峰值（命中 0.4–0.75，挥刀 ~0.3，格挡/弹刀 ~0.7）；**没法在沙箱里“听”，音色需要玩家试听后提意见**。
+- **`aim_assist`**（`js/combat.js`，`assistPick/asLocal/asLunge`）：出刀瞬间在视野锥（远 ≈35°、近 ≈55°）里挑最近的活敌人，刀路圆心挪到其胸口，刃的有效射程按需延长（最多 ×2.4，轨迹也跟着变长），>1.75m 时向前小步突进（≤1m，世界自己会把玩家推出碰撞体）；刺击同理；扫掠半径 ×1.3、`foe.js contact()` 骨骼半径 ×1.4；伤害按延长比例折回（不因射程变长而变大），辅助命中按“刃中段以上”算。**不碰镜头，没有粘滞**。挥空播 `whiff`。测试：`_tools/wv/combat_aa.html`（gitignored）——2–2.4m 原来必空的目标现在命中。
+- **`foe_roles`** → 新文件 `js/foe_roles.js`（`window.FoeRoles`；霸主不分职业）。foe.js 只有薄钩子：`assign`(populate) / `clip`,`tune`(attack) / `fire`(atkStep 命中帧，`A.ranged`) / `after`(收招) / `tick`(update，返回非空则接管本帧移动) / `update`(飞行物) / `evade`,`hurt`(hit) / `clear`；新增速度字段 `fo.spdMul` 与额外世界速度 `fo.rv`；`Foe` 导出 `tokenOK, ctx`，`ATK.OverhandThrow`（出手帧 0.6s 是估计值）。
+  职业：🪓蛮兵（血×1.9、慢、重击长前摇、poise 累计≥26/蓄力/破绽才硬直）· 💨游击（快、冲刺斩后撤、你挥刀时翻滚闪避——翻滚中刃穿过去）· 🛡️盾卫（永远举盾，盾朝向每 ~0.5s 才跟上你的刀；被弹刀立刻反击）· 🗡️刺客（只给持武器敌人；绕到玩家背后，背刺 ×1.6 + 0.42s 预警 + 拔刀声，得手后撤）· 🔥狂战（连击、不后退、半血狂暴）· 🎯投掷手（只给持武器敌人；拉开距离掷刃，用 `fo.wpn.clone(true)` 做飞行物（无自制模型），可格挡/可挥刀打回去伤害投掷者）。职业色调用 `mat.color` 乘系数（不新建材质），首次发现时头顶显示职业名，每种职业首次出现 toast 一次打法提示。
+  **未验证**：整套游戏（OOM）、VRM 身体实机里的翻滚/潜行动画观感、掷刃克隆武器的朝向与大小、`OverhandThrow` 出手帧。已用假 Foe 的 `_tools/wv/roles.html` 验证各职业 tick/tune/hurt/掷刃命中/打回的逻辑无异常。
+- 给后续 agent：新增敌人行为请加在 `foe_roles.js`，不要再往 foe.js 的 update 里堆；需要新音效请加在 `combatfx.js`。
