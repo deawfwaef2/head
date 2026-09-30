@@ -1426,3 +1426,18 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
    - 仍可留意：头后面“nape 壳”（MMD 后脑补丁）从下往上看是白色锯齿边（头发遮住时看不到，F 视角从下看才可能露）；VRoid 头的断面因脖子倾斜看着是斜椭圆，属正常。
 - 改动文件：`js/game.js`、`js/chess.js`、`js/foe_mind.js`（新）、`js/mods.js`（+foe_mind）、`index.html`（+script）、`js/recall_iw.js`、`js/heads.js`、`tools/test/cutview.html`（新）、`tools/test/fight.html`、`HANDOFF.md`。
 - 提醒用户：聊天里的 GitHub PAT 已多次暴露，请去 GitHub 撤销并换新。
+## R37（主管）：废铁武器手感 + 第三批敌人
+用户：“敌人种类太少、太简单，战斗过程粗糙”；“垃圾武器攻击前摇长，必须按住才攻击，战斗不好玩”。（第 1 条头棋朝向已由 R37c 完成，未改动。）
+
+**武器（js/combat.js，我的文件）**
+- 根因：CD 中点击会进缓冲，但 CD 结束时若点击已超过 480ms 就被丢弃；钉头棒/流星锤/巨斧 自重 1.3/1.5/1.4 × sqrt → CD 800~1100ms → 早点的一下全丢，只有“按住+晃鼠标”能出刀。
+- 修：缓冲窗口 = max(480, 本次CD+220ms)（CD 中的点击永不丢）；WEIGHT → [0.85,0.95,0.8,1.2,1.25,0.9,1.0]；重量曲线 sqrt → wt^0.35（WK）；CD 基数 500/750/950 → 380/560/800；轻击前摇 0.08→0.06。
+- 导出 `window.CombatTune {WEIGHT, WK, CDB, WU, SW}`。**js/wpnspec.js（R36b 他人文件，最小改动）**：WT/前摇/冷却改为读 CombatTune（带旧值兜底），两条 FEEL 文案改为新手感。以后改公式只改 combat.js。
+- 测试（tools/test/fight.html，同点击节奏 4 秒）：出刀 6~7 次 → 9~10 次。
+
+**第三批敌人：MOD `foe_roles3`（js/foe_roles3.js，新文件，默认开）**
+- 长枪手 lancer / 双刀舞姬 twinblade / 炼金投弹手 bomber / 猎网手 netter / 陷阱师 trapper / 唤灵师 wispcaller；约 38% 敌人换成这批。全是特效（光球/地面标记），无新模型。
+- 接入：不改 foe_roles.js / foe_roles2.js——加载时包 FoeRoles2 的 pick/init/clip/tune/after/tick/evade/hurt/update/clear，并把 key 加进 FoeRoles2.R / FoeRoles.INFO。**必须在 foe_roles2.js 之后加载。**
+- 反“贴脸狂点”：1.4 秒内挨第 3 刀 → 不硬直 + 职业脱身（后滚/侧闪/脚下药瓶），冷却 4 秒；长枪手脱身后的突刺、双刀侧闪后的连斩霸体。测试证明以前贴脸每 0.3 秒一刀可无限硬直，新职业技能根本放不出。
+- 定身（网/夹子）：**js/worlds.js:829** 玩家移速多乘 `FoeRoles3.moveK()`（一处）。连按空格缩短。遮罩 DOM `#fr3root`（z 40）。
+- 其他：mods.js 加一条；index.html 在 foe_roles2.js 后加 script；tools/test/fight.html 加 script。调试计数 `FoeRoles3.CNT`。

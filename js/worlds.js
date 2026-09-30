@@ -826,7 +826,7 @@ window.Worlds = (() => {
         sp = ex ? ex : (wantRun ? 6.2 : 3.6) * (1 - 0.55 * P.crouch); }
       runBar();
       fw.set(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)); rt.set(Math.cos(P.yaw), 0, -Math.sin(P.yaw));
-      want.copy(fw).multiplyScalar(f).addScaledVector(rt, s); if (want.lengthSq() > 0) want.normalize().multiplyScalar(sp * (window.Talents ? Talents.moveMul() : 1)); // R36 移速天赋/增益
+      want.copy(fw).multiplyScalar(f).addScaledVector(rt, s); if (want.lengthSq() > 0) want.normalize().multiplyScalar(sp * (window.Talents ? Talents.moveMul() : 1) * (window.FoeRoles3 ? FoeRoles3.moveK() : 1)); // R37 被网/夹住=定身；R36 移速天赋/增益
       if (W.dashT > 0) { W.dashT -= dt; W.vel.x = W.dashV.x; W.vel.z = W.dashV.z; } else { W.vel.x += (want.x - W.vel.x) * Math.min(1, dt * 10); W.vel.z += (want.z - W.vel.z) * Math.min(1, dt * 10); }
       if (K.Space && W.onGround && P.crouch < 0.3 && (!window.Stamina || Stamina.canJump())) { W.vel.y = 4.4; W.onGround = false; }
     } else { W.vel.x *= 0.8; W.vel.z *= 0.8; }
