@@ -439,6 +439,7 @@ window.Foe = (() => {
       } else if (window.Persona && fo.state === 'idle' && Persona.idle(fo, dt, FOES)) { turnTo = fo.pidle.turnTo; spd = fo.pidle.spd; } // 第二十四轮：日常作息
       else { f.play(fo.idleClip, { fade: 0.3 }); }
       if (fo.spdMul && fo.spdMul !== 1 && spd > 0.5 && !fo.atk && fo.state !== 'flee') spd *= fo.spdMul;
+      if (fo.slowK && fo.slowK < 1 && spd > 0.5) spd *= fo.slowK; // R36：减速（魂爆/毒雾）
       if (window.Persona) { Persona.tick(fo, dt); if (fo.gestT > 0) { spd = 0; strafe = 0; } } // 第二十四轮：点头/摇头时站定
       if (SMART && spd > 0.5 && turnTo != null && !fo.atk) { // 第二十一轮：绕开树/石头/墙，卡住就换方向绕路
         if (fo.sideT > 0) fo.sideT -= dt; if (fo.detour > 0) { fo.detour -= dt; turnTo = fo.detourYaw; } else turnTo = goal ? steer(fo, turnTo, goal) : avoidC(fo, turnTo);
@@ -708,9 +709,10 @@ window.Foe = (() => {
     let dealt = Math.max(1, Math.round((fo.boss ? 11 : 12) * q * sp * mult * (slash ? 1 : 0.8) * (0.85 + Math.random() * 0.3)));
     if (!(window.FoeAbs && FoeAbs.on)) dealt = Math.max(dealt, Math.round(fo.maxHp * (fo.boss ? 0.09 : 0.17) * (fo.floorK || 1) * (info.fmul || 1) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：一记正常的砍至少削掉 ~17% 血（≈6 刀），霸主 ~9%（≈11 刀）——实力差距再大也不会出现“砍 20 刀不死”
     if (!(window.FoeAbs && FoeAbs.on)) { fo.nHit = (fo.nHit || 0) + 1; const cap = Math.round((fo.boss ? 12 : 6) * (fo.capK || 1)); /* R34：区域强度大时保险刀数按比例增加 */ if (fo.nHit >= cap - 2) dealt = Math.max(dealt, Math.ceil(fo.hp / (cap + 1 - Math.min(fo.nHit, cap)))); } // 第二十六轮保险（用户：永远打不死）：不管护甲/角色/回血，普通敌人第 6 刀必死、霸主第 12 刀必死
-    const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.12; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk);
+    if (window.Talents) dealt = Talents.outDmg(fo, info, dealt, zone, brk); // R36：属性/天赋/暴击/背刺/印记
+    const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.12; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk || !!info.crit);
     { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp); fo.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退：0.16 秒内推完（以前是一帧内整段位移 = “瞬移”）
-    ctx.event && ctx.event('hit', fo, { dealt, zone, brk, kind: info.kind, spd, charged: info.charged });
+    ctx.event && ctx.event('hit', fo, { dealt, zone, brk, kind: info.kind, spd, charged: info.charged, crit: info.crit, skill: info.skill, spell: info.spell, proc: info.proc });
     if (!fo.seen) { fo.seen = true; fo.state = fo.brave ? 'chase' : 'flee'; if (fo.boss) ctx.bossMeet(fo); }
     if (!fo.brave && Math.random() < 0.65) { fo.brave = true; fo.state = 'chase'; } // 第二十六轮：挨打后更容易回头拼命（0.35→0.65）
     if (fo.boss) ctx.bossHp(fo);
@@ -736,6 +738,11 @@ window.Foe = (() => {
     if (!fo.boss && !fo.dead && window.Persona && fo.state === 'chase' && Persona.fleeHp(fo) && fo.hp < fo.maxHp * Persona.fleeHp(fo) && !fo.fledOnce) { fo.fledOnce = true; fo.state = 'flee'; fo.brave = false; sayP(fo, 'flee', SAY.flee); } // 胆小：挨几刀就跑向门
     if (!(window.CombatFX && CombatFX.on)) { sfx().chop && sfx().chop(); sfx().squish && sfx().squish(0.5); } // 有 combat_fx 时由 CombatFX 合成更丰富的受击音
     return true;
+  }
+  function dotDmg(fo, n, info) { // R36：持续伤害 / 反伤：直接扣血（不打断、不触发命中事件），致死走 die()
+    if (!fo || fo.dead || !(n > 0)) return false; n = Math.max(1, Math.round(n)); fo.hp -= n; fo.flash = 0.08; if (CTX && CTX.floatDmg) CTX.floatDmg(fo.anchor.pos, n, false);
+    if (!fo.seen) { fo.seen = true; fo.state = 'chase'; fo.brave = true; } if (fo.boss && CTX && CTX.bossHp) CTX.bossHp(fo);
+    if (fo.hp <= 0) { const p = fo.pos.clone(); p.y += 1; die(fo, info || { point: p, vel: new V3(0, 0, 0), speed: 3, kind: 'slash' }, false); } return true;
   }
   function die(fo, info, quiet) {
     if (!fo.boss && window.Persona) { const t = Persona.line(fo, 'die'); if (t) talk(fo, t, '#c8c8d0'); } // 第二十四轮：最后一句
@@ -969,5 +976,5 @@ window.Foe = (() => {
     const pinv = new M4().copy(par.matrixWorld).invert().multiply(root.matrixWorld); hips.position.copy(want.applyMatrix4(pinv));
   }
   function has(name) { return !!(window.BODY_LIST && BODY_LIST.includes(name)); }
-  return { bodyFor, say: (fo, t, col) => talk(fo, t, col), hasHead: (h) => HEADS.includes(h), warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, attack, ATK, tokenOK, ctx: () => CTX, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
+  return { bodyFor, say: (fo, t, col) => talk(fo, t, col), hasHead: (h) => HEADS.includes(h), warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, dot: dotDmg, attack, ATK, tokenOK, ctx: () => CTX, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
 })();

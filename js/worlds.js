@@ -551,7 +551,7 @@ window.Worlds = (() => {
         if (type === 'block' && window.Combat) { Combat.recoil(1); G.toast && G.toast('🛡️ 被她挡住了——换个方向砍，或蓄力重斩破防', '#9fd0ff', 1.1); } if (type === 'break') { W.shake = Math.max(W.shake || 0, 0.35); G.toast && G.toast('💥 破防！', '#9fd0ff', 1.1); } },
       power: (fo) => { if ((window.FoeAbs && FoeAbs.on)) return FoeAbs.power() * (window.Gear2 ? Gear2.hitMul() : 1); const q = G.st().power / ((fo.boss ? node.loc.rec * (fo.boss.pow || 2) : node.loc.rec * [0.7, 0.9, 1.15, 1.5, 2.1][fo.rar])); return Math.pow(clamp(q, 0.25, 3), 0.7) * (window.Sack ? Sack.dmgMul() : 1); },
       rec: (fo) => node.loc.rec * (fo.boss ? (fo.boss.pow || 2) : [0.7, 0.9, 1.15, 1.5, 2.1][fo.rar]), // R34：这个敌人的“推荐战力”（foe_ai2 按它缩放血量/伤害）
-      hitPlayer: (fo, n, h = {}) => { const s = G.st(); if ((window.FoeAbs && FoeAbs.on)) n = FoeAbs.conv(fo, n, s, node.loc.rec); n = Math.max(1, Math.round(n * (1 - s.dodge * 0.5) * (1 - Math.min(0.5, s.def / (s.def + 300)))));
+      hitPlayer: (fo, n, h = {}) => { const s = G.st(); if ((window.FoeAbs && FoeAbs.on)) n = FoeAbs.conv(fo, n, s, node.loc.rec); if (window.Talents && Talents.avoid(fo, h)) return; n = Math.max(1, Math.round(n * (1 - s.dodge * 0.5) * (1 - Math.min(0.5, s.def / (s.def + 300)))));
         const now = performance.now() / 1000, CS = window.Combat && Combat.drawn && !(window.Stamina && Stamina.ex) && Combat.state; // 力竭：格挡失效
         // 闪身无敌帧
         if (W.dodgeT > now) { const perfect = now - W.dodgeAt < 0.22; if (perfect) { W.shake = Math.max(W.shake || 0, 0.25); fo.broken = Math.max(fo.broken || 0, 1.1); fo.stag = Math.max(fo.stag || 0, 0.9); G.toast && G.toast('💨 完美闪避！她露出了破绽', '#c8f0ff', 1.4); foeEvent('perfectdodge', fo); } else foeEvent('dodge', fo); return; }
@@ -569,6 +569,7 @@ window.Worlds = (() => {
           else { G.toast && G.toast('❌ 格挡方向错了！', '#ff9080', 0.8); G.flash && G.flash('#a00000', 0.4, 280); W.shake = Math.max(W.shake || 0, 0.25); }
         } else { G.flash && G.flash('#a00000', 0.4, 280); W.shake = Math.max(W.shake || 0, fo.boss ? 0.5 : 0.25); }
         if (W.stats) W.stats.combo = 0;
+        if (window.Talents && n > 0) n = Talents.inDmg(fo, n, h); // R36：减伤 / 护盾 / 荆棘 / 不屈
         if (n > 0) { if (window.Sack) Sack.interrupt(); if (window.CombatFX) CombatFX.hurt(n, fo, h); if (window.Recall) Recall.hurtBy(fo, n); G.damage(n); W.trip.log.push({ t: `${NM(fo.h.c)}${fo.boss ? '' : '反击'}，你受了伤。`, d: `-${n} HP` }); } },
       bossMeet: (fo) => { W.dom.boss.style.display = 'block'; W.boss = { B: fo.boss, pos: fo.pos, foe: fo, hp: 100, dead: false, sayT: 0 }; bossSay(fo.boss.say || pick(Math.random, fo.boss.taunt), 3); },
       bossHp: (fo) => { W.dom.bossHp.style.width = Math.max(0, fo.hp / fo.maxHp * 100) + '%'; if (W.boss && W.boss.sayT <= 0 && Math.random() < 0.3) { bossSay(pick(Math.random, fo.boss.hurt), 2); W.boss.sayT = 4; } },
@@ -595,7 +596,7 @@ window.Worlds = (() => {
     W.dom.root.appendChild(el); SFX.fanfare && SFX.fanfare(3); setTimeout(() => el.classList.add('out'), 2600); setTimeout(() => el.remove(), 3400);
   }
   function gainXp(n) { // 食人魔升级：经验来自战斗事件；升级永久加属性，回一部分血
-    const S = G.S, s0 = G.st(); if (G.xpMul) { const x = n * G.xpMul() + (S._xf || 0); n = Math.floor(x); S._xf = x - n; if (n < 1) return; } const up = RPG.addXp(S, n); if (!up) return; const s1 = G.st();
+    const S = G.S, s0 = G.st(); if (G.xpMul) { const x = n * G.xpMul() + (S._xf || 0); n = Math.floor(x); S._xf = x - n; if (n < 1) return; } const up = RPG.addXp(S, n); if (!up) return; if (window.Talents) Talents.onLevel(up); const s1 = G.st();
     S.hp = Math.min(s1.maxHp, S.hp + Math.round(s1.maxHp * 0.35));
     const d = [['str', '力量'], ['con', '体魄'], ['agi', '敏捷'], ['ter', '凶威'], ['soul', '魂力']].filter(([k]) => s1[k] > s0[k]).map(([k, n]) => `${n}+${s1[k] - s0[k]}`).concat(s1.maxHp > s0.maxHp ? [`生命+${s1.maxHp - s0.maxHp}`] : []).join(' · ');
     achBanner(`升级！Lv.${up.to}`, d || '继续变强'); W && W.trip.log.push({ t: `⬆️ 食人魔升到 Lv.${up.to}（${d}）`, cls: 'gethead' }); SFX.levelup && SFX.levelup(); G.save && G.save();
@@ -605,10 +606,10 @@ window.Worlds = (() => {
   //   现在：声明单独成行；整个事件处理包 try/catch——音效/日志/成就里的任何 bug 都不能再打断伤害结算。
   function foeEvent(t, fo, d) { try { foeEvent0(t, fo, d); } catch (e) { console.warn('foeEvent', t, e); } }
   function foeEvent0(t, fo, d) {
-    if (!W) return; if (window.Recall) { try { Recall.log(fo, t, d); } catch (e) { console.warn(e); } } if (window.CombatFX) { try { CombatFX.event(t, fo, d); } catch (e) { console.warn(e); } } // 第二十二轮（续 9）：命中/击杀/格挡音效 + 命中准星
+    if (!W) return; if (window.Talents) { try { Talents.onEvent(t, fo, d); } catch (e) { console.warn('Talents', e); } } // R36 天赋事件（吸血/魂能/暴击联动） if (window.Recall) { try { Recall.log(fo, t, d); } catch (e) { console.warn(e); } } if (window.CombatFX) { try { CombatFX.event(t, fo, d); } catch (e) { console.warn(e); } } // 第二十二轮（续 9）：命中/击杀/格挡音效 + 命中准星
     const now = performance.now() / 1000, st = W.stats = W.stats || { kill: 0, decap: 0, execute: 0, onecut: 0, sever: 0, halve: 0, parry: 0, combo: 0, maxCombo: 0, lastHit: 0, kills: [] };
     if (t === 'hit') { st.combo = now - st.lastHit < 2.5 ? st.combo + 1 : 1; st.lastHit = now; st.maxCombo = Math.max(st.maxCombo, st.combo); showCombo(st.combo, d && d.brk); if (st.combo >= 10) achAdd('combo', st.combo, true); return; }
-    const rw = REW[t]; if (rw) { const mul = 1 + (fo.rar || 0) * 0.5 + (fo.boss ? 3 : 0), c = Math.round(rw[0] * mul * (1 + Math.min(1, st.combo / 20))); G.addCoins(c); W.trip.coins += c; gainXp(Math.max(1, Math.round(rw[0] * mul * 0.8)));
+    const rw = REW[t]; if (rw) { const tm = window.Talents ? Talents.rewardMul(fo) : { c: 1, x: 1 }, mul = 1 + (fo.rar || 0) * 0.5 + (fo.boss ? 3 : 0), c = Math.round(rw[0] * mul * (1 + Math.min(1, st.combo / 20)) * tm.c); G.addCoins(c); W.trip.coins += c; gainXp(Math.max(1, Math.round(rw[0] * mul * 0.8 * tm.x)));
       floatDmg(fo.anchor ? fo.anchor.pos : fo.pos, `${rw[1]} +${c}🔮`, t === 'execute' || t === 'onecut'); SFX.coins && SFX.coins(); }
     if (t in st) st[t]++;
     if (t === 'kill') { st.kills = st.kills.filter(x => now - x < 8); st.kills.push(now); if (st.kills.length >= 2) { const nm = ['', '', '双杀！', '三杀！', '四杀！', '屠戮！'][Math.min(5, st.kills.length)]; G.toast && G.toast(`💀 ${nm}`, '#ff7060', 1.6); achAdd('multi', st.kills.length, true); } }
@@ -825,7 +826,7 @@ window.Worlds = (() => {
         sp = ex ? ex : (wantRun ? 6.2 : 3.6) * (1 - 0.55 * P.crouch); }
       runBar();
       fw.set(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)); rt.set(Math.cos(P.yaw), 0, -Math.sin(P.yaw));
-      want.copy(fw).multiplyScalar(f).addScaledVector(rt, s); if (want.lengthSq() > 0) want.normalize().multiplyScalar(sp);
+      want.copy(fw).multiplyScalar(f).addScaledVector(rt, s); if (want.lengthSq() > 0) want.normalize().multiplyScalar(sp * (window.Talents ? Talents.moveMul() : 1)); // R36 移速天赋/增益
       if (W.dashT > 0) { W.dashT -= dt; W.vel.x = W.dashV.x; W.vel.z = W.dashV.z; } else { W.vel.x += (want.x - W.vel.x) * Math.min(1, dt * 10); W.vel.z += (want.z - W.vel.z) * Math.min(1, dt * 10); }
       if (K.Space && W.onGround && P.crouch < 0.3 && (!window.Stamina || Stamina.canJump())) { W.vel.y = 4.4; W.onGround = false; }
     } else { W.vel.x *= 0.8; W.vel.z *= 0.8; }

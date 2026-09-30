@@ -67,12 +67,13 @@ window.RPG = (() => {
   }
   // 最终属性 = 基础 + 训练 + 装备 + 建筑加成
   // ---- 第二十二轮：食人魔等级（MOD ogre_level）：斩杀/处决/斩首/格挡等战斗事件给经验，升级永久提高属性与生命上限 ----
-  const LVMAX = 60, lvNeed = lv => Math.round(30 * Math.pow(1.3, lv - 1));
+  const LVMAX = 60, lvNeed = lv => (window.Talents && Talents.on() ? Talents.need(lv) : Math.round(30 * Math.pow(1.3, lv - 1))); // R36：天赋系统开启时用更平缓的曲线
   const lvOn = () => !(window.Mods && Mods.on('ogre_level') === false);
   function lvOf(xp) { let lv = 1, x = Math.max(0, xp || 0); while (lv < LVMAX && x >= lvNeed(lv)) { x -= lvNeed(lv); lv++; } return { lv, cur: Math.round(x), need: lv >= LVMAX ? 0 : lvNeed(lv) }; }
-  function lvBonus(S) { if (!lvOn()) return { lv: 1 }; const n = lvOf(S.xp).lv - 1; return { lv: n + 1, str: Math.floor(n * 0.8), con: Math.floor(n * 1.1), agi: Math.floor(n * 0.5), ter: Math.floor(n * 0.4), soul: Math.floor(n * 0.25), hp: n * 5 }; }
+  function lvBonus(S) { if (!lvOn()) return { lv: 1 }; const n = lvOf(S.xp).lv - 1; if (window.Talents && Talents.on()) return { lv: n + 1, hp: n * 5 }; /* R36：属性改为手动加点 */ return { lv: n + 1, str: Math.floor(n * 0.8), con: Math.floor(n * 1.1), agi: Math.floor(n * 0.5), ter: Math.floor(n * 0.4), soul: Math.floor(n * 0.25), hp: n * 5 }; }
   function addXp(S, n) { if (!lvOn() || !(n > 0)) return null; const a = lvOf(S.xp).lv; S.xp = (S.xp || 0) + n; const b = lvOf(S.xp).lv; return b > a ? { from: a, to: b } : null; }
   function stats(S, buildBonus) {
+    if (window.Talents) buildBonus = Talents.bonus(S, buildBonus); // R36：手动属性点
     const e = eqSum(S); const o = {}, lb = lvBonus(S);
     for (const [k] of STATS) o[k] = (S.base[k] || 0) + (e[k] || 0) + (buildBonus[k] || 0) + (lb[k] || 0);
     o.lv = lb.lv;
@@ -81,6 +82,7 @@ window.RPG = (() => {
     o.power = Math.round((o.str + o.atk) * 3 + o.agi * 2 + o.ter * 2 + o.con * 1.5 + o.def * 1.5);
     o.dodge = o.agi / (o.agi + 80);
     o.yieldMul = 1 + o.soul * 0.04;
+    if (window.Talents) Talents.post(S, o); // R36：暴击/魂能/冷却/减伤等派生属性
     return o;
   }
   const TRAIN = {

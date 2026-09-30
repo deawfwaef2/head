@@ -8,7 +8,7 @@ T0 = time.time()
 def log(*a): print('T+%03d' % (time.time() - T0), *a, flush=True)
 with sync_playwright() as p:
     b = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--js-flags=--max-old-space-size=1400"])
-    pg = b.new_page(viewport={'width': 800, 'height': 450})
+    pg = b.new_page(viewport={'width': int(__import__('os').environ.get('VW', 800)), 'height': int(__import__('os').environ.get('VH', 450))})
     pg.add_init_script("Element.prototype.requestPointerLock=undefined;")
     pg.on('pageerror', lambda e: log('PAGEERR', str(e)[:300]))
     pg.on('crash', lambda: log('PAGE CRASHED'))
