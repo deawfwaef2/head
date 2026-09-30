@@ -67,7 +67,7 @@ window.RegEcon = (() => {
   const CAT = () => window.BuildCat && BuildCat.C;
   const hash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
   // 价位档：<150 免材料（开局建筑）；<400 只要通用材料；之后按价格 / 所需洞层升档，档越高地区越远、越要稀有料
-  const BANDS = [null, { lo: 0, hi: 1, c: [2, 4] }, { lo: 0, hi: 3, c: [4, 7] }, { lo: 2, hi: 5, c: [6, 10], r: [1, 2] }, { lo: 4, hi: 8, c: [8, 12], r: [2, 3] }];
+  const BANDS = [null, { lo: 0, hi: 1, c: [2, 4] }, { lo: 1, hi: 4, c: [4, 7] }, { lo: 3, hi: 7, c: [6, 10], r: [1, 2] }, { lo: 5, hi: 8, c: [8, 12], r: [2, 3] }];
   const baseCache = {};
   function baseNeed(k) {
     if (baseCache[k]) return baseCache[k]; const d = CAT() && CAT()[k]; if (!d) return {};
