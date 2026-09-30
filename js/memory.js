@@ -84,7 +84,8 @@ window.Memory = (() => {
     root.addEventListener('click', e => { const c = e.target.closest('[data-mm]'); if (c) return pick(+c.dataset.mm); if (e.target.closest('[data-rr]')) return reroll(); if (e.target.closest('[data-x]')) close(); });
   }
   const lvl = () => { try { return RPG.lvOf(G().S.xp).lv; } catch (e) { return 1; } };
-  const rrCost = () => (hasAltar() && !st.rr ? 0 : 40 * lvl() * (st.rr + (hasAltar() ? 0 : 1)));
+  const tok = () => { try { return (G().S.saga && G().S.saga.rr) || 0; } catch (e) { return 0; } };
+  const rrCost = () => (tok() > 0 ? 0 : hasAltar() && !st.rr ? 0 : 40 * lvl() * (st.rr + (hasAltar() ? 0 : 1)));
   function render() {
     const D = TD(), L = left(); st.left = L;
     if (!st.cards.length) { root.innerHTML = `<div class="hd"><div class="a">MEMORY</div><div class="b">回 忆</div></div><div class="empty">${L > 0 ? '没有可以唤醒的记忆了——天赋树已经点满。' : '没有多余的技能点。升级、击败霸主和精英可以获得更多。'}</div><div class="ft"><button data-x>返回 ▶</button></div>`; return; }
@@ -97,7 +98,7 @@ window.Memory = (() => {
     }).join('');
     const c = rrCost();
     root.innerHTML = `<div class="hd"><div class="a">${hasAltar() ? '回 忆 之 镜' : 'M E M O R Y'}</div><div class="b">回 忆</div><div class="c">唤醒一段记忆　·　可用技能点 <b>${L}</b></div></div><div class="cards">${cards}</div>
-<div class="ft"><button data-rr ${c > G().S.coins ? 'disabled' : ''}>🔄 重抽 ${c ? '🔮' + c : '（免费）'}</button><button data-x>稍后再想</button><small>按 1 / 2 / 3${st.cards.length > 3 ? ' / 4' : ''} 选择 · Esc 关闭</small></div>`;
+<div class="ft"><button data-rr ${c > G().S.coins ? 'disabled' : ''}>🔄 重抽 ${c ? '🔮' + c : (tok() > 0 ? '（重抽券 ×' + tok() + '）' : '（免费）')}</button><button data-x>稍后再想</button><small>按 1 / 2 / 3${st.cards.length > 3 ? ' / 4' : ''} 选择 · Esc 关闭</small></div>`;
   }
   function open(opts) {
     if (!on() || !window.Talents || !window.TalData) return false; ensure();
@@ -107,7 +108,7 @@ window.Memory = (() => {
     try { G().setUI(true); SFX.open && SFX.open(); SFX.page && SFX.page(); } catch (e) { } return true;
   }
   function close() { if (!root || !root.classList.contains('on')) return; root.classList.remove('on'); try { G().setUI(false); G().lockPointer && G().lockPointer(); SFX.close && SFX.close(); } catch (e) { } }
-  function reroll() { const c = rrCost(); if (c > G().S.coins) return; if (c) G().addCoins(-c); st.rr++; st.cards = draw(hasAltar() ? 4 : 3); st.fl = {}; render(); try { SFX.page && SFX.page(); } catch (e) { } }
+  function reroll() { const c = rrCost(); if (c > G().S.coins) return; if (c) G().addCoins(-c); else if (tok() > 0) G().S.saga.rr--; st.rr++; st.cards = draw(hasAltar() ? 4 : 3); st.fl = {}; render(); try { SFX.page && SFX.page(); } catch (e) { } }
   function flash(col) { let f = document.getElementById('mmFlash'); if (!f) { f = document.createElement('div'); f.id = 'mmFlash'; document.body.appendChild(f); } f.style.setProperty('--c', col); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); }
   function pick(i) {
     const id = st && st.cards[i]; if (!id) return; const D = TD(), nd = D.ALL[id], sc = D.SCHOOLS.find(s => s.id === nd.school);
@@ -172,5 +173,6 @@ window.Memory = (() => {
   }, 800);
   // 结算卡关闭后若还有技能点，自动弹出回忆
   function afterSettle() { setTimeout(() => { if (on() && left() > 0 && !(window.Worlds && Worlds.active)) open({ auto: 1 }); }, 500); }
-  return { on, open, close, draw, eligible, left, afterSettle, hasAltar, FLAVOR, get st() { return st; } };
+  function grantReroll(n) { const S = G().S; S.saga = S.saga || {}; S.saga.rr = (S.saga.rr || 0) + (n || 1); }
+  return { grantReroll, on, open, close, draw, eligible, left, afterSettle, hasAltar, FLAVOR, get st() { return st; } };
 })();

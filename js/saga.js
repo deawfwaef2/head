@@ -168,24 +168,24 @@ window.Saga = (() => {
 /* 结算 */
 #sgSet{position:fixed;inset:0;z-index:62;display:none;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 40%,rgba(18,10,24,.6),rgba(0,0,0,.9));backdrop-filter:blur(5px);font-family:var(--u-serif,serif)}
 #sgSet.on{display:flex;animation:arIn .5s ease-out}
-#sgSet .cd{width:min(1040px,94vw);max-height:92vh;overflow:auto;background:linear-gradient(180deg,#16101c,#0c080e);box-shadow:0 0 0 1px var(--c),0 30px 120px #000,0 0 120px color-mix(in srgb,var(--c) 25%,transparent);color:#eee;position:relative}
-#sgSet .hd{padding:30px 40px 16px;text-align:center;background:linear-gradient(180deg,color-mix(in srgb,var(--c) 22%,transparent),transparent)}
+#sgSet .cd{width:min(1040px,94vw);max-height:97vh;overflow:auto;background:linear-gradient(180deg,#16101c,#0c080e);box-shadow:0 0 0 1px var(--c),0 30px 120px #000,0 0 120px color-mix(in srgb,var(--c) 25%,transparent);color:#eee;position:relative}
+#sgSet .hd{padding:18px 40px 6px;text-align:center;background:linear-gradient(180deg,color-mix(in srgb,var(--c) 22%,transparent),transparent)}
 #sgSet .hd .a{font-size:16px;letter-spacing:.6em;color:var(--c);padding-left:.6em}
-#sgSet .hd .b{font-size:clamp(40px,6vw,76px);font-weight:900;letter-spacing:.3em;color:#fff;text-shadow:0 0 50px color-mix(in srgb,var(--c) 60%,transparent);padding-left:.3em;margin:4px 0}
-#sgSet .hd .c{font-size:20px;color:#e8dcc6;letter-spacing:.1em;line-height:1.7}
-#sgSet .bd{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:10px 34px 6px}
-#sgSet .bx{padding:14px 18px;background:rgba(255,255,255,.04);box-shadow:inset 3px 0 0 var(--c2,var(--c))}
+#sgSet .hd .b{font-size:clamp(34px,4.4vw,56px);font-weight:900;letter-spacing:.3em;color:#fff;text-shadow:0 0 50px color-mix(in srgb,var(--c) 60%,transparent);padding-left:.3em;margin:4px 0}
+#sgSet .hd .c{font-size:19px;color:#e8dcc6;letter-spacing:.1em;line-height:1.5}
+#sgSet .bd{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:6px 34px 4px}
+#sgSet .bx{padding:8px 16px;background:rgba(255,255,255,.04);box-shadow:inset 3px 0 0 var(--c2,var(--c))}
 #sgSet .bx .k{font-size:15px;letter-spacing:.3em;color:var(--c2,var(--c));font-weight:800}
-#sgSet .bx .v{font-size:21px;font-weight:800;color:#fff;margin:4px 0;line-height:1.5}
+#sgSet .bx .v{font-size:21px;font-weight:800;color:#fff;margin:2px 0;line-height:1.4}
 #sgSet .bx .w{font-size:16px;color:#cbbda6;line-height:1.6}
 #sgSet .st{grid-column:1/-1;display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
-#sgSet .st div{text-align:center;padding:10px 4px;background:rgba(255,255,255,.04)}
-#sgSet .st b{display:block;font-size:30px;color:#fff;font-weight:900}#sgSet .st span{font-size:15px;color:#b8a98f;letter-spacing:.2em}
-#sgSet .cl{grid-column:1/-1;display:flex;align-items:center;gap:16px;padding:12px 18px;background:rgba(120,100,200,.12);box-shadow:inset 3px 0 0 #b8a8ff}
+#sgSet .st div{text-align:center;padding:5px 4px;background:rgba(255,255,255,.04)}
+#sgSet .st b{display:block;font-size:26px;color:#fff;font-weight:900}#sgSet .st span{font-size:15px;color:#b8a98f;letter-spacing:.2em}
+#sgSet .cl{grid-column:1/-1;display:flex;align-items:center;gap:16px;padding:7px 18px;background:rgba(120,100,200,.12);box-shadow:inset 3px 0 0 #b8a8ff}
 #sgSet .cl .pp{display:flex;gap:8px}#sgSet .cl .pp i{width:26px;height:26px;border-radius:50%;box-shadow:inset 0 0 0 2px #8878c8;display:block}#sgSet .cl .pp i.on{background:radial-gradient(circle,#fff,#b8a8ff);box-shadow:0 0 14px #b8a8ff}
 #sgSet .cl .tx{font-size:17px;color:#e0d8ff;flex:1;line-height:1.6}
-#sgSet .go{text-align:center;padding:14px 0 26px}#sgSet .go button{font-size:20px;letter-spacing:.4em;padding:12px 44px;background:linear-gradient(180deg,#5a1a1a,#3a0e0e);color:#fff;border:1px solid var(--c);cursor:pointer;font-family:inherit}
-@media (max-width:820px){#sgSet .bd{grid-template-columns:1fr}#sgSet .st{grid-template-columns:repeat(3,1fr)}}`;
+#sgSet .go{text-align:center;padding:10px 0 16px}#sgSet .go button{font-size:20px;letter-spacing:.4em;padding:12px 44px;background:linear-gradient(180deg,#5a1a1a,#3a0e0e);color:#fff;border:1px solid var(--c);cursor:pointer;font-family:inherit}
+#sgSet .rw{padding:6px 34px 0}#sgSet .rw .rk{font-size:17px;letter-spacing:.3em;color:#ffe28a;margin:4px 0 6px}#sgSet .rw .rc{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}#sgSet .rw .r{cursor:pointer;text-align:center;padding:8px 8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.18);transition:.2s}#sgSet .rw .r:hover{background:rgba(255,226,138,.12)}#sgSet .rw .r.sel{border-color:#ffe28a;background:rgba(255,226,138,.18);box-shadow:0 0 22px rgba(255,226,138,.3);transform:translateY(-3px)}#sgSet .rw .ri{font-size:32px;line-height:1.2}#sgSet .rw .rn{font-size:19px;font-weight:900;color:#fff;margin:2px 0}#sgSet .rw .rd{font-size:15px;color:#e0d4b8}@media (max-width:820px){#sgSet .bd{grid-template-columns:1fr}#sgSet .st{grid-template-columns:repeat(3,1fr)}}`;
     document.head.appendChild(s);
   }
   let noise = null;
@@ -402,6 +402,7 @@ window.Saga = (() => {
   }
   let setEl = null;
   function showSettle(sg, win, extra, fx, ts) {
+    sg.tsx = ts;
     css(); if (!setEl) { setEl = document.createElement('div'); setEl.id = 'sgSet'; document.body.appendChild(setEl); ['mousedown', 'pointerdown', 'wheel', 'contextmenu'].forEach(ev => setEl.addEventListener(ev, e => e.stopPropagation())); setEl.addEventListener('click', e => { if (e.target.closest('[data-sgok]')) closeSettle(); }); }
     const A = sg.arch, L = LOC(sg.k), col = win ? '#ffe28a' : '#ff8a7a', cn = clues(), ctx = sg.ctx;
     const line = win ? fill(pick1(A.good), ctx) : fill(pick1(A.bad), ctx);
@@ -413,10 +414,28 @@ window.Saga = (() => {
 <div class="bx" style="--c2:${col}"><div class="k">${win ? '✦ 恩' : '✧ 祸'}</div><div class="v">${esc(sg.envoy && win ? '月之线索 +1' : FX_TXT[fx][0])}${extra ? ` <small style="font-size:17px;color:${extra > 0 ? '#9fe89f' : '#ff9a8a'}">（${extra > 0 ? '+' : ''}${extra} 🔮）</small>` : ''}</div><div class="w">${esc(FX_LONG[fx] || '')}</div></div>
 <div class="st"><div><b>${ts.coins}</b><span>🔮 魂晶</span></div><div><b>${ts.kills}</b><span>🗡 放倒</span></div><div><b>${ts.decap}</b><span>💀 斩首</span></div><div><b>${ts.hp}</b><span>❤ 损失</span></div><div><b>${Math.floor(ts.sec / 60)}:${String(ts.sec % 60).padStart(2, '0')}</b><span>⏱ 用时</span></div></div>
 <div class="cl"><div class="pp">${pips}</div><div class="tx"><b>月之线索 ${cn}/${D.NEED}</b>${cn >= D.NEED ? ' · 神殿的门已打开——去「精英挑战」里找月之魔女' : lastClue ? `　最新：${esc(lastClue.t.replace(/^“|”$/g, ''))}` : '　斩下月使、触发章节闪回，都能得到线索'}</div></div></div>
-<div class="go"><button data-sgok>收下结算 ▶</button></div></div>`;
+${rwHTML(sg, win)}<div class="go"><button data-sgok>收下结算 ▶</button></div></div>`;
+    rwSel = 0; setEl.querySelectorAll("[data-rw]").forEach(el => el.addEventListener("click", () => { rwSel = +el.dataset.rw; setEl.querySelectorAll("[data-rw]").forEach(x => x.classList.toggle("sel", x === el)); try { SFX.page && SFX.page(); } catch (e) { } }));
     setEl.classList.add('on'); try { G().setUI(true); SFX.open && SFX.open(); } catch (e) { }
   }
-  function closeSettle() { if (!setEl) return; setEl.classList.remove('on'); try { G().setUI(false); G().lockPointer && G().lockPointer(); } catch (e) { } try { window.Memory && Memory.afterSettle(); } catch (e) { } }
+  // ---- 战利品三选一：结算时从随机 3 份里挑 1 份（点击选择，默认第 1 份）----
+  let rwSel = 0, rwList = [];
+  function rwHTML(sg, win) {
+    const ts = sg.tsx || {}, base = Math.max(60, Math.round((ts.coins || 0) * 0.35) + 40);
+    const P = [
+      { ic: '💰', n: '魂晶袋', d: `+${base} 🔮 魂晶`, f: () => G().addCoins(base) },
+      { ic: '📖', n: '旧日手札', d: `经验 +${Math.round(base * 0.8)}`, f: () => { try { RPG.addXp(G().S, Math.round(base * 0.8)); } catch (e) { } } },
+      { ic: '🧪', n: '月下泉水', d: '立即回复 45% 生命', f: () => { try { const s0 = G().st(); G().S.hp = Math.min(s0.maxHp, G().S.hp + s0.maxHp * 0.45); } catch (e) { } } },
+      { ic: '🪞', n: '镜中残片', d: '回忆重抽券 ×1（下次重抽免费）', f: () => { try { Memory.grantReroll(1); } catch (e) { } }, need: () => !!window.Memory },
+      { ic: '🕯️', n: '安魂烛', d: '全境仇恨 −6', f: () => { try { const h = G().S.h2; if (h && typeof h.hate === 'number') h.hate = Math.max(0, h.hate - 6); } catch (e) { } } },
+      { ic: '🗡️', n: '磨刀石', d: '魂晶 +' + Math.round(base * 0.6) + '，并回复 20% 生命', f: () => { try { G().addCoins(Math.round(base * 0.6)); const s0 = G().st(); G().S.hp = Math.min(s0.maxHp, G().S.hp + s0.maxHp * 0.2); } catch (e) { } } }
+    ].filter(x => !x.need || x.need());
+    const a = []; while (a.length < 3 && P.length) a.push(P.splice(Math.floor(Math.random() * P.length), 1)[0]);
+    rwList = a;
+    return `<div class="rw"><div class="rk">✦ 战利品 · 三选一（点击挑选）</div><div class="rc">${a.map((x, i) => `<div class="r ${i ? '' : 'sel'}" data-rw="${i}"><div class="ri">${x.ic}</div><div class="rn">${x.n}</div><div class="rd">${x.d}</div></div>`).join('')}</div></div>`;
+  }
+  function applyReward() { const r = rwList[rwSel]; rwList = []; if (!r) return; try { r.f(); G().toast(`${r.ic} ${r.n}：${r.d}`, '#ffe28a', 3); G().save(); } catch (e) { } }
+  function closeSettle() { if (!setEl) return; setEl.classList.remove('on'); applyReward(); try { G().setUI(false); G().lockPointer && G().lockPointer(); } catch (e) { } try { window.Memory && Memory.afterSettle(); } catch (e) { } }
   addEventListener('keydown', e => { if (setEl && setEl.classList.contains('on') && ['Space', 'Enter', 'Escape', 'KeyE'].includes(e.code)) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) closeSettle(); } }, true);
 
   // ================= 追踪 HUD =================
