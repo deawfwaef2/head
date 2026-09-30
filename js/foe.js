@@ -723,7 +723,8 @@ window.Foe = (() => {
     if (!fo.brave && Math.random() < 0.65) { fo.brave = true; fo.state = 'chase'; } // 第二十六轮：挨打后更容易回头拼命（0.35→0.65）
     if (fo.boss) ctx.bossHp(fo);
     // 斩首：够快的横砍砍中脖子，且这一刀后她剩不到一半血（霸主要剩不到 25%）
-    if (slash && (zone === 'neck' || zone === 'head') && spd > 3 && ((brk && !(fo.boss || fo.hunter || fo.eliteId)) || fo.hp <= fo.maxHp * ((fo.boss || fo.hunter || fo.eliteId ? 0.4 : 0.75) + (info.charged ? 0.1 : 0)))) { /* R42 斩首放宽：头/脖子都算；刃速 4.5→3；血线 50%→75%（霸主/精英 25%→40%，蓄力刀再 +10%）；霸主仍不会一刀死 */ // 破绽中 = 处决，不看血量（R36b：霸主/精英/猎手除外，必须先打到 25% 以下）
+    // R42b 斩首（用户：伤害要达到能打死时才能斩首；只有部分武器技能可按“血量低于 X%”斩首）：横砍命中头/脖子，且这一刀致死（hp≤0），或技能带 decapAt 且血量已低于该比例（霸主/精英/猎手上限 25%）
+    if (slash && (zone === 'neck' || zone === 'head') && spd > 3 && (fo.hp <= 0 || (info.decapAt && fo.hp <= fo.maxHp * ((fo.boss || fo.hunter || fo.eliteId) ? Math.min(info.decapAt, 0.25) : info.decapAt)))) {
       const one = first && !brk; fo.hp = 0; die(fo, info, true); decapitate(fo, info); ctx.event && ctx.event(brk ? 'execute' : one ? 'onecut' : 'decapAlive', fo); return true; }
     if (fo.hp <= 0) {
       die(fo, info, false); if (CTX && CTX.shake) CTX.shake(0.35); // 第十八轮：击杀不再慢放
@@ -731,7 +732,7 @@ window.Foe = (() => {
       else if (slash && (zone === 'spine' || zone === 'hips') && spd > 9) sever(fo, 'spine', info); // 致命的快刀砍在腰：腰斩
       return true;
     }
-    if ((zone === 'neck' || zone === 'head') && slash && !fo.boss) ctx.toast && fo.hp > fo.maxHp * 0.75 && Math.random() < 0.5 && ctx.toast('脖子砍中了——再削弱她一些就能一刀斩首', '#ffc0a0', 1.6);
+    if ((zone === 'neck' || zone === 'head') && slash && !fo.boss) ctx.toast && fo.hp > 0 && fo.hp <= dealt * 1.6 && Math.random() < 0.6 && ctx.toast('脖子砍中了——她只剩一口气，再补一刀头颈就能斩首', '#ffc0a0', 1.6);
     // 受击硬直（霸主不容易被打断）
     if (fo.boss) { fo.poise = (fo.poise || 0) + dealt; // 第十九轮：BOSS 韧性槽取代 25% 随机打断
       if (!fo.rage && fo.hp <= fo.maxHp * 0.5) { fo.rage = true; fo.poise = 0; fo.atk = null; fo.stag = 0.9; fo.f.play('Hit_Knockback', { once: true, fade: 0.05, restart: true }); ctx.shake && ctx.shake(0.5); ctx.toast && ctx.toast('👑 霸主被激怒了——出手更快更狠！', '#ff9a60', 2.4); sfx().roar && sfx().roar(1); if (fo.sayT <= 0) talk(fo, pickR(Math.random, ['……有意思。', '你惹怒我了。', '玩够了。']), '#ffb0a0'); } }
