@@ -1,0 +1,7 @@
+<!doctype html><meta charset="utf8"><title>mastery card harness</title>
+<link rel="stylesheet" href="../../css/ui3a.css"><link rel="stylesheet" href="../../css/mastery.css">
+<body class="ui3a" style="background:#0a0608;margin:0;padding:20px;display:grid;grid-template-columns:repeat(2,minmax(0,560px));gap:20px"><div id="o" style="display:contents"></div>
+<script>window.Mods={on:()=>true};window.RPG={lvOf:()=>({lv:1})};window.G={S:{xp:0},HOOK:{frame:[]}};</script>
+<script src="../../js/balance.js"></script>
+<script>const q=new URLSearchParams(location.search);const L=q.get('lang')||'zh';localStorage.setItem('soulhead_lang',L);
+document.getElementById('o').innerHTML=[1,7,13,22,30].map(l=>'<div>'+Balance.card(l)+'</div>').join('');</script>

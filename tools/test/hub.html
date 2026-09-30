@@ -21,10 +21,11 @@ window.FoeRoles = { INFO: { guard: { ic: '🛡️', n: '守卫', col: '#9cf' } }
 </script>
 <script src="../../js/mods.js"></script><script src="../../js/lore.js"></script><script src="../../js/rpg.js"></script>
 <script src="../../js/talents_data.js"></script><script src="../../js/talents.js"></script><script src="../../js/talents_ui.js"></script>
-<script src="../../js/r35ui.js"></script><script src="../../js/keyguide.js"></script><script src="../../js/sack.js"></script><script src="../../js/gear2.js"></script><script src="../../js/ui.js"></script><script src="../../js/hudfix.js"></script><script src="../../js/hub.js"></script>
+<script src="../../js/r35ui.js"></script><script src="../../js/keyguide.js"></script><script src="../../js/sack.js"></script><script src="../../js/gear2.js"></script><script src="../../js/balance.js"></script><script src="../../js/ui.js"></script><script src="../../js/hudfix.js"></script><script src="../../js/hub.js"></script>
 <script>
 window.onerror = (m, s, l) => __log.push('ERR ' + m + '@' + (s||'').split('/').pop() + ':' + l);
 window.tick = (n, dt) => { for (let i = 0; i < (n || 1); i++) for (const f of G.HOOK.frame) f(dt || 0.05); };
+fetch('../../css/mastery.css').then(r => r.text()).then(c => { const s = document.createElement('style'); s.textContent = c; document.head.appendChild(s); });
 fetch('../../css/ui3a.css').then(r => r.text()).then(c => { const s = document.createElement('style'); s.textContent = c; document.head.appendChild(s); document.body.classList.add('ui3a'); });
 fetch('../../index.html').then(r => r.text()).then(h => { const m = h.match(/<style>([\s\S]*?)<\/style>/); if (m) { const s = document.createElement('style'); s.textContent = m[1]; document.head.insertBefore(s, document.head.firstChild); } });
 try { UI.init(); } catch (e) { __log.push('UIinit ' + e.message); }

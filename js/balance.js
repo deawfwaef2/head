@@ -25,6 +25,30 @@ window.Balance = (() => {
   const earlyDmg = P => dmgK(); // 兼容旧调用（foe_abs.power / wpnspec）：现在按熟练度（等级）而不是战力
   function stage(lv) { lv = lv || curLv(); let k = 0; for (let i = 0; i < STAGES.length; i++) if (lv >= STAGES[i][0]) k = i; const L = lang(); return { i: k, name: STAGES[k][1][L], names: STAGES[k][1], next: STAGES[k + 1] ? STAGES[k + 1][0] : 0 }; }
   function label(lv) { const a = m(lv), L = lang(), s = stage(lv), p = x => (x >= 1 ? '×' + x.toFixed(1) : '×' + x.toFixed(2)); const T = { zh: `武技熟练：${s.name}　前摇 ${p(a.wu)} · 收招 ${p(a.cd)} · 伤害 ${Math.round(a.dmg * 100)}%`, ja: `武技熟練：${s.name}　予備動作 ${p(a.wu)} · 硬直 ${p(a.cd)} · ダメージ ${Math.round(a.dmg * 100)}%`, en: `Weapon mastery: ${s.name}  windup ${p(a.wu)} · recovery ${p(a.cd)} · damage ${Math.round(a.dmg * 100)}%` }; return T[L]; }
+
+  // ===== 武技熟练度卡片（Tab → 总览 顶部）：大印章 + 五境界路线 + 四条大进度条。样式见 css/mastery.css =====
+  const COLS = ['#a79a86', '#86d07f', '#6fb8ff', '#c08cff', '#ffcf6a'];
+  const NUM = { zh: ['壹', '贰', '叁', '肆', '伍'], ja: ['壱', '弐', '参', '肆', '伍'], en: ['I', 'II', 'III', 'IV', 'V'] };
+  const TXT = {
+    zh: { t: '武技熟练', lv: 'Lv', nx: n => `再升到 Lv.${n} 晋升下一境界`, top: '已臻宗师 · 满熟练在 Lv.30', bars: ['前摇速度', '收招速度', '体力效率', '造成伤害'], note: ['出刀前的蓄势越短越好', '挥完之后恢复越快越好', '每一刀更省体力', '相对满熟练的伤害'], tip: '升级就能变强：出刀更快、前摇更短、收招更短、伤害更高。', of: '满熟练' },
+    ja: { t: '武技熟練', lv: 'Lv', nx: n => `Lv.${n} で次の境地へ`, top: '宗師に到達 · 満熟練は Lv.30', bars: ['予備動作', '硬直回復', 'スタミナ効率', '与ダメージ'], note: ['構えが短いほど速い', '振り終わりの回復が速い', '一振りあたりの消費が少ない', '満熟練に対する割合'], tip: 'レベルが上がるほど、振りが速く・予備動作と硬直が短く・ダメージが増える。', of: '満熟練' },
+    en: { t: 'WEAPON MASTERY', lv: 'Lv', nx: n => `Reach Lv.${n} for the next rank`, top: 'Master rank · full mastery at Lv.30', bars: ['Windup speed', 'Recovery speed', 'Stamina economy', 'Damage dealt'], note: ['Shorter wind-up = faster strikes', 'Recover faster after each swing', 'Each swing costs less stamina', 'Versus full mastery'], tip: 'Level up to get faster swings, shorter windup & recovery, and more damage.', of: 'full mastery' }
+  };
+  function card(lv) {
+    lv = lv || curLv(); const L = lang(), X = TXT[L], a = m(lv), s = stage(lv), c = COLS[s.i], cur = STAGES[s.i][0], nxt = s.next, prog = nxt ? clamp((lv - cur) / (nxt - cur), 0, 1) : 1;
+    const M0 = m(TUNE.mLv), ratings = [M0.wu / a.wu, M0.cd / a.cd, M0.st / a.st, a.dmg / M0.dmg].map(v => clamp(v, 0, 1));
+    const vals = [a.wu, a.cd, a.st, a.dmg], mv = [M0.wu, M0.cd, M0.st, M0.dmg];
+    const R = 54, C = 2 * Math.PI * R;
+    const seal = `<svg viewBox="0 0 140 140" class="ms-seal"><defs><radialGradient id="msg" cx="50%" cy="40%" r="65%"><stop offset="0" stop-color="${c}" stop-opacity=".35"/><stop offset="1" stop-color="#0b0709" stop-opacity=".95"/></radialGradient></defs>
+      <circle cx="70" cy="70" r="66" fill="url(#msg)" stroke="${c}" stroke-opacity=".5" stroke-width="1.5"/><circle cx="70" cy="70" r="${R}" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="7"/>
+      <circle cx="70" cy="70" r="${R}" fill="none" stroke="${c}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(C * prog).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 70 70)" style="filter:drop-shadow(0 0 6px ${c})"/>
+      
+      <text x="70" y="82" text-anchor="middle" font-size="44" font-weight="900" fill="#fff6dc" stroke="#000" stroke-width="3" paint-order="stroke" style="font-family:var(--u-serif,serif)">${NUM[L][s.i]}</text></svg>`;
+    const track = STAGES.map((g, i) => `<div class="ms-st ${i < s.i ? 'done' : i === s.i ? 'cur' : ''}" style="--c:${COLS[i]}"><i></i><b>${g[1][L]}</b><small>${X.lv}.${g[0]}${i === STAGES.length - 1 ? '+' : ''}</small></div>`).join('');
+    const bars = X.bars.map((n, i) => `<div class="ms-bar" style="--c:${c}"><div class="ms-bh"><b>${n}</b><em>${Math.round(ratings[i] * 100)}<u>%</u></em></div><div class="ms-bt"><span style="width:${(ratings[i] * 100).toFixed(1)}%"></span></div><div class="ms-bn"><span class="v">×${vals[i].toFixed(2)} <i>→</i> <b>×${mv[i].toFixed(2)}</b> <small>${X.of}</small></span><span class="n">${X.note[i]}</span></div></div>`).join('');
+    return `<div class="ms-card ${s.i === 4 ? 'top' : ''}" data-l="${L}" data-noi18n style="--c:${c}"><div class="ms-hero">${seal}<div class="ms-ti"><small>${X.t}</small><div class="ms-name">${s.name}</div><div class="ms-sub"><b>${X.lv}.${lv}</b><span>${nxt ? X.nx(nxt) : X.top}</span></div></div></div>
+      <div class="ms-track">${track}</div><div class="ms-bars">${bars}</div><p class="ms-tip">${X.tip}</p></div>`;
+  }
   const foeDmgK = rec => 1 + TUNE.foeEarly * clamp(1 - ((rec || 40) - 40) / 160, 0, 1);
   const need = lv => Math.round(TUNE.needA + TUNE.needB * Math.pow(lv, 1.6));
   const oldNeed = lv => Math.round(28 + 9 * Math.pow(lv, 1.6));
@@ -35,12 +59,17 @@ window.Balance = (() => {
     const frac = lv >= 60 ? 0 : x / oldNeed(lv); let base = 0; for (let i = 1; i < lv; i++) base += need(i);
     S.xp = Math.round(base + frac * (lv >= 60 ? 0 : need(lv)));
   }
+  function banner(st, L) { // 晋升大横幅
+    const T = { zh: ['武技晋升', '出刀更快 · 前摇更短 · 收招更短 · 伤害更高'], ja: ['武技昇格', '振りが速く · 予備動作と硬直が短く · ダメージ増'], en: ['MASTERY RANK UP', 'Faster swings · shorter windup & recovery · more damage'] }[L];
+    let el = document.getElementById('msUp'); if (el) el.remove(); el = document.createElement('div'); el.id = 'msUp'; el.setAttribute('data-noi18n', ''); el.style.setProperty('--c', COLS[st.i]);
+    el.innerHTML = `<small>${T[0]}</small><h2>${st.name}</h2><p>${T[1]}</p>`; document.body.appendChild(el); setTimeout(() => el.remove(), 3600);
+  }
   let lastStage = -1;
   function frame() {
     const S = window.G && G.S; if (!S) return; if (S.balV !== 41 && on()) migrate(S); if (!on()) return;
     const st = stage(RPG.lvOf(S.xp).lv); if (lastStage < 0) { lastStage = st.i; return; }
-    if (st.i > lastStage) { lastStage = st.i; const L = lang(); try { G.toast && G.toast({ zh: `⚔️ 武技晋升：${st.name}！出刀更快、更稳、更狠了`, ja: `⚔️ 武技が上達：${st.name}！振りが速く鋭くなった`, en: `⚔️ Mastery up: ${st.name}! Faster, steadier, harder hits` }[L], '#ffd27a', 3.2); } catch (e) { } } else lastStage = st.i;
+    if (st.i > lastStage) { lastStage = st.i; const L = lang(); try { banner(st, L); } catch (e) { } } else lastStage = st.i;
   }
   const wait = setInterval(() => { if (window.G && G.HOOK && G.S) { clearInterval(wait); G.HOOK.frame.push(frame); } }, 500);
-  return { TUNE, STAGES, on, m, dmgK, tempo, earlyDmg, stage, label, foeDmgK, need, xpK, migrate };
+  return { card, TUNE, STAGES, on, m, dmgK, tempo, earlyDmg, stage, label, foeDmgK, need, xpK, migrate };
 })();

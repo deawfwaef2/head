@@ -1548,3 +1548,4 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - `js/wpnspec.js`：武器属性页用同一倍率；`js/ui.js` 总览加「武技熟练」行；F 拔刀提示带【阶段】；`js/mods.js` / `mods_i18n.js` 改名为「武技熟练 / 前期平衡（R43）」（id 仍为 balance_r41，存档的开关不变）。
 - `tools/balance/sim.js`：TUNES.new 同步；新增 ③ 熟练度阶梯表。结果：Lv1 平均出刀间隔 831ms → Lv27 403ms → Lv30 353ms；仅熟练度就使 DPS 约 ×5.2（伤害 45%→100%）。Lv1 对 rar1 TTK 5.8s，早期 Lv2–5 有少量死亡（罚 10% 金币）。
 - 与 R35 不冲突：仍是绝对数值，无百分比伤害、无保底刀数。未在真机验证。
+- **R43b（用户：“小字看得眼瞎、UI 太普通、不够大师级”）**：武技熟练度 UI 重做。`Balance.card(lv)`（js/balance.js）生成卡片：带进度环的境界印章（壹~伍）、按境界变色的大标题（最大 68px）、五境界路线图、四条大进度条（前摇/收招/体力/伤害，大字百分比 + ×倍率 → 满熟练）；样式 `css/mastery.css`（已在 index.html 引入；字号下限 15px；矮屏 ≤940px 自动紧凑）。升阶改为全屏宽大横幅 `#msUp`（3.6s），不再用小字 toast。测试页：`tools/test/mastery.html`（五阶段静态预览，?lang=zh|en|ja）、`tools/test/hub.html`（已加载 balance.js / mastery.css）。教训：read_file 会缓存同名截图，换文件名再看。

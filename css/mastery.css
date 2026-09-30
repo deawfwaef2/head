@@ -1,0 +1,62 @@
+/* R43 武技熟练度卡片（Tab → 总览）。字号下限 15px，大标题 64px；颜色随境界变化（--c） */
+.ms-card { --c: #a79a86; position: relative; margin: 6px 0 18px; padding: 22px 26px 18px; color: #f1e6cf; background:
+  radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--c) 26%, transparent), transparent 60%),
+  linear-gradient(160deg, #1d1319, #0d080b 70%); border: 1px solid color-mix(in srgb, var(--c) 55%, #000); clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.04), inset 0 0 60px color-mix(in srgb, var(--c) 12%, transparent); overflow: hidden; }
+.ms-card::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--c), transparent); }
+.ms-card.top::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 40%, rgba(255,230,160,.16) 50%, transparent 60%); background-size: 250% 100%; animation: ms-shine 4.5s linear infinite; }
+@keyframes ms-shine { from { background-position: 150% 0; } to { background-position: -100% 0; } }
+.ms-hero { display: flex; align-items: center; gap: 24px; }
+.ms-seal { width: 132px; height: 132px; flex: none; filter: drop-shadow(0 0 18px color-mix(in srgb, var(--c) 55%, transparent)); }
+.ms-ti { min-width: 0; }
+.ms-ti small { display: block; font-size: 15px; letter-spacing: .42em; color: color-mix(in srgb, var(--c) 70%, #fff); opacity: .9; font-weight: 700; text-transform: uppercase; }
+.ms-ti .ms-name { margin: 2px 0 6px; font-family: var(--u-serif, serif); font-weight: 900; font-size: clamp(46px, 5.2vw, 68px); line-height: 1.05; letter-spacing: .16em; padding-left: .02em;
+  background: linear-gradient(180deg, #fff 8%, var(--c) 62%, color-mix(in srgb, var(--c) 40%, #000)); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; filter: drop-shadow(0 2px 0 #000) drop-shadow(0 0 16px color-mix(in srgb, var(--c) 50%, transparent)); }
+.ms-sub { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; font-size: 17px; color: #d9c9a8; }
+.ms-sub b { font-family: var(--u-serif, serif); font-size: 26px; color: #fff3cf; letter-spacing: .04em; }
+.ms-track { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); margin: 20px 0 8px; }
+.ms-track::before { content: ""; position: absolute; left: 10%; right: 10%; top: 12px; height: 3px; background: rgba(255,255,255,.12); }
+.ms-st { position: relative; text-align: center; opacity: .55; }
+.ms-st i { display: block; width: 26px; height: 26px; margin: 0 auto 6px; transform: rotate(45deg) scale(.72); background: #181016; border: 2px solid color-mix(in srgb, var(--c) 60%, #000); position: relative; z-index: 1; }
+.ms-st b { display: block; font-family: var(--u-serif, serif); font-size: 18px; font-weight: 900; letter-spacing: .12em; color: #d7c8aa; }
+.ms-st small { font-size: 15px; color: #a8977c; }
+.ms-st.done { opacity: .9; } .ms-st.done i { background: var(--c); border-color: var(--c); transform: rotate(45deg) scale(.72); }
+.ms-st.cur { opacity: 1; } .ms-st.cur i { background: var(--c); border-color: #fff; transform: rotate(45deg) scale(1); box-shadow: 0 0 18px var(--c); animation: ms-pulse 1.8s ease-in-out infinite; }
+.ms-st.cur b { color: var(--c); font-size: 22px; text-shadow: 0 0 12px color-mix(in srgb, var(--c) 60%, transparent); } .ms-st.cur small { color: #fff0c4; }
+@keyframes ms-pulse { 50% { box-shadow: 0 0 6px var(--c); } }
+.ms-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 28px; margin-top: 18px; }
+@media (max-width: 900px) { .ms-bars { grid-template-columns: 1fr; } .ms-hero { gap: 14px; } .ms-seal { width: 96px; height: 96px; } }
+.ms-bh { display: flex; align-items: baseline; justify-content: space-between; }
+.ms-bh b { font-size: 18px; font-weight: 800; color: #f3e7cc; letter-spacing: .08em; }
+.ms-bh em { font-style: normal; font-family: var(--u-serif, serif); font-weight: 900; font-size: 30px; line-height: 1; color: #fff3cf; text-shadow: 0 0 14px color-mix(in srgb, var(--c) 55%, transparent); }
+.ms-bh u { text-decoration: none; font-size: 17px; margin-left: 2px; color: var(--c); }
+.ms-bt { height: 14px; margin: 6px 0 5px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.12); clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
+.ms-bt span { display: block; height: 100%; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 45%, #000), var(--c) 70%, #fff); box-shadow: 0 0 12px var(--c); transition: width .6s var(--u-ease, ease); }
+.ms-bn { display: flex; flex-direction: column; gap: 2px; font-size: 15px; color: #b9a98a; line-height: 1.45; }
+.ms-bn .v { font-size: 17px; color: #e7d9b8; white-space: nowrap; font-family: var(--u-serif, serif); font-weight: 800; }
+.ms-bn .v i { font-style: normal; color: var(--c); margin: 0 2px; }
+.ms-bn .v small { font-size: 15px; font-weight: 600; color: #a8977c; margin-left: 4px; font-family: inherit; }
+.ms-bn b { color: #ffe39a; }
+.ms-tip { margin: 16px 0 0; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,.14); font-size: 16px; color: #e3d4b3; line-height: 1.6; }
+.ms-card[data-l=en] .ms-name { letter-spacing: .03em; font-size: clamp(38px, 4.4vw, 54px); }
+.ms-card[data-l=ja] .ms-name { letter-spacing: .1em; }
+.ms-card[data-l=en] .ms-st b { letter-spacing: .02em; font-size: 16px; }
+.ms-card[data-l=en] .ms-st.cur b { font-size: 18px; }
+
+/* 晋升横幅 */
+#msUp { --c: #ffcf6a; position: fixed; left: 0; right: 0; top: 22%; z-index: 130; pointer-events: none; text-align: center; padding: 26px 0 22px; animation: ms-up 3.6s ease both;
+  background: linear-gradient(90deg, transparent, rgba(8,4,7,.88) 18%, rgba(8,4,7,.88) 82%, transparent); border-top: 2px solid transparent; border-image: linear-gradient(90deg, transparent, var(--c), transparent) 1; }
+#msUp small { display: block; font-size: 18px; letter-spacing: .6em; text-indent: .6em; color: var(--c); font-weight: 800; }
+#msUp h2 { margin: 4px 0 8px; font-family: var(--u-serif, serif); font-weight: 900; font-size: clamp(64px, 9vw, 120px); letter-spacing: .22em; text-indent: .22em; line-height: 1.05;
+  background: linear-gradient(180deg, #fff 10%, var(--c) 65%, color-mix(in srgb, var(--c) 35%, #000)); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 3px 0 #000) drop-shadow(0 0 28px var(--c)); }
+#msUp p { margin: 0; font-size: 20px; color: #f0e2c0; letter-spacing: .1em; }
+@keyframes ms-up { 0% { opacity: 0; transform: scale(1.25); letter-spacing: .3em; } 10% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(.98) translateY(-14px); } }
+.ms-ti .ms-name { display: block; border: 0; padding: 0; }
+/* 矮屏（笔记本 / 面板内嵌）：紧凑版，去掉说明行 */
+@media (max-height: 940px) {
+  .ms-card { padding: 14px 20px 12px; margin-bottom: 12px; }
+  .ms-seal { width: 92px; height: 92px; } .ms-hero { gap: 18px; }
+  .ms-ti .ms-name { font-size: 50px; } .ms-ti small { font-size: 14px; }
+  .ms-track { margin: 12px 0 4px; } .ms-bars { gap: 10px 24px; margin-top: 10px; }
+  .ms-bn .n, .ms-tip { display: none; } .ms-bh em { font-size: 26px; }
+}
