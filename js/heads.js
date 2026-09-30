@@ -14,7 +14,27 @@ window.FaceFill = (() => {
   const hk = { get value() { return tune.pbr; } }; // 实测（草甸/松林，脸颊 vs 脖子）：1.45/1 发白，1.45/0 偏黄，1.3/0.5 最接近
   const ko = { get value() { return (window.Mods && !Mods.on('head_tone')) || performance.now() - worldT > 600 ? 0 : tune.knee; } };
   const envT = new THREE.Color(); const ea = { get value() { return (window.Mods && !Mods.on('head_tone')) || performance.now() - worldT > 600 ? ZERO : envT.copy(envA).multiplyScalar(tune.env); } };
+  // ===== R36 MOD anime_shade（用户：“角色头部像塑料，二次元模型在三次元 shader 上的违和感，改成二次元光影！”）=====
+  // 思路：PBR 光照照旧算（天空/太阳/篝火/阴影都照常响应），但在 lights_fragment_end 之后把“受光比 lr”（= 光照亮度 / 反照率亮度，满光≈1）
+  // 重新映射成二次元的两段式：亮面（平涂，几乎不随角度变）/ 暗面（抬高到 ~80%，并染上暖粉的阴影色）/ 之间 ~0.12 宽的软过渡；
+  // 并彻底去掉高光与环境镜面反射（塑料感的来源）、再加一圈很淡的边缘光。极暗环境（洞里、夜里）仍然保持暗，不会被抬平。
+  const animeOn = () => !window.Mods || !Mods.on || Mods.on('anime_shade') !== false;
+  const ANIME_GLSL = `// ANIME_BLOCK
+    { vec3 _litC = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse;
+      float _alb = max(dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)), 1e-3) * 0.3183;
+      float _lr = dot(_litC, vec3(0.299, 0.587, 0.114)) / _alb;
+      float _tB = smoothstep(0.50, 0.74, _lr);
+      float _dk = smoothstep(0.03, 0.32, _lr);
+      float _tl = mix(0.80 * _dk, max(1.04, min(_lr * 1.05, 1.28)), _tB);
+      float _sc = min(_tl / max(_lr, 0.02), 6.0);
+      vec3 _tint = mix(vec3(1.0, 0.885, 0.93), vec3(1.0), _tB);
+      reflectedLight.directDiffuse *= _sc * _tint; reflectedLight.indirectDiffuse *= _sc * _tint;
+      reflectedLight.directSpecular = vec3(0.0); reflectedLight.indirectSpecular = vec3(0.0);
+      float _fr = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0);
+      reflectedLight.indirectDiffuse += diffuseColor.rgb * 0.3183 * _fr * 0.22 * _dk; }`;
+  function animePatch(sh) { if (!animeOn() || sh.fragmentShader.indexOf('ANIME_BLOCK') >= 0 || sh.fragmentShader.indexOf('#include <lights_fragment_end>') < 0) return; sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n' + ANIME_GLSL); }
   function inject(sh, k, toon, hp) {
+    if (!toon) animePatch(sh);
     sh.uniforms.uFill = u; if (hp) sh.uniforms.uHeadK = hk; if (toon) { sh.uniforms.uEnvA = ea; sh.uniforms.uKneeOff = ko; }
     if (toon) sh.fragmentShader = sh.fragmentShader.replace('float _s = clamp(_t / _ex, 0.0, 1.3);', 'float _s = clamp(_t / _ex, 0.0, 1.3); if (uKneeOff > 1.001) { float _t2 = _ex <= 1.0 ? _ex : 1.0 + (uKneeOff - 1.0) * (1.0 - exp((1.0 - _ex) / (uKneeOff - 1.0))); _s = _t2 / _ex; }');
     sh.fragmentShader = sh.fragmentShader.replace('void main() {', (toon ? 'uniform vec3 uEnvA; uniform float uKneeOff;\n' : '') + (hp ? 'uniform float uHeadK;\n' : '') + 'uniform float uFill;\nvoid main() {')
@@ -25,12 +45,12 @@ window.FaceFill = (() => {
         float lr = dot(litC, vec3(0.299, 0.587, 0.114)) / al; float fc = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
         totalEmissiveRadiance += diffuseColor.rgb * 0.3183 * max(0.0, uFill * ${k.toFixed(2)} - lr) * (0.45 + 0.55 * fc); }`);
   }
-  const HPBR_OBC = function (sh) { sh.uniforms.uHeadK = hk; sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform float uHeadK;\nvoid main() {').replace('#include <lights_physical_fragment>', 'diffuseColor.rgb *= uHeadK;\n#include <lights_physical_fragment>'); }; // R33：head_pbr 头材质的默认注入（hair/skin 自带 onBeforeCompile 的由 wrap 注入同一句）
+  const HPBR_OBC = function (sh) { animePatch(sh); sh.uniforms.uHeadK = hk; sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform float uHeadK;\nvoid main() {').replace('#include <lights_physical_fragment>', 'diffuseColor.rgb *= uHeadK;\n#include <lights_physical_fragment>'); }; // R33：head_pbr 头材质的默认注入（hair/skin 自带 onBeforeCompile 的由 wrap 注入同一句）
   function wrap(m, k) { // 包一层 onBeforeCompile（clone() 不会复制它：克隆后要重新包）
     if (!m || !(m.isMeshToonMaterial || (m.isMeshStandardMaterial && window.Mods && Mods.on('char_lift'))) || done.has(m)) return m; /* R29 char_lift：身体默认是 PBR 标准材质（foe_toon 关）→ 以前完全没补光，洞里发黑 */ const prev = m.customProgramCacheKey(), o = m.onBeforeCompile;
-    const toon = !!m.isMeshToonMaterial, hp = !!(m.userData && m.userData.hpbr) && o !== HPBR_OBC; m.onBeforeCompile = function (sh, r) { o.call(this, sh, r); inject(sh, k, toon, hp); }; m.customProgramCacheKey = () => prev + '|ff' + k + (toon ? 'e' : '') + (hp ? 'h' : ''); done.add(m); return m;
+    const toon = !!m.isMeshToonMaterial, hp = !!(m.userData && m.userData.hpbr) && o !== HPBR_OBC; m.onBeforeCompile = function (sh, r) { o.call(this, sh, r); inject(sh, k, toon, hp); }; m.customProgramCacheKey = () => prev + '|ff' + k + (toon ? 'e' : '') + (hp ? 'h' : '') + (animeOn() ? 'A' : ''); done.add(m); return m;
   }
-  return { u, wrap, tune, hk, HPBR_OBC, world() { worldT = performance.now(); }, env(c) { if (c) envA.copy(c).multiplyScalar(0.55); else envA.setRGB(0, 0, 0); } };
+  return { u, wrap, tune, hk, HPBR_OBC, animeOn, world() { worldT = performance.now(); }, env(c) { if (c) envA.copy(c).multiplyScalar(0.55); else envA.setRGB(0, 0, 0); } };
 })();
 window.ModelHeads = (() => {
   const T = [];               // templates
@@ -65,7 +85,7 @@ window.ModelHeads = (() => {
   function MTM(p) {
     if (window.Mods && !Mods.on('head_pbr')) return new THREE.MeshToonMaterial(p);
     const q = Object.assign({}, p); delete q.gradientMap; if (q.roughness == null) q.roughness = 0.88; if (q.metalness == null) q.metalness = 0;
-    const m = new THREE.MeshStandardMaterial(q); m.envMapIntensity = 0.55; m.userData.hpbr = 1; m.onBeforeCompile = FaceFill.HPBR_OBC; m.customProgramCacheKey = () => 'hpbr1'; return m;
+    const m = new THREE.MeshStandardMaterial(q); m.envMapIntensity = 0.55; m.userData.hpbr = 1; m.onBeforeCompile = FaceFill.HPBR_OBC; m.customProgramCacheKey = () => 'hpbr1' + (FaceFill.animeOn() ? 'A' : ''); return m;
   }
   function b64ToBuf(b64) { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
 

@@ -1377,3 +1377,11 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - Z 面板（传奇风纸娃娃）：左边 5 个原槽位 + 8 个饰品槽，右边双列属性表（含全部特殊词条），下面是麻袋/储物箱里的装备，点击穿上；悬停显示完整词条和等级要求。
 - **sack.js 改动（5 处，都带 `R35 gear2` 注释）**：nameOf / rarOf 识别 o.g2；tipHtml 调用 Gear2.tipBody；equip() 开头转交 Gear2.equip；roll() 加 Gear2.rollLoot。
 - 测试：tools/sc_g2.py 流程在真实游戏（洞内）跑过：专属腰带战力 58→64、生命 140→390；等级不够时拒绝穿戴；Z/C/U/Esc 真实按键开关，没有误开其他菜单。
+
+## R36 — 用户：“角色头部看着像塑料（二次元模型在三次元 shader 上的违和感），角色改成二次元光影！”
+- **根因**：R33b 把头改成 PBR（`head_pbr`），身体也是 PBR：有高光 + 环境镜面反射 + 连续明暗渐变 → 头发出现一片片三角面的反光、衣服有脏兮兮的渐变，典型“塑料/3D 渲染感”。
+- **MOD `anime_shade`（默认开，js/heads.js 的 FaceFill IIFE 里 `animePatch` / `ANIME_GLSL`；需重新载入）**：在 `#include <lights_fragment_end>` 之后把受光比 `lr`（光照亮度/反照率亮度，满光≈1）重映射为二次元两段式——亮面平涂（≥1.04）、暗面抬到 80% 并染暖粉阴影色 (1,.885,.93)、0.50~0.74 之间 smoothstep 软过渡；`lr<0.32` 时按 smoothstep 压暗（洞里/夜里仍然暗）；`directSpecular/indirectSpecular` 清零（塑料感来源）；再加一圈 22% 的边缘光。天空/太阳/篝火/阴影照常响应。
+  - 接入点：`HPBR_OBC`（所有 PBR 头材质的默认注入）和 `FaceFill.wrap → inject`（头发/皮肤自带 onBeforeCompile 的、以及 foe.js 的身体材质 FF()），用 `ANIME_BLOCK` 标记防止重复注入；cache key 末尾加 `A`。toon 材质（head_pbr 关）不受影响。关闭 MOD = R33 的 PBR 头。
+  - 参数集中在 `ANIME_GLSL`：亮面电平 `max(1.04, min(lr*1.05,1.28))`、暗面 0.80、阴影色、过渡 0.50/0.74、边缘光 0.22。头偏暗先调 `FaceFill.tune.pbr`（0.62）。
+- **测试台**：新增 `tools/test/shade.html`（真实 foe.js 身体 + ModelHeads 头 + 天空 PMREM + 太阳/篝火），`window.__shade({yaw, target:'face'|'body', sun, fire, amb, sky, bg})`；`?off=1` = 关 anime_shade 对比。截图用 canvas.toDataURL（`preserveDrawingBuffer`），不要用 page.screenshot（headless 下 WebGL 画布为空）。实拍：左（关）头发满是三角面反光，右（开）平滑成块；篝火-only 场景仍然暗、脸有受光面；全身像衣服渐变干净。
+- 没做：描边（inverted hull）、头发“天使环”高光条。若用户还想更二次元，下一步做这两项。
