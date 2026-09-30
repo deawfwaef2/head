@@ -982,7 +982,7 @@ window.Worlds = (() => {
   // ================= 输入（game.js 在世界里把按键转给这里）=================
   function onKey(e) {
     if (!W) return false;
-    if ((e.code === 'Tab' || e.code === 'KeyB') && (window.Sack && Sack.on()) && !W.busy && !W.dead) { e.preventDefault(); Sack.toggleWild(); return true; }
+    if ((e.code === 'Tab' || e.code === 'KeyB') && (window.Sack && Sack.on()) && !W.busy && !W.dead) { e.preventDefault(); if (window.Hub && Hub.on()) Hub.go('kit', true); else Sack.toggleWild(); return true; }
     if (e.code === 'Tab' || e.code === 'Escape') { if (W.mapOpen && e.code === 'Escape') { toggleMap(false); return true; } return false; }
     if (W.busy || W.dead) return true;
     if (e.code === 'KeyM') { toggleMap(); return true; }

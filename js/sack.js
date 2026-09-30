@@ -470,7 +470,9 @@ window.Sack = (() => {
     if (!panel || mode !== 'wild') { closePanel(); panel = document.createElement('div'); panel.id = 'skUI'; document.body.appendChild(panel); mode = 'wild'; }
     G.setUI(true); render(); if (window.ItemIcons && !ItemIcons.ready) ItemIcons.onReady(() => { if (panel && !drag) render(); }); return true;
   }
-  function closePanel(relock) { closeMenu(); if (mode === 'wild' && panel) { panel.remove(); panel = null; mode = null; cont = null; G.setUI(false); if (relock) try { G.lockPointer(); } catch (e) {} } }
+  function closePanel(relock) { closeMenu(); if (mode === 'wild' && panel) { if (panel._hub) { panel._hub = 0; panel = null; mode = null; cont = null; return; } /* R42：挂在 Tab 菜单里的麻袋，由菜单自己管关闭 */ panel.remove(); panel = null; mode = null; cont = null; G.setUI(false); if (relock) try { G.lockPointer(); } catch (e) {} } }
+  function unmount() { if (panel && panel._hub) closePanel(); } // R42
+  function mountWild(host) { if (!on() || !host || !W_()) return false; css(); inv(); if (panel && panel !== host) closePanel(); host.className = 'sk-host'; host._hub = 1; panel = host; mode = 'wild'; cont = null; render(); if (window.ItemIcons && !ItemIcons.ready) ItemIcons.onReady(() => { if (panel === host && !drag) render(); }); return true; } // R42：野外也能在 Tab 菜单里看麻袋
   function toggleWild() { if (mode === 'wild') closePanel(true); else openWild(null); }
   function mountCave(host) { if (!on() || !host) return; css(); inv(); closePanel(); host.className = 'sk-host'; panel = host; mode = 'cave'; cont = null; render(); if (window.ItemIcons && !ItemIcons.ready) ItemIcons.onReady(() => { if (panel === host && !drag) render(); }); }
   function hud() {
@@ -489,9 +491,10 @@ window.Sack = (() => {
   addEventListener('keydown', (e) => {
     if (mode !== 'wild' || !panel) return;
     if (e.code === 'KeyR' && drag) { dragRot && dragRot(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+    if (panel._hub) return; // R42：菜单自己处理 Tab / B / Esc / H
     if (e.code === 'Tab' || e.code === 'KeyB' || e.code === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); closePanel(true); return; }
     if (e.code === 'KeyH') { e.preventDefault(); e.stopImmediatePropagation(); quickUse(); return; }
   }, true);
   function frame(dt) { if (buffT > 0) buffT -= dt; tick(dt); }
-  return { equip, enchant, enchCost, salvage, resizeSack, nameOf, RARC, on, IT, def, mk, stashAdd, have, take, RECIPES, inv, lvOf, genLoot, placeLoot, corpse, carcass, openWild, toggleWild, closePanel, mountCave, frame, interrupt, queueHead, capture, heads, tripEnd, onDeath, pourPending, homeArrive, quickUse, dmgMul, usage, itemsOf, roll, addTo, canAdd, get panelOpen() { return mode === 'wild' && !!panel; }, get queue() { return Q; } };
+  return { equip, enchant, enchCost, salvage, resizeSack, nameOf, RARC, on, IT, def, mk, stashAdd, have, take, RECIPES, inv, lvOf, genLoot, placeLoot, corpse, carcass, openWild, toggleWild, closePanel, mountCave, mountWild, unmount, frame, interrupt, queueHead, capture, heads, tripEnd, onDeath, pourPending, homeArrive, quickUse, dmgMul, usage, itemsOf, roll, addTo, canAdd, get panelOpen() { return mode === 'wild' && !!panel; }, get queue() { return Q; } };
 })();

@@ -28,6 +28,7 @@ window.UI = (() => {
   }
   function close(relock = true) {
     if (!cur) return;
+    try { window.Sack && Sack.unmount && Sack.unmount(); } catch (e) { } // R42
     root.classList.remove('on'); cur = null; G.setUI(false);
     if (relock) G.lockPointer(); else document.getElementById('menu').classList.remove('hidden');
     SFX.close();
@@ -122,6 +123,7 @@ window.UI = (() => {
       <div class="m-coins">🔮 ${fmt(S.coins)}</div><button class="m-close" data-a="close">✕ 关闭</button></div>`;
     let body = '';
     if (tab === 'stats') body = statsBody();
+    else if (tab === 'equip' && window.Hub && Hub.on() && window.Sack && Sack.on()) { body = Hub.kitBody(); setTimeout(() => Hub.kitMount(), 0); } // R42：装备 + 物品合并页
     else if (tab === 'equip' && window.Sack && Sack.on()) { body = '<div id="skHost"></div>'; setTimeout(() => Sack.mountCave(document.getElementById('skHost')), 0); } // 第十九轮：储物·附魔·合成
     else if (tab === 'equip') body = equipBody();
     else if (tab === 'build') body = buildBody();
@@ -533,5 +535,5 @@ window.UI = (() => {
     open('intro', `<div class="intro"${ix ? ' data-noi18n' : ''}><h2>${t}</h2><p>${b}</p><div class="btns"><button class="red" data-a="introNext">${ix ? ix.btn : introI >= INTRO.length ? '开始狩猎 ▶' : '继续 ▶'}</button></div><div class="dots">${INTRO.map((_, i) => `<i class="${i < introI ? 'on' : ''}"></i>`).join('')}</div></div>`, 'intro-m');
   }
 
-  return { init, onKey, showIntro, needIntro: () => !G.S.intro, openMenu, openBounty, openCard, openTraining, openExpedition, close, get open() { return cur; }, get trip() { return trip; }, _startTrip: startTrip, _pick: pickChoice };
+  return { init, onKey, showIntro, needIntro: () => !G.S.intro, openMenu, openBounty, openCard, openTraining, openExpedition, close, get open() { return cur; }, get tab() { return menuState.tab; }, quiet() { if (!cur) return; try { window.Sack && Sack.unmount && Sack.unmount(); } catch (e) { } root.classList.remove('on'); cur = null; }, get trip() { return trip; }, _startTrip: startTrip, _pick: pickChoice };
 })();

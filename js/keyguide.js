@@ -37,10 +37,10 @@ window.KeyGuide = (() => {
       [['X', 'X'], { zh: '连按两次：碾碎首级吸魂 / 拆除建筑', ja: '2回連打：首を砕いて魂を吸う / 建物を解体', en: 'Press twice: crush a head for soul / demolish a build' }],
     ] },
     { ic: '🏰', t: { zh: '菜单与面板', ja: 'メニューとパネル', en: 'Menus & panels' }, rows: [
-      [['Tab'], { zh: '属性 / 装备 / 麻袋', ja: 'ステータス / 装備 / 麻袋', en: 'Stats / gear / sack' }],
+      [['Tab'], { zh: '总菜单：左边分类一键切换（总览 · 装备与背包 · 天赋 · 收藏 · 日志 · 设置…）', ja: 'メインメニュー：左の分類から切替（概要・装備と持ち物・才能・コレクション・日誌・設定…）', en: 'Main menu: switch pages from the left rail (overview, gear & bag, talents, collection, log, settings…)' }],
       [['B'], { zh: '建造', ja: '建築', en: 'Build' }],
       [['T'], { zh: '天赋面板', ja: 'タレントパネル', en: 'Talent panel' }],
-      [['Z'], { zh: '装备纸娃娃', ja: '装備ドール', en: 'Paper-doll gear' }],
+      [['Z'], { zh: '装备与背包（菜单里的同一页）', ja: '装備と持ち物（メニュー内の同じページ）', en: 'Gear & bag (same page of the menu)' }],
       [['K'], { zh: '首级收藏册', ja: '首級コレクション', en: 'Head collection' }],
       [['L'], { zh: '狩猎日志', ja: '狩りの記録', en: 'Hunt logs' }],
       [['U'], { zh: '食人魔猎手 / 精英挑战', ja: 'オーガハンター / エリート挑戦', en: 'Ogre hunters / elite challenges' }],

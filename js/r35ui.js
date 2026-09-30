@@ -89,5 +89,5 @@ window.R35UI = (() => {
   function toggle(id) { if (isOpen(id)) close(); else open(id); }
   // Esc：先于游戏处理
   addEventListener('keydown', e => { if (e.code === 'Escape' && isOpen()) { e.preventDefault(); e.stopImmediatePropagation(); close(); } }, true);
-  return { reg, open, close, toggle, isOpen, render, get cur() { return cur; }, get box() { return box; } };
+  return { reg, open, close, toggle, isOpen, render, avail: id => !!(TABS[id] && (!TABS[id].on || TABS[id].on())), get cur() { return cur; }, get box() { return box; } };
 })();

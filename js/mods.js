@@ -116,6 +116,7 @@ window.Mods = (() => {
     { id: 'foe_skills', cat: 'play', icon: '💢', n: '敌人新技能（R34）', d: '跃斩（红圈落点，落地后有破绽）· 冲锋（红色走廊，格挡无效）· 旋风斩（脚下红圈）· 破防击（红光 = 格挡无效，只能闪身）。所有技能都有预警，做完会露出破绽。', def: true },
     { id: 'foe_mind', cat: 'play', icon: '🎭', n: '敌人读你（R37）', d: '敌人会记住你的习惯（爱举盾 / 爱乱挥 / 爱绕圈 / 爱后撤）并针对：举盾多了 → 红光破防刀；乱挥 → 后撤引你空挥再反击；绕圈 → 横向预判。每个敌人性格不同（耐心 / 突进 / 诈术 / 反击），出手节奏 6 选 1（快刀 / 常规 / 拖刀 / 假动作再快刀 / 破防 / 补刀），并按你的反应接连招。所有新招都有预警，不改伤害数值。', def: true },
     { id: 'region_echo', cat: 'play', icon: '🗞️', n: '地区回响：名声 · 关系 · 后继故事（R39）', d: '每个地区都会记住你：名声称号、百姓 / 武装 / 圣职 / 术士 / 权贵 五方势力的关系、你放倒的人的“后继故事”（亲人哀悼 / 复仇 / 恐惧 / 传说 / 纪念 / 遗产 / 继任）。每趟回洞弹出回响卡并随机给魂晶 / 地区材料 / 药水，也可能多出仇家、猎手仇恨上升；下次抵达时地区会用供品、警告、馈赠、信徒或沉默回应你（同样随机给资源或麻烦）。选地点界面的地区详情里随时可看。不改战斗数值。', def: true },
+    { id: 'ui_hub', cat: 'ui', icon: '☰', n: '统一菜单（R42）', d: '按 Tab（洞里 / 野外都行）打开总菜单：左边按 角色 / 挑战 / 收藏 / 世界 / 系统 分组，一键切换各个界面；装备纸娃娃、物品栏、铁匠、工坊、典籍合并成「装备与背包」一页。T / O / F1 / C / U / K / L / B / Z 等原热键仍可用，打开任何面板导航栏都会出现。关闭 = 回到各自分散的窗口。', def: true },
     { id: 'balance_r41', cat: 'play', icon: '⚖️', n: '前期平衡（R41）', d: '新手出刀更慢（Lv1 节奏 ×1.5，到 Lv26 恢复正常）、低战力时伤害打折、低强度地区敌人出手更疼、升级曲线前期更慢、深层地区经验更多。数值来自 tools/balance/sim.js 的模拟；旧存档等级不变。关闭 = 回到 R37 的快节奏。', def: true },
     { id: 'hud_legible', cat: 'ui', icon: '👁', n: '界面更清楚 · 底栏不被挡（R40b）', d: '热键栏出现时，所有贴底的提示（[E] 提示、麻袋 HUD、手持书、灵契、按键按钮…）自动抬到它上面，互不重叠；底部整行提示条让位；第二排热键全空时折叠；提示/字幕加深底板、加大字号；F 拔刀提示改成一行短字。不影响任何玩法。', def: true },
     { id: 'keyguide', cat: 'ui', icon: '⌨', n: '按键一览（R40）', d: 'F1 或 ? 打开 / 关闭；标题菜单「⌨ 按键一览」按钮与右下角「按键 F1」小按钮。中 / 日 / EN 三语，按下的键会在面板里亮起。不影响任何玩法。', def: true },
@@ -342,5 +343,5 @@ window.Mods = (() => {
     else if (box && e.code === 'Escape') { e.preventDefault(); const q = document.getElementById('modq'); if (q && q.value) { q.value = ''; view.q = ''; refresh(false); } else close(); }
     else if (box && e.key === '/' && document.activeElement && document.activeElement.id !== 'modq') { e.preventDefault(); const q = document.getElementById('modq'); if (q) q.focus(); }
   });
-  return { LIST, on, set, apply, open, close, get state() { return st; }, get boot() { return bootSt; } };
+  return { LIST, on, set, apply, open, close, get isOpen() { return !!box; }, get state() { return st; }, get boot() { return bootSt; } };
 })();

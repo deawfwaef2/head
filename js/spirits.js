@@ -314,6 +314,6 @@ window.Spirits = (() => {
     build(); keyArt(); g.HOOK.frame.push(frame); g.HOOK.e.unshift(onE); g.HOOK.tip.unshift(onTip);
     for (const id in st().met) spawnSprite(id); return true; }
   const wait = setInterval(() => { if (window.G && G.HOOK && G.S && G.scene && window.THREE) { clearInterval(wait); try { init(); } catch (e) { console.warn('Spirits init', e); } } }, 200);
-  return { open: openDlg, panel: openPanel, st, D, appraise, taste, addMet, addAff, scan, queue,
+  return { open: openDlg, panel: openPanel, closePanel, get panelOpen() { return pan.open; }, st, D, appraise, taste, addMet, addAff, scan, queue,
     _dbg: { sprites: () => sprites, frame, checkQueue, litN, friends, finishEnding, openPanel, toggleHide } };
 })();

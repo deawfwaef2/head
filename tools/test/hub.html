@@ -1,0 +1,31 @@
+<!doctype html><html><head><meta charset="utf-8"><title>hub harness</title>
+<style>body{margin:0;background:linear-gradient(#3a4a3a,#1a2018);height:100vh;color:#eee;font-family:system-ui,"Noto Sans CJK SC","Noto Color Emoji",sans-serif;overflow:hidden}#wStat{position:fixed;left:14px;top:12px;color:#fff;font-size:14px}#wHint{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#0007;padding:6px 14px;border-radius:8px}</style></head><body>
+<div id="wStat"><div class="hp"></div>Lv · 魂晶 +0</div><div id="wHint"><b>F</b> 拔刀 · <b>M</b> 地图</div>
+<script src="../../lib/three.min.js"></script>
+<script>
+// 天赋系统测试台：真实 mods/lore/rpg/talents_data/talents/talents_ui + 假 G / Worlds / Foe
+const V3 = THREE.Vector3;
+window.__log = []; window.SFX = new Proxy({}, { get: () => () => { } });
+const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.05, 200); scene.add(camera); camera.position.set(0, 1.45, 0);
+const S = { v: 3, coins: 300, hp: 150, base: { str: 5, con: 5, agi: 5, ter: 5, soul: 5 }, trained: {}, eq: { weapon: 0, helm: 0, armor: 0, charm: 0, bag: 0 }, eqPlus: {}, items: { potion: 2 }, xp: 0, bosses: {}, stats: { trips: 3, kills: 12, earned: 456, pokes: 7 }, heads: [], depth: 1, eqPlus: {}, g2: null, inv: null };
+window.G = { S, fmtN: n => String(n), buildBonus: () => ({}), daily: { n: 'x', d: 'y' }, bounties: () => [], exhibit: () => ({ grade: 'C', score: 0, tier: 0 }), playing: true, uiOpen: false, HOOK: { frame: [], e: [], click: [] }, scene, camera, player: { pos: new V3(0, 0, 0), yaw: 0, pitch: 0 }, keys: {},
+  st() { return RPG.stats(S, {}); }, setUI(o) { G.uiOpen = o; }, lockPointer() { }, save() { }, toast(t) { __log.push('T:' + t); }, flash() { }, addCoins(n) { S.coins += n; } };
+const W = { pos: G.player.pos, vel: new V3(), B: { sc: scene, H: () => 0 }, busy: false, dead: false, stats: { combo: 0, kills: [] }, dodgeT: 0, shake: 0 };
+window.Worlds = { active: true, _W: W };
+const mk = (x, z, o) => Object.assign({ pos: new V3(x, 0, z), hp: 100, maxHp: 100, dead: false, yaw: 0, h: { c: { name: '测试' + x, rar: 1 } }, rar: 1, block: 0, stag: 0, f: { bones: {}, play() { } } }, o || {});
+window.Foe = { foes: [mk(0, -4), mk(3, -6, { role: 'guard' }), mk(-3, -5, { elite: true, aff: { frenzy: 1, iron: 1 } })],
+  hit(fo, info) { let d = 12 * (info.mult || 1); d = Talents.outDmg(fo, info, d, 'chest', false); fo.hp -= d; __log.push('hit' + d + (info.crit ? 'c' : '')); Talents.onEvent('hit', fo, { dealt: d, crit: info.crit, skill: info.skill, spell: info.spell, proc: info.proc }); if (fo.hp <= 0) { fo.dead = true; Talents.onEvent('kill', fo); } return true; },
+  dot(fo, n) { fo.hp -= n; if (fo.hp <= 0) { fo.dead = true; Talents.onEvent('kill', fo); } }, roar() { return 2; }, execute(fo) { fo.hp = 0; fo.dead = true; Talents.onEvent('execute', fo); Talents.onEvent('kill', fo); }, brokenNear() { return null; }, ctx() { return { power: () => 1 }; } };
+window.FoeAI2 = { AFF: { frenzy: { n: '狂热', ic: '🔥', col: '#ff8a3a' }, iron: { n: '铁壁', ic: '🛡️', col: '#9fc8ff' } } };
+window.FoeRoles = { INFO: { guard: { ic: '🛡️', n: '守卫', col: '#9cf' } } };
+</script>
+<script src="../../js/mods.js"></script><script src="../../js/lore.js"></script><script src="../../js/rpg.js"></script>
+<script src="../../js/talents_data.js"></script><script src="../../js/talents.js"></script><script src="../../js/talents_ui.js"></script>
+<script src="../../js/r35ui.js"></script><script src="../../js/keyguide.js"></script><script src="../../js/sack.js"></script><script src="../../js/gear2.js"></script><script src="../../js/ui.js"></script><script src="../../js/hudfix.js"></script><script src="../../js/hub.js"></script>
+<script>
+window.onerror = (m, s, l) => __log.push('ERR ' + m + '@' + (s||'').split('/').pop() + ':' + l);
+window.tick = (n, dt) => { for (let i = 0; i < (n || 1); i++) for (const f of G.HOOK.frame) f(dt || 0.05); };
+fetch('../../css/ui3a.css').then(r => r.text()).then(c => { const s = document.createElement('style'); s.textContent = c; document.head.appendChild(s); document.body.classList.add('ui3a'); });
+fetch('../../index.html').then(r => r.text()).then(h => { const m = h.match(/<style>([\s\S]*?)<\/style>/); if (m) { const s = document.createElement('style'); s.textContent = m[1]; document.head.insertBefore(s, document.head.firstChild); } });
+try { UI.init(); } catch (e) { __log.push('UIinit ' + e.message); }
+</script></body></html>

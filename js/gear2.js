@@ -214,6 +214,18 @@ window.Gear2 = (() => {
 <div class="g2h4" style="margin-top:16px">${wild ? '麻袋里的装备' : '麻袋 + 储物箱里的装备'} · ${LIST.length}</div><div class="g2inv">${inv || '<span class="g2note">还没有找到装备——去野外翻翻宝箱和尸体吧。</span>'}</div>
 <div class="g2note">稀有度：${RARN.map((n, i) => `<span style="color:${RARC[i]}">${n}</span>`).join(' · ')}。词条数 = 稀有度。武器/护甲/头盔/护符的强化（+N）仍在铁匠处。</div></div></div>`;
   }
+  // R42：Tab 菜单里的「装备与背包」页——左边纸娃娃 + 属性（这里只放槽位；穿戴从右边麻袋/物品里点）
+  function dollHTML() {
+    defs(); css(); bust(); const eq = SS().eq, st = G.st(), a = sum(), e = x => eq[x] || null;
+    const cells = [slotHtml('helm', '头盔', 0, 1), slotHtml('neck', '项链', e('neck')), slotHtml('medal', '勋章', e('medal')), slotHtml('charm', '护符', 0, 1),
+      slotHtml('weapon', '武器', 0, 1), `<div class="g2body"><div class="o">🧌</div><div class="pw">战 力<b>${st.power}</b></div></div>`, slotHtml('armor', '护甲', 0, 1),
+      slotHtml('brace1', '左镯', e('brace1')), slotHtml('brace2', '右镯', e('brace2')), slotHtml('ring1', '左戒', e('ring1')), slotHtml('ring2', '右戒', e('ring2')),
+      slotHtml('belt', '腰带', e('belt')), slotHtml('boots', '靴子', e('boots')), slotHtml('bag', '背篓', 0, 1)];
+    const r = (n, v, sp, z) => `<div class="${sp ? 'sp' : ''}${z ? ' z' : ''}"><span>${n}</span><b>${v}</b></div>`;
+    const base = r('等级', 'Lv.' + (st.lv || 1)) + r('生命', `${Math.round(G.S.hp)} / ${st.maxHp}`) + r('攻击', st.atk) + r('防御', st.def) + r('闪避', Math.round(st.dodge * 100) + '%') + r('伤害加成', '+' + a.dmg + '%', 1, !a.dmg) + r('暴击率', a.crit + '%', 1, !a.crit) + r('受到伤害', '-' + a.dr + '%', 1, !a.dr);
+    return `<div class="g2doll"><div class="g2grid">${cells.join('')}</div></div><div class="g2tb" style="margin-top:10px">${base}</div><div class="g2note">点格子卸下；穿戴请在右边「物品」里点装备。悬停看词条。</div>`;
+  }
+  function dollClick(e) { const s = e.target.closest('[data-pos]'); if (!s) return false; showTip(null); unequip(s.dataset.pos); bust(); return true; }
   function render() { if (window.R35UI && R35UI.isOpen('gear')) R35UI.render(); }
   function showTip(html, e, col) { if (!tipEl) { tipEl = document.createElement('div'); tipEl.id = 'g2Tip'; document.body.appendChild(tipEl); } if (!html) { tipEl.style.display = 'none'; return; } tipEl.innerHTML = html; tipEl.style.setProperty('--tc', col || 'rgba(231,194,122,.5)'); tipEl.style.display = 'block'; const x = Math.min(innerWidth - tipEl.offsetWidth - 8, e.clientX + 16), y = Math.min(innerHeight - tipEl.offsetHeight - 8, e.clientY + 12); tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px'; }
   function onMove(e) {
@@ -231,9 +243,9 @@ window.Gear2 = (() => {
     if (o.g2) equip(o, back); else Sack.equip(o, back);
     bust(); render();
   }
-  function toggle(v) { if (!window.R35UI) return; if (v === false) { if (R35UI.isOpen('gear')) R35UI.close(); } else if (v === true) R35UI.open('gear'); else R35UI.toggle('gear'); }
+  function toggle(v) { if (window.Hub && Hub.on()) { if (v === false) Hub.closeAll(); else Hub.go('kit', v == null); return; } /* R42：装备并进 Tab 菜单的「装备与背包」 */ if (!window.R35UI) return; if (v === false) { if (R35UI.isOpen('gear')) R35UI.close(); } else if (v === true) R35UI.open('gear'); else R35UI.toggle('gear'); }
   if (window.R35UI) R35UI.reg('gear', { n: '💍 装备', title: '装 备', on, html: panelHTML, click: onClick, move: onMove, leave: () => showTip(null) });
   addEventListener('keydown', e => { if (!on() || !window.G || !G.S) return; if (e.code === 'KeyZ' && !e.repeat && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) { if (window.UI && UI.open) return; e.preventDefault(); toggle(); } }, true);
   hook(); setTimeout(hook, 0); addEventListener('load', hook);
-  return { on, SL, POS, AF, UNQ, make, name, rollLoot, dropFor, equip, unequip, sum, hitMul, avgMul, hateMul, senseMul, tipBody, tipFull, toggle, owns: o => !!(o && o.g2), get lastCrit() { return lastCrit; }, _bust: bust };
+  return { on, SL, POS, AF, UNQ, make, name, rollLoot, dropFor, equip, unequip, sum, hitMul, avgMul, hateMul, senseMul, tipBody, tipFull, dollHTML, dollClick, dollMove: onMove, dollLeave: () => showTip(null), toggle, owns: o => !!(o && o.g2), get lastCrit() { return lastCrit; }, _bust: bust };
 })();
