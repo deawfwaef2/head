@@ -578,7 +578,7 @@ window.Sanctum = (() => {
       return `<b>🛢️ 腌渍魂桶阵</b>（${hs.length}/3 位 · 当前最高陈酿 ×${maxM.toFixed(2)}） · <b>[E]</b> 搅桶榨取`;
     }
     if ((b.type === 'bust_pedestal' || b.type === 'headless_statue') && hs.length && !hit.head)
-      return `<b>🗽 ${C[b.type].n}</b>（已嫁接「${hs[0].NM(rec.c)}」） · <b>[E]</b> 切换雕像姿态 / 亵渎咏叹`;
+      return `<b>🗽 ${C[b.type].n}</b>（已嫁接「${NM(hs[0].rec.c)}」） · <b>[E]</b> 切换雕像姿态 / 亵渎咏叹`;
     if (b.type === 'gothic_commode' && hs.length && !hit.head)
       return `<b>🪞 魔镜雕花供案</b>（${hs.length}/4 位） · <b>[E]</b> 魔镜照魂（全体残响 ×2）`;
     if (b.type === 'vault' && !hit.head) {
