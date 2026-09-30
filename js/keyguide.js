@@ -61,6 +61,27 @@ window.KeyGuide = (() => {
     ja: { title: 'キー一覧', sub: '魂首窟 · 操作早見表', tip: '画面をクリックしてマウスをロック。Esc で解除。', hero: ['まずはこの3つ', ['WASD で移動、マウスで視点', '外に出たら F で抜刀。左クリックで斬り、右クリックでガード', '敵を倒して E で首を拾い、洞窟で弄んで魂晶を得る']], close: '閉じる', open: '⌨ キー一覧', btn: 'キー F1' },
     en: { title: 'Key Guide', sub: 'Soulhead Cave · Controls cheat-sheet', tip: 'Click the window to lock the mouse; Esc releases it.', hero: ['Do these three first', ['WASD to walk, mouse to look', 'Outside, press F to draw — LMB slashes, RMB blocks', 'Drop a foe, press E to take the head, play with it in the cave for crystals']], close: 'Close', open: '⌨ Key Guide', btn: 'Keys F1' },
   };
+
+  // R44：图形化操作图（少文字：键帽 + 图标 + 一两个字）
+  const VW = { // 词表 [zh, ja, en]
+    move: ['移动', '移動', 'MOVE'], combat: ['战斗', '戦闘', 'COMBAT'], loot: ['首级 · 菜单', '首級・メニュー', 'HEADS · MENU'],
+    sprint: ['疾跑', 'ダッシュ', 'Sprint'], jump: ['跳', 'ジャンプ', 'Jump'], crouch: ['蹲', 'しゃがみ', 'Crouch'], look: ['视角', '視点', 'Look'],
+    slash: ['斩', '斬る', 'Slash'], block: ['挡', 'ガード', 'Block'], draw: ['拔刀', '抜刀', 'Draw'], dodge: ['闪身', '回避', 'Dodge'], exec: ['处决', '処刑', 'Execute'], heal: ['喝药', '回復', 'Heal'],
+    grab: ['拾取', '拾う', 'Grab'], play: ['把玩', '弄ぶ', 'Play'], throw: ['投掷', '投げる', 'Throw'], menu: ['菜单', 'メニュー', 'Menu'], pause: ['暂停', '停止', 'Pause'], keys: ['按键表', 'キー表', 'Keys'], walk: ['走', '移動', 'Walk']
+  };
+  const MOUSE = (l, r, L) => `<div class="ms"><svg viewBox="0 0 90 130"><path class="b${l ? ' on1' : ''}" d="M45 6 H30 Q8 6 8 30 V58 H45 Z"/><path class="b${r ? ' on2' : ''}" d="M45 6 H60 Q82 6 82 30 V58 H45 Z"/><path class="bd" d="M8 64 H82 V86 Q82 124 45 124 Q8 124 8 86 Z"/><rect class="w" x="40" y="18" width="10" height="24" rx="5"/></svg>${l ? `<b class="l1">${VW.slash[L]}</b>` : ''}${r ? `<b class="l2">${VW.block[L]}</b>` : ''}</div>`;
+  function visual(L) {
+    const i = n => VW[n][{ zh: 0, ja: 1, en: 2 }[L]];
+    const K = (k, n, cls) => `<div class="kk ${cls || ''}"><span class="cap big" data-c="${capCode(k)}">${esc(k)}</span><small>${esc(i(n))}</small></div>`;
+    const M = (l, r) => MOUSE(l, r, { zh: 0, ja: 1, en: 2 }[L]);
+    const card = (ic, t, inner) => `<div class="vc"><h4><i>${ic}</i>${esc(i(t))}</h4><div class="vb">${inner}</div></div>`;
+    const wasd = `<div class="wasd"><span class="cap big" data-c="KeyW">W</span><span class="cap big" data-c="KeyA">A</span><span class="cap big" data-c="KeyS">S</span><span class="cap big" data-c="KeyD">D</span></div>`;
+    return `<div class="vis">
+      ${card('🚶', 'move', `<div class="vrow">${wasd}<div class="vcol">${K('Shift', 'sprint', 'wide')}${K('Space', 'jump', 'wide')}${K('C', 'crouch')}</div>${M(0, 0).replace('<div class="ms">', '<div class="ms"><em>' + esc(i('look')) + '</em>')}</div>`)}
+      ${card('⚔️', 'combat', `<div class="vrow">${M(1, 1)}<div class="vgrid">${K('F', 'draw')}${K('Q', 'dodge')}${K('E', 'exec')}${K('H', 'heal')}</div></div>`)}
+      ${card('💀', 'loot', `<div class="vgrid g3">${K('E', 'grab')}<div class="kk"><span class="cap big mini">LMB</span><small>${esc(i('play'))}</small></div><div class="kk"><span class="cap big mini">RMB</span><small>${esc(i('throw'))}</small></div>${K('Tab', 'menu')}${K('Esc', 'pause')}${K('F1', 'keys')}</div>`)}
+    </div>`;
+  }
   let root = null, isOpen = false;
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const capCode = k => ({ W: 'KeyW', A: 'KeyA', S: 'KeyS', D: 'KeyD', Shift: 'ShiftLeft', Space: 'Space', Tab: 'Tab', Esc: 'Escape', F1: 'F1', F9: 'F9', '?': 'Slash' }[k] || (/^[A-Z]$/.test(k) ? 'Key' + k : /^[0-9]$/.test(k) ? 'Digit' + k : ''));
@@ -91,6 +112,32 @@ window.KeyGuide = (() => {
 #kg .cap{display:inline-block;min-width:22px;padding:2px 5px 3px;text-align:center;font:700 12px/1.3 "SF Mono",Consolas,"Noto Sans Mono",monospace;color:#ffe3a6;background:linear-gradient(180deg,#3a2a1c,#22160f);border:1px solid #8a6a3a;border-bottom-width:3px;border-radius:5px;box-shadow:0 1px 0 #000}
 #kg .cap.hit{background:#ffcf70;color:#2a1608;border-color:#fff2c0;transform:translateY(2px);border-bottom-width:1px}
 #kg .ft{margin-top:6px;display:flex;justify-content:space-between;font-size:11.5px;color:#9b8562}
+#kg .vis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0 16px}
+@media(max-width:900px){#kg .vis{grid-template-columns:1fr}}
+#kg .vc{position:relative;padding:12px 16px 16px;background:radial-gradient(120% 90% at 0 0,rgba(216,69,46,.22),transparent 60%),linear-gradient(180deg,#22150f,#100908);border:1px solid #6d5430;border-top:3px solid #d8452e;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)}
+#kg .vc h4{margin:0 0 12px;display:flex;align-items:center;gap:10px;font:900 22px/1 "Noto Serif CJK SC","Noto Serif CJK JP",Georgia,serif;letter-spacing:.2em;color:#ffd27a}
+#kg .vc h4 i{font-style:normal;font-size:26px}
+#kg .vrow{display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap}
+#kg .vcol{display:flex;flex-direction:column;gap:8px}
+#kg .wasd{display:grid;grid-template-columns:repeat(3,54px);grid-template-rows:repeat(2,54px);gap:6px}
+#kg .wasd .cap:nth-child(1){grid-column:2;grid-row:1}#kg .wasd .cap:nth-child(2){grid-column:1;grid-row:2}#kg .wasd .cap:nth-child(3){grid-column:2;grid-row:2}#kg .wasd .cap:nth-child(4){grid-column:3;grid-row:2}
+#kg .cap.big{min-width:54px;height:54px;display:inline-flex;align-items:center;justify-content:center;font-size:22px;border-radius:8px;border-width:2px;border-bottom-width:6px;padding:0 8px;box-shadow:0 4px 10px rgba(0,0,0,.5)}
+#kg .cap.big.mini{font-size:15px;letter-spacing:.04em}
+#kg .cap.big.hit{border-bottom-width:2px;transform:translateY(4px)}
+#kg .kk{display:flex;flex-direction:column;align-items:center;gap:5px} #kg .kk small{font-size:16px;font-weight:700;color:#f1e3c4;letter-spacing:.08em;white-space:nowrap}
+#kg .kk.wide .cap.big{min-width:96px;font-size:17px;height:40px;border-bottom-width:5px}
+#kg .kk.wide{flex-direction:row;gap:10px}
+#kg .vgrid{display:grid;grid-template-columns:repeat(2,auto);gap:12px 22px} #kg .vgrid.g3{grid-template-columns:repeat(3,1fr);justify-items:center;gap:14px 10px}
+#kg .ms{position:relative;width:86px;flex:none;text-align:center} #kg .ms svg{width:86px;height:124px;display:block;filter:drop-shadow(0 4px 8px rgba(0,0,0,.6))}
+#kg .ms .b,#kg .ms .bd{fill:#2a1c12;stroke:#8a6a3a;stroke-width:2.5} #kg .ms .w{fill:#8a6a3a}
+#kg .ms .b.on1{fill:#d8452e;stroke:#ffb09a;filter:drop-shadow(0 0 7px #ff5a3a)} #kg .ms .b.on2{fill:#3a82d8;stroke:#a8d2ff;filter:drop-shadow(0 0 7px #4a9aff)}
+#kg .ms b{position:absolute;top:-2px;font:900 17px/1 "Noto Serif CJK SC",serif;padding:2px 6px;background:rgba(0,0,0,.6);border-radius:4px;white-space:nowrap}
+#kg .ms b{top:auto;bottom:-30px;font-size:18px} #kg .ms b.l1{left:-6px;color:#ff9a84} #kg .ms b.l2{right:-6px;color:#9ccaff}
+#kg .vrow:has(.ms b){padding-bottom:30px}
+#kg .ms em{position:absolute;left:0;right:0;bottom:-24px;font:700 16px/1 system-ui;font-style:normal;color:#f1e3c4;letter-spacing:.08em}
+#kg .vrow:has(.ms em){padding-bottom:22px}
+#kg .r{font-size:15px!important;line-height:1.5!important} #kg .sec h3{font-size:17px!important} #kg .cap{font-size:14px!important} #kg .ks{width:108px!important}
+#kg .ft{font-size:14px!important}
 #kgBtn{position:fixed;right:14px;bottom:46px;z-index:30;display:none;background:rgba(20,12,8,.75);border:1px solid #6d5430;color:#dcc79c;padding:4px 10px;font:12px system-ui;cursor:pointer}
 #kgBtn:hover{border-color:#ffd27a;color:#fff}`;
     document.head.appendChild(s);
@@ -101,7 +148,7 @@ window.KeyGuide = (() => {
     const secs = SEC.map(s => `<div class="sec"><h3>${s.ic} ${esc(s.t[L])}</h3>` + s.rows.map(r =>
       `<div class="r"><div class="ks">${r[0].map(k => `<span class="cap" data-c="${capCode(k)}">${esc(k)}</span>`).join('')}</div><div class="d">${esc(r[1][L])}</div></div>`).join('') + '</div>').join('');
     root.innerHTML = `<div class="box"><h2>⌨ ${esc(T.title)} <small>${esc(T.sub)}</small><button class="x" data-x="1">${esc(T.close)} · Esc</button></h2>
-<div class="hero"><b>${esc(T.hero[0])}</b><ol>${T.hero[1].map(x => `<li>${esc(x)}</li>`).join('')}</ol></div>
+${visual(L)}
 <div class="grid">${secs}</div><div class="ft"><span>${esc(T.tip)}</span><span>F1 / ?</span></div></div>`;
     const b = document.getElementById('kgBtn'); if (b) b.textContent = T.btn;
     const tb = document.getElementById('kgTitleBtn'); if (tb) tb.textContent = T.open;
