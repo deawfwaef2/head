@@ -20,6 +20,17 @@ window.Combat = (() => {
     thrust: 0, thrustQ: 0, thrustSide: 1, guard: { x: 0, y: 1 }, gdir: 'up',
     stam: 100, stop: 0, gAng: Math.PI / 2, gHist: [], charge: 0, charged: 0, shake: 0, lastTip: null, lastBase: null, tipSpeed: 0, swingSnd: 0, hitCd: new Map(), len: 0.8, wt: 1, edge: new V3(1, 0, 0)
   };
+  // ===== 第二十二轮（用户）：蓄势挥击（MOD release_slash，默认开，需要 gesture_combat）=====
+  // 按住左键 = 蓄势（视角 1:1 跟手，刀向“趋势”的反方向拉开）；松开左键 = 捕捉松手前的鼠标微趋势 → 沿该方向挥出一刀。
+  //   没有趋势：短按 = 突刺；长按 ≥0.7s（蓄力）无趋势 = 直劈。按住期间刀尖本身不再造成伤害（只有松手那一刀和突刺）。
+  const RS = () => !window.Mods || !Mods.on || Mods.on('release_slash') !== false;
+  const RH = []; // 鼠标历史 [ms, dx, dyUp]
+  function rsTrend(nowMs, tau) { // 时间加权（越近权重越大）的微趋势，返回 {x,y,m}；x 右 y 上，m = 加权像素量
+    let x = 0, y = 0; tau = tau || 140;
+    for (let i = RH.length - 1; i >= 0; i--) { const age = nowMs - RH[i][0]; if (age > 320) break; const w = Math.exp(-age / tau); x += RH[i][1] * w; y += RH[i][2] * w; }
+    return { x, y, m: Math.hypot(x, y) };
+  }
+  function snap8(x, y) { const a = Math.atan2(y, x), k = Math.PI / 4, n = Math.round(a / k), d = a - n * k; const b = Math.abs(d) < 0.25 ? n * k : a; return [Math.cos(b), Math.sin(b)]; } // 14° 内吸附到 8 方向
   const providers = [];
   const addProvider = (f) => providers.push(f);
 
@@ -52,7 +63,8 @@ window.Combat = (() => {
     const b = document.createElement('i'); b.style.cssText = 'display:block;height:100%;width:100%;border-radius:3px;background:linear-gradient(90deg,#ffd27a,#ff9a3a);transition:width .08s';
     const g = document.createElement('div'); g.style.cssText = 'position:absolute;left:50%;top:-44px;transform:translateX(-50%);font:600 13px sans-serif;color:#cfe6ff;text-shadow:0 1px 3px #000;opacity:0;transition:opacity .15s;white-space:nowrap';
     const c = document.createElement('i'); c.style.cssText = 'position:absolute;left:0;top:8px;display:block;height:3px;width:0;border-radius:2px;background:#9fe0ff;box-shadow:0 0 6px #6cf';
-    d.appendChild(b); d.appendChild(g); d.appendChild(c); document.body.appendChild(d); return { d, b, g, c };
+    const ar = document.createElement('i'); ar.style.cssText = 'position:absolute;left:50%;top:-26px;width:46px;height:2px;margin-top:-1px;transform-origin:0 50%;background:linear-gradient(90deg,rgba(255,226,176,0),#ffe2b0);opacity:0;pointer-events:none;border-radius:1px';
+    d.appendChild(b); d.appendChild(g); d.appendChild(c); d.appendChild(ar); document.body.appendChild(d); return { d, b, g, c, a: ar };
   }
 
   function init(game) {
@@ -72,7 +84,7 @@ window.Combat = (() => {
       vm.userData.rest = vm.userData.rest || { p: vm.position.clone(), r: vm.rotation.clone() };
       vm.position.set(0, 0, 0); vm.rotation.set(0, 0, 0); if (fist) fist.visible = false;
       S.hand.set(0.2, -0.55, -0.35); S.hv.set(0, 0, 0); S.blade.copy(IDLE_B); S.lastTip = null; trail.pts.length = 0; S.stam = Math.max(S.stam, 30);
-      SFX.play('draw', 0.7); G.toast && G.toast('⚔️ 拔刀：按住左键＝刀尖锁在准星上，转动视角挥砍（不动 0.7 秒=蓄力重斩）· 连点刺 · 右键格挡并转动鼠标对准红色来刀弧 · Q 闪身 · 破绽时 E 处决 · F 收刀', '#ffd27a', 4);
+      SFX.play('draw', 0.7); G.toast && G.toast((RS() ? '⚔️ 拔刀：按住左键＝蓄势（刀向反方向拉开）· 微微带一下鼠标定方向 · 松开＝沿该方向挥出（蓄满 0.7 秒=重斩，不带方向=直劈）· 点一下=刺' : '⚔️ 拔刀：按住左键＝刀尖锁在准星上，转动视角挥砍（不动 0.7 秒=蓄力重斩）· 连点刺') + ' · 右键格挡并转动鼠标对准红色来刀弧 · Q 闪身 · 破绽时 E 处决 · F 收刀', '#ffd27a', 4);
     } else {
       const r = vm.userData.rest; if (r) { vm.position.copy(r.p); vm.rotation.copy(r.r); }
       if (wpn && wpn.userData.rest) { wpn.position.copy(wpn.userData.rest.p); wpn.rotation.copy(wpn.userData.rest.r); }
@@ -86,15 +98,41 @@ window.Combat = (() => {
   // ---------- 输入 ----------
   function onDown(btn) {
     if (!drawn) return false;
-    if (btn === 0) { S.lmb = true; S.lmbT = performance.now(); S.drag = 0; S.charge = 0; const c = invCtrl(S.hand); S.ctrl.x = c.x; S.ctrl.y = c.y; }
+    if (btn === 0) { S.lmb = true; S.lmbT = performance.now(); S.drag = 0; S.charge = 0; RH.length = 0; S.rsv = S.rsv || { x: 0, y: 0, m: 0 }; S.rsv.x = S.rsv.y = S.rsv.m = 0; const c = invCtrl(S.hand); S.ctrl.x = c.x; S.ctrl.y = c.y; }
     if (btn === 2) { S.rmb = true; S.guardT = performance.now() / 1000; }
     return true;
   }
   function onUp(btn) {
     if (!drawn) return false;
+    if (btn === 0 && S.lmb && RS() && XH()) { S.lmb = false; rsRelease(); return true; }
     if (btn === 0 && S.lmb) { S.lmb = false; const dt = performance.now() - S.lmbT; if (dt < 190 && S.drag < 0.12) queueThrust(); if (S.charged > 0) S.charged = Math.min(S.charged, 1.0); S.charge = 0; }
     if (btn === 2) S.rmb = false;
     return true;
+  }
+  function rsRelease() {
+    const nowMs = performance.now(), hold = nowMs - S.lmbT, T = rsTrend(nowMs, 140), charged = S.charged > 0;
+    S.charge = 0; if (S.charged > 0) S.charged = Math.min(S.charged, 1.0);
+    if (S.rmb || S.sw) { RH.length = 0; return; }
+    if (T.m >= 1.2) { const [dx, dy] = snap8(T.x, T.y); startSwing(dx, dy, hold, charged, T.m); }
+    else if (charged || hold > 700) startSwing(0, -1, hold, true, 0); // 蓄满无趋势：直劈
+    else queueThrust();
+    RH.length = 0;
+  }
+  function startSwing(dx, dy, hold, charged, mag) {
+    const pw = 0.7 + 0.3 * Math.min(1, hold / 450), tired = S.stam <= 0 ? 0.6 : 1;
+    S.sw = { t: 0, dur: 0.15 * Math.sqrt(S.wt) / (charged ? 1.0 : 1) / tired, dx, dy, pw: pw * tired, charged, v: new V3(dx, dy, 0), hit: false, h0: S.hand.clone() };
+    S.stam = Math.max(0, S.stam - (charged ? 16 : 10)); S.thrust = 0; S.thrustQ = 0; S.hitCd.clear();
+    SFX.play('draw', Math.min(0.65, 0.3 + pw * 0.3), charged ? 0.9 : 1.25 + Math.random() * 0.2);
+  }
+  // 挥击动画：刀尖从“趋势反方向”一侧扫过准星到趋势方向一侧；直接摆姿态（不过弹簧），速度由位置差得出 → 走原有扫掠命中
+  const HAND0 = new V3(0.2, -0.3, -0.36), _st = new V3();
+  function swingStep(dt) {
+    const w = S.sw; w.t += dt; const u = Math.min(1, w.t / w.dur);
+    let sgn; if (u < 0.2) sgn = -1 - 0.12 * Math.sin(u / 0.2 * Math.PI / 2); else { const k = (u - 0.2) / 0.8, ez = 1 - Math.pow(1 - k, 2.0); sgn = -1.12 + 2.24 * ez; } // 前 20% 回拉，其后 80% 挥出
+    const A = 0.62 * (S.len / 0.8) * (0.85 + 0.25 * w.pw) * (w.charged ? 1.2 : 1), dist = 0.82;
+    S.hand.set(HAND0.x + w.dx * sgn * 0.09, HAND0.y + w.dy * sgn * 0.07, HAND0.z - (u > 0.2 ? 0.04 : 0)); S.hv.set(0, 0, 0); S.tgt.copy(S.hand);
+    _st.set(w.dx * sgn * A, w.dy * sgn * A * 0.9, -dist); S.bladeT.copy(_st).sub(S.hand).normalize();
+    if (u >= 1) { S.sw = null; S.tgt.copy(S.hand); }
   }
   // 第二十一轮（用户）：挥砍（按住左键）灵敏度不降低，但镜头按武器重量带惯性（越重越"拖"、松手前会继续滑一点）；不按住没有惯性；
   //   格挡（按住右键）灵敏度更低 ×0.3。MOD wpn_feel（默认开）；关掉恢复第二十轮的 ×0.42/×0.45。
@@ -117,6 +155,7 @@ window.Combat = (() => {
   // 返回镜头转动系数：挥砍/格挡时鼠标主要用于控制武器
   function onMove(dx, dy) {
     if (!drawn) return 1;
+    if (S.lmb && XH() && RS()) { RH.push([performance.now(), dx, -dy]); if (RH.length > 80) RH.shift(); S.drag += Math.hypot(dx, dy) * 0.0062; return 1; }
     if (S.lmb && XH()) { S.mAcc.x += dx; S.mAcc.y -= dy; S.drag += Math.hypot(dx, dy) * 0.0062; return lookLmb(dx, dy); }
     if (S.lmb) { const k = 0.0062; S.ctrl.x += dx * k; S.ctrl.y -= dy * k; S.drag += Math.hypot(dx, dy) * k; const r = Math.hypot(S.ctrl.x, S.ctrl.y); if (r > 1.25) { S.ctrl.x *= 1.25 / r; S.ctrl.y *= 1.25 / r; } return lookLmb(dx, dy); } // 旧：鼠标控制武器轨迹 // 第十八轮：挥砍 = 刀尖锁在准星上，鼠标只转镜头
     if (S.rmb) { S.guard.x += dx * 0.022; S.guard.y -= dy * 0.022; const r = Math.hypot(S.guard.x, S.guard.y); if (r > 1) { S.guard.x /= r; S.guard.y /= r; } return FEEL() ? 0.3 : (window.Mods && Mods.on('guard_slowlook') ? 0.45 : 1); } // 第十九轮：用户要求格挡时降灵敏度
@@ -174,7 +213,9 @@ window.Combat = (() => {
     if (!S.lmb && S.charged > 0) { S.charged -= dt; if (S.charged <= 0) S.charged = 0; }
     if (!S.rmb) S.gHist.length = 0;
     // 目标姿态
-    if (S.rmb) {
+    if (S.sw) { if (S.rmb) S.sw = null; else swingStep(dt); }
+    if (S.sw) { omega = 60; }
+    else if (S.rmb) {
       const g = S.guard; S.gdir = Math.abs(g.x) > Math.abs(g.y) ? (g.x < 0 ? 'left' : 'right') : (g.y < 0 ? 'down' : 'up');
       // 连续角度：手放在来刀一侧，刀身垂直于来刀方向横挡
       const ga = S.gAng = Math.atan2(g.y, g.x), cx = Math.cos(ga), cy = Math.sin(ga);
@@ -189,7 +230,12 @@ window.Combat = (() => {
     } else if (S.lmb) {
       if (S.drag < 0.1 && S.charged <= 0) { S.charge += dt / 0.7; if (S.charge >= 1) { S.charged = 9; S.charge = 1; SFX.play('draw', 0.6, 0.7); G.toast && G.toast('⚡ 蓄力完成：挥出重斩（破防）', '#ffd24a', 1); } }
       // 第十八轮：手留在右下方，刀尖锁在屏幕中心（准星）→ 镜头转动时世界里的刀光就是准星的轨迹；沿运动方向略滞后 = 重量感
-      if (XH()) { const mvn = _x.copy(S.mv).multiplyScalar(1 / 2600); if (mvn.length() > 1) mvn.normalize();
+      if (XH() && RS()) { // 蓄势：刀向趋势反方向拉开（趋势实时更新，松手瞬间采样）
+        const T = rsTrend(performance.now(), 140), v = S.rsv, k = Math.min(1, T.m / 16), tx = T.m > 0.01 ? T.x / T.m : 0, ty = T.m > 0.01 ? T.y / T.m : 0; const f = Math.min(1, dt * 14);
+        v.x += (tx - v.x) * f; v.y += (ty - v.y) * f; v.m += (k - v.m) * f; const hp = Math.min(1, (performance.now() - S.lmbT) / 450);
+        S.tgt.set(HAND0.x - v.x * 0.14 * v.m, HAND0.y - v.y * 0.1 * v.m - 0.03 * hp, HAND0.z + 0.06 * hp + 0.04 * v.m); omega *= 1.4;
+        _st.set(-v.x * 0.55 * v.m, -v.y * 0.5 * v.m + 0.12 * (1 - v.m), -0.85); S.bladeT.copy(_st).sub(S.tgt).normalize(); }
+      else if (XH()) { const mvn = _x.copy(S.mv).multiplyScalar(1 / 2600); if (mvn.length() > 1) mvn.normalize();
       S.tgt.set(0.2 - mvn.x * 0.05, -0.3 - mvn.y * 0.04, -0.36); omega *= 1.3;
       aimBlade(S.hand, mvn, S.bladeT); }
       else { ctrlToHand(S.ctrl.x, S.ctrl.y, S.tgt); S.bladeT.copy(S.tgt).sub(PIVOT).normalize().add(_t.set(0, 0, -0.35)).normalize(); }
@@ -204,10 +250,12 @@ window.Combat = (() => {
     { const e = Math.exp(-omega * dt); const x0 = _t.copy(S.hand).sub(S.tgt); const j = _x.copy(S.hv).addScaledVector(x0, omega).multiplyScalar(dt);
       S.hv.addScaledVector(j, -omega).multiplyScalar(e); S.hand.copy(S.tgt).add(x0.add(j).multiplyScalar(e)); }
     // 刃方向：朝目标方向转，并被手速拖拽（重量感）
-    if (S.lmb && !S.rmb && S.thrust === 0 && XH()) { const mvn = _x.copy(S.mv).multiplyScalar(1 / 2600); if (mvn.length() > 1) mvn.normalize(); aimBlade(S.hand, mvn, _b); S.blade.lerp(_b, Math.min(1, dt * 30)).normalize(); } // 用弹簧后的手重算：刀尖始终在准星附近
+    if (S.lmb && !S.rmb && S.thrust === 0 && XH() && RS()) { S.blade.lerp(S.bladeT, Math.min(1, dt * 26)).normalize(); }
+    else if (S.lmb && !S.rmb && S.thrust === 0 && XH()) { const mvn = _x.copy(S.mv).multiplyScalar(1 / 2600); if (mvn.length() > 1) mvn.normalize(); aimBlade(S.hand, mvn, _b); S.blade.lerp(_b, Math.min(1, dt * 30)).normalize(); } // 用弹簧后的手重算：刀尖始终在准星附近
     else { const lag = Math.min(0.5, S.hv.length() * 0.035 * S.wt);
     _b.copy(S.bladeT); if (lag > 0.01) _b.addScaledVector(S.hv.clone().normalize(), -lag);
     S.blade.lerp(_b.normalize(), Math.min(1, dt * 18 / S.wt)).normalize(); }
+    if (S.sw) S.blade.copy(S.bladeT);
     placeWeapon();
     // 世界坐标刃线 + 扫掠命中
     const L = S.len; cam.updateMatrixWorld();
@@ -215,7 +263,7 @@ window.Combat = (() => {
     cam.localToWorld(_baseW); cam.localToWorld(_tipW);
     if (S.lastTip && S.lastTip.distanceToSquared(_tipW) > 2.25) { S.lastTip = null; trail.pts.length = 0; } // 瞬移/传送：不把跳变当成挥砍
     if (S.lastTip) {
-      _vel.copy(_tipW).sub(S.lastTip).divideScalar(Math.max(1e-3, dt)); S.tipSpeed = S.tipSpeed * 0.6 + _vel.length() * 0.4;
+      _vel.copy(_tipW).sub(S.lastTip).divideScalar(Math.max(1e-3, dt)); S.tipSpeed = S.tipSpeed * 0.6 + _vel.length() * 0.4; if (S.sw) S.tipSpeed = Math.min(22, Math.max(S.tipSpeed, _vel.length() * 0.9));
       if (S.tipSpeed > 3 && !S.rmb) { S.stam = Math.max(0, S.stam - dt * S.tipSpeed * 2.2); }
       if (S.tipSpeed > 6.5 && now - S.swingSnd > 0.28) { S.swingSnd = now; SFX.play('draw', Math.min(0.5, S.tipSpeed / 30), 1.6 + Math.random() * 0.3); }
       if (!S.rmb) sweep(now);
@@ -223,7 +271,8 @@ window.Combat = (() => {
     }
     S.lastTip = (S.lastTip || new V3()).copy(_tipW); S.lastBase = (S.lastBase || new V3()).copy(_baseW);
     // HUD
-    hud.d.style.display = 'block'; hud.b.style.width = Math.max(0, S.stam) + '%'; { const k = S.lmb && S.thrust === 0 ? commitK() : 0, w = Math.round(k / 1.2 * 100); if (w !== hud.cw) { hud.cw = w; hud.c.style.width = w + '%'; hud.c.style.background = k >= 0.95 ? '#ffe070' : k > 0.45 ? '#9fe0ff' : '#5a7a90'; } } hud.b.style.background = S.stam < 25 ? 'linear-gradient(90deg,#ff6a5a,#ff3a3a)' : 'linear-gradient(90deg,#ffd27a,#ff9a3a)';
+    hud.d.style.display = 'block'; hud.b.style.width = Math.max(0, S.stam) + '%'; { const k = S.lmb && S.thrust === 0 ? (RS() && XH() ? (S.charged > 0 ? 1.25 : S.charge * 1.1) : commitK()) : 0, w = Math.round(k / 1.2 * 100); if (w !== hud.cw) { hud.cw = w; hud.c.style.width = w + '%'; hud.c.style.background = k >= 0.95 ? '#ffe070' : k > 0.45 ? '#9fe0ff' : '#5a7a90'; } } hud.b.style.background = S.stam < 25 ? 'linear-gradient(90deg,#ff6a5a,#ff3a3a)' : 'linear-gradient(90deg,#ffd27a,#ff9a3a)';
+    { const v = S.rsv, on = RS() && XH() && S.lmb && S.thrust === 0 && !S.sw && v && v.m > 0.12; hud.a.style.opacity = on ? Math.min(1, v.m * 1.2) : 0; if (on) hud.a.style.transform = `rotate(${Math.atan2(-v.y, v.x)}rad)`; }
     hud.g.style.opacity = 0; drawOverlay(now);
     for (const [k, t] of S.hitCd) if (now - t > 0.3) S.hitCd.delete(k);
   }
@@ -240,6 +289,7 @@ window.Combat = (() => {
   // 线段-球扫掠：刃上 5 个点，从上一帧位置到这一帧位置
   function sweep(now) {
     if (S.tipSpeed < 2 && S.thrust === 0) return;
+    if (RS() && XH() && !S.sw && S.thrust === 0) return; // 蓄势挥击：只有松手那一刀 / 突刺造成伤害
     const center = G.player.pos; let list = [];
     for (const p of providers) { try { list = list.concat(p(center) || []); } catch (e) { console.warn(e); } }
     if (!list.length) return;
@@ -262,9 +312,9 @@ window.Combat = (() => {
     }
   }
   // 冲力系数：挥幅 < 60px 几乎无伤；≥ 340px 满额；蓄力斩/刺击不受影响
-  function commitK() { if (S.thrust > 0) return 1; if (S.charged > 0) return 1.25; if (!XH() || (window.Mods && !Mods.on('swing_momentum'))) return 1; const a = S.arc || 0; return Math.max(0.1, Math.min(1.2, (a - 40) / 300)); }
+  function commitK() { if (S.thrust > 0) return 1; if (S.sw) return S.charged > 0 ? 1.25 : 0.85 + 0.3 * S.sw.pw; if (S.charged > 0) return 1.25; if (!XH() || (window.Mods && !Mods.on('swing_momentum'))) return 1; const a = S.arc || 0; return Math.max(0.1, Math.min(1.2, (a - 40) / 300)); }
   function XH() { return !window.Mods || Mods.on('crosshair_slash'); }
-  function motion() { return XH() && S.lmb && S.thrust === 0 && S.mv.lengthSq() > 4e4 ? S.mv : S.hv; }
+  function motion() { if (S.sw) return S.sw.v; return XH() && S.lmb && S.thrust === 0 && S.mv.lengthSq() > 4e4 ? S.mv : S.hv; }
   function fromAng() { const v = motion(); return Math.atan2(-v.y, -v.x); }
   function dirName() { const v = motion(); return Math.abs(v.x) > Math.abs(v.y) ? (v.x > 0 ? 'right' : 'left') : (v.y > 0 ? 'up' : 'down'); }
   const _ab = new V3(), _ap = new V3();

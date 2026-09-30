@@ -940,3 +940,18 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - `js/props.js`：新增伪类型 `P.og`（不在 KEYS，不进制作页）；`spawn` 对 `og` 计算每件的 `it.d`（`markDirty()` 会按同主套装重算，其余逻辑不用改）；`startPlace(t,item)`、`findU/takeU`；收回/全部收回时还原成带 `og` 的器官物品；`onTip` 显示归属+属性。
 - `js/mods.js` 新增 `organs` 条目。测试用 `_tools/wv/organs.html`。
 - 未做/待做：无 CC0 器官模型；兽骸暂无独立器官模型差异；整机（index.html）未做完整运行（2GB 内存 OOM），只用最小桩页验证：解剖→物品→摆放→属性加成→收回。
+
+---
+
+## 第二十二轮（续 7）· Arena Agent：蓄势挥击（MOD `release_slash`，默认开）
+
+**用户需求**：武器战斗"没有挥击感"。设计：先按住左键，松开时捕捉松手前的**微趋势（鼠标微小移动方向）**，对应方向进行攻击。
+注意：第二十二轮续 2 用户要求**移除按住左键的武器惯性**——本次没有恢复惯性，按住左键视角仍 1:1 跟手（`lookLmb` 返回 1）。
+
+- `js/combat.js`（最小侵入，全部在 `RS()`=MOD `release_slash` 且 `crosshair_slash` 开时生效；关掉=原第十八轮“刀尖锁准星”逻辑完全不变）：
+  - 按住左键 = 蓄势：`onMove` 把鼠标增量写入 `RH`（历史 `[ms,dx,dyUp]`），不再累计 `S.arc`；每帧 `rsTrend()`（时间加权 τ=140ms，只看最近 320ms）得到趋势；手/刀向趋势**反方向**拉开（`S.rsv` 平滑），准星旁 `hud.a` 方向线显示当前趋势；`S.charge` 照旧 0.7s 蓄满 → `S.charged`。
+  - 松开左键 `onUp → rsRelease()`：趋势量 ≥1.2px → `startSwing(dx,dy,…)`（方向 14° 内吸附到 8 方向）；无趋势：蓄满(≥0.7s) = 直劈（向下）、否则 = `queueThrust()` 刺。松手时若右键按住则不出刀（格挡优先）。
+  - 挥击 `S.sw`：`swingStep(dt)` 直接摆姿态（不过弹簧）：前 20% 回拉、其后 80% 挥出（ease-out，起手快），刀尖沿 `dir·sgn·A` 扫过准星；时长 0.15·√重量；体力 −10（蓄力 −16）；体力耗尽则更慢更弱；蓄力斩幅度 ×1.2、`commitK`=1.25。`S.tipSpeed` 在挥击期取瞬时速度（上限 22 m/s，不被平滑拖低）。`motion()/dirName()/fromAng()` 在挥击期返回 `S.sw.v`，敌人方向格挡/弹刀判定照用。
+  - `sweep()`：蓄势期间刀尖不造成伤害（`!S.sw && !S.thrust` 直接 return），只有松手那一刀和突刺。`swing_momentum` 在此模式下不再使用。
+  - 拔刀提示、`js/mods.js` 新增 `release_slash`。
+- 测试：`_tools/wv/combat_rs.html`（gitignored 目录，桩页：假 G/相机/武器，直接循环 `Combat.update`）。`sim(moves,holdMs,tx,ty)`：右/左/上/斜向微动各自按对应方向命中（dir=right/left/up/…），无趋势=刺，长按无趋势=直劈；刀尖峰值 16–22 m/s。**未做真机/完整游戏实测**（整机会 OOM），手感参数（回拉幅度 A=0.62、时长 0.15s、τ=140ms、阈值 1.2px、吸附 14°）需要用户试玩后调。
