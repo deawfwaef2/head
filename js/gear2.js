@@ -141,7 +141,7 @@ window.Gear2 = (() => {
   let lk = null, rgAcc = 0;
   setInterval(() => {
     try {
-      hook(); if (!on() || !window.G || !G.S) return; if (!SS().hint && G.toast && document.getElementById('menu') && document.getElementById('menu').classList.contains('hidden')) { SS().hint = 1; setTimeout(() => G.toast('Z 装备 · C 精英 · U 猎手', '#ffd890', 4), 2500); } const W = window.Worlds && Worlds.active && Worlds._W; if (!W) { lk = null; return; }
+      hook(); if (!on() || !window.G || !G.S) return; if (!SS().hint && G.toast && document.getElementById('menu') && document.getElementById('menu').classList.contains('hidden')) { SS().hint = 1; setTimeout(() => G.toast('Z 装备 · U 猎手（页签里有精英挑战）', '#ffd890', 4), 2500); } const W = window.Worlds && Worlds.active && Worlds._W; if (!W) { lk = null; return; }
       const a = sum(), st = G.st(); if (W.dead) return;
       if (a.regen && G.S.hp < st.maxHp && G.S.hp > 0) { rgAcc += a.regen * 0.25; if (rgAcc >= 1) { const n = Math.floor(rgAcc); rgAcc -= n; G.S.hp = Math.min(st.maxHp, G.S.hp + n); } }
       const k = (W.stats && W.stats.kill) || 0; if (lk == null) lk = k;
