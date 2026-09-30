@@ -3,7 +3,7 @@
 <div id="grid" style="display:flex;flex-wrap:wrap;gap:2px"></div>
 <script src="../../lib/three.min.js"></script><script src="../../lib/GLTFLoader.js"></script>
 <script src="../../js/mods.js"></script><script src="../../js/assets.js"></script>
-<script>['wooden_axe_02','wicker_basket_01','planter_box_01','flower_ursinia','watering_can_metal_01','namaqualand_boulder_02','bull_head','lion_head','horse_head','GothicCommode_01','brass_candleholders','wooden_bucket_02','stone_fire_pit','brass_pot_01','wine_barrel_01','stone_01','ornate_war_hammer','wooden_ladder','img_fire'].forEach(n=>document.write(`<script src="../../assets/${n}.js"><\/script>`));</script>
+<script>['wooden_axe_02','wicker_basket_01','planter_box_01','flower_ursinia','watering_can_metal_01','namaqualand_boulder_02','bull_head','lion_head','horse_head','GothicCommode_01','brass_candleholders','wooden_bucket_02','stone_fire_pit','brass_pot_01','wine_barrel_01','stone_01','ornate_war_hammer','wooden_ladder','img_fire','namaqualand_boulder_05'].forEach(n=>document.write(`<script src="../../assets/${n}.js"><\/script>`));</script>
 <script src="../../models/props_pack.js"></script><script src="../../js/sanctum.js"></script>
 <script>
 const V3=THREE.Vector3; window.BuildCat={C:{}}; const IT={};
@@ -11,6 +11,7 @@ window.Sack={IT,def:(id,o)=>IT[id]=Object.assign({id},o),mk:(id,n)=>({id,n}),hav
 window.G={builds:[],HOOK:{frame:[],e:[],tip:[]},S:{coins:1e6,bosses:{}},burst(){},floatText(t){window.__ft=t;},toast(t){window.__toast=t;},flash(){},player:{pos:new V3(0,0,3)},clock:{elapsedTime:0},held:null};
 </script>
 <script src="../../js/regecon.js"></script>
+<script src="../../js/headphys.js"></script>
 <script>
 (async()=>{
   await Assets.init(); await PropModels.init();

@@ -137,6 +137,7 @@ window.RegEcon = (() => {
     const out = new THREE.Group(); out.add(inner); out.position.set(o.x || 0, o.y || 0, o.z || 0); out.rotation.set(o.rx || 0, 0, o.rz || 0); out.userData.size = sz.multiplyScalar(u); g.add(out); return out;
   }
   const tint = (m, col, em, ei) => { if (m) m.traverse(o => { if (o.isMesh && o.material) { o.material = o.material.clone(); o.material.color && o.material.color.set(col); if (em && o.material.emissive) { o.material.emissive.set(em); o.material.emissiveIntensity = ei || 1; } } }); return m; };
+  const topAt = (g, x, z, r, y0, dflt) => { const t = window.HeadPhys && HeadPhys.top ? HeadPhys.top(g, x, z, r, y0) : null; return t ? [t.x, t.y, t.z] : [x, dflt, z]; }; // 首级必须落在实物上（head_support）
   const piv = (g, x, y, z) => { const p = new THREE.Group(); p.position.set(x, y, z); g.add(p); return p; };
   const ease = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
   function arcPts(g, n, col, size) { // 喷水 / 丝线用的粒子弧（只是特效，不是模型）
@@ -146,21 +147,21 @@ window.RegEcon = (() => {
   // 各地区合成器：make(g,U) 摆模型并写 U.seat=[x,y,z,yaw]；anim(b,U,st) 做动画并返回首级偏移 {off,rx,ry,rz}
   const MACH = {
     village: { n: '稻草人脱粒机', icon: '🌾', verb: '摇稻草人', fp: [0.6, 0.5],
-      desc: B => `把「${B.n}」的首级插在斧柄上当稻草人，横杆一转，稻草就从篮子里冒出来。她生前总问「你知道稻草人是怎么做出来的吗」——现在她知道了。`,
+      desc: B => '玛蒂尔达的头插在斧柄上当稻草人。',
       poke: B => `你抓住稻草人的横杆猛转——${B.n}的金发在风里乱飞，脱粒机咔咔狂转。`,
       make(g, U) {
         F(g, 'wooden_axe_02', { h: 1.42, y: 1.42, rx: Math.PI });
         U.arm = piv(g, 0, 1.08, 0); F(U.arm, 'wooden_axe_02', { h: 0.95, x: 0.47, rz: Math.PI / 2 });
         F(g, 'wicker_basket_01', { w: 0.55, x: 0.36, z: 0.34 }); F(g, 'wicker_basket_01', { w: 0.46, x: -0.36, z: 0.3, ry: 0.6 });
-        U.seat = [0, 1.42, 0, 0];
+        const t = topAt(g, 0, 0, 0.12, 2, 1.42); U.seat = [t[0], t[1], t[2], 0];
       },
       anim(b, U, st) {
         U.arm.rotation.y += st.dt * (st.rush ? 9 : st.on ? 0.6 : 0);
         const sh = st.poke < 1.2 ? Math.sin(st.poke * 40) * 0.25 * (1 - st.poke / 1.2) : 0;
-        return { rz: Math.sin(st.t * 1.1) * 0.1 + sh, ry: st.rush ? U.arm.rotation.y : Math.sin(st.t * 0.5) * 0.3, off: [0, st.pop < 0.4 ? Math.sin(st.pop / 0.4 * Math.PI) * 0.06 : 0, 0] };
+        return { rz: Math.sin(st.t * 1.1) * 0.06 + sh * 0.5, ry: st.rush ? U.arm.rotation.y : Math.sin(st.t * 0.5) * 0.3, rx: st.pop < 0.4 ? Math.sin(st.pop / 0.4 * Math.PI) * 0.12 : 0 };
       } },
     forest: { n: '女王盆栽', icon: '🪴', verb: '浇水', fp: [0.55, 0.35],
-      desc: B => `「${B.n}」的首级被种进花槽，只露出下巴以上。浇水、晒灯、等她发芽——月桂枝会从花槽里一根根长出来。`,
+      desc: B => '希瑟莉亚种在花槽里，浇水长月桂枝。',
       poke: B => `你拎起水壶往${B.n}头顶浇水。她发间冒出几根新枝——精灵女王果然是植物系的。`,
       make(g, U) {
         F(g, 'planter_box_01', { w: 0.9 });
@@ -178,19 +179,19 @@ window.RegEcon = (() => {
         return { ry: Math.sin(st.t * 0.4) * 0.35, rz: w > 0.6 ? Math.sin(st.t * 30) * 0.05 : Math.sin(st.t * 0.7) * 0.04 };
       } },
     wilds: { n: '狼嚎图腾', icon: '🐺', verb: '让她嚎', fp: [0.55, 0.45],
-      desc: B => `三尊兽首托着「${B.n}」的首级，垒成一根新的部落图腾。她一仰头，荒原上的狼就会叼着自己的鬃毛来进贡。`,
+      desc: B => '三尊兽首托着加尔莎，她一嚎狼就送毛来。',
       poke: B => `你拍了拍图腾。${B.n}仰头长嚎——荒原上的狼群闻声而来，留下一地掉毛。`,
       make(g, U) {
         F(g, 'namaqualand_boulder_02', { w: 0.9 });
         F(g, 'bull_head', { h: 0.52, y: 0.2 }); F(g, 'lion_head', { h: 0.42, x: -0.36, y: 0.08, z: 0.1, ry: 0.5 }); F(g, 'horse_head', { h: 0.42, x: 0.36, y: 0.08, z: 0.1, ry: -0.5 });
-        U.seat = [0, 0.7, 0.0, 0];
+        const t = topAt(g, 0, 0.02, 0.05, 1.5, 0.7); U.seat = [t[0], t[1], t[2], 0];
       },
       anim(b, U, st) {
         const h = st.poke < 2 ? Math.sin(Math.min(1, st.poke / 0.25, (2 - st.poke) / 0.5) * Math.PI / 2) : 0;
         return { rx: -0.6 * h + Math.sin(st.t * 0.9) * 0.03, rz: h * Math.sin(st.t * 22) * 0.04, ry: Math.sin(st.t * 0.3) * 0.25 * (1 - h) };
       } },
     abbey: { n: '圣水喷泉', icon: '⛲', verb: '拍后脑勺', fp: [0.5, 0.55],
-      desc: B => `「${B.n}」的首级供在祭台上，嘴里源源不断地往下吐圣水。修道院管这个叫神迹，你管它叫水龙头。`,
+      desc: B => '塞拉菲娜供在祭台上，嘴里吐圣水。',
       poke: B => `你一巴掌拍在${B.n}后脑勺上。圣水「噗」地喷出一大口——神迹。`,
       make(g, U) {
         const alt = F(g, 'GothicCommode_01', { w: 0.8, z: -0.1 }); const H = alt ? alt.userData.size.y : 0.8, D = alt ? alt.userData.size.z : 0.45;
@@ -205,28 +206,28 @@ window.RegEcon = (() => {
         return { rx: big * 0.35 * Math.sin(Math.min(1, st.poke / 0.1) * Math.PI / 2) + 0.12, ry: 0 };
       } },
     swamp: { n: '魔女大坩埚', icon: '🧙', verb: '搅拌', fp: [0.55, 0.55],
-      desc: B => `「${B.n}」的首级压在自己的坩埚盖上，随沸腾一颠一颠。锅里熬的是沼泽黑泥——她生前的独家配方。`,
+      desc: B => '莫甘娜压在锅盖上，熬沼泽黑泥。',
       poke: B => `你抓起搅拌棍猛搅。${B.n}在坩埚盖上转成了陀螺——「黑沼之母」，名副其实。`,
       make(g, U) {
         F(g, 'stone_fire_pit', { w: 0.95 }); if (window.Assets && Assets.flame) { const fl = Assets.flame(0, 0.02, 0, 0.55, '#7ad040'); if (fl) g.add(fl); }
         const pot = F(g, 'brass_pot_01', { w: 0.62, y: 0.08 }); const top = 0.08 + (pot ? pot.userData.size.y : 0.6);
         U.stir = piv(g, 0, top - 0.12, 0); F(U.stir, 'wooden_axe_02', { h: 0.75, x: 0.24, rz: -0.35, ry: Math.PI });
-        U.seat = [0, top - 0.02, 0, 0]; U.top = top;
+        const t = topAt(g, 0, 0, 0.05, top + 0.3, top - 0.02); U.seat = [t[0], t[1], t[2], 0]; U.top = top;
       },
       anim(b, U, st) {
         const sp = st.poke < 3 ? (1 - st.poke / 3) : 0; U.stir.rotation.y += st.dt * (0.4 + sp * 14 + (st.rush ? 3 : 0));
         if (st.on && Math.random() < st.dt * (st.rush ? 8 : 2.5)) G.burst(new V3(b.x + (Math.random() - 0.5) * 0.4, U.top, b.z + (Math.random() - 0.5) * 0.4), '#7aa04a', 3, 0.3, 0.7, 1.2);
-        return { off: [0, st.on ? Math.abs(Math.sin(st.t * 5)) * 0.035 : 0, 0], ry: sp > 0 ? U.stir.rotation.y * 1.3 : Math.sin(st.t * 0.6) * 0.4, rz: Math.sin(st.t * 5) * 0.04 };
+        return { ry: sp > 0 ? U.stir.rotation.y * 1.3 : Math.sin(st.t * 0.6) * 0.4, rz: st.on ? Math.sin(st.t * 5) * 0.05 : 0 };
       } },
     fortress: { n: '元帅督造锻炉', icon: '⚒️', verb: '下令开工', fp: [0.7, 0.5],
-      desc: B => `「${B.n}」的首级坐镇火药桶，盯着铁锤一下一下砸。元帅就算只剩一颗头，督造起来也毫不含糊。`,
+      desc: B => '布伦希尔德坐镇酒桶，督着铁锤打精钢。',
       poke: B => `你替${B.n}吼了一声「开工！」铁锤立刻疯了一样砸下去，火星溅了你一脸。`,
       make(g, U) {
         const br = F(g, 'wine_barrel_01', { h: 0.72, x: -0.45, z: -0.05 });
         PF(g, 'bench_vice_01', { h: 0.42, x: 0.25, z: 0.08 }) || F(g, 'stone_01', { w: 0.3, x: 0.25, z: 0.08 });
         F(g, 'stone_fire_pit', { w: 0.55, x: 0.3, z: -0.42 }); if (window.Assets && Assets.flame) { const fl = Assets.flame(0.3, 0.02, -0.42, 0.45); if (fl) g.add(fl); }
         U.ham = piv(g, 0.78, 0.5, 0.08); F(U.ham, 'ornate_war_hammer', { h: 0.62, rz: Math.PI / 2 });
-        U.seat = [-0.45, br ? br.userData.size.y : 0.72, -0.05, 0.5]; U.ph = 0;
+        { const t = topAt(g, -0.45, -0.05, 0.08, 1.5, br ? br.userData.size.y : 0.72); U.seat = [t[0], t[1], t[2], 0.5]; } U.ph = 0;
       },
       anim(b, U, st) {
         const per = st.rush || st.poke < 3 ? 0.42 : 1.3; if (!st.on) { U.ham.rotation.z += (-0.7 - U.ham.rotation.z) * Math.min(1, st.dt * 3); return {}; }
@@ -235,11 +236,11 @@ window.RegEcon = (() => {
         const nd = st.t - (U.nod || -9); return { rx: nd < 0.3 ? Math.sin(nd / 0.3 * Math.PI) * 0.2 : 0 };
       } },
     capital: { n: '女王纺车', icon: '🧶', verb: '猛蹬踏板', fp: [0.55, 0.35],
-      desc: B => `「${B.n}」的首级套在纺锤上当线轴，轮子一转她就跟着转，王都丝绸就从她发梢里抽出来。`,
+      desc: B => '伊莎贝拉当线轴，转出王都丝绸。',
       poke: B => `你猛蹬踏板。${B.n}在纺锤上转得飞快，头发都快缠成丝了。`,
       make(g, U) {
         const w = PF(g, 'spinning_wheel_01', { w: 1.0 }); const H = w ? w.userData.size.y : 0.97;
-        U.seat = [-0.36, H * 0.62, 0, 0]; U.silk = arcPts(g, 22, '#ff9ac8', 0.03);
+        { const t = topAt(g, -0.36, 0, 0.07, H * 0.62 + 0.04, H * 0.62); U.seat = [t[0], t[1], t[2], 0]; } U.silk = arcPts(g, 22, '#ff9ac8', 0.03);
       },
       anim(b, U, st) {
         const sp = st.poke < 3 ? 1 - st.poke / 3 : 0; U.rot = (U.rot || 0) + st.dt * (st.on ? 0.8 + sp * 16 + (st.rush ? 4 : 0) : 0);
@@ -248,31 +249,32 @@ window.RegEcon = (() => {
         return { ry: U.rot, rz: sp * Math.sin(st.t * 18) * 0.08 };
       } },
     abyss: { n: '深渊凝视炉', icon: '👁️', verb: '与她对视', fp: [0.6, 0.45],
-      desc: B => `「${B.n}」的首级悬浮在裂石上方，黑曜碎片绕着她打转。你凝视深渊的时候，深渊会吐出黑曜石。`,
+      desc: B => '莉莉丝供在裂石上，黑曜碎片绕着她转。',
       poke: B => `你和${B.n}对视了三秒。深渊也在回望你——然后吐出了一堆黑曜石。`,
       make(g, U) {
         F(g, 'namaqualand_boulder_02', { w: 1.0 });
-        U.orb = piv(g, 0, 0.72, 0); U.sh = [];
+        const t = topAt(g, 0, 0, 0.16, 2, 0.35); U.orb = piv(g, t[0], t[1] + 0.2, t[2]); U.sh = [];
         for (let i = 0; i < 6; i++) { const q = piv(U.orb, 0, 0, 0); const m = tint(F(q, 'stone_01', { w: 0.13, ry: i }), '#2a1c38', '#5a1890', 0.6); if (m) U.sh.push(q); }
-        U.seat = [0, 0.64, 0, 0];
+        U.seat = [t[0], t[1], t[2], 0];
       },
       anim(b, U, st) {
         const bl = st.poke < 1.6 ? Math.sin(st.poke / 1.6 * Math.PI) : 0, r = 0.34 + bl * 0.45;
         U.sh.forEach((q, i) => { const a = st.t * (st.rush ? 2.6 : 0.9) + i * Math.PI / 3; q.position.set(Math.cos(a) * r, Math.sin(st.t * 1.3 + i) * 0.08, Math.sin(a) * r); q.rotation.set(st.t + i, st.t * 0.7, 0); });
-        return { off: [0, st.on ? Math.sin(st.t * 1.5) * 0.06 + 0.05 : -0.02, 0], ry: bl > 0 ? 0 : Math.sin(st.t * 0.35) * 0.6, rx: -bl * 0.15 };
+        return { ry: bl > 0 ? 0 : Math.sin(st.t * 0.35) * 0.6, rx: -bl * 0.15 };
       } },
     peak: { n: '龙骨风铃', icon: '🎐', verb: '敲风铃', fp: [0.55, 0.4],
-      desc: B => `「${B.n}」的首级吊在龙骨风铃下面荡啊荡。风一吹，龙鳞叮当作响，一片片掉进你的仓库。`,
-      poke: B => `你敲了一下风铃。${B.n}荡来荡去，龙鳞叮当作响——圣山上的风从来没这么好听过。`,
+      desc: B => '奥瑞莉娅供在石堆上，风铃一响掉龙鳞。',
+      poke: B => `你敲响风铃。${B.n}跟着一晃一晃，龙鳞叮当落了一地。`,
       make(g, U) {
         const ld = F(g, 'wooden_ladder', { h: 2.2, ry: Math.PI }); const H = ld ? ld.userData.size.y : 2.2;
-        U.sw = piv(g, 0, H - 0.04, 0); const ch = PF(U.sw, 'Chandelier_01', { w: 0.4 }); if (ch) ch.position.y = -ch.userData.size.y;
-        U.L = (ch ? ch.userData.size.y : 0.45) + 0.36; U.seat = [0, H - 0.04 - U.L, 0, 0]; U.H = H - 0.04;
+        F(g, 'namaqualand_boulder_05', { w: 0.52 }); F(g, 'stone_01', { w: 0.3, y: 0.12 });
+        const t = topAt(g, 0, 0, 0.07, 0.8, 0.3); U.seat = [t[0], t[1], t[2], 0];
+        U.sw = piv(g, 0, H - 0.04, 0); const ch = PF(U.sw, 'Chandelier_01', { w: 0.42 }); if (ch) ch.position.y = -ch.userData.size.y;
       },
       anim(b, U, st) {
-        const kick = st.poke < 4 ? (1 - st.poke / 4) : 0, amp = 0.05 + kick * 0.45 + (st.rush ? 0.12 : 0), a = Math.sin(st.t * 2.1) * amp; U.sw.rotation.z = a;
+        const kick = st.poke < 4 ? (1 - st.poke / 4) : 0, amp = 0.04 + kick * 0.4 + (st.rush ? 0.1 : 0), a = Math.sin(st.t * 2.1) * amp; U.sw.rotation.z = a;
         if (st.poke < 4 && st.near && window.SFX && SFX.play && Math.floor((st.t) * 2.1 / Math.PI) !== U.lb) { U.lb = Math.floor(st.t * 2.1 / Math.PI); SFX.play('bell', 0.28, 1.1 + Math.random() * 0.3); }
-        return { off: [Math.sin(a) * U.L, U.L * (1 - Math.cos(a)), 0], rz: a, ry: Math.sin(st.t * 0.8) * 0.3 };
+        return { rz: a * 0.25, ry: Math.sin(st.t * 0.8) * 0.3 };
       } }
   };
   function wp(b, x, y, z) { const a = -b.rot * Math.PI / 2, c = Math.cos(a), s = Math.sin(a); return [b.x + x * c + z * s, y, b.z - x * s + z * c]; }
@@ -329,9 +331,9 @@ window.RegEcon = (() => {
     REG.forEach(R => {
       const M = MACH[R.k], B = bossOf(R.k), L = locOf(R.k), key = 'syn_' + R.k, g2 = GEN[(R.i * 2 + 1) % 5];
       C[key] = { cat: 'func', n: M.n, icon: M.icon, base: Math.round(2000 * Math.pow(1.6, R.i)), grow: 1, max: 1, fp: M.fp, stat: {}, depth: 1,
-        desc: `${M.desc(B)} ——【霸主首级合成器】只认${L.n}霸主「${B.n}」的首级；每 ${PER} 秒花 ${price(R)} 魂晶合成 1 份${R.c[1]}（只产常见材料），空手按 E【${M.verb}】立刻多产并加速 ${RUSH} 秒。`,
+        desc: `${M.desc(B)} 需${B.n}的首级 · 每${PER}秒产${R.c[2]} · E ${M.verb}`,
         rmNeed: { [R.c[0]]: 10 + R.i * 2, [R.r[0]]: 1, [g2]: 6 },
-        mount: { y: 1, period: 1e9, mult: 0, labelY: 1.2, slots: [[0, 1, 0, 0]], accept: h => !!(h && h.rec && h.rec.c && h.rec.c.boss === R.k), deny: () => `${M.icon} ${M.n}只认${L.n}霸主「${B.n}」的首级` },
+        mount: { y: 1, period: 1e9, mult: 0, labelY: 1.2, selfSeat: true, slots: [[0, 1, 0, 0]], accept: h => !!(h && h.rec && h.rec.c && h.rec.c.boss === R.k), deny: () => `${M.icon} ${M.n}只认${L.n}霸主「${B.n}」的首级` },
         make() { const g = new THREE.Group(); try { M.make(g, g.userData); } catch (e) { console.warn('regecon.make', key, e); } const s = g.userData.seat; if (s) { C[key].mount.slots[0] = s.slice(); C[key].mount.y = s[1]; C[key].mount.labelY = s[1] + 0.35; } return g; },
         cols: () => [[-M.fp[0], 0, -M.fp[1], M.fp[0], 1.2, M.fp[1]]] };
       if (window.Unlocks && Unlocks.R) Unlocks.R[key] = [S => !!(S.bosses && S.bosses[R.k]), `你带回了${L.n}霸主「${B.n}」的首级。地精斯尼克盯着她看了很久：「……这颗头，能带动一台机器。」（建造 → 功能：${M.n}）`];

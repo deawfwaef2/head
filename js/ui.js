@@ -175,7 +175,7 @@ window.UI = (() => {
         return `<div class="bp-item ${lock ? 'locked' : maxed ? 'done' : S.coins < c || !rmOk ? 'poor' : ''}" ${lock || maxed ? '' : `data-a="place" data-v="${k}"`}>
           ${own ? `<div class="bp-own">已建 ${own}</div>` : ''}<div class="bp-icon">${lock ? '🔒' : d.icon}</div><div class="bp-name">${d.n}</div>
           <div class="bp-cost">${lock ? `需洞窟第 ${d.depth} 层` : maxed ? '已建成' : '🔮 ' + fmt(c)}</div>${lock || maxed || !window.RegEcon ? '' : RegEcon.needHTML(rmN)}
-          <div class="bp-stat">${statTxt(d.stat)}${d.regen ? ' 恢复+' + d.regen + '%' : ''}</div><div class="bp-desc">${esc(d.desc || '')}</div></div>`;
+          <div class="bp-stat">${statTxt(d.stat)}${d.regen ? ' 恢复+' + d.regen + '%' : ''}</div><div class="bp-desc" title="${esc((d.desc || '').replace(/<[^>]+>/g, ''))}">${esc(d.desc || '')}</div></div>`;
       }).join('');
       const hid = Object.keys(C).filter(k => C[k].cat === sub).length - vis.length;
       if (hid > 0) grid += `<div class="bp-item locked"><div class="bp-icon">❔</div><div class="bp-name">??? × ${hid}</div><div class="bp-desc">还有未发现的建造灵感，条件未知。</div></div>`;
