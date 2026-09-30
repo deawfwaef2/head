@@ -1,0 +1,30 @@
+<!doctype html><html><head><meta charset="utf-8"><title>hu</title>
+<style>body{margin:0;background:linear-gradient(#3a4a5a,#2a3020);height:100vh;color:#eee;font-family:system-ui,"Noto Sans CJK SC",sans-serif}</style></head><body>
+<script src="../../lib/three.min.js"></script>
+<script>
+const stash=[];window.Sack={stashAdd:x=>stash.push(x),mk:(id,n)=>({id,n})};
+const toasts=[];window.__game={S:{bosses:{},eq:{}},st:()=>({power:300}),addCoins:c=>(window.__coins=(window.__coins||0)+c),save(){},toast:t=>toasts.push(t),usedNames:new Set(),usedSig:new Set()};
+window.RPG={foe:()=>({c:{}})};
+let spawned=null;window.Foe={populate:async(ctx,list)=>(spawned=list.map(it=>({h:it.h,dead:false,hp:1,maxHp:1})))};
+const V=THREE.Vector3;
+window.Worlds={active:true,_W:null,start(trip){const loc=trip.loc;this._W={graph:{trip:true,nodes:[{i:0,home:true,x:0,y:40,loc,style:'swamp',depth:0},{i:1,x:20,y:40,loc,style:'swamp',depth:1,region:'swamp'}]},cur:1,stats:{decap:0,kill:0},busy:false,B:{R:12},pos:new V(),trip:{coins:0},doorNear:{to:1}};},
+ onKey(e){return 'orig'}, _debug:{goto:async i=>{const W=Worlds._W;W.cur=i;await Foe.populate({},W.graph.nodes[i].prey.map(h=>({h})));}}};
+</script>
+<script src="../../js/mods.js"></script><script src="../../js/lore.js"></script><script src="../../js/regecon.js"></script><script src="../../js/hunters.js"></script>
+<script>
+const errs=[];window.onerror=m=>errs.push(m);const ph=(location.hash.match(/ph=(\d)/)||[])[1]||'1';
+setTimeout(async()=>{
+ const loc=Lore.LOCS.find(l=>l.k==='swamp'); Worlds.start({loc}); const W=Worlds._W;
+ W.stats.kill=5; W.stats.decap=2; await new Promise(r=>setTimeout(r,400));
+ console.log('RES heatStage='+Hunters.H.stage+' heat='+Hunters.H.heat.toFixed(1));
+ W.stats.kill=8; W.stats.decap=2; await new Promise(r=>setTimeout(r,400));
+ console.log('RES stage='+Hunters.H.stage);
+ if(ph==='2'){ Hunters.H.warnAt-=15500; await new Promise(r=>setTimeout(r,600));
+   console.log('RES afterWarn stage='+Hunters.H.stage+' cur='+W.cur+' hunters='+Hunters.H.hunters.length+' hp='+spawned.map(f=>f.maxHp).join(',')+' names='+spawned.map(f=>f.h.c.title+'·'+f.h.c.name+'/'+f.h.c.id).join(','));
+   console.log('RES doorBlocked='+(Worlds.onKey({code:'KeyE'})===true)+' toast='+toasts.slice(-1));
+   spawned.forEach(f=>f.dead=true); await new Promise(r=>setTimeout(r,400));
+   console.log('RES after kill stage='+Hunters.H.stage+' lv='+__game.S.hunt.lv+' coins='+window.__coins+' stash='+JSON.stringify(stash)+' door='+Worlds.onKey({code:'KeyE'}));
+ }
+ console.log('RES errs='+JSON.stringify(errs)); setTimeout(()=>document.title='done',300);
+},300);
+</script></body></html>
