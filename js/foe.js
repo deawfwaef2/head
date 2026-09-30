@@ -172,7 +172,16 @@ window.Foe = (() => {
   const SKIN_FIX = {"Jean":[0.613,0.652,0.764],"Noelle":[0.991,1.214,1.484],"Amber":[0.749,0.898,1.13],"Rosaria":[0.777,1.044,1.039],"Lisa":[1.272,1.554,1.757],"Sucrose":[2.954,2.213,2.941],"Xiangling":[1.607,1.518,1.406],"Ningguang":[1.019,1.205,1.436],"Furina":[0.849,0.949,1.125],"Kokomi":[0.82,0.839,0.784],"YaeMiko":[1.566,2.149,2.172],"Shenhe":[1.507,1.32,1.558],"Mona":[2.583,2.373,2.564],"Eula":[0.783,0.965,1.236],"Beidou":[0.747,0.767,0.855],"HikariCape":[0.97,1.115,1.302],"HikariScholar":[0.804,0.824,0.806],"AvatarSample_A":[1.04,0.986,1.08]};
   const LIFT = 1.04; // 第十八轮：角色整体稍提亮
   function bodyGain(name) { const f = SKIN_FIX[name]; if (!f) return LIFT; const L = f[0] * 0.3 + f[1] * 0.59 + f[2] * 0.11; return (L < 1 ? Math.min(1.7, 1 / L) : 1) * LIFT; }
-  const TINT = { HikariCape: 1, HikariScholar: 1, AvatarSample_A: 1 }; // 皮肤是独立材质、能跟头同色的身体
+  const TINT = { HikariCape: 1, HikariScholar: 1, AvatarSample_A: 1, Vita: 1, Victoria_Rubin: 1, Darkness_Shibu: 1, HairSample_Female: 1, AvatarSample_B: 1 }; // 皮肤是独立材质、能跟头同色的身体
+  // 第二十四轮 MOD vroid_bodies：pixiv VRoid 官方 CC0 模型的原装身体（非原神），按衣服风格追加到身份候选
+  const VB = {
+    Vita: ['ranger', 'archer', 'assassin', 'shadow', 'merc', 'crossbow', 'dragonslayer', 'wolfwarrior', 'dragonknight', 'huntress'],
+    Victoria_Rubin: ['princess', 'lady', 'saint', 'choir', 'singer', 'countess', 'musician', 'elfprincess', 'archangel', 'moonpriest'],
+    Darkness_Shibu: ['witch', 'hexer', 'covenlady', 'duchess', 'fallen', 'countess', 'bogwitch', 'courtmage', 'abyssqueen', 'shaman'],
+    HairSample_Female: ['villager', 'novice', 'herbalist', 'shepherd', 'choir', 'saint', 'medic', 'druid', 'barmaid', 'nun'],
+    AvatarSample_B: ['catthief', 'bard', 'engineer', 'alchemist', 'musician', 'merc', 'smithgirl']
+  };
+  const VB_ID = {}; for (const b in VB) for (const id of VB[b]) (VB_ID[id] = VB_ID[id] || []).push(b);
   const LIGHT = ['瓷白', '象牙', '蜜色', '苍白'];
   const ARMED = { knight: 'antique_katana_01', paladin: 'ornate_medieval_mace', guard: 'antique_estoc', general: 'antique_katana_01', dragonknight: 'ornate_war_hammer', dragonslayer: 'antique_katana_01', merc: 'machete',
     wolfwarrior: 'wooden_axe_02', chieftess: 'ornate_war_hammer', inquisitor: 'ornate_medieval_mace', assassin: 'machete', huntress: 'wooden_axe_02', smithgirl: 'ornate_war_hammer', crossbow: 'machete', shadow: 'machete', fallen: 'antique_estoc' };
@@ -194,6 +203,7 @@ window.Foe = (() => {
   function bodyFor(h, r, bossK, used) {
     if (bossK) return BOSS_BODY[bossK] || 'Jean';
     let list = IDENT[h.c.id] || ['Jean', 'Noelle', 'HikariCape'];
+    if (VB_ID[h.c.id] && window.Mods && Mods.on('vroid_bodies')) list = list.concat(VB_ID[h.c.id]);
     if (used && used.size >= 3) { const hit = list.filter(b => used.has(b)); if (hit.length) list = hit; } // 同一地点最多 ~3 种身体：加载快、省内存
     const light = LIGHT.includes(h.look.sk);
     if (!light) { const t = list.filter(b => TINT[b]); if (t.length) list = t; else if (r() < 0.45) list = ['HikariCape', 'HikariScholar']; }

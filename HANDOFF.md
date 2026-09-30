@@ -1051,3 +1051,10 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   - 不改共享文件逻辑：自带 250ms `setInterval` 轮询（出猎时 `Worlds.frame` 接管主循环，`G.HOOK.frame` 不跑），读 `Worlds._W.graph.nodes[cur].style`；不在出猎=洞穴。`G.playing=false`/切后台 → 淡出，`G.uiOpen` → 40%。接 `SFX.out`，受 SFX 开关控制。
   - 实测（headless Chrome 真 AudioContext + Analyser）：各场景平均 −42（王城夜）… −23.5 dB（深渊），峰值 ≤0.2（战斗音效峰值≈1，环境音不会盖过战斗）；暂停 −71 dB；事件频率与配置一致；无报错。调试：`Ambience.demo('forest')` 强制场景、`Ambience.debug()`。
   - index.html 在 steps.js 之后加 `<script src="js/ambience.js">`；mods.js 加条目。
+
+### 第二十四轮（续）：新身体 MOD vroid_bodies
+- 新增 big/body/{Vita,Victoria_Rubin,Darkness_Shibu,HairSample_Female,AvatarSample_B}.js（tools/vrm2body.py 转换，pixiv VRoid 官方 CC0 / 样本条款，源 madjin/vrm-samples 的 vroid/beta、vroid/stable）。全部非原神。
+- 剔除：Vivi（体型偏幼）、Sendagaya_Shibu/Shino（学生制服）——已转换但没入库（符合“只要成年外观”）。男性样本 HairSample_Male / Sakurada_Fumiriya / AvatarSample_C 暂不收：身份表和名字全是女性设定。
+- js/foe.js：TINT 加这 5 具（VRoid 皮肤是独立材质，可随首级染色）；新增 VB / VB_ID 表（身体→身份），bodyFor() 在 Mods.on('vroid_bodies') 时把 VB_ID[身份] 追加到 IDENT 候选（不改 IDENT 原表、不动 BOSS_BODY）。
+- js/mods.js：新条目 vroid_bodies（look，默认开），放在 head_norm 前面。
+- 未做：SKIN_FIX 精调（新身体用默认 LIFT）；古铜肤色时手部略偏橙，可用 calib 流程补。
