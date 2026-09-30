@@ -404,6 +404,7 @@ window.Worlds = (() => {
       const rim = st.hill * sstep(Ra + 0.5, Ra + 16, rr) * (0.55 + 0.9 * nz(Math.cos(ang) * 3 + 9, Math.sin(ang) * 3 + 9)) + st.hill * 1.2 * sstep(Ra + 20, Ra + 60, rr);
       return inner + rim + (LY.dh ? LY.dh(x, z) : 0); };
     let H = H0; if (g) { WGen.prepare(st, node, { R, Rmin, nz, doorList, LY, H0 }); H = (x, z) => g.h(x, z, H0(x, z), flat(x, z)); }
+    if (window.WTerrain) try { H = WTerrain.wrap(H, { node, st, R, Rmin, doorList, LY, g, flat }); } catch (e) { console.warn('WTerrain', e); } // R46 地形特色化：脊状分形 + 标志地貌
     if (corOn && node.lay !== 'ravine') { // R41：视线锥——从每道门朝中心看，地形高度软限制在一条缓升的视线下面（土丘被压成垭口，而不是整座挡在眼前）
       const Hr = H, sight = doorList.map(d => ({ x: d.x, z: d.z, ux: -Math.cos(d.a), uz: -Math.sin(d.a), L: Math.hypot(d.x, d.z) + 4, h0: Hr(d.x, d.z) }));
       H = (x, z) => { let h = Hr(x, z); for (const s of sight) { const px = x - s.x, pz = z - s.z, t = px * s.ux + pz * s.uz; if (t < 3 || t > s.L) continue;
@@ -415,7 +416,7 @@ window.Worlds = (() => {
     const tg = new THREE.PlaneGeometry(ext * 2, ext * 2, seg, seg); tg.rotateX(-Math.PI / 2);
     const tp = tg.attributes.position; for (let i = 0; i < tp.count; i++) tp.setY(i, H(tp.getX(i), tp.getZ(i))); tg.computeVertexNormals(); if (g) WGen.paint(tg, { st, LP, R });
     const gset = TEX[st.ground]; let gm;
-    if (gset && window.Assets && Assets.triplanar) { gm = Assets.triplanar(gset, { scale: st.gs, normal: 1.1, env: 0.35, ao: 0.9, vertexColors: !!g, macro: window.WorldMaster ? WorldMaster.terr() : 0 }); gm.envMap = sky ? sky.env : null; }
+    if (gset && window.Assets && Assets.triplanar) { gm = Assets.triplanar(gset, { scale: st.gs, normal: 1.1, env: 0.35, ao: 0.9, vertexColors: !!g, macro: window.WorldMaster ? WorldMaster.terr() : 0, ...((RKs) => RKs && TEX[RKs.name] ? { rock: TEX[RKs.name], rockTint: RKs.tint, rockLite: window.WorldMaster ? WorldMaster.terr() < 2 : false } : {})(window.WTerrain && WTerrain.act() ? WTerrain.rock(node) : null) }); gm.envMap = sky ? sky.env : null; }
     else gm = new THREE.MeshStandardMaterial({ color: '#556644', roughness: 1, vertexColors: !!g });
     if (st.tint) gm.color = new THREE.Color(st.tint);
     const terr = new THREE.Mesh(tg, gm); terr.receiveShadow = true; sc.add(terr);
@@ -468,6 +469,7 @@ window.Worlds = (() => {
     if (window.Sack) Sack.placeLoot(node, { sc, H, free, mark, cols, inter, R, r });
     // 普通散布
     const area = Math.PI * R * R / 100;
+    const stp = window.WTerrain && WTerrain.act() ? WTerrain.steep(H) : null;
     if (!LITE) for (const [list, dens, s0, s1, kind, fkind] of st.props) {
       if (kind === 'fire') { const n = Math.max(0, Math.round(dens * area * (0.6 + r() * 0.8))); for (let i = 0; i < n; i++) { const a = r() * 6.28, d = R * (0.2 + r() * 0.7), x = Math.cos(a) * d, z = Math.sin(a) * d; if (!free(x, z, 1.5)) continue; mark(x, z, 1.5); const y = H(x, z); if (window.Assets && Assets.has('stone_fire_pit')) { const f = Assets.fit('stone_fire_pit', { w: 0.9, x, y, z }); if (f) sc.add(f); const fl = Assets.flame(x, y + 0.12, z, 4); if (fl) sc.add(fl); const pl = new THREE.PointLight('#ff7a30', 1.6, 9, 2); pl.position.set(x, y + 0.8, z); sc.add(pl); } cols.push({ x, z, r: 0.6 }); } continue; }
       const vs = variants(list); if (!vs.length) continue;
@@ -477,6 +479,7 @@ window.Worlds = (() => {
       const n = Math.min(cap, Math.round(dens * WMD * area * (LP ? WLayout.densK(LP, kind) : 1) * (0.7 + r() * 0.6)));
       for (let i = 0; i < n; i++) {
         const a = r() * 6.28, d = RM * Math.sqrt(r()) * 0.97, x = Math.cos(a) * d, z = Math.sin(a) * d, v = pick(r, vs), s = s0 + r() * (s1 - s0);
+        if (stp && (kind === 'grass' || kind === 'plant' || kind === 'tree') && stp(x, z) > (kind === 'tree' ? 0.8 : 1.05)) continue; // R46：陡坡不长草树
         if (LP && (d > Rf(a) * 0.97 || !WLayout.keep(LP, x, z, kind, r))) continue;
         if (g && !WGen.keep(g, kind, x, z, r, fkind)) continue;
         if (g && g.wd && g.wd(x, z).d < 0.7) continue;
@@ -496,6 +499,7 @@ window.Worlds = (() => {
         if (kind === 'lamp') { const pl = new THREE.PointLight('#ffc070', 1.5, 10, 2); pl.position.set(x, H(x, z) + v.t.size.y * s * 0.9, z); sc.add(pl); }
       }
     }
+    if (!LITE && window.WTerrain) try { WTerrain.outcrops({ H, R, put, variants, cols, st, node, pick, doorList, LYk: LY.k, k: window.WorldMaster ? [0.6, 1, 1.3][WorldMaster.terr() === 2 ? 2 : WorldMaster.terr()] : 1 }); } catch (e) { console.warn('outcrops', e); } // R46：陡坡岩石
     // 山坡上也长草/灌木（不投影、无碰撞）
     if (!LITE) for (const [list, dens, s0, s1, kind, fkind] of st.props) {
       if ((kind !== 'grass' && kind !== 'plant') || fkind === 'flower') continue; const vs = variants(list); if (!vs.length) continue;

@@ -1657,3 +1657,10 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - `js/foe.js` hit()：普通横砍命中头/脖子，只有这一刀把血量打到 ≤0（致死）才斩首；去掉了“破绽中不看血量”的捷径。`info.decapAt`（技能专用）= 血量比例线，命中头/脖子且血量 ≤ 该比例时斩首；霸主/精英/猎手上限 25%。尸体补刀斩首仍宽松（刃速>2）。头、脖子都算斩首部位；脖子判定半径/吸附权重的放宽保留。提示改为“她只剩一口气，再补一刀头颈就能斩首”。
 - `js/talents.js`：`hitFoe` 透传 `o.decapAt`。带血线斩首的技能：旋风斩（扫脖子高度，≤35%）、百刃最后一刀（≤40%）、处决令非处决那一击（≤50%；≤35% 本来就直接处决）。技能描述（`talents_data.js` + `tools/i18n/d_talents.py`）已同步三语。
 - `tools/test/srv.py`：沙箱重置后的测试服务器（本地没有的文件回源 GitHub raw 并缓存）；`cp tools/test/srv.py /tmp/ && python3 /tmp/srv.py &`。
+## R46 阶段 2：地形特色化（MOD `terrain_master`，`js/wterrain.js`，?wt=0 关）
+用户反馈：“地形生成挺没特色，比较一般，很重复”。原地形=平缓盆地(±1~3m)+外圈山坡，每张图都像。
+- `WTerrain.wrap(H, X)`（worlds.js 在 WGen.prepare 之后包一层 H）：脊状分形 + 域扭曲 + 地层台阶（wilds/fortress/capital/peak/abyss）；每地点 1~3 个标志地貌（断崖/古冢/深壕/石冢/高台，种子决定；名字加进 g.tag 显示在 HUD 标签）。门口(13m内渐弱)、水边(wd<7渐弱，水面由原 g.h 决定故水边不动)、中心渐弱；lake/ravine 布局不叠加，henge ×0.5。
+- 坡度贴岩：`Assets.triplanar` 新选项 `rock/rockTint/rockLite/rockScale`（三平面岩石 diff/nor/arm 按坡度混合；mid 档 rockLite 不混法线）。新增 CC0 贴图（Poly Haven，phtex.py 512px）`big/world/tex_aerial_rocks_02|cliff_side|rock_face_03.js`（共约 0.65MB），按地区选（meadow/forest/swamp/ruins 青苔岩，wilds 层岩，fortress/capital/abyss/peak 灰岩+染色）；`WGen.assets` 里追加需要加载的贴图名。
+- 陡坡长岩石：`WTerrain.outcrops`（复用该地区样式里 kind='rock' 的模型，不新增模型）；陡坡（>1.05 草/灌，>0.8 树）不长草树（worlds.js 散布循环里 `stp`）。
+- 测试：`tools/test/wterrain.html?s=1&r=meadow,forest,...`（9 地区网格渲染；首次渲染后要 await 再画，否则是空帧）。沙箱 2GB 跑不了整个野外，真机观感待用户确认。
+- 玩家/敌人直接贴 H，没有坡度限制；断崖最陡约 50°，可直接走上去。下一步候选：断崖处加碰撞/爬不上去的感觉、河谷/瀑布、更多标志地貌（环形山、天然拱桥、巨树洞）。

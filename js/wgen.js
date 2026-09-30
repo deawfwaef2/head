@@ -182,7 +182,7 @@ window.WGen = (() => {
     if (st.edge) st.edge[0].forEach(n => { names.add(n.replace('#*', '')); if (n === 'island_tree_01' || n === 'island_tree_02' || n === 'tree_small_02') names.add(n + '_lo'); });
     st.marks.forEach(m => (MARKA[m] || []).forEach(n => names.add(n)));
     if (g) { g.pieces.forEach(p => (p.need || []).forEach(n => names.add(n))); if (g.waterKind) { names.add('grass_medium_02'); if (g.waterKind === 'river') names.add('modular_wooden_pier'); } }
-    (extra || []).forEach(n => names.add(n));
+    (extra || []).forEach(n => names.add(n)); if (window.WTerrain) WTerrain.assets(st, node).forEach(n => names.add(n));
     return [...names];
   }
   // ---------------- 布景库 ----------------
