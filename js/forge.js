@@ -85,9 +85,9 @@ window.Forge = (() => {
     // 武器：内嵌附魔
     let ench = '';
     if (sl !== 'bag') {
-      const p = plus, cc = Sk().enchCost(p, sl), have = Sk().have, ok = s.coins >= cc.coin && have('iron') >= cc.iron && have('dust') >= cc.dust && have('gem') >= cc.gem;
+      const p = plus, cc = Sk().enchCost(p, sl), have = Sk().have, rm = cc.rm || {}, ok = s.coins >= cc.coin && have('iron') >= cc.iron && have('dust') >= cc.dust && have('gem') >= cc.gem && Object.keys(rm).every(id => have(id) >= rm[id]);
       const nxt = statsOf(c, p + 1, sl), dd = Object.keys(nxt).filter(k => k !== 'cap' && nxt[k] !== cs[k]).map(k => `${SN[k]} ${cs[k] || 0}→<b style="color:#8fe88f">${nxt[k]}</b>`).join('　');
-      ench = `<div class="fg-ench"><div class="nx">🔮 <b>强化 +${p}</b>${p >= 10 ? ' · 已满' : ` → +${p + 1}`}　每级全部属性 +15%${sl === 'weapon' ? '' : '（向上取整）'}（+5 起要血玉）${p >= 10 || !dd ? '' : `<br><span style="color:#cfc2a8">${dd}</span>`}<br>${p >= 10 ? '' : `<span class="fg-need ${s.coins >= cc.coin ? 'ok' : 'no'}">🔮 ${fmt(cc.coin)}</span>${need('iron', cc.iron, have('iron'))}${need('dust', cc.dust, have('dust'))}${need('gem', cc.gem, have('gem'))}`}</div>
+      ench = `<div class="fg-ench"><div class="nx">🔮 <b>强化 +${p}</b>${p >= 10 ? ' · 已满' : ` → +${p + 1}`}　每级全部属性 +15%${sl === 'weapon' ? '' : '（向上取整）'}（+5 起要血玉）${p >= 10 || !dd ? '' : `<br><span style="color:#cfc2a8">${dd}</span>`}<br>${p >= 10 ? '' : `<span class="fg-need ${s.coins >= cc.coin ? 'ok' : 'no'}">🔮 ${fmt(cc.coin)}</span>${need('iron', cc.iron, have('iron'))}${need('dust', cc.dust, have('dust'))}${need('gem', cc.gem, have('gem'))}${Object.keys(rm).map(id => need(id, rm[id], have(id))).join('')}`}</div>
         <button class="sk-btn fg-go" data-ench="eq:${sl}" ${p >= 10 || !ok || !Object.keys(cs).length ? 'disabled' : ''}>${p >= 10 ? '已满' : '强化'}<small>${p >= 10 ? '' : !Object.keys(cs).length ? '没有可强化的属性' : ok ? '材料齐了' : '材料/魂晶不足'}</small></button></div>`;
     }
     // 储物箱里的同部位装备

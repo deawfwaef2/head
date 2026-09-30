@@ -56,7 +56,7 @@ window.UI = (() => {
       case 'close': close(); break;
       case 'tab': openMenu(v, a.dataset.sub); break;
       case 'sub': menuState.sub = v; openMenu('build', v); break;
-      case 'place': { const k = v; const d = BuildCat.C[k]; if (G.S.coins < G.cost(k)) { deny(a); break; } if (d.max && G.bought(k) >= d.max) { deny(a); break; } close(); G.startPlace(k); break; }
+      case 'place': { const k = v; const d = BuildCat.C[k]; if (G.S.coins < G.cost(k)) { deny(a); break; } if (d.max && G.bought(k) >= d.max) { deny(a); break; } if (window.RegEcon && RegEcon.can && !RegEcon.can(k)) { deny(a); G.toast && G.toast('材料不足：' + RegEcon.lackText(RegEcon.need(k)), '#f96', 2.6); break; } close(); G.startPlace(k); break; }
       case 'dig': if (G.dig()) openMenu('build', 'dig'); else deny(a); break;
       case 'equip': if (G.buyEquip(v)) openMenu('equip'); else deny(a); break;
       case 'buy': if (G.buyItem(v)) openMenu(menuState.tab); else deny(a); break;
@@ -165,16 +165,16 @@ window.UI = (() => {
     let grid = '';
     if (sub === 'dig') {
       grid = BuildCat.DIG.slice(1).map(d => {
-        const done = S.depth >= d.depth, next = S.depth + 1 === d.depth;
-        return `<div class="bp-item dig ${done ? 'done' : next ? (S.coins < d.cost ? 'poor' : '') : 'locked'}" ${next ? 'data-a="dig"' : ''}><div class="bp-icon">${done ? '✅' : next ? '⛏️' : '🔒'}</div><div class="bp-name">${d.n}</div><div class="bp-cost">${done ? '已完成' : '🔮 ' + fmt(d.cost)}</div><div class="bp-desc">洞窟半径 ${d.r}m。${done ? '' : '岩壁后面也许藏着新的东西……'}</div></div>`;
+        const done = S.depth >= d.depth, next = S.depth + 1 === d.depth, rmN = window.RegEcon && RegEcon.digNeed ? RegEcon.digNeed(d.depth) : {}, rmOk = !window.RegEcon || RegEcon.hasAll(rmN);
+        return `<div class="bp-item dig ${done ? 'done' : next ? (S.coins < d.cost || !rmOk ? 'poor' : '') : 'locked'}" ${next ? 'data-a="dig"' : ''}><div class="bp-icon">${done ? '✅' : next ? '⛏️' : '🔒'}</div><div class="bp-name">${d.n}</div><div class="bp-cost">${done ? '已完成' : '🔮 ' + fmt(d.cost)}</div>${done || !window.RegEcon ? '' : RegEcon.needHTML(rmN)}<div class="bp-desc">洞窟半径 ${d.r}m。${done ? '' : '岩壁后面也许藏着新的东西……'}</div></div>`;
       }).join('');
     } else {
       const vis = Object.keys(C).filter(k => C[k].cat === sub && (!window.Unlocks || Unlocks.has(k)));
       grid = vis.map(k => {
-        const d = C[k], lock = d.depth && d.depth > S.depth, c = G.cost(k), own = G.bought(k), maxed = d.max && own >= d.max;
-        return `<div class="bp-item ${lock ? 'locked' : maxed ? 'done' : S.coins < c ? 'poor' : ''}" ${lock || maxed ? '' : `data-a="place" data-v="${k}"`}>
+        const d = C[k], lock = d.depth && d.depth > S.depth, c = G.cost(k), own = G.bought(k), maxed = d.max && own >= d.max, rmN = window.RegEcon && RegEcon.need ? RegEcon.need(k) : {}, rmOk = !window.RegEcon || RegEcon.hasAll(rmN);
+        return `<div class="bp-item ${lock ? 'locked' : maxed ? 'done' : S.coins < c || !rmOk ? 'poor' : ''}" ${lock || maxed ? '' : `data-a="place" data-v="${k}"`}>
           ${own ? `<div class="bp-own">已建 ${own}</div>` : ''}<div class="bp-icon">${lock ? '🔒' : d.icon}</div><div class="bp-name">${d.n}</div>
-          <div class="bp-cost">${lock ? `需洞窟第 ${d.depth} 层` : maxed ? '已建成' : '🔮 ' + fmt(c)}</div>
+          <div class="bp-cost">${lock ? `需洞窟第 ${d.depth} 层` : maxed ? '已建成' : '🔮 ' + fmt(c)}</div>${lock || maxed || !window.RegEcon ? '' : RegEcon.needHTML(rmN)}
           <div class="bp-stat">${statTxt(d.stat)}${d.regen ? ' 恢复+' + d.regen + '%' : ''}</div><div class="bp-desc">${esc(d.desc || '')}</div></div>`;
       }).join('');
       const hid = Object.keys(C).filter(k => C[k].cat === sub).length - vis.length;

@@ -117,12 +117,14 @@ window.Sack = (() => {
       if (r() < 0.12) add('potion', 1, 1); if (extra && extra.boss) { out.push(rollEquip(r, lv, 1.5)); out.push(rollW(r, lv, 1.5)); add('gem', 1, 2); add('dust', 6, 12); } }
     { const bkI = window.Books && Books.rollLoot(r, kind, lv, extra); if (bkI) out.push(bkI); } // 第二十二轮：书与笔记
     { const pr = window.Props && Props.rollLoot ? Props.rollLoot(r, kind, lv, extra) : null; if (pr) out.push(...pr); } // 续 4：道具原料
+    { const rg = window.RegEcon && RegEcon.rollLoot ? RegEcon.rollLoot(r, kind, lv, extra) : null; if (rg) out.push(...rg); } /* 第二十六轮(k) region_econ：地区材料 */
     return out;
   }
   // worlds.populate：给地点分配容器（只定种类，物品首次打开时再按种子生成）
   function genLoot(node, r) {
     if (!on()) return []; const n = ({ s: 2, m: 3, l: 5 }[node.size] || 3) + (r() < 0.5 ? 1 : 0), out = [];
     for (let i = 0; i < n; i++) { const k = r(); out.push({ kind: k < 0.12 ? 'rack' : k < 0.42 ? 'crate' : k < 0.64 ? 'barrel' : k < 0.82 ? 'basket' : 'bucket', seed: (node.seed * 31 + i * 7919) >>> 0, items: null }); }
+    if (window.RegEcon && RegEcon.veins) out.push(...RegEcon.veins(node)); /* 第二十六轮(k)：地区采集点 */
     return out;
   }
   let sparkMat = null;
@@ -132,7 +134,7 @@ window.Sack = (() => {
   function placeLoot(node, C) {
     if (!on() || !node.loot) return; const lv = lvOf(node);
     node.loot.forEach((L, k) => {
-      const K = KINDS[L.kind] || KINDS.crate; L.name = K[0]; L.lv = lv;
+      const K = (L.kind === 'vein' && window.RegEcon && RegEcon.veinKind(node)) || KINDS[L.kind] || KINDS.crate; L.name = K[0]; L.lv = lv;
       let x = 0, z = 0; for (let t = 0; t < 40; t++) { const a = C.r() * 6.28, d = C.R * (0.18 + C.r() * 0.7); x = Math.cos(a) * d; z = Math.sin(a) * d; if (C.free(x, z, 1.4)) break; }
       C.mark(x, z, 1.3); const y = C.H(x, z);
       const name = window.Assets && Assets.has(K[1]) ? K[1] : 'wooden_crate_01';
@@ -148,7 +150,7 @@ window.Sack = (() => {
   }
   function carcass(b, W) { // 第二十二轮：野兽尸骸（不掉首级，只有材料）
     if (!on() || !W || !W.B || !window.Beasts) return; const nd = W.graph.nodes[W.cur];
-    const L = { kind: 'corpse', name: `${b.T.n}的尸骸`, bst: b.T.n, lv: lvOf(nd), seed: b.e.seed >>> 0, items: Beasts.dropsOf(b).map(([id, n]) => mk(id, n)).concat(window.Props && Props.carcassExtra ? Props.carcassExtra() : []), extra: {}, x: b.pos.x, z: b.pos.z };
+    const L = { kind: 'corpse', name: `${b.T.n}的尸骸`, bst: b.T.n, lv: lvOf(nd), seed: b.e.seed >>> 0, items: Beasts.dropsOf(b).map(([id, n]) => mk(id, n)).concat(window.Props && Props.carcassExtra ? Props.carcassExtra() : []).concat(window.RegEcon && RegEcon.carcassExtra ? RegEcon.carcassExtra() : []), extra: {}, x: b.pos.x, z: b.pos.z };
     W.B.inter.push({ kind: 'loot', L, x: L.x, z: L.z, corpse: true });
   }
   const itemsOf = (L) => L.items || (L.items = L.kind === 'pile' ? [] : roll(L.kind, L.lv || 0, L.seed || 1, L.extra));
@@ -230,14 +232,15 @@ window.Sack = (() => {
 
   // ---- 附魔 / 分解 / 合成（洞里）----
   const ENF = { weapon: 1, armor: 0.9, helm: 0.7, charm: 0.8 };
-  function enchCost(p, sl) { return { coin: Math.round(80 * (ENF[sl] || 1) * Math.pow(1.75, p)), iron: p + 1, dust: 2 * p + 2, gem: p >= 5 ? p - 4 : 0 }; }
+  function enchCost(p, sl) { return { coin: Math.round(80 * (ENF[sl] || 1) * Math.pow(1.75, p)), iron: p + 1, dust: 2 * p + 2, gem: p >= 5 ? p - 4 : 0, rm: window.RegEcon && RegEcon.enchNeed ? RegEcon.enchNeed(p, sl) : {} }; } /* 第二十六轮(k)：rm = 地区材料 */
   const have = (id) => inv().stash.reduce((a, o) => a + (o.id === id ? o.n : 0), 0);
   function take(id, n) { const st = inv().stash; for (const o of st.slice()) { if (o.id !== id || n <= 0) continue; const k = Math.min(n, o.n); o.n -= k; n -= k; if (!o.n) st.splice(st.indexOf(o), 1); } }
   function enchant(target, sl) { // target: 'eq'（sl = 部位，默认武器）或储物箱里的装备
     const S = G.S; sl = sl || 'weapon'; const p = target === 'eq' ? (S.eqPlus[sl] || 0) : (target.plus || 0); if (p >= 10) return;
     if (target !== 'eq') sl = (IT[target.id] || {}).slot || 'weapon';
-    const c = enchCost(p, sl); if (S.coins < c.coin || have('iron') < c.iron || have('dust') < c.dust || have('gem') < c.gem) { SFX.deny && SFX.deny(); toast('魂晶或材料不足', '#f88'); return; }
+    const c = enchCost(p, sl); if (S.coins < c.coin || have('iron') < c.iron || have('dust') < c.dust || have('gem') < c.gem || Object.keys(c.rm).some(id => have(id) < c.rm[id])) { SFX.deny && SFX.deny(); toast('魂晶或材料不足', '#f88'); return; }
     S.coins -= c.coin; take('iron', c.iron); take('dust', c.dust); if (c.gem) take('gem', c.gem);
+    for (const id in c.rm) take(id, c.rm[id]);
     if (target === 'eq') { S.eqPlus[sl] = p + 1; if (sl === 'weapon') G.refreshWeapon && G.refreshWeapon(); } else target.plus = p + 1;
     SFX.metal && SFX.metal(); SFX.levelup && SFX.levelup(); toast(`🔮 附魔成功：+${p + 1}`, '#c9a0ff', 2); G.save && G.save(); render();
   }

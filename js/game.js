@@ -285,6 +285,7 @@ window.startGame = function () {
   }
   function mountHead(h, b, i) {
     if (h.mount || !b.heads) return false;
+    { const mt = CAT[b.type] && CAT[b.type].mount; if (mt && mt.accept && !mt.accept(h)) { if (mt.deny) { SFX.deny(); toast(mt.deny(h), '#fb8', 2.6); } return false; } } /* 第二十六轮(k)：只收特定首级的展位（霸主合成器） */
     if (i == null || i < 0) i = freeSlot(b);
     if (i < 0 || b.heads[i]) return false;
     if (held === h) held = null;
@@ -534,7 +535,7 @@ window.startGame = function () {
     // 命中了哪座建筑 / 哪颗头
     let b = null; for (let o = hit.object; o && !b; o = o.parent) b = builds.find(x => x.g === o) || null;
     // 1) 空展位吸附
-    if (b && CAT[b.type].mount && b.heads) {
+    if (b && CAT[b.type].mount && b.heads && (!CAT[b.type].mount.accept || CAT[b.type].mount.accept(h))) {
       const slot = freeSlot(b, hit.point);
       if (slot >= 0 && mountPos(b, slot).distanceTo(hit.point) < 0.6) {
         const s = slotsOf(CAT[b.type])[slot];
@@ -721,7 +722,9 @@ window.startGame = function () {
       removeHead(h); save();
     } else if (hit.build) {
       const b = hit.build; const refund = Math.round(cost(b.type) / CAT[b.type].grow * 0.5);
-      removeBuild(b); addCoins(refund); SFX.wood(); toast('拆除，返还 ' + refund + ' 魂晶', '#ccc'); save();
+      removeBuild(b); addCoins(refund); SFX.wood();
+      { const rm = window.RegEcon && RegEcon.refund ? RegEcon.refund(b.type) : ''; toast('拆除，返还 ' + refund + ' 魂晶' + (rm ? '、' + rm : ''), '#ccc', rm ? 2.6 : undefined); }
+      save();
     }
   }
 
@@ -1070,17 +1073,21 @@ window.startGame = function () {
     if (!ghostOk) { SFX.deny(); toast('这里放不下', '#f66', 1); return; }
     if (S.coins < c) { SFX.deny(); toast('魂晶不足', '#f66', 1); cancelBuild(); return; }
     if (d.max && bought(k) >= d.max) { SFX.deny(); toast('只能建一个', '#f66', 1); cancelBuild(); return; }
+    if (window.RegEcon && RegEcon.can && !RegEcon.can(k)) { SFX.deny(); toast('材料不足：' + RegEcon.lackText(RegEcon.need(k)) + ' —— 去对应地区搜刮', '#f96', 3); cancelBuild(); return; }
     S.coins -= c;
+    if (window.RegEcon && RegEcon.pay) RegEcon.pay(k);
     const b = addBuild(k, ghost.position.x, ghost.position.z, buildRot);
     SFX.wood(); SFX.mine(); burst(new V3(b.x, 0.3, b.z), '#b0a090', 30, 2, 0.8, -6); shake = 0.1;
     const statTxt = d.stat ? Object.entries(d.stat).map(([k2, v]) => RPG.STATS.find(s => s[0] === k2)[1] + '+' + v).join(' ') : '';
     toast(`建成 <b>${d.n}</b> ${statTxt}`, '#8fe0a0', 2);
     save();
-    if (S.coins < cost(k) || (d.max && bought(k) >= d.max)) cancelBuild();
+    if (S.coins < cost(k) || (d.max && bought(k) >= d.max) || (window.RegEcon && RegEcon.can && !RegEcon.can(k))) cancelBuild();
   }
+  function RegEcon_ok(o) { return !window.RegEcon || !RegEcon.hasAll || RegEcon.hasAll(o); }
   function dig() {
     const next = BuildCat.DIG[S.depth]; if (!next) return false;
     if (S.coins < next.cost) { SFX.deny(); return false; }
+    { const dn = window.RegEcon && RegEcon.digNeed ? RegEcon.digNeed(S.depth + 1) : {}; if (!RegEcon_ok(dn)) { SFX.deny(); toast('挖深材料不足：' + RegEcon.lackText(dn), '#f96', 3); return false; } if (window.RegEcon) RegEcon.payO(dn); }
     S.coins -= next.cost; S.depth++;
     // 超出新范围的不会发生（只会变大）
     buildCave(); assignLights();
