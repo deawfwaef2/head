@@ -235,7 +235,7 @@ window.CFX3D = (() => {
     const go = () => { if (!wrap()) setTimeout(go, 400); }; go();
   }
   const api = {
-    on, init, fx, trailOwn: false,
+    on, init, fx, frame, trailOwn: false,
     pre(info, tg) { cur = { info, tg, at: now() }; },
     post() { },
     _dbg: { get add() { return ADD; }, get alp() { return ALP; }, get trail() { return TRL; }, hit: (t, fo, d, info) => { cur = info ? { info, at: now() } : null; fx(t, fo, d); } }

@@ -126,13 +126,128 @@ window.FPV = (() => {
   }
 
   // ---------------- 第三人称 ----------------
-  const TP = { active: () => false };
+  // 身体：Quaternius「Goblin Animated」CC0（assets/ogre_body.js，FBX→GLB），放大成兽人、染绿皮；动作 Idle/Walk/Run/Jump/Attack/Attack2。
+  // 逻辑：战斗判定始终按第一人称（眼睛位置的镜头）算；第三人称只是 HOOK.pre 里把相机挪到身后（渲染完在微任务里还原，不影响拾取/瞄准），
+  //      武器按“第一人称算好的真实位置”画在世界里，右臂（持双手武器时左臂也）做两段 IK 够到握柄 —— 所以刀划过哪里、就砍在哪里。
+  const TP = (() => {
+    const T = { want: false, ready: false, loading: false, body: null, root: null, mixer: null, act: {}, bones: {}, cur: '', H: 1.75, scale: 1, yaw: 0, wclone: null, wsrc: null, dist: 2.6, atkT: 0, atkAct: null, lastSw: null, lastThrust: 0, alt: 0, fpPos: new V3(), fpQuat: new Q(), fpEuler: new THREE.Euler(0, 0, 0, 'YXZ'), lastCam: new V3(), sp: 0, vel: new V3(), init: false, restore: null };
+    const UPPER = new Set(['Abdomen', 'Torso', 'ShoulderL', 'ShoulderR', 'UpperArmL', 'UpperArmR', 'LowerArmL', 'LowerArmR', 'PalmL', 'PalmR', 'MiddleHandL', 'MiddleHandR', 'FingersL', 'FingersR', 'Neck', 'Head']);
+    const KEY = 'soulhead_view';
+    try { T.want = localStorage.getItem(KEY) === 'tp'; } catch (e) { }
+    const curScene = () => { const W = window.Worlds && Worlds.active && Worlds._W && Worlds._W.B; return (W && W.sc) || (G && G.scene); };
+    const _A = new V3(), _B = new V3(), _C = new V3(), _D = new V3(), _E = new V3(), _wq = new Q(), _pq = new Q(), _q1 = new Q();
+    function load() {
+      if (T.ready || T.loading || !window.OGRE_BODY || !window.THREE.GLTFLoader) return; T.loading = true;
+      new THREE.GLTFLoader().parse(b64buf(window.OGRE_BODY), '', g => {
+        const root = g.scene, body = new THREE.Group(); body.add(root);
+        const M = { Skin: ['#4c7a30', 0.8], BeltBoots: ['#2b1c12', 0.9], Pants: ['#3a2f28', 0.9], Shirt: ['#6b4428', 0.85], Eyebrows: ['#1a100a', 0.9], Eyes: ['#fff0b0', 0.4] };
+        root.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; const fix = m => { const c = M[m.name] || ['#5f8a3a', 0.8]; const n = new THREE.MeshStandardMaterial({ color: c[0], roughness: c[1], metalness: 0, flatShading: true, emissive: m.name === 'Eyes' ? '#aa8820' : c[0], emissiveIntensity: m.name === 'Eyes' ? 0.6 : 0.07 }); return n; }; o.material = Array.isArray(o.material) ? o.material.map(fix) : fix(o.material); }
+          if (o.isBone) T.bones[o.name] = o; });
+        root.updateMatrixWorld(true);
+        const bb = new THREE.Box3(); root.traverse(o => { if (o.isBone) bb.expandByPoint(o.getWorldPosition(new V3())); });
+        T.scale = T.H / Math.max(0.5, bb.max.y - Math.min(0, bb.min.y)); root.scale.multiplyScalar(T.scale); T.root = root; T.body = body;
+        T.mixer = new THREE.AnimationMixer(root);
+        for (const c of g.animations) T.act[c.name] = T.mixer.clipAction(c);
+        for (const n of ['Attack', 'Attack2']) { const c = g.animations.find(x => x.name === n); if (c) { const u = new THREE.AnimationClip(n + 'U', c.duration, c.tracks.filter(tr => UPPER.has(tr.name.split('.')[0]))); T.act[n + 'U'] = T.mixer.clipAction(u); } }
+        for (const k of ['Idle', 'Walk', 'Run']) if (T.act[k]) { T.act[k].setLoop(THREE.LoopRepeat, Infinity); }
+        for (const k of ['AttackU', 'Attack2U']) if (T.act[k]) { T.act[k].setLoop(THREE.LoopOnce, 1); T.act[k].clampWhenFinished = true; }
+        play('Idle', 0); T.ready = true; T.loading = false; body.visible = false; const sc = curScene(); sc && sc.add(body);
+      }, () => { T.loading = false; });
+    }
+    function play(n, fade) { const a = T.act[n]; if (!a || T.cur === n) return; a.reset().setEffectiveWeight(1).play(); const o = T.act[T.cur]; if (o && fade > 0) o.crossFadeTo(a, fade, false); else if (o) o.stop(); T.cur = n; }
+    function setView(v, silent) {
+      T.want = v === 'tp'; try { localStorage.setItem(KEY, T.want ? 'tp' : 'fp'); } catch (e) { }
+      if (T.want) load(); if (!silent && G && G.toast) G.toast(T.want ? '🎥 第三人称（V 切回第一人称）' : '👁️ 第一人称（V 切换第三人称）', '#cfe8ff', 1.6);
+    }
+    function blocked() { return !G || !G.playing || G.uiOpen || G.held || (window.RecallIW && RecallIW.active) || (window.Recall && Recall.open && Recall.open.call && false); }
+    const active = () => T.want && T.ready && !blocked() && onView();
+    // -------- 两段 IK：让 hd 够到世界坐标 tgt，肘部朝 pole --------
+    function rotW(bone, q) { bone.getWorldQuaternion(_wq); _wq.premultiply(q); if (bone.parent) { bone.parent.getWorldQuaternion(_pq); _pq.invert(); } else _pq.identity(); bone.quaternion.copy(_pq.multiply(_wq)); bone.updateMatrixWorld(true); }
+    function ik(up, lo, hd, tgt, pole) {
+      up.getWorldPosition(_A); lo.getWorldPosition(_B); hd.getWorldPosition(_C);
+      const l1 = _A.distanceTo(_B), l2 = _B.distanceTo(_C); let d = _A.distanceTo(tgt); d = Math.max(Math.abs(l1 - l2) + 1e-3, Math.min(l1 + l2 - 1e-3, d));
+      _D.copy(tgt).sub(_A).normalize(); const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+      _E.copy(pole).sub(_A); _E.addScaledVector(_D, -_E.dot(_D)); if (_E.lengthSq() < 1e-6) _E.set(0, -1, 0); _E.normalize();
+      const elbow = new V3().copy(_A).addScaledVector(_D, a).addScaledVector(_E, h), wrist = new V3().copy(_A).addScaledVector(_D, d);
+      _q1.setFromUnitVectors(_B.clone().sub(_A).normalize(), elbow.clone().sub(_A).normalize()); rotW(up, _q1);
+      lo.getWorldPosition(_B); hd.getWorldPosition(_C); _q1.setFromUnitVectors(_C.clone().sub(_B).normalize(), wrist.clone().sub(_B).normalize()); rotW(lo, _q1);
+    }
+    const fpCam = { p: new V3() };
+    function frameTP(dt, now) {
+      const wpn = G.weapon, on = active();
+      if (T.body) { T.body.visible = on; const sc = curScene(); if (sc && T.body.parent !== sc) sc.add(T.body); }
+      if (T.wclone) T.wclone.visible = on;
+      if (!on) { T.init = false; return; }
+      const P = G.player, C = window.Combat, S = C && C.state, drawn = !!(C && C.drawn);
+      cam.updateMatrixWorld(true);
+      // 第一人称（眼睛）相机位姿：本帧 Combat 已按它算完
+      T.fpPos.copy(cam.position); T.fpEuler.copy(cam.rotation); T.fpQuat.copy(cam.quaternion);
+      if (!T.init) { T.init = true; T.lastCam.copy(cam.position); T.yaw = P.yaw + Math.PI; }
+      T.vel.set((cam.position.x - T.lastCam.x) / Math.max(dt, 1e-3), 0, (cam.position.z - T.lastCam.z) / Math.max(dt, 1e-3)); if (T.vel.length() > 14) T.vel.set(0, 0, 0); T.lastCam.copy(cam.position);
+      T.sp += (T.vel.length() - T.sp) * Math.min(1, dt * 10);
+      // 身体朝向跟着视线（出刀时更快）
+      const want = P.yaw + Math.PI; let dy = Math.atan2(Math.sin(want - T.yaw), Math.cos(want - T.yaw)); T.yaw += dy * Math.min(1, dt * (T.atkT > 0 ? 18 : 10));
+      const crouch = P.crouch || 0, feet = cam.position.y - (P.h || 1.45);
+      T.body.position.set(cam.position.x, feet, cam.position.z); T.body.rotation.y = T.yaw; T.body.scale.set(1.08, 1 - 0.18 * crouch, 1.08);
+      // 动作：Idle / Walk / Run（Walk 倒走 = 负速度）
+      const fwd = new V3(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)), back = T.vel.dot(fwd) < -0.5;
+      const loco = T.sp < 0.5 ? 'Idle' : T.sp < 4.4 ? 'Walk' : 'Run'; play(loco, 0.18);
+      const a = T.act[loco]; if (a) a.timeScale = loco === 'Walk' ? Math.max(0.6, T.sp / 2.2) * (back ? -1 : 1) : loco === 'Run' ? Math.max(0.8, T.sp / 5.2) : 1;
+      // 出刀：上半身攻击动作（覆盖）
+      const sw = S && S.sw, th = S ? S.thrust : 0;
+      if (drawn && ((sw && sw !== T.lastSw) || (th > 0 && !(T.lastThrust > 0)))) { const n = (T.alt++ % 2) ? 'Attack2U' : 'AttackU', aa = T.act[n]; if (aa) { if (T.atkAct && T.atkAct !== aa) T.atkAct.stop(); aa.reset(); aa.timeScale = Math.max(1.3, Math.min(3.5, aa.getClip().duration / Math.max(0.3, ((sw && sw.dur) || 0.3) * 1.6))); aa.setEffectiveWeight(30); aa.play(); T.atkAct = aa; T.atkT = aa.getClip().duration / aa.timeScale; } }
+      T.lastSw = sw; T.lastThrust = th;
+      if (T.atkT > 0) { T.atkT -= dt; const k = Math.min(1, T.atkT / 0.14); if (T.atkAct) T.atkAct.setEffectiveWeight(30 * Math.max(0.02, k)); if (T.atkT <= 0 && T.atkAct) { T.atkAct.stop(); T.atkAct = null; } }
+      T.mixer.update(dt); T.body.updateMatrixWorld(true);
+      // 武器：画在第一人称算好的世界位置；没拔刀就挂在右手上
+      if (wpn) {
+        if (T.wsrc !== wpn) { if (T.wclone && T.wclone.parent) T.wclone.parent.remove(T.wclone); T.wsrc = wpn; T.wclone = wpn.clone(true); T.wclone.traverse(o => { o.frustumCulled = false; }); T.wclone.matrixAutoUpdate = false; }
+        const sc = curScene(); if (sc && T.wclone.parent !== sc) sc.add(T.wclone);
+        wpn.updateMatrixWorld(true);
+        T.wclone.matrix.copy(wpn.matrixWorld); T.wclone.matrixWorld.copy(T.wclone.matrix); T.wclone.visible = drawn;
+        // 右臂 IK 到握柄（拔刀时）；双手武器 / 格挡时左臂也上
+        if (drawn) {
+          const asset = !!(wpn.userData && wpn.userData.asset), gy = asset ? -0.02 : 0, B = T.bones, len = (wpn.userData && wpn.userData.len) || 0.8;
+          const right = new V3(Math.cos(P.yaw), 0, -Math.sin(P.yaw)), ppR = new V3();
+          if (B.UpperArmR && B.LowerArmR && B.PalmR) { B.UpperArmR.getWorldPosition(ppR); const gp = new V3(0, gy + 0.03, 0).applyMatrix4(wpn.matrixWorld); ik(B.UpperArmR, B.LowerArmR, B.PalmR, gp, ppR.clone().addScaledVector(right, 0.6).add(new V3(0, -1, 0)).addScaledVector(fwd, -0.3)); }
+          if ((len >= 1.0 || (S && S.rmb)) && B.UpperArmL && B.LowerArmL && B.PalmL) { const ppL = new V3(); B.UpperArmL.getWorldPosition(ppL); const gp = new V3(0, gy - 0.085, 0).applyMatrix4(wpn.matrixWorld); ik(B.UpperArmL, B.LowerArmL, B.PalmL, gp, ppL.clone().addScaledVector(right, -0.6).add(new V3(0, -1, 0)).addScaledVector(fwd, -0.3)); }
+        }
+      }
+    }
+    // -------- 相机 --------
+    function okPoint(p) {
+      const W = window.Worlds && Worlds.active && Worlds._W && Worlds._W.B;
+      if (W) { if (Math.hypot(p.x, p.z) > W.R - 0.45) return false; if (W.H && p.y < W.H(p.x, p.z) + 0.22) return false; for (const c of W.cols || []) { if (p.y < 3 && Math.hypot(p.x - c.x, p.z - c.z) < c.r + 0.18) return false; } return true; }
+      const cv = G.cave; if (cv) { if (Math.hypot(p.x, p.z) > cv.R - 0.4) return false; if (cv.H && p.y > cv.H - 0.25) return false; if (cv.floorAt && p.y < cv.floorAt(p.x, p.z) + 0.2) return false; for (const c of cv.pillars || []) { if (p.y < c.h + 0.3 && Math.hypot(p.x - c.x, p.z - c.z) < c.r + 0.2) return false; } }
+      return true;
+    }
+    function preTP(dt, now) {
+      const on = active(); if (on) { vm.visible = false; if (rig) rig.g.visible = false; }
+      if (!on) return;
+      const eye = T.fpPos, ex = T.fpEuler; const q = T.fpQuat;
+      const desired = new V3(0.6, 0.32, 3.0);
+      const dirs = desired.clone().applyQuaternion(q), head = eye.clone().add(new V3(0, 0.05, 0));
+      let best = 0; for (let i = 1; i <= 12; i++) { const f = i / 12; const p = head.clone().addScaledVector(dirs, f); if (!okPoint(p)) break; best = f; }
+      best = Math.max(0.12, best - 0.06); T.dist += (best - T.dist) * (best < T.dist ? 1 : Math.min(1, dt * 3)); if (!isFinite(T.dist) || T.dist > 1) T.dist = best;
+      const f0 = Math.min(1, T.dist); cam.position.copy(head).addScaledVector(dirs, f0);
+      // 准星收敛到眼睛前方 ~10 米：向左转一点、向下压一点
+      cam.rotation.set(ex.x - 0.03 * f0, ex.y + 0.05 * f0, 0, 'YXZ'); cam.updateMatrixWorld(true);
+      T.p0 = T.p0 || new V3(); T.e0 = T.e0 || new THREE.Euler(0, 0, 0, 'YXZ'); T.p0.copy(eye); T.e0.copy(ex);
+      if (!T.restore) { T.restore = true; Promise.resolve().then(() => { cam.position.copy(T.p0); cam.rotation.copy(T.e0); cam.updateMatrixWorld(true); T.restore = null; }); }
+    }
+    addEventListener('keydown', e => {
+      if (e.code !== 'KeyV' || e.repeat || !G || !onView() || !G.playing || G.uiOpen || G.held || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      e.stopImmediatePropagation(); setView(T.want ? 'fp' : 'tp');
+    }, true);
+    return { active, setView, load, frame: frameTP, pre: preTP, get want() { return T.want; }, _T: T, ik };
+  })();
 
   function init(game) {
     if (hooked) return; G = game; cam = G.camera; vm = G.vm; hooked = true; loadHandSrc();
-    if (G.HOOK) G.HOOK.frame.push(frame);
+    if (G.HOOK) { G.HOOK.frame.push(frame); G.HOOK.pre.push((dt, now) => TP.pre(dt, now)); } if (TP.want) TP.load();
     const wrap = () => { if (!window.CombatFX) return false; if (CombatFX._fpvw) return true; const o = CombatFX.event; CombatFX.event = function (t, fo, d) { let r; try { r = o.apply(this, arguments); } finally { try { onStrike(t, d); } catch (e) { } } return r; }; CombatFX._fpvw = true; return true; };
     const go = () => { if (!wrap()) setTimeout(go, 400); }; go();
   }
-  return { init, onStrike, get rig() { return rig; }, TP, tp: null, _curl: curl };
+  return { init, onStrike, frame, pre: (dt, now) => TP.pre(dt, now), get rig() { return rig; }, TP, tp: TP, setView: v => TP.setView(v), _curl: curl };
 })();

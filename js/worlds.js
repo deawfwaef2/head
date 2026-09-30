@@ -858,6 +858,7 @@ window.Worlds = (() => {
     if (window.Combat) { try { Combat.update(dt, now); Combat.prerender(); } catch (e) { console.warn(e); } }
     W.hintT -= dt; if (W.hintT <= 0) { W.hintT = 0.12; hud(); skillHud(); }
     if (G.S.hp <= 0) dieNow();
+    if (window.CFX3D) try { CFX3D.frame(dt, now); } catch (e) { console.warn(e); } if (window.FPV) try { FPV.frame(dt, now); FPV.pre(dt, now); } catch (e) { console.warn(e); } /* R41：3D 战斗特效 / 第一人称兽人手 / 第三人称（HOOK 在出猎世界里不跑，这里直接调） */
     const post = G.post; if (post && post.setRayLight) post.setRayLight(tmp.set(0, -100, 0), 0);
     if (post && post.on) post.render(B.sc, cam); else G.renderer.render(B.sc, cam);
   }

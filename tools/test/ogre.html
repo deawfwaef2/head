@@ -1,0 +1,19 @@
+<!doctype html><meta charset="utf-8"><base href="/"><body style="margin:0;background:#222"><canvas id="cv" width="960" height="540"></canvas>
+<script src="/lib/three.min.js"></script><script src="/lib/GLTFLoader.js"></script><script src="/assets/ogre_body.js"></script>
+<script>
+function b64buf(s){const b=atob(s),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u.buffer;}
+async function show(clip,t,yaw){
+ const g=await new Promise((r,j)=>new THREE.GLTFLoader().parse(b64buf(OGRE_BODY),'',r,j));
+ const renderer=window.__r||(window.__r=new THREE.WebGLRenderer({canvas:document.getElementById('cv'),antialias:true}));renderer.setSize(960,540,false);renderer.setClearColor(0x333844);
+ const sc=new THREE.Scene();sc.add(new THREE.HemisphereLight(0xffffff,0x555555,1.3));const dl=new THREE.DirectionalLight(0xffffff,1.2);dl.position.set(2,4,3);sc.add(dl);
+ const root=g.scene;sc.add(root);root.rotation.y=yaw||0;
+ const mx=new THREE.AnimationMixer(root);const a=g.animations.find(c=>c.name===clip);if(a){mx.clipAction(a).play();mx.update(t||0.1);}
+ root.updateMatrixWorld(true);
+ const sk=[];root.traverse(o=>{if(o.isSkinnedMesh)sk.push(o.name+':'+o.material.length)});
+ const bb=new THREE.Box3();root.traverse(o=>{if(o.isBone){bb.expandByPoint(o.getWorldPosition(new THREE.Vector3()))}});
+ const bones={};root.traverse(o=>{if(o.isBone&&/Head|PalmR|UpperArmR|LowerArmR|Hips|FootL|Torso/.test(o.name))bones[o.name]=o.getWorldPosition(new THREE.Vector3()).toArray().map(v=>+v.toFixed(2))});
+ const cam=new THREE.PerspectiveCamera(35,16/9,0.1,50);const h=(bb.max.y+bb.min.y)/2;cam.position.set(0,h,(bb.max.y-bb.min.y)*2.4);cam.lookAt(0,h,0);
+ renderer.render(sc,cam);
+ return {names:g.animations.map(c=>c.name+':'+c.duration.toFixed(2)),bb:[bb.min.toArray(),bb.max.toArray()],bones,rootScale:root.scale.toArray(),children:root.children.map(c=>c.name+':'+c.type+':'+c.scale.toArray().join(','))};
+}
+</script>
