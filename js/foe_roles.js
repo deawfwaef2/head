@@ -10,11 +10,11 @@ window.FoeRoles = (() => {
   const ang = a => Math.atan2(Math.sin(a), Math.cos(a)), clamp = (x, a, b) => Math.max(a, Math.min(b, x));
   const V3 = () => window.THREE.Vector3;
   const INFO = {
-    brute: { n: '蛮兵', ic: '🪓', col: '#ff9a60', hp: 1.9, spd: 0.82, dmg: 1.15, tint: [1, 0.78, 0.62], tip: '硬吃轻击，只有蓄力重斩或连续猛砍才能打断；重击前摇很长——看准了闪' },
+    brute: { n: '蛮兵', ic: '🪓', col: '#ff9a60', hp: 1.4, spd: 0.82, dmg: 1.15, tint: [1, 0.78, 0.62], tip: '硬吃轻击，只有蓄力重斩或连续猛砍才能打断；重击前摇很长——看准了闪' },
     skirm: { n: '游击', ic: '💨', col: '#9fe0ff', hp: 0.8, spd: 1.25, dmg: 0.85, tint: [0.75, 0.95, 1], tip: '冲刺斩后撤步，你挥刀时会翻滚闪开——别连续乱挥，等她落地再砍' },
-    guard: { n: '盾卫', ic: '🛡️', col: '#9fd0ff', hp: 1.3, spd: 0.85, dmg: 0.9, tint: [0.78, 0.86, 1], tip: '永远举着盾：绕到侧后、换个方向砍或蓄力重斩破防；她被弹刀后会立刻反击' },
+    guard: { n: '盾卫', ic: '🛡️', col: '#9fd0ff', hp: 1.15, spd: 0.85, dmg: 0.9, tint: [0.78, 0.86, 1], tip: '永远举着盾：绕到侧后、换个方向砍或蓄力重斩破防；她被弹刀后会立刻反击' },
     assassin: { n: '刺客', ic: '🗡️', col: '#c890ff', hp: 0.6, spd: 1.0, dmg: 1.0, tint: [0.55, 0.5, 0.65], tip: '潜行绕到你背后，听到拔刀声就按 Q 闪身；正面对着她她就不敢上' },
-    berserk: { n: '狂战', ic: '🔥', col: '#ff6050', hp: 1.25, spd: 1.1, dmg: 1.0, tint: [1, 0.7, 0.66], tip: '连击猛攻，不会后退；半血狂暴后更快更狠' },
+    berserk: { n: '狂战', ic: '🔥', col: '#ff6050', hp: 1.15, spd: 1.1, dmg: 1.0, tint: [1, 0.7, 0.66], tip: '连击猛攻，不会后退；半血狂暴后更快更狠' },
     ranged: { n: '投掷手', ic: '🎯', col: '#ffe080', hp: 0.8, spd: 1.0, dmg: 0.8, tint: [1, 0.95, 0.75], tip: '远远掷刃并保持距离：举刀格挡，或者在刃飞来时挥刀把它打回去' }
   };
   const PROJ = []; // 飞行中的掷刃
@@ -81,21 +81,21 @@ window.FoeRoles = (() => {
       if (fo.cd <= 0 && tok()) { if (fo.block > 0) fo.block = 0; rs.up = false; return null; } // 轮到出手：放下盾，走原来的“上步 + 起手”
       if (d > 7) return null;
       fo.block = Math.max(fo.block, 0.35); // 举盾
-      if (!rs.up) { rs.up = true; f.play('Sword_Block', { once: true, fade: 0.15, restart: true }); }
       rs.gT = (rs.gT || 0) - dt; if (rs.gT <= 0) { rs.gT = 0.45 + Math.random() * 0.15; const aim = ctx.handAng ? ctx.handAng(fo) : null; if (aim != null) fo.gAng = aim + (Math.random() - 0.5) * 0.5; } // 盾的朝向每 ~0.5 秒才跟上你的刀：快速换向能绕过
       if (fo.gAng == null) fo.gAng = Math.PI / 2;
-      const ux = dx / d, uz = dz / d; let vx = 0, vz = 0;
-      if (d > 2.3) { vx = ux * 1.5; vz = uz * 1.5; } else if (d < 1.7) { vx = -ux * 0.9; vz = -uz * 0.9; } else { rs.sd = rs.sd || (Math.random() < 0.5 ? -1 : 1); if (rs.t % 3 < dt) rs.sd = -rs.sd; vx = uz * rs.sd * 0.9; vz = -ux * rs.sd * 0.9; }
+      const ux = dx / d, uz = dz / d; let vx = 0, vz = 0, mv = 0; // 走位时播走路腿（以前举着盾的定格姿势在地上滑行）；站定才摆格挡姿势
+      if (d > 2.5) { vx = ux * 1.4; vz = uz * 1.4; mv = 1; } else if (d < 1.6) { vx = -ux * 0.9; vz = -uz * 0.9; mv = -1; }
+      if (mv) { rs.up = false; f.play('Walk_Loop', { fade: 0.25, speed: mv > 0 ? 0.95 : -0.9 }); } else if (!rs.up) { rs.up = true; f.play('Sword_Block', { once: true, fade: 0.2, restart: true }); }
       fo.rv = { x: vx, z: vz }; return { turnTo: face, spd: 0 };
     }
     if (fo.role === 'assassin') {
       if (d > 10) return null;
       const pl = P, ca = Math.atan2(-dx, -dz), delta = ang(pl.yaw - ca), behind = Math.abs(delta) < 0.75;
-      if (fo.cd <= 0 && tok() && ((behind && d < 3.4) || rs.t - (rs.stalk0 || 0) > 8)) { rs.stalk0 = rs.t; Foe_.attack(fo, d, 'Sword_Dash'); return { turnTo: face, spd: 0 }; }
+      if (fo.cd <= 0 && tok() && ((behind && d < 3.4) || rs.t - (rs.stalk0 || 0) > 5)) { rs.stalk0 = rs.t; Foe_.attack(fo, d, 'Sword_Dash'); return { turnTo: face, spd: 0 }; }
       if (fo.cd > 0 || !behind || d > 3.4) { // 潜行绕背
         const sg = delta >= 0 ? 1 : -1, w = clamp(Math.abs(delta) / 0.7, 0.35, 1), R = 2.4, rad = clamp(d - R, -1, 1.2) * 3;
         fo.rv = { x: Math.cos(ca) * sg * 4.3 * w + (dx / d) * rad, z: -Math.sin(ca) * sg * 4.3 * w + (dz / d) * rad };
-        f.play('Crouch_Fwd_Loop', { fade: 0.25, speed: 1.7 }); return { turnTo: face, spd: 0 };
+        f.play('Crouch_Fwd_Loop', { fade: 0.25, speed: 1.7 }); const hd = Math.atan2(fo.rv.x, fo.rv.z); return { turnTo: face + clamp(ang(hd - face), -1.25, 1.25), spd: 0 };
       }
       return null;
     }
@@ -103,7 +103,9 @@ window.FoeRoles = (() => {
       if (d < 2.3) return null; // 被贴脸：近战
       if (fo.cd <= 0 && d >= 3.2 && d <= 11 && tok() && Foe_.ATK.OverhandThrow) { Foe_.attack(fo, d, null); return { turnTo: face, spd: 0 }; }
       const ux = dx / d, uz = dz / d;
-      if (d < 4.6) { fo.rv = { x: -ux * 3.3, z: -uz * 3.3 }; f.play('Walk_Loop', { fade: 0.25, speed: -1.25 }); return { turnTo: face, spd: 0 }; } // 拉开距离
+      rs.kT = rs.kT || 0; rs.kC = (rs.kC || 0) - dt; // 拉开距离最多 1.8 秒，然后站住掷刃/近战（以前一直倒着跑，永远追不上）
+      if (d < 4.6 && rs.kC <= 0) { rs.kT += dt; if (rs.kT > 1.8) { rs.kT = 0; rs.kC = 3.2; } else { fo.rv = { x: -ux * 2.7, z: -uz * 2.7 }; f.play('Walk_Loop', { fade: 0.25, speed: -1.05 }); return { turnTo: face, spd: 0 }; } }
+      if (d < 3.2) return null;
       if (d > 10) { f.play('Jog_Fwd_Loop', { fade: 0.25, speed: 0.95 }); return { turnTo: face, spd: 3.6 }; }
       f.play('Sword_Idle', { fade: 0.3 }); return { turnTo: face, spd: 0 };
     }

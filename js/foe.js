@@ -320,7 +320,7 @@ window.Foe = (() => {
       else if (!SMART && fo.state === 'chase') {
         // 第十九轮：对峙距离 + 攻击令牌 + 平滑移动（旧版贴在 1.3m 绕圈游走、随时换向 = 用户说的“在你附近闪烁”、太快）
         turnTo = face;
-        const hold = fo.armed ? 2.7 : 2.2, atkR = fo.armed ? 1.55 : 1.15, mine = tokenOK(fo);
+        const hold = fo.armed ? 2.1 : 1.7, atkR = fo.armed ? 1.55 : 1.15, mine = tokenOK(fo);
         if (fo.armed && fo.cd <= 0 && mine && d > 2.4 && d < 4.6 && fo.iq > 0.6 && Math.random() < 0.008) attack(fo, d, 'Sword_Dash'); // 冲刺斩
         else if (fo.cd <= 0 && mine) { // 轮到我：先上步到出手距离，再起手
           if (d > atkR) { spd = d > 6 ? 3.0 : 1.6; f.play(d > 6 ? 'Sprint_Loop' : 'Walk_Loop', { fade: 0.3, speed: d > 6 ? 0.9 : 1.1 }); }
@@ -330,7 +330,7 @@ window.Foe = (() => {
         else { // 对峙：在对峙距离上慢慢游走，经常站定观察
           fo.strafeT = (fo.strafeT || 0) - dt;
           if (fo.strafeT <= 0) { fo.strafeT = 1.8 + Math.random() * 2.2; const r0 = Math.random(); fo.strafeDir = r0 < 0.45 ? 0 : r0 < 0.72 ? -1 : 1; }
-          strafe = fo.strafeDir || 0; if (d < hold - 0.6) strafe = 2;
+          strafe = fo.strafeDir || 0; if (d < hold - 0.45) strafe = 2;
           if (strafe === 2) f.play('Walk_Loop', { fade: 0.35, speed: -0.75 }); // 倒着走 = 后退
           else if (strafe) { f.play('Walk_Loop', { fade: 0.35, speed: 0.7 }); turnTo = face + strafe * 0.75; } // 侧移：身体偏向移动方向
           else f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.35 });
@@ -342,17 +342,17 @@ window.Foe = (() => {
         else if (fo.sayT <= 0 && Math.random() < 0.006) sayP(fo, 'flee', SAY.flee);
       }
       else if (SMART && fo.state === 'retreat') { // 第二十一轮：重伤后退开整顿（聪明的敌人不会一味送死）
-        fo.retT -= dt; turnTo = Math.atan2(-dx, -dz); if (d > 7.5) { turnTo = face; spd = 0; f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.3 }); fo.hp = Math.min(fo.maxHp, fo.hp + fo.maxHp * 0.05 * dt); }
+        fo.retT -= dt; turnTo = Math.atan2(-dx, -dz); if (d > 7.5) { turnTo = face; spd = 0; f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.3 }); fo.hp = Math.min(fo.maxHp, fo.hp + fo.maxHp * 0.012 * dt); }
         else { spd = 3.6; f.play('Jog_Fwd_Loop', { fade: 0.25, speed: 0.9 }); }
         if (fo.retT <= 0 || (d < 2.6 && fo.cd <= 0)) { fo.state = 'chase'; fo.cd = 0.3; sayP(fo, 'back', SAY2.back); }
       }
       else if (fo.state === 'chase') {
         // 第二十一轮：更聪明的追击 —— 预判拦截、包抄站位、惩罚逃跑、丢失目标会去搜索；速度足以追上疾跑后没体力的玩家
-        const hold = fo.armed ? 2.7 : 2.2, atkR = fo.armed ? 1.55 : 1.15, mine = tokenOK(fo);
+        const hold = fo.armed ? 2.1 : 1.7, atkR = fo.armed ? 1.55 : 1.15, mine = tokenOK(fo);
         const sprint = fo.boss ? 5.9 : 4.9 + fo.iq * 1.1 + fo.rar * 0.15;
         goal = [P.pos.x, P.pos.z, 'P']; const pv = ctx.pvel || { x: 0, z: 0 }, away = (pv.x * dx + pv.z * dz) / d; // 玩家远离我的速度
         const track = see || ((fo.lostT || 0) < 0.05 || fo.t % 0.25 < dt) && d < 22 && ctx.sees(fo.pos, 22); if (track) { fo.lostT = 0; (fo.lastSeen || (fo.lastSeen = new V3())).set(P.pos.x, 0, P.pos.z); } else fo.lostT = (fo.lostT || 0) + dt;
-        if (!fo.boss && fo.hp < fo.maxHp * 0.3 && !fo.retreated && fo.iq > 0.45 && !fo.atk) { fo.retreated = true; fo.state = 'retreat'; fo.retT = 3 + Math.random() * 2.5; sayP(fo, 'low', SAY2.hurt); }
+        if (!fo.boss && fo.hp < fo.maxHp * 0.3 && !fo.retreated && fo.iq > 0.45 && !fo.atk) { fo.retreated = true; fo.state = 'retreat'; fo.retT = 1.8 + Math.random() * 1.2; sayP(fo, 'low', SAY2.hurt); }
         else if (fo.lostT > 1.2 && fo.lastSeen) { // 看不见你了：去最后看见的位置找
           const lx = fo.lastSeen.x - fo.pos.x, lz = fo.lastSeen.z - fo.pos.z, ld = Math.hypot(lx, lz);
           if (ld > 1.2) { turnTo = Math.atan2(lx, lz); goal = [fo.lastSeen.x, fo.lastSeen.z, 'P']; spd = 3.4; f.play('Jog_Fwd_Loop', { fade: 0.3, speed: 0.85 }); } else { turnTo = fo.yaw + Math.sin(fo.t * 1.3) * 1.5; f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.3 }); }
@@ -375,7 +375,7 @@ window.Foe = (() => {
           if (ed > 0.6) { // 走向自己的槽位：身体朝玩家，横着/倒着走过去
             fo.slotV = fo.slotV || new V3(); fo.slotV.set(ex / ed, 0, ez / ed); strafe = 3; f.play('Walk_Loop', { fade: 0.35, speed: (fo.slotV.x * dx + fo.slotV.z * dz) < 0 ? -0.8 : 0.8 });
           } else { fo.strafeT = (fo.strafeT || 0) - dt; if (fo.strafeT <= 0) { fo.strafeT = 1.4 + Math.random() * 1.8; const r0 = Math.random(); fo.strafeDir = r0 < 0.5 ? 0 : r0 < 0.75 ? -1 : 1; }
-            strafe = fo.strafeDir || 0; if (d < hold - 0.6) strafe = 2;
+            strafe = fo.strafeDir || 0; if (d < hold - 0.45) strafe = 2;
             if (strafe === 2) f.play('Walk_Loop', { fade: 0.35, speed: -0.75 }); else if (strafe) f.play('Walk_Loop', { fade: 0.35, speed: 0.7 }); else f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.35 }); }
           if (fo.sayT <= 0 && Math.random() < 0.004 * (window.Persona ? Persona.tauntK(fo) : 1)) { sayP(fo, n > 1 && Math.random() < 0.5 ? 'pack' : 'taunt', n > 1 ? SAY2.pack : SAY2.duel); if (window.Persona) Persona.gesture(fo); }
         }
@@ -399,16 +399,20 @@ window.Foe = (() => {
       if (SMART && spd > 0.5 && turnTo != null && !fo.atk) { // 第二十一轮：绕开树/石头/墙，卡住就换方向绕路
         if (fo.sideT > 0) fo.sideT -= dt; if (fo.detour > 0) { fo.detour -= dt; turnTo = fo.detourYaw; } else turnTo = goal ? steer(fo, turnTo, goal) : avoidC(fo, turnTo);
         fo.stuckT = (fo.stuckT || 0) + dt; if (fo.stuckT > 0.5) { const lp = fo.lastP || (fo.lastP = fo.pos.clone()), mv = Math.hypot(fo.pos.x - lp.x, fo.pos.z - lp.z); if (mv < spd * 0.5 * 0.3 && !fo.detour) { fo.detour = 0.9 + Math.random() * 0.6; fo.detourYaw = unstick(fo, turnTo); } lp.copy(fo.pos); fo.stuckT = 0; } }
+      if (!fo.atk && !(fo.stag > 0) && !(fo.block > 0) && fo.state === 'chase' && spd < 0.5 && !(fo.gestT > 0)) { // 绕圈/走位时身体转向前进方向（以前正面朝你、脚朝前走着横向滑 = 螃蟹步）
+        if (strafe === 3 && fo.slotV) { const hd = Math.atan2(fo.slotV.x, fo.slotV.z), rel = ang(hd - face); if (Math.abs(rel) < 2.3) turnTo = face + clampA(rel, 0.95); }
+        else if (strafe === 1 || strafe === -1) turnTo = face + strafe * 0.9; }
       if (turnTo != null) fo.yaw += clampA(ang(turnTo - fo.yaw), 6 * dt * (0.6 + fo.iq) * (spd > 4 ? 1.4 : 1));
       { // 第十九轮：速度带加速度（不再瞬间换向）；侧移/后退都以“面向玩家”的方向为基准
         let vx = 0, vz = 0; if (spd > 0) { vx = Math.sin(fo.yaw) * spd; vz = Math.cos(fo.yaw) * spd; }
         if (strafe === 3 && !fo.atk && fo.stag <= 0 && fo.slotV) { vx += fo.slotV.x * 1.6; vz += fo.slotV.z * 1.6; }
-        else if (strafe && !fo.atk && fo.stag <= 0) { if (strafe === 2) { vx -= Math.sin(face) * 0.8; vz -= Math.cos(face) * 0.8; } else { vx += Math.cos(face) * strafe * 0.65; vz -= Math.sin(face) * strafe * 0.65; } }
+        else if (strafe && !fo.atk && fo.stag <= 0) { if (strafe === 2) { vx -= Math.sin(face) * 0.8; vz -= Math.cos(face) * 0.8; } else { vx += Math.cos(face) * strafe * 0.85; vz -= Math.sin(face) * strafe * 0.85; } }
         if (fo.rv) { vx += fo.rv.x; vz += fo.rv.z; fo.rv = null; } // 职业给的额外世界速度（绕背 / 翻滚 / 倒退）
         const fv = fo.fv || (fo.fv = new V3()), kk = 1 - Math.exp(-(fo.atk ? 14 : 6) * dt); fv.x += (vx - fv.x) * kk; fv.z += (vz - fv.z) * kk;
         fo.pos.x += fv.x * dt; fo.pos.z += fv.z * dt;
+        if (fo.kb) { const kt = Math.min(dt, fo.kb.t); fo.pos.x += fo.kb.x * kt; fo.pos.z += fo.kb.z * kt; fo.kb.t -= dt; if (fo.kb.t <= 0) fo.kb = null; }
         const pd = Math.hypot(fo.pos.x - P.pos.x, fo.pos.z - P.pos.z), mn = 1.05; // 永远不贴进玩家 1.05m 内（第一人称近裁剪穿模闪烁）
-        if (pd < mn && pd > 1e-4) { fo.pos.x = P.pos.x + (fo.pos.x - P.pos.x) / pd * mn; fo.pos.z = P.pos.z + (fo.pos.z - P.pos.z) / pd * mn; }
+        if (pd < mn && pd > 1e-4) { const push = Math.min(mn - pd, 9 * dt); fo.pos.x += (fo.pos.x - P.pos.x) / pd * push; fo.pos.z += (fo.pos.z - P.pos.z) / pd * push; } // 软推开（以前一帧硬弹到 1.05m = 瞬移）
       }
       if (fo.state === 'chase') guardAI(fo, dt, d); guardShow(fo);
       collide(fo.pos, 0.35); fo.pos.y = ctx.H(fo.pos.x, fo.pos.z); f.root.rotation.y = fo.yaw;
@@ -510,11 +514,11 @@ window.Foe = (() => {
     if (fo.role && window.FoeRoles) clip = FoeRoles.clip(fo, clip, d, force) || clip;
     const c = f.clips[clip], T = ATK[clip]; if (!c || !T) return;
     const base = fo.boss ? (fo.rage ? 0.08 : 0.07) : 0.03 + fo.rar * 0.014 + (fo.armed ? 0.02 : 0); // 第十九轮：BOSS 每刀 10%→7%（狂暴 8%）
-    const ws = fo.boss ? 0.45 : 0.34 + Math.min(0.2, fo.iq * 0.12);
+    const ws = fo.boss ? 0.45 : 0.46 + Math.min(0.2, fo.iq * 0.12);
     const hits = T.hits.map(([t, a, k]) => ({ t, a: a * D2R, ang: a * D2R, heavy: k === 'heavy', thrust: k === 'thrust' }));
     const act = f.play(clip, { once: true, fade: 0.12, speed: 1, restart: true }); if (!act) return; lastAtkAt = CLK; if (CTX.windup) try { CTX.windup(fo, clip); } catch (e) {}
     fo.atk = { clip, act, hits, hi: 0, ws, ws2: Math.min(1, ws * 1.7), end: Math.min(c.duration, T.end || c.duration), lunge: T.lunge || 0,
-      holdAt: Math.min(0.1, hits[0].t * 0.4), hold: fo.boss ? 0.3 : 0.34 - Math.min(0.14, fo.iq * 0.1), feint: !fo.boss && fo.iq > 0.8 && Math.random() < 0.14,
+      holdAt: Math.min(0.1, hits[0].t * 0.4), hold: fo.boss ? 0.3 : 0.26 - Math.min(0.1, fo.iq * 0.08), feint: !fo.boss && fo.iq > 0.8 && Math.random() < 0.14,
       reach: fo.armed ? 1.8 : 1.35, tot: 0, dmg: Math.max(1, Math.round(s.maxHp * base * (0.85 + Math.random() * 0.3))) };
     if (fo.role && window.FoeRoles) FoeRoles.tune(fo, fo.atk, d);
     if (fo.sayT <= 0 && Math.random() < 0.25) { if (fo.boss) talk(fo, '', '#ffb0a0'); else sayP(fo, 'fight', SAY.fight, '#ffb0a0'); } else if (!fo.boss && window.Persona && Math.random() < 0.5) Persona.line(fo, 'atk', true); // 第二十四轮：出手喝声
@@ -537,7 +541,7 @@ window.Foe = (() => {
         else if (fo.sayT <= 0 && Math.random() < 0.3) talk(fo, '……躲开了？'); }
     }
     act.timeScale = sc;
-    if (!A.hits[A.hi] && (ct >= A.end - 1e-3 || ct >= act.getClip().duration - 1e-3)) { fo.atk = null; fo.cd = (fo.boss ? (fo.rage ? 1.0 : 1.5) : 2.2) + Math.random() * Math.max(0.6, 2.4 - fo.iq); fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); if (fo.role && window.FoeRoles) FoeRoles.after(fo); }
+    if (!A.hits[A.hi] && (ct >= A.end - 1e-3 || ct >= act.getClip().duration - 1e-3)) { fo.atk = null; fo.cd = (fo.boss ? (fo.rage ? 1.0 : 1.5) : 1.15) + Math.random() * (fo.boss ? Math.max(0.6, 2.4 - fo.iq) : Math.max(0.5, 1.6 - fo.iq)); fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); if (fo.role && window.FoeRoles) FoeRoles.after(fo); }
     return { turnTo, spd };
   }
   // 给 HUD：正在蓄力/出手的敌人 → 来刀方向 + 进度（1 = 命中那一刻）
@@ -654,9 +658,10 @@ window.Foe = (() => {
       } else { fo.block = 0; side = 1.35; ctx.event && ctx.event('outflank', fo); } // 绕开格挡：破绽伤害
     }
     const q = ctx.power(fo), brk = fo.broken > 0, mult = (zone === 'head' ? 1.6 : zone === 'neck' ? 1.8 : /Arm|Leg/.test(zone) ? 0.7 : 1) * (brk ? 2 : 1) * side * (info.charged ? 2.2 : 1) * (info.mult || 1);
-    const dealt = Math.max(1, Math.round((fo.boss ? 11 : 12) * q * sp * mult * (slash ? 1 : 0.8) * (0.85 + Math.random() * 0.3)));
+    let dealt = Math.max(1, Math.round((fo.boss ? 11 : 12) * q * sp * mult * (slash ? 1 : 0.8) * (0.85 + Math.random() * 0.3)));
+    if (!fo.boss) dealt = Math.max(dealt, Math.round(fo.maxHp * 0.10 * sp * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：一记正常的砍至少削掉 ~10% 血
     const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.12; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk);
-    { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp); fo.pos.add(kv); } } // 击退
+    { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp); fo.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退：0.16 秒内推完（以前是一帧内整段位移 = “瞬移”）
     ctx.event && ctx.event('hit', fo, { dealt, zone, brk, kind: info.kind, spd, charged: info.charged });
     if (!fo.seen) { fo.seen = true; fo.state = fo.brave ? 'chase' : 'flee'; if (fo.boss) ctx.bossMeet(fo); }
     if (!fo.brave && Math.random() < 0.35) { fo.brave = true; fo.state = 'chase'; }
