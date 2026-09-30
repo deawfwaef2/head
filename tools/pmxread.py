@@ -6,7 +6,7 @@ class R:
     def arr(s,dt,n):
         a=np.frombuffer(s.b,dt,n,s.o); s.o+=a.nbytes; return a
 def read(path):
-    r=R(open(path,'rb').read()); assert r.u('4s')==b'PMX '
+    r=R(open(path,'rb').read()); assert r.u('4s')[:3]==b'PMX'
     ver=r.u('f'); n=r.u('B'); g=r.u('%dB'%n)
     enc='utf-16-le' if g[0]==0 else 'utf-8'; addUV=g[1]; vis,tis,mis,bis,mois,ris=g[2:8]
     def t(): l=r.u('i'); s=r.b[r.o:r.o+l].decode(enc,'replace'); r.o+=l; return s
@@ -103,6 +103,8 @@ def read_pmd(path):
     head_i = next((i for i, x in enumerate(bn) if x in ('頭', 'head')), -1)
     isHair = np.array([anc(i, ('髪', 'hair', 'Hair', 'アホ毛', 'ツインテ', 'テール', 'もみあげ', 'リボン')) for i in range(len(bones))])
     isHead = np.array([anc(i, ('頭',)) for i in range(len(bones))])
+    isTail = np.array([anc(i, ('尻尾', 'しっぽ', 'シッポ', 'tail', 'Tail')) for i in range(len(bones))])
+    isMouth = np.array([any(q in bn[i] for q in ('舌', 'tongue')) for i in range(len(bones))])
     isEye = np.array([any(q in bn[i] for q in ('目', 'eye')) and '目' in bn[i] for i in range(len(bones))])
     sk = lambda c: c[0] > 0.75 and 0.55 < c[1] < 0.95 and 0.45 < c[2] < 0.9 and c[0] >= c[1] >= c[2] and c[0] - c[2] > 0.08
     import os
@@ -119,13 +121,16 @@ def read_pmd(path):
         f = faces[fo // 3:(fo + fc) // 3]; fo += fc; vs = np.unique(f.ravel()) if len(f) else np.zeros(0, int); pb = V['b'][vs, 0] if len(vs) else np.zeros(0, int)
         pb = pb[pb < len(bones)]; fr = lambda A: float(A[pb].mean()) if len(pb) else 0.0
         hh, hr, he = fr(isHead), fr(isHair), fr(isEye); tl = tn.lower(); ti = -1
+        ht, hm = fr(isTail), fr(isMouth)
         if tn and not tl.endswith(('.sph', '.spa')): tex.append(tn); ti = len(tex) - 1
         col = [dif[0], dif[1], dif[2]]
         if ti >= 0 and len(vs):
             tc = texcol(tn, vs)
             if tc is not None: col = [float(tc[0]), float(tc[1]), float(tc[2])]
         cy = float(pos[vs, 1].mean()) if len(vs) else 0
-        if any(q in tl for q in ('face', 'kao', '顔')): c = '顔'
+        if ht > 0.4: c = 'cloth'  # 尾巴（八云蓝九尾）：建模姿势下高过肩，别切进头里
+        elif hm > 0.4: c = '歯'
+        elif any(q in tl for q in ('face', 'kao', '顔')): c = '顔'
         elif any(q in tl for q in ('hair', 'kami', '髪')): c = '髪'
         elif 'eye' in tl or '目' in tn or he > 0.5: c = '白目' if (min(col) > 0.9 and ti < 0) else '目'
         elif hr > 0.5 and hh > 0.5: c = '髪'

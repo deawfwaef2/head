@@ -9,9 +9,17 @@ pos = P['pos'] * S; pos[:, 2] *= -1
 nrm = P['nrm'].copy(); nrm[:, 2] *= -1
 def cls(n):
     if n.endswith('+') or 'spa' in n.lower() or 'sph' in n.lower() or n.lower().startswith('mmd_edge') or 'edge' in n.lower(): return None  # 描边外壳
+    if any(k in n for k in ('面具', '仮面', 'マスク', 'mask', 'Mask')): return 'cloth'  # 面具≠脸（“面”字会误中）
+    L = n.lower()
+    if any(k in L for k in ('eyebase', 'shirome', 'eye_white', 'eyewhite')): return '_EYE_EyeWhite'
+    if any(k in L for k in ('kurome', 'hitomi')): return '_EYE_Iris'
+    if any(k in L for k in ('matsuge', 'matuge', 'mabuta')): return '_FACE_Eyeline'
+    if L.startswith('mayu'): return '_FACE_Brow'
+    if L.startswith(('kao', 'mimi')): return 'FACE_SKIN'
+    if 'kami' in L and 'kazari' not in L: return '_HAIR'
     if any(k in n for k in ('白目', '眼白', 'eyewhite', 'EyeWhite')): return '_EYE_EyeWhite'
     if any(k in n for k in ('星', 'ハイライト', '高光', 'highlight', 'Highlight', 'hl')): return '_EYE_Highlight'
-    if any(k in n for k in ('脸红', '頬', '照れ', '红晕', 'cheek', '黑', '影', 'shadow')): return '_FACE_Cheek'
+    if any(k in n for k in ('脸红', '頬', '照れ', '红晕', 'cheek', '黑', '影', 'shadow', 'shade', '表情')): return '_FACE_Cheek'
     if '眉' in n or 'brow' in n.lower(): return '_FACE_Brow'
     if any(k in n for k in ('睫', '二重', 'まつ', '眼线', 'lash')): return '_FACE_Eyeline'
     if any(k in n for k in ('目', '眼', '瞳', 'eye', 'Eye')): return '_EYE_Iris'
@@ -52,6 +60,14 @@ def tex(ti):
     if ti < 0 or ti >= len(P['tex']): return None
     if ti in tcache: return tcache[ti]
     fp = os.path.join(base, P['tex'][ti].replace('\\', '/'))
+    if not os.path.exists(fp):  # Windows 模型：大小写不敏感（BodyA.png vs bodyA.png）
+        cur = base
+        for part in P['tex'][ti].replace('\\', '/').split('/'):
+            if not part or part == '.': continue
+            try: hit = [x for x in os.listdir(cur) if x.lower() == part.lower()]
+            except OSError: hit = []
+            cur = os.path.join(cur, hit[0] if hit else part)
+        fp = cur
     try:
         im = Image.open(fp); im.load(); im = im.convert('RGBA')
         if max(im.size) > 1024: s = 1024 / max(im.size); im = im.resize((int(im.size[0] * s), int(im.size[1] * s)), Image.LANCZOS)
@@ -85,13 +101,42 @@ J4 = P['bi'].clip(0).astype(np.uint16); W4 = (P['bw'] / np.maximum(P['bw'].sum(1
 A = {'POSITION': acc(p32, 'VEC3', 5126), 'NORMAL': acc(n32, 'VEC3', 5126), 'TEXCOORD_0': acc(uv, 'VEC2', 5126), 'JOINTS_0': acc(J4, 'VEC4', 5123), 'WEIGHTS_0': acc(W4, 'VEC4', 5126)}
 TG = [{'POSITION': acc(d, 'VEC3', 5126)} for d in D]
 G['accessors'][A['POSITION']]['min'] = p32.min(0).tolist(); G['accessors'][A['POSITION']]['max'] = p32.max(0).tolist()
-seen = {}
-for m in P['mats']:
+import re as _re
+TEXK = [(('eyesbase', 'white', 'shiro', 'eyewhite'), '白目'), (('matuge', 'lash', 'matsuge'), '睫'), (('blush', 'hoho', 'cheek'), '頬'), (('mayu', 'brow'), '眉'),
+        (('eye', 'hitomi', 'me_'), '目'), (('kao', 'face', 'head', 'kubi'), '顔'), (('kami', 'hair'), '髪'), (('mouth', 'kuchi', 'teeth', 'ha_'), '口'), (('skin', 'hada'), '肌')]
+def cls2(m):  # 材质名是“材質12 / mat3 / Material”这类通用名时，改看贴图文件名
     c = cls(m['name'])
-    if c is None or m['nf'] == 0 or m['color'][3] < 0.05: continue
+    if c != 'cloth' or not _re.fullmatch(r'(新規材質|材質|材质|mat|material|Material|Mat)[ _.]?\d*', m['name'].strip()) or not (0 <= m['tex'] < len(P['tex'])): return c
+    tn = os.path.basename(P['tex'][m['tex']].replace('\\', '/')).lower()
+    for ks, jp in TEXK:
+        if any(k in tn for k in ks): return cls(jp)
+    return c
+seen = {}
+# 脸皮并在身体皮肤材质里（结月缘 ver7「肌」、IA「skin」、秦始皇「body01」）：模型几乎没有独立脸皮时，按“三角形≥2个顶点主骨骼属于头”拆出脸皮
+_par = [b['parent'] for b in P['bones']]
+def _underHead(i, d=0):
+    while 0 <= i < len(_par) and d < 64:
+        if i == HEAD: return True
+        i = _par[i]; d += 1
+    return False
+_isH = np.array([_underHead(i) for i in range(len(_par))])
+_faceTot = sum(m['nf'] for m in P['mats'] if cls2(m) == 'FACE_SKIN')
+def _segs(m, c):
+    f = P['faces'][m['f0']:m['f0'] + m['nf']]
+    if _faceTot < 600 and (c == 'Body_SKIN' or (c == 'cloth' and _re.match(r'(body|Body|身体|体)', m['name']))):
+        hm = _isH[P['bi'][f, 0].clip(0, len(_par) - 1)].sum(1) >= 2
+        if hm.sum() > 100: return [('FACE_SKIN', f[hm]), (c, f[~hm])]
+    return [(c, f)]
+_jobs = []
+for m in P['mats']:
+    c0 = cls2(m)
+    if c0 is None or m['nf'] == 0 or m['color'][3] < 0.05: continue
+    for c, ff in _segs(m, c0): _jobs.append((m, c, ff))
+for m, c, ff in _jobs:
+    if len(ff) == 0: continue
     k = seen.get(c, 0); seen[c] = k + 1; name = c if k == 0 else '%s%d' % (c, k)
     if c == 'cloth': name = 'cloth_%d' % k
-    f = P['faces'][m['f0']:m['f0'] + m['nf']][:, [0, 2, 1]].astype(np.uint32)
+    f = ff[:, [0, 2, 1]].astype(np.uint32)
     mat = {'name': name, 'pbrMetallicRoughness': {'baseColorFactor': [1, 1, 1, float(m['color'][3])]}, 'doubleSided': bool(m['flag'] & 1)}
     t = tex(m['tex'])
     if not t:  # 无贴图材质（あにまさ式等老模型）：颜色全靠材质漫反射色 → 生成 4×4 纯色贴图（×1.2 近似 MMD 环境光补亮），让游戏的贴图路径（亮度/肤色修正）一致
@@ -102,7 +147,7 @@ for m in P['mats']:
         t = tcache[ck]
     if t:
         mat['pbrMetallicRoughness']['baseColorTexture'] = {'index': t[0]}
-        if t[1]: mat['alphaMode'] = 'BLEND' if 'Highlight' in c else 'MASK'; mat['alphaCutoff'] = 0.5
+        if t[1] and 'SKIN' not in c: mat['alphaMode'] = 'BLEND' if 'Highlight' in c else 'MASK'; mat['alphaCutoff'] = 0.5
     G['materials'].append(mat)
     pr = {'attributes': A, 'indices': acc(f.ravel(), 'SCALAR', 5125), 'material': len(G['materials']) - 1}
     if TG: pr['targets'] = TG

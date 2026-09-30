@@ -5,7 +5,11 @@
   var P = window.HEAD_PACKS = {
     pack_hsr: ['HSR_Kafka', 'HSR_Himeko', 'HSR_BlackSwan', 'HSR_Acheron', 'HSR_Jingliu', 'HSR_RuanMei', 'HSR_Aglaea', 'HSR_Castorice', 'HSR_Tingyun', 'HSR_Hysilens', 'HSR_Feixiao', 'HSR_Robin'],
     pack_zzz: ['ZZZ_ZhuYuan', 'ZZZ_JaneDoe', 'ZZZ_TsukishiroYanagi', 'ZZZ_HoshimiMiyabi', 'ZZZ_AstraYao', 'ZZZ_EvelynChevalier', 'ZZZ_VivianBanshee', 'ZZZ_Yixuan', 'ZZZ_Isolde', 'ZZZ_Orchidea', 'ZZZ_Lucia'],
-    pack_nte: ['NTE_Hathor', 'NTE_Fadia', 'NTE_Lacrimosa', 'NTE_Jiuyuan', 'NTE_Shinku', 'NTE_Zankou', 'NTE_Blackbird', 'NTE_Alphard', 'NTE_Nanally']
+    pack_nte: ['NTE_Hathor', 'NTE_Fadia', 'NTE_Lacrimosa', 'NTE_Jiuyuan', 'NTE_Shinku', 'NTE_Zankou', 'NTE_Blackbird', 'NTE_Alphard', 'NTE_Nanally'],
+    // 第二十七轮：经典日系 MMD（あにまさ / YYB / Tda 等大师作品，均为非 CC0 → 仅私人使用）
+    pack_voc: ['CLS_MikuAnimasa', 'CLS_MikuYYB10', 'CLS_MikuRacing', 'CLS_MikuVBS', 'CLS_HakuAnimasa', 'CLS_KaitoAnimasa', 'CLS_MeikoAnimasa', 'CLS_IA', 'CLS_Yukari'],
+    pack_touhou: ['CLS_Mokou', 'CLS_Kaguya', 'CLS_YakumoRan', 'CLS_YakumoYukari'],
+    pack_cls: ['CLS_RemTda', 'CLS_Tohru', 'CLS_2B', 'CLS_Mikasa', 'CLS_Junko', 'CLS_Brahma', 'CLS_QinYYB', 'CLS_LLHonoka', 'CLS_LLEri', 'CLS_LLKotori', 'CLS_LLUmi', 'CLS_LLMaki', 'CLS_LLNozomi']
   };
   var on = function (id) { try { return !window.Mods || Mods.on(id); } catch (e) { return true; } };
   var html = '';
