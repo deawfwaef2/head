@@ -1,5 +1,9 @@
 # 模型来源、授权与公开发布状态
 
+## R38：CC0 模式（MOD `cc0_only`，默认开）
+开启时游戏里只出现 **CC0（公有领域）** 人物模型：头 = Sendagaya_Shino、Sendagaya_Shibu、Darkness_Shibu、Vivi、Vita、Victoria_Rubin、HairSample_Female、AvatarSample_D_Darkness、Base_Female；身体 = Vita、Victoria_Rubin、Darkness_Shibu、HairSample_Female（均为 pixiv Inc. CC0）。
+注意：pixiv 官方说明 AvatarSample_A/B/C（及 K/L/S 等样本）**不是 CC0**，只是“样本条款”，因此不在 CC0 模式内。动作（Quaternius UAL）、野兽/道具（Quaternius）、场景（Poly Haven）本来就是 CC0。关闭 CC0 模式才会加载下面其它许可的模型（含仅限私人使用者）。
+
 ## 当前随机池：公开仓库可用（按表中原许可署名/遵守条件）
 
 下表中的基础脸与发型会被组合，角色卡显示该角色实际使用的脸模/发型来源。它们都已收录在本仓库的 `models/` 中；不代表作者对游戏剧情背书。分发时请连同本文件保留。
