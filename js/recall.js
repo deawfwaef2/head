@@ -376,7 +376,7 @@ window.Recall = (() => {
     // 表情
     const exb = V.mode === 'act' ? V.exT : V.exT, sp = 1 - Math.exp(-dt * 9), cur = V.ex;
     for (const k of EXK) { let tg = exb[k] || 0; if (k === 'blink' && V.mode !== 'act' || k === 'blink' && V.act === 'stare') tg = Math.max(tg, V.blinkNow * 0.9); cur[k] = (cur[k] || 0) + (tg - (cur[k] || 0)) * sp; }
-    hb.setExpression(cur); hb.setSway(V.sway);
+    if (!(window.Mods && Mods.on('recall_iw'))) hb.setExpression(cur); hb.setSway(V.sway); /* R33：首级已死，不变表情（MOD recall_iw 开时旧界面也不动表情） */
     // 魂光 / 生前
     const L = S.rec.look || {}; const k = 1 - V.alive; hb.U.dull.value = (L.glowEye ? 0.08 : 0.4) * k; hb.U.blood.value = (L.blood || 0) * k; hb.U.spat.value = (L.spat || 0) * k; hb.U.pale.value = (L.pale || 0) * k;
     lights.fire.intensity = V.glow * (1.6 + Math.sin(t * 17) * 0.4);
@@ -412,5 +412,5 @@ window.Recall = (() => {
     window.SFX && SFX.duck && SFX.duck(false); const G = GG(); G.setUI && G.setUI(false); G.save && G.save(); if (window.UI && UI.refresh) UI.refresh(); G.lockPointer && G.lockPointer();
     S.cb && S.cb.onClose && S.cb.onClose();
   }
-  return { _dbg: () => ({ V, S, rig, pivot, cam, hb, handG, R, scene }), open, close, nm, known, reveal, log, hurtBy, card, FAC, ACT, fightHTML, fightBrief, nKnown, tag, on: modOn, get active() { return S.open; }, _S: S, _V: V };
+  return { _dbg: () => ({ V, S, rig, pivot, cam, hb, handG, R, scene }), narrate, chessHTML, cardHTML, hasB, bn, adorn, FK, open, close, nm, known, reveal, log, hurtBy, card, FAC, ACT, fightHTML, fightBrief, nKnown, tag, on: modOn, get active() { return S.open; }, _S: S, _V: V };
 })();

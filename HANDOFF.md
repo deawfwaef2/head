@@ -1288,3 +1288,18 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   - 稻草人脱粒机（首级插斧柄上当稻草人，横杆转）/ 女王盆栽（种进花槽，花随进度长，E 水壶浇头）/ 狼嚎图腾（三兽首托着，E 仰头嚎）/ 圣水喷泉（哥特柜当祭台，嘴里喷粒子水弧进木桶，E 拍后脑勺）/ 魔女大坩埚（压在锅盖上颠，E 搅成陀螺）/ 元帅督造锻炉（坐镇酒桶，铁锤砸台钳溅火星）/ 女王纺车（当线轴转，丝线粒子）/ 深渊凝视炉（悬浮，黑曜碎片环绕，E 紫闪+碎片炸开）/ 龙骨风铃（梯子顶吊水晶灯，首级在下面荡，E 大幅摆动+铃声）。全部用 assets/ 与 props_pack 的 CC0 模型，粒子弧只是特效。
 - 测试：`tools/test/regecon_mach.html`（假 G + 球形假头，红鼻子=朝向；`#poke` 看督工动画，`#only=forest,peak`，`#far`/`#close`）。file:// 直接开。
 - 注意：新建筑放头的朝向 yaw=0（面向建筑正面 +z）；`U.seat` 在 make() 里按模型实际尺寸算，并回写 `C[key].mount.slots[0]`。
+---
+## R33 回忆 F 界面重做（MOD `recall_iw`，默认开）
+用户反馈：不要新开 3D 界面，要原场景换镜头；UI 信息不清晰；主角手/动作不行；死去的首级不能变表情；没音效；没有把玩动作。
+- **新文件 `js/recall_iw.js`**（`window.RecallIW`）：包裹 `Recall.open`。MOD 开且首级在场景里（或在库房→自动 `G.takeOut`）时走原场景模式；`Worlds.active` 或 MOD 关时回退旧界面。
+  - 镜头：用 `G.HOOK.pre`（相机已按玩家设置、渲染前）叠加相机偏移/俯仰/FOV；首级位置=相机局部坐标，按包围盒中心补偿，姿势整体按首级高度/0.26 缩放（`S.k`）。
+  - 手：`limb_hand_avatar` 克隆×2（左手镜像）+ 前臂圆柱与袖口，挂在相机上。关键帧动作：对视/抚摸/嗅闻/贴耳/那一战 + 把玩（抛接/转一圈/戳脸颊/拍拍头）+ 建筑动作（茶话/照魔镜/梳妆/鉴魂/棋谱/牌局，通灵直接调 `Seance.open`）。
+  - 音效：`snd(k)` 用 `SFX.ctx/SFX.out` 合成 + 已有采样，每个动作都有提示音（32 个键已无头测试）。
+  - UI：`#riw` 覆盖层——左侧信息卡（未知条目显示“？？？ + 解锁方式”）、底部动作栏（1–9,0 分组 回忆/把玩/建筑）、字幕、进度条、✕。`body.riw-on` 隐藏准星/提示/HUD。把玩或拖动转动累计 8 次揭示“饰物与印记”。
+  - 调试开关：`RecallIW._S.freeze / .snap`（截图用），`RecallIW._snd`。
+- **改动他人文件**：
+  - `js/recall.js`：导出增加 `narrate, chessHTML, cardHTML, hasB, bn, adorn, FK`；MOD 开时 `loop` 里不再 `hb.setExpression`（首级不变表情）。
+  - `index.html`：在 `js/recall.js` 后加 `<script src="js/recall_iw.js">`。
+  - `js/mods.js`：在 `head_qc` 后加 `recall_iw` 条目。
+  - `game.js` 未改（主循环只看 `Recall.active`，原场景模式下保持 false；持头插值被 pre 覆盖）。
+- 测试工具：`bak/tools/riw.py`（按动作/时间截图，`FUNC=1` 跑按键功能测试），`mk_r.py`（保留手部资源的轻量测试页）。
