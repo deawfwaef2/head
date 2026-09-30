@@ -309,6 +309,7 @@ window.Mods = (() => {
     box.querySelector('.cnt').textContent = `${LIST.filter(m => st[m.id]).length} / ${LIST.length} 已开启`;
     if (keepScroll) box.querySelector('.ls').scrollTop = y;
   }
+  if (window.I18N && I18N.onChange) I18N.onChange(() => { try { if (box && box.isConnected && box.style.display !== 'none') refresh(); } catch (e) { } }); // R40：切换语言时面板重绘
   function open() {
     css(); if (box) box.remove();
     if (document.pointerLockElement) document.exitPointerLock();
