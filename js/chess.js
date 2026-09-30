@@ -161,26 +161,54 @@ window.Chess = (() => {
   let el = null, R = null, scene, cam, raf = 0, st = null, lastT = 0;
   const hitList = [];
   const css = `
-  #chess{position:fixed;inset:0;z-index:30;display:none;background:#07050a;font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;color:#f0e2c8;user-select:none}
+  #chess{position:fixed;inset:0;z-index:30;display:none;background:#07050a;font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;color:#f0e2c8;user-select:none;overflow:hidden}
   #chess canvas.c3{position:absolute;inset:0;width:100%;height:100%}
-  #chess .ch-top{position:absolute;left:50%;top:14px;transform:translateX(-50%);text-align:center;pointer-events:none}
-  #chess .ch-title{font-size:24px;font-weight:900;letter-spacing:4px;text-shadow:0 2px 10px #000}
-  #chess .ch-turn{margin-top:4px;font-size:16px;padding:4px 16px;border-radius:20px;background:rgba(20,12,8,.75);border:1px solid #6a4a2e;display:inline-block}
-  #chess .ch-side{position:absolute;right:14px;top:14px;width:290px;max-height:calc(100% - 100px);overflow:auto;background:rgba(18,11,8,.82);border:1px solid #5a3e28;border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.6}
-  #chess .ch-side h4{margin:4px 0 6px;color:#ffcf7a;font-size:14px}
-  #chess .ch-snik{display:flex;gap:10px;align-items:flex-start;background:rgba(60,90,30,.18);border:1px solid #4a6a2a;border-radius:10px;padding:8px;margin-bottom:8px;min-height:54px}
-  #chess .ch-snik b{color:#b8e070}
-  #chess .ch-log{font-size:12px;color:#c8b090;max-height:220px;overflow:auto}
-  #chess .ch-info{position:absolute;left:14px;top:14px;width:300px;background:rgba(18,11,8,.82);border:1px solid #5a3e28;border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.6;display:none}
-  #chess .ch-info .n{font-size:17px;font-weight:900}
-  #chess .ch-bot{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:8px}
-  #chess button{font:inherit;font-size:15px;font-weight:800;padding:9px 18px;border-radius:10px;border:1px solid #6a4a2e;background:#2e1e14;color:#eadcc4;cursor:pointer}
+  #chess .ch-vig{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s;background:radial-gradient(ellipse at 50% 50%,transparent 45%,rgba(255,20,30,.55) 100%)}
+  #chess .ch-top{position:absolute;left:50%;top:10px;transform:translateX(-50%);text-align:center;pointer-events:none;width:min(520px,44vw)}
+  #chess .ch-title{font-size:15px;letter-spacing:5px;color:#d8b888;text-shadow:0 2px 8px #000}
+  #chess .ch-turn{margin:5px auto 0;font-size:20px;font-weight:900;padding:5px 22px;border-radius:26px;background:rgba(20,12,8,.82);border:2px solid var(--tc,#ff9a5a);color:#fff3e0;display:inline-block;box-shadow:0 0 18px var(--tc,#ff9a5a);transition:all .3s}
+  #chess .ch-turn.me{animation:chpulse 1.6s ease-in-out infinite}@keyframes chpulse{50%{box-shadow:0 0 30px var(--tc,#ff9a5a),0 0 4px var(--tc,#ff9a5a) inset}}
+  #chess .ch-bar{margin:8px auto 0;height:10px;border-radius:6px;overflow:hidden;display:flex;background:#0008;border:1px solid #ffffff30;width:100%}
+  #chess .ch-bar i{display:block;height:100%;transition:width .7s cubic-bezier(.2,.8,.2,1)}#chess .ch-bar .a{background:linear-gradient(90deg,#ff7a4a,#ffb070)}#chess .ch-bar .b{background:linear-gradient(90deg,#70b8ff,#3a78d8)}
+  #chess .ch-barl{display:flex;justify-content:space-between;font-size:12px;margin-top:3px;color:#d8c8a8;text-shadow:0 1px 4px #000}
+  #chess .ch-col{position:absolute;top:10px;bottom:70px;width:clamp(200px,17.5vw,270px);display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  #chess .ch-col.l{left:10px}#chess .ch-col.r{right:10px}
+  #chess .pn{background:rgba(16,10,7,.86);border:1px solid #6a4a2e;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.6;pointer-events:auto;backdrop-filter:blur(3px)}
+  #chess .pn h4{margin:0 0 6px;color:#ffcf7a;font-size:13px;letter-spacing:2px;font-weight:700}
+  #chess .ic{border-color:var(--c,#6a4a2e);box-shadow:0 0 16px -4px var(--c,#0000);transition:opacity .2s}
+  #chess .ic-h{display:flex;gap:10px;align-items:center}#chess .ic-g{font-size:34px;line-height:1;color:var(--c);text-shadow:0 0 12px var(--c)}
+  #chess .ic-h b{font-size:19px;color:var(--c);display:block;line-height:1.2}#chess .ic-h small{color:#c8b090;font-size:12px}
+  #chess .ic-mv{display:grid;grid-template-columns:repeat(8,1fr);gap:1px;margin:8px auto;width:min(100%,168px);aspect-ratio:1;background:#0008;padding:2px;border-radius:6px}
+  #chess .ic-mv i{display:block;background:#2a1e18;border-radius:1px;position:relative}#chess .ic-mv i:nth-child(odd){background:#33261e}
+  #chess .ic-mv i.m::after,#chess .ic-mv i.x::after,#chess .ic-mv i.me::after{content:"";position:absolute;inset:22%;border-radius:50%;background:#7aff9a}
+  #chess .ic-mv i.x::after{background:#ffd040;transform:rotate(45deg);border-radius:2px;inset:18%;box-shadow:0 0 6px #ffd040}#chess .ic-mv i.me::after{background:var(--c);inset:8%;box-shadow:0 0 8px var(--c)}
+  #chess .ic-t{font-size:13px}#chess .ic-t b{color:#ffe0a0}#chess .ic-x{margin-top:5px;color:#ffd040;font-size:12px}#chess .ic-q{margin-top:6px;color:#c8b090;font-size:12px;font-style:italic}
+  #chess .ic-tip{color:#b8a080;font-size:12px}
+  #chess .ch-snik{display:flex;gap:10px;align-items:flex-start;background:rgba(40,64,20,.55);border-color:#4a6a2a}
+  #chess .ch-snik b{color:#b8e070}#chess .ch-say{font-size:13px;min-height:2.6em}
+  #chess .ch-cap{display:flex;flex-wrap:wrap;gap:4px;min-height:22px}#chess .ch-cap span{padding:1px 6px;border-radius:10px;background:#0008;border:1px solid var(--c);color:var(--c);font-size:12px;animation:chpop .4s}
+  @keyframes chpop{from{transform:scale(2);opacity:0}}
+  #chess .ch-logw{flex:1;min-height:0;display:flex;flex-direction:column}#chess .ch-log{font-size:12.5px;color:#d8c4a4;overflow:auto;flex:1;line-height:1.75}
+  #chess .ch-log div{padding:0 2px;border-left:3px solid var(--c);padding-left:6px;margin-bottom:1px}#chess .ch-log div:last-child{background:#ffffff14}
+  #chess .ch-bot{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:8px}
+  #chess button{font:inherit;font-size:14px;font-weight:800;padding:8px 16px;border-radius:10px;border:1px solid #6a4a2e;background:#2e1e14;color:#eadcc4;cursor:pointer}
   #chess button:hover{background:#4a2e1c;border-color:#b08050}
   #chess button.red{background:linear-gradient(180deg,#a01810,#600a06);border-color:#ff6a4a}
-  #chess .ch-help{position:absolute;left:14px;bottom:14px;font-size:12px;color:rgba(240,226,200,.55);pointer-events:none}
+  #chess .ch-help{position:absolute;left:12px;bottom:12px;font-size:12px;color:rgba(240,226,200,.6);pointer-events:none;max-width:24vw;line-height:1.5}
+  #chess .ch-leg{position:absolute;inset:0;display:none;place-items:center;background:#000a;z-index:3}#chess .ch-leg.on{display:grid}
+  #chess .ch-leg>div{width:min(620px,92vw);max-height:84vh;overflow:auto}#chess .ch-leg p{margin:3px 0;font-size:14px}
+  #chess .ch-tag{position:absolute;transform:translate(-50%,-100%);padding:3px 10px;border-radius:12px;background:#140c08e8;border:1px solid var(--c);color:var(--c);font-size:13px;font-weight:700;white-space:nowrap;pointer-events:none;display:none;box-shadow:0 0 12px -2px var(--c)}
+  #chess .ch-bub{position:absolute;transform:translate(-50%,-100%);max-width:200px;padding:6px 10px;border-radius:12px 12px 12px 2px;background:#fff6e4;color:#2a1a10;font-size:14px;font-weight:600;line-height:1.4;pointer-events:none;box-shadow:0 4px 14px #000a;border:2px solid var(--c);animation:chbub .25s}
+  @keyframes chbub{from{opacity:0;margin-top:14px}}
+  #chess .ch-fl{position:absolute;font-size:22px;font-weight:900;color:var(--c);text-shadow:0 0 10px var(--c),0 2px 0 #000,0 0 3px #000;pointer-events:none;animation:chfl 1.3s ease-out forwards;white-space:nowrap}
+  @keyframes chfl{0%{transform:translate(-50%,-30%) scale(.3);opacity:0}15%{transform:translate(-50%,-70%) scale(1.3);opacity:1}100%{transform:translate(-50%,-260%) scale(1);opacity:0}}
+  #chess .ch-flash{position:absolute;left:50%;top:32%;transform:translate(-50%,-50%);font-size:clamp(40px,6vw,84px);font-weight:900;letter-spacing:10px;color:var(--c,#ffd890);text-shadow:0 0 34px var(--c,#ff8040),0 5px 0 #2a0a06;pointer-events:none;opacity:0;text-align:center}
+  #chess .ch-flash.on{animation:chflash 1.5s ease-out}@keyframes chflash{0%{opacity:0;transform:translate(-50%,-50%) scale(2.4)}14%{opacity:1;transform:translate(-50%,-50%) scale(1)}70%{opacity:1}100%{opacity:0;transform:translate(-50%,-62%) scale(1.05)}}
+  #chess .ch-flash small{display:block;font-size:.26em;letter-spacing:3px;color:#ffe8c0}
   #chess .ch-banner{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-size:56px;font-weight:900;letter-spacing:8px;text-shadow:0 0 30px rgba(255,120,40,.7),0 4px 0 #3a0a06;opacity:0;transition:opacity .4s;pointer-events:none;text-align:center}
   #chess .ch-banner small{display:block;font-size:20px;letter-spacing:2px;color:#ffd890}
   #chess .ch-banner.on{opacity:1}
+  #chess .ch-log .mn{opacity:.45;margin-right:5px;font-size:11px}#chess .ch-log em{color:#ff8a6a;font-style:normal}#chess .ch-log .cp{background:#ff3a2a14}
   #chlobby{position:fixed;inset:0;z-index:31;display:flex;align-items:center;justify-content:center;background:rgba(6,3,2,.8);font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;color:#f0e2c8}
   #chlobby .box{width:min(1100px,96vw);max-height:92vh;overflow:auto;background:linear-gradient(180deg,#24160f,#140c08);border:2px solid #6a4a2e;border-radius:20px;padding:18px 22px}
   #chlobby h2{margin:0 0 4px;font-size:28px}#chlobby .sub{color:#b09070;font-size:14px;margin-bottom:10px}
@@ -236,23 +264,24 @@ window.Chess = (() => {
     if (t === 'Q' || t === 'A') { for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; const b = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), t === 'A' ? m.gold : mat); b.position.set(Math.cos(a) * 0.17, 0.87, Math.sin(a) * 0.17); g.add(b); } }
     if (t === 'R') { for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; const b = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.06), mat); b.position.set(Math.cos(a) * 0.18, 0.69, Math.sin(a) * 0.18); b.rotation.y = -a; g.add(b); } }
     return g; }
-  function glyphSprite(t, side) { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.font = 'bold 96px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = side ? '#4aa8ff' : '#ff6a3a'; g.shadowBlur = 18; g.fillStyle = side ? '#d8e8ff' : '#fff0d8'; g.fillText(GLYPH[t], 64, 70);
-    const tx = new THREE.CanvasTexture(c); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, transparent: true, depthWrite: false, opacity: 0.85 })); sp.scale.setScalar(0.34); return sp; }
-  function headPiece(p) { const m = mats(), g = new THREE.Group(), side = p.s;
-    // 底座：黑曜石/白骨柱 + 天鹅绒垫，高度按走法
-    const hgt = { P: 0.16, N: 0.22, B: 0.26, R: 0.24, Q: 0.3, A: 0.32, K: 0.34 }[p.t];
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 0.08, 28), side ? m.obs : m.bone); base.position.y = 0.04; base.castShadow = true; g.add(base);
-    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.22, hgt, 20), side ? m.obs : m.bone); col.position.y = 0.08 + hgt / 2; col.castShadow = true; g.add(col);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.025, 8, 28), m.gold); ring.rotation.x = Math.PI / 2; ring.position.y = 0.09 + hgt; g.add(ring);
-    const cush = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.2, 0.05, 24), side ? m.velvetB : m.velvetW); cush.position.y = 0.105 + hgt; g.add(cush);
-    const top = 0.13 + hgt;
-    let hb = null;
-    try { hb = ModelHeads.create(p.rec.look); const S = 2.6; hb.group.scale.setScalar(S); const meta = hb.meta || {}, cut = meta.cut || { x: 0, y: meta.bottom || -0.1, z: 0 };
-      hb.group.position.set(-(cut.x || 0) * S, top - cut.y * S - 0.01, -(cut.z || 0) * S); // 面朝 +z（镜头/红方一侧），看得见脸 // 双方都面朝镜头一侧（+z），红方看得见脸，蓝方面朝红方
-      hb.group.traverse(o => { if (o.isMesh) o.castShadow = true; }); g.add(hb.group);
+  // 第二十七轮：棋子 = 只有头（没有底座）。脚下只有一圈队色光环 + 软阴影；头悬浮微微起伏，始终转向镜头；头顶是清晰的“棋种徽章”。
+  function glyphSprite(t, side, rar) { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const col = RCOL[Math.min(4, rar || 0)];
+    g.beginPath(); g.arc(64, 64, 56, 0, 7); g.fillStyle = 'rgba(16,10,8,.9)'; g.fill(); g.lineWidth = 10; g.strokeStyle = side ? '#5ab0ff' : '#ff8a52'; g.stroke();
+    g.lineWidth = 3; g.strokeStyle = col; g.beginPath(); g.arc(64, 64, 45, 0, 7); g.stroke();
+    g.font = 'bold 66px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff3dc'; g.shadowColor = col; g.shadowBlur = 10; g.fillText(GLYPH[t], 64, 70);
+    const tx = new THREE.CanvasTexture(c); tx.encoding = THREE.sRGBEncoding; const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, transparent: true, depthWrite: false, depthTest: false })); sp.renderOrder = 10; sp.scale.setScalar(0.36); return sp; }
+  function headPiece(p) { const g = new THREE.Group(), side = p.s, yaw = new THREE.Group(); g.add(yaw); g.userData.yaw = yaw;
+    const tc = side ? '#5ab0ff' : '#ff8a52';
+    const shd = new THREE.Mesh(new THREE.CircleGeometry(0.3, 24), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.42, depthWrite: false })); shd.rotation.x = -Math.PI / 2; shd.position.y = 0.008; g.add(shd); g.userData.shadow = shd;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.375, 40), new THREE.MeshBasicMaterial({ color: tc, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide })); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.012; g.add(ring); g.userData.ring = ring;
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(0.3, 32), new THREE.MeshBasicMaterial({ color: tc, transparent: true, opacity: 0.16, depthWrite: false })); disc.rotation.x = -Math.PI / 2; disc.position.y = 0.011; g.add(disc);
+    const top = 0.06; let hb = null;
+    try { hb = ModelHeads.create(p.rec.look); const S = 3.0; hb.group.scale.setScalar(S); const meta = hb.meta || {}, cut = meta.cut || { x: 0, y: meta.bottom || -0.1, z: 0 };
+      hb.group.position.set(-(cut.x || 0) * S, top - cut.y * S, -(cut.z || 0) * S); // 面朝 +z，yaw 组负责转向镜头
+      hb.group.traverse(o => { if (o.isMesh) o.castShadow = true; }); yaw.add(hb.group);
     } catch (e) { console.warn('chess head', e); }
-    const gs = glyphSprite(p.t, side); gs.position.y = top + 0.78; g.add(gs); g.userData.glyph = gs;
-    if (p.rec.c.shiny || p.rec.c.rar >= 3) { const lt = new THREE.PointLight(p.rec.c.shiny ? '#fff2b0' : RCOL[p.rec.c.rar], 0.5, 1.4); lt.position.y = top + 0.4; g.add(lt); }
+    const gs = glyphSprite(p.t, side, p.rec.c.rar); gs.position.y = top + 0.9; yaw.add(gs); g.userData.glyph = gs;
+    if (p.rec.c.shiny || p.rec.c.rar >= 3) { const lt = new THREE.PointLight(p.rec.c.shiny ? '#fff2b0' : RCOL[p.rec.c.rar], 0.5, 1.4); lt.position.y = top + 0.4; yaw.add(lt); }
     g.userData.hb = hb; return g; }
 
   function sqPos(i) { return new V3((i & 7) - 3.5, 0, 3.5 - (i >> 3)); }
@@ -304,13 +333,18 @@ window.Chess = (() => {
     if (el) return;
     const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s);
     el = document.createElement('div'); el.id = 'chess';
-    el.innerHTML = `<canvas class="c3"></canvas><div class="ch-top"><div class="ch-title">♟ 头棋殿</div><div class="ch-turn"></div></div>
-      <div class="ch-info"></div>
-      <div class="ch-side"><div class="ch-snik"><div style="font-size:30px">🧌</div><div><b>斯尼克</b><div class="ch-say">嘿嘿，摆好你的脑袋们。</div></div></div><h4>棋谱</h4><div class="ch-log"></div><h4>走法（按魂阶）</h4><div class="ch-leg" style="font-size:12px;color:#c8a878"></div></div>
-      <div class="ch-bot"><button data-a="flip">🔄 翻转视角</button><button data-a="undo">↩ 悔棋</button><button data-a="resign" class="red">🏳 认输</button><button data-a="quit">离开</button></div>
-      <div class="ch-help">左键：选子 / 走子 · 右键拖动 / Q E：旋转镜头 · 滚轮：缩放 · Esc：离开</div><div class="ch-banner"></div>`;
+    el.innerHTML = `<canvas class="c3"></canvas><div class="ch-vig"></div>
+      <div class="ch-top"><div class="ch-title">♟ 头棋殿</div><div class="ch-turn"></div><div class="ch-bar"><i class="a" style="width:50%"></i><i class="b" style="width:50%"></i></div><div class="ch-barl"><span class="ba"></span><span>子力对比</span><span class="bb"></span></div></div>
+      <div class="ch-col l"><div class="pn ic"></div></div>
+      <div class="ch-col r"><div class="pn ch-snik"><div style="font-size:30px">🧌</div><div><b>斯尼克</b><div class="ch-say">嘿嘿，摆好你的脑袋们。</div></div></div><div class="pn"><h4>战果 · 被吃掉的棋子</h4><div class="ch-cap a" style="--c:#ffb070"></div><div class="ch-cap b" style="--c:#70b8ff;margin-top:5px"></div></div><div class="pn ch-logw"><h4>棋谱</h4><div class="ch-log"></div></div></div>
+      <div class="ch-tag"></div><div class="ch-flash"></div>
+      <div class="ch-bot"><button data-a="flip">🔄 翻转视角</button><button data-a="undo">↩ 悔棋</button><button data-a="leg">📖 走法表</button><button data-a="resign" class="red">🏳 认输</button><button data-a="quit">离开</button></div>
+      <div class="ch-help">左键选子 / 走子 · 右键拖动、Q E 旋转 · 滚轮缩放 · Esc 离开<br>绿点=可走 · 红圈=可吃 · <span style="color:#ffd040">金菱=她专属的特殊棋路</span> · 红框=正被威胁</div>
+      <div class="ch-leg"><div class="pn"></div></div><div class="ch-banner"></div>`;
     document.body.appendChild(el);
-    el.querySelector('.ch-leg').innerHTML = ['P', 'N', 'B', 'R', 'Q', 'A'].map((t, i) => `<div><b style="color:${RCOL[Math.min(4, i)]}">${GLYPH[t]} ${i < 5 ? RNAME[i] : '异色/双印神魂'} → ${NAME[t]}</b>：${MOVE_DESC[t]}</div>`).join('') + `<div><b>${GLYPH.K} 首领</b>：${MOVE_DESC.K}</div>`;
+    el.querySelector('.ch-leg .pn').innerHTML = '<h4>走法表（按魂阶）· 点空白处关闭</h4>' + ['P', 'N', 'B', 'R', 'Q', 'A'].map((t, i) => `<p><b style="color:${RCOL[Math.min(4, i)]}">${GLYPH[t]} ${i < 5 ? RNAME[i] : '异色/双印神魂'} → ${NAME[t]}</b>：${MOVE_DESC[t]}</p>`).join('') + `<p><b>${GLYPH.K} 首领</b>：${MOVE_DESC.K}</p><p style="color:#ffd040">✦ 每颗首级还有自己的“棋路”：在常规走法之外多出几格特殊落点（金菱）。</p>`;
+    el.querySelector('.ch-leg').addEventListener('click', e => { if (!e.target.closest('button')) el.querySelector('.ch-leg').classList.remove('on'); });
+    el.querySelector('.ic').innerHTML = '';
     R = new THREE.WebGLRenderer({ canvas: el.querySelector('canvas'), antialias: true });
     R.outputEncoding = THREE.sRGBEncoding; R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.05; R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap;
     el.addEventListener('contextmenu', e => e.preventDefault());
@@ -318,7 +352,7 @@ window.Chess = (() => {
     addEventListener('mousemove', onMove); addEventListener('mouseup', () => { if (st) st.drag = null; });
     el.querySelector('canvas').addEventListener('wheel', e => { if (!st) return; st.cam.d = Math.max(6, Math.min(20, st.cam.d * (e.deltaY > 0 ? 1.08 : 0.93))); }, { passive: true });
     el.querySelector('.ch-bot').addEventListener('click', e => { const a = e.target.closest('button'); if (!a || !st) return; const k = a.dataset.a;
-      if (k === 'flip') st.cam.tt += Math.PI; if (k === 'quit') close(); if (k === 'resign') { if (!st.over) finish(1 - st.turn, '认输'); } if (k === 'undo') undo(); });
+      if (k === 'flip') st.cam.tt += Math.PI; if (k === 'leg') el.querySelector('.ch-leg').classList.toggle('on'); if (k === 'quit') close(); if (k === 'resign') { if (!st.over) finish(1 - st.turn, '认输'); } if (k === 'undo') undo(); });
     addEventListener('resize', resize);
   }
   function resize() { if (!R || !st) return; R.setPixelRatio(Math.min(devicePixelRatio, 1.5)); R.setSize(innerWidth, innerHeight, false); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); }
@@ -329,23 +363,72 @@ window.Chess = (() => {
   function onDown(e) { if (!st) return; if (e.button === 2 || e.button === 1) { st.drag = { x: e.clientX, y: e.clientY }; return; }
     if (st.over || st.busy || !human(st.turn)) return; const sq = pick(e); if (sq < 0) return;
     if (st.sel >= 0 && st.targets.includes(sq)) { doMove([st.sel, sq]); return; }
-    if (st.T[sq] && st.S[sq] === st.turn) { st.sel = sq; st.targets = gen(st.T, st.S, st.turn).filter(m => m[0] === sq).map(m => m[1]); SFX.click && SFX.click(); showInfo(sq); markTargets(); }
-    else { st.sel = -1; st.targets = []; markTargets(); } }
-  function onMove(e) { if (!st) return; if (st.drag) { st.cam.tt -= (e.clientX - st.drag.x) * 0.006; st.cam.tp = Math.max(0.35, Math.min(1.35, st.cam.tp + (e.clientY - st.drag.y) * 0.004)); st.drag.x = e.clientX; st.drag.y = e.clientY; return; }
-    if (e.target !== el.querySelector('canvas')) return; const sq = pick(e); if (sq !== st.hover) { st.hover = sq; if (sq >= 0 && st.T[sq]) showInfo(sq); else if (st.sel >= 0) showInfo(st.sel); else el.querySelector('.ch-info').style.display = 'none'; } }
-  function showInfo(sq) { const p = st.pieces.find(q => q.alive && q.sq === sq); const box = el.querySelector('.ch-info'); if (!p) { box.style.display = 'none'; return; }
-    const t = st.T[sq];
-    if (p.rec) { const c = p.rec.c; box.innerHTML = `<div class="n" style="color:${RCOL[c.rar]}">${GLYPH[t]} ${esc(NM(c))}</div><div>${RNAME[c.rar]}${c.shiny ? ' · ✨异色' : ''} · ${esc(c.raceN)} · ${esc(c.idN)}</div>${c.title ? `<div style="color:#ffcf7a">「${esc(c.title)}」</div>` : ''}<div style="margin-top:6px"><b>${NAME[t]}</b>：${MOVE_DESC[t]}</div>${window.HeadGame && XS[sq] ? `<div style="margin-top:4px;color:#ffcf7a">✦ 她的棋路「${esc(HeadGame.profile(p.rec).chess.style)}」：额外 ${esc(HeadGame.profile(p.rec).chess.shapeNames.join("、"))}（${XS[sq].length} 个落点）</div>` : ''}`; }
-    else box.innerHTML = `<div class="n">${GLYPH[t]} 木制${NAME[t]}</div><div style="color:#b8a080">斯尼克亲手削的，缺了个角。</div><div style="margin-top:6px"><b>${NAME[t]}</b>：${MOVE_DESC[t]}</div>`;
-    box.style.display = 'block'; }
+    if (st.T[sq] && st.S[sq] === st.turn) selectSq(sq); else deselect(); }
+  function selectSq(sq) { const p = pieceAt(sq); st.sel = sq; st.selP = p; st.targets = gen(st.T, st.S, st.turn).filter(m => m[0] === sq).map(m => m[1]);
+    SFX.select && SFX.select(); showInfo(sq); markTargets(); if (p && p.rec && Math.random() < 0.55) talk(p, pickS(['see', 'fight', 'pack', 'taunt']));
+    if (!st.targets.length) floater('无路可走', sq, '#ff9a8a'); }
+  function deselect() { st.sel = -1; st.selP = null; st.targets = []; markTargets(); showInfo(st.hover >= 0 && st.T[st.hover] ? st.hover : -1); }
+  function onMove(e) { if (!st) return; if (st.drag) { st.cam.tt -= (e.clientX - st.drag.x) * 0.006; st.cam.tp = Math.max(0.3, Math.min(1.35, st.cam.tp + (e.clientY - st.drag.y) * 0.004)); st.drag.x = e.clientX; st.drag.y = e.clientY; return; }
+    const cv = el.querySelector('canvas'); if (e.target !== cv) { if (st.hover !== -2) { st.hover = -2; st.hoverP = null; } return; }
+    const sq = pick(e); if (sq === st.hover) return; st.hover = sq; st.hoverP = sq >= 0 ? pieceAt(sq) : null;
+    cv.style.cursor = sq >= 0 && (st.targets.includes(sq) || (st.T[sq] && st.S[sq] === st.turn && !st.busy)) ? 'pointer' : 'default';
+    if (sq >= 0 && st.T[sq]) showInfo(sq); else showInfo(st.sel >= 0 ? st.sel : -1); }
+  // ---- 走法示意：空棋盘上这颗棋子能去哪（绿点 = 常规；金菱 = 她专属的棋路）----
+  function moveDiagram(t, rec, sq) {
+    const T = new Array(64).fill(''), S = new Array(64).fill(-1), f0 = 3, r0 = t === 'P' ? 1 : 3, s0 = r0 * 8 + f0, keep = XS.slice(), ex = rec && XS[sq] ? XS[sq].map(o => o.slice()) : null;
+    T[s0] = t === 'N' && false ? 'N' : t; S[s0] = 0; if (t === 'P') { T[(r0 + 1) * 8 + f0 - 1] = 'P'; S[(r0 + 1) * 8 + f0 - 1] = 1; T[(r0 + 1) * 8 + f0 + 1] = 'P'; S[(r0 + 1) * 8 + f0 + 1] = 1; }
+    XS.fill(null); const norm = new Set(gen(T, S, 0).filter(m => m[0] === s0).map(m => m[1])); let all = norm;
+    if (ex && t !== 'K') { XS[s0] = ex; all = new Set(gen(T, S, 0).filter(m => m[0] === s0).map(m => m[1])); }
+    for (let i = 0; i < 64; i++) XS[i] = keep[i];
+    let h = ''; for (let r = 7; r >= 0; r--) for (let f = 0; f < 8; f++) { const i = r * 8 + f; h += `<i class="${i === s0 ? 'me' : all.has(i) ? (norm.has(i) ? 'm' : 'x') : ''}"></i>`; }
+    return h; }
+  function infoHTML(p, sq) {
+    const t = st.T[sq], c = p.rec && p.rec.c, col = c ? RCOL[c.rar] : '#c8a070';
+    let h = `<div class="ic-h"><div class="ic-g">${GLYPH[t]}</div><div><b>${c ? esc(NM(c)) : '木制' + NAME[t]}</b><small>${c ? `【${RNAME[c.rar]}】${c.shiny ? ' ✨异色' : ''} ${esc(c.raceN)} · ${esc(c.idN)}` : '斯尼克亲手削的，缺了个角'}</small></div></div>`;
+    if (c && window.Ranks) h += `<div style="margin-top:5px">${Ranks.badge(c)}</div>`;
+    h += `<div class="ic-mv">${moveDiagram(t, p.rec, sq)}</div><div class="ic-t"><b>${p.s ? '蓝方' : '红方'}${NAME[t]}</b>：${MOVE_DESC[t]}</div>`;
+    if (c && window.HeadGame && t !== 'K' && XS[sq] && XS[sq].length) { const pr = HeadGame.profile(p.rec).chess; h += `<div class="ic-x">✦ 棋路「${esc(pr.style)}」：额外 ${esc(pr.shapeNames.join('、'))}（金菱 ${XS[sq].length} 格）</div>`; }
+    if (c && window.Overhear) { const b = Overhear.bio(c); h += `<div class="ic-q">「${esc(b.catch)}」</div>`; }
+    if (st.threat && st.threat.has(sq)) h += `<div style="margin-top:5px;color:#ff7a7a;font-weight:700">⚠ 正被对方威胁</div>`;
+    if (st.sel >= 0 && st.targets.includes(sq) && st.T[sq]) { const v = VAL[st.T[sq]]; h += `<div style="margin-top:5px;color:#ff9a6a;font-weight:700">▶ 走到这里 = 吃掉她${st.T[sq] === 'K' ? '（首领！直接获胜）' : `（价值 ${Math.round(v / 100)}）`}</div>`; }
+    return [h, col]; }
+  function showInfo(sq) { const box = el.querySelector('.ic'); if (!st) return; const p = sq >= 0 ? pieceAt(sq) : null;
+    if (!p) { box.style.setProperty('--c', '#6a4a2e'); box.innerHTML = '<div class="ic-tip">把鼠标移到棋子上，看她的走法、阶位和棋路。<br>点选己方棋子开始走棋；绿点是可走的格子，<span style="color:#ff8a7a">红圈</span>是可以吃的，<span style="color:#ffd040">金菱</span>是她专属的特殊棋路。</div>'; return; }
+    const [h, col] = infoHTML(p, sq); box.style.setProperty('--c', col); box.innerHTML = h; }
   let markGroup = null;
-  function markTargets() { if (markGroup) { scene.remove(markGroup); markGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+  function markTargets() { if (markGroup) { scene.remove(markGroup); markGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
     markGroup = new THREE.Group(); scene.add(markGroup);
-    const add = (sq, col, r = 0.36, op = 0.8) => { const m = new THREE.Mesh(new THREE.RingGeometry(r - 0.06, r, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide })); m.rotation.x = -Math.PI / 2; const p = sqPos(sq); m.position.set(p.x, 0.012, p.z); markGroup.add(m); return m; };
-    if (st.last) { for (const s of st.last) { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.96), new THREE.MeshBasicMaterial({ color: '#ffd060', transparent: true, opacity: 0.18, depthWrite: false })); m.rotation.x = -Math.PI / 2; const p = sqPos(s); m.position.set(p.x, 0.006, p.z); markGroup.add(m); } }
-    if (st.sel >= 0) add(st.sel, '#ffe080', 0.46, 1);
-    for (const t of st.targets) add(t, st.T[t] ? '#ff3a3a' : '#7aff9a', st.T[t] ? 0.46 : 0.18, 0.85);
-    for (const side of [0, 1]) { const k = kingSq(st.T, st.S, side); if (k >= 0 && attacked(st.T, st.S, k, 1 - side)) { const m = add(k, '#ff0020', 0.5, 1); m.userData.pulse = true; } } }
+    const flat = (geo, col, op, sq, kind, y = 0.014) => { const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide })); m.rotation.x = -Math.PI / 2; const p = sqPos(sq); m.position.set(p.x, y, p.z); m.userData.kind = kind; m.userData.op = op; markGroup.add(m); return m; };
+    if (st.last) for (const s of st.last) flat(new THREE.PlaneGeometry(0.96, 0.96), '#ffd060', 0.2, s, 'last', 0.006);
+    if (st.sel >= 0) { flat(new THREE.RingGeometry(0.4, 0.49, 40), '#ffe080', 1, st.sel, 'sel'); flat(new THREE.PlaneGeometry(0.96, 0.96), '#ffe080', 0.16, st.sel, 'last', 0.007); }
+    let special = new Set(); if (st.sel >= 0 && XS[st.sel]) { const sv = XS[st.sel]; XS[st.sel] = null; const norm = new Set(gen(st.T, st.S, st.turn).filter(m => m[0] === st.sel).map(m => m[1])); XS[st.sel] = sv; special = new Set(st.targets.filter(t => !norm.has(t))); }
+    for (const t of st.targets) {
+      if (st.T[t]) { flat(new THREE.RingGeometry(0.36, 0.47, 40), '#ff3a3a', 0.95, t, 'cap'); flat(new THREE.PlaneGeometry(0.96, 0.96), '#ff2a2a', 0.22, t, 'capf', 0.008); }
+      else if (special.has(t)) { const d = flat(new THREE.CircleGeometry(0.24, 4), '#ffd040', 0.95, t, 'xs'); d.rotation.z = Math.PI / 4; flat(new THREE.RingGeometry(0.3, 0.34, 4), '#fff0a0', 0.9, t, 'xs2').rotation.z = Math.PI / 4; }
+      else flat(new THREE.CircleGeometry(0.17, 24), '#7aff9a', 0.9, t, 'mv');
+    }
+    if (st.threat && human(st.turn)) for (const s of st.threat) if (st.S[s] === st.turn) flat(new THREE.RingGeometry(0.44, 0.5, 4), '#ff3030', 0.9, s, 'thr').rotation.z = Math.PI / 4;
+    for (const side of [0, 1]) { const k = kingSq(st.T, st.S, side); if (k >= 0 && attacked(st.T, st.S, k, 1 - side)) { const m = flat(new THREE.RingGeometry(0.42, 0.52, 40), '#ff0020', 1, k, 'chk'); } } }
+  function updThreat() { const th = new Set(); for (const s of [0, 1]) gen(st.T, st.S, 1 - s, true).forEach(m => { if (st.S[m[1]] === s && st.T[m[1]]) th.add(m[1]); }); st.threat = th; }
+  function mat(s) { let v = 0; for (let i = 0; i < 64; i++) if (st.T[i] && st.S[i] === s && st.T[i] !== 'K') v += VAL[st.T[i]]; return v; }
+  function updBar() { const a = mat(0), b = mat(1), tot = Math.max(1, a + b), q = s => el.querySelector(s); q('.ch-bar .a').style.width = Math.round(a / tot * 100) + '%'; q('.ch-bar .b').style.width = (100 - Math.round(a / tot * 100)) + '%';
+    const who = st.mode === 'pvp' ? ['红方', '蓝方'] : ['你', '斯尼克']; q('.ba').textContent = `${who[0]} ${Math.round(a / 100)}`; q('.bb').textContent = `${Math.round(b / 100)} ${who[1]}`; }
+  // ---- 反馈：表情 / 台词气泡 / 飘字 / 横幅 / 粒子 ----
+  const EXMAP = { worry: { sad: 0.45, surprised: 0.2 }, sel: { happy: 0.55 }, hov: { relaxed: 0.45, happy: 0.15 }, happy: { happy: 0.85 }, hurt: { sad: 0.8, surprised: 0.45 }, angry: { angry: 0.75 }, shock: { surprised: 0.5 } };
+  const sn = c => String(NM(c)).split('·')[0];
+  function face(p, key, dur) { if (p && p.hb) { p.exTimed = key; p.exT = dur || 1; } }
+  function plLine(c, key) { const PL = window.PERSONA_LINES; if (!PL || !window.Persona) return ''; const d = PL.p[Persona.archOf(c)]; if (!d) return ''; const ix = []; PL.keys.forEach((k, i) => { if (k === key) ix.push(i); }); return ix.length ? d.l[pickS(ix)] || '' : ''; }
+  function toScreen(v3) { const v = v3.clone().project(cam); return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight, z: v.z }; }
+  function talk(p, key, txt) { if (!p || !p.rec || !st) return; const c = p.rec.c; const t = txt || plLine(c, key) || (window.Overhear ? Overhear.bio(c).catch : ''); if (!t) return;
+    while (st.bubs.length >= 3) { const o = st.bubs.shift(); o.el.remove(); }
+    const d = document.createElement('div'); d.className = 'ch-bub'; d.style.setProperty('--c', RCOL[c.rar]); d.innerHTML = `<b style="color:${RCOL[c.rar]};font-size:12px">${esc(sn(c))}</b><br>${esc(t)}`; el.appendChild(d); st.bubs.push({ el: d, p, t: 2.4 + t.length * 0.05 }); }
+  function floater(text, at, col) { const pos = typeof at === 'number' ? sqPos(at) : at.clone(); pos.y += 0.9; const s = toScreen(pos), d = document.createElement('div'); d.className = 'ch-fl'; d.style.cssText = `left:${s.x}px;top:${s.y}px;--c:${col || '#ffe080'}`; d.textContent = text; el.appendChild(d); setTimeout(() => d.remove(), 1400); }
+  function flash(text, col, sub) { const f = el.querySelector('.ch-flash'); f.style.setProperty('--c', col || '#ffd890'); f.innerHTML = text + (sub ? `<small>${sub}</small>` : ''); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); }
+  let glowT = null; const glowTex = () => glowT || (glowT = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.4, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })());
+  function spark(pos, vel, col, life, size, grav) { if (st.parts.length > 160) return; const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: col, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); sp.scale.setScalar(size); sp.position.copy(pos); scene.add(sp); st.parts.push({ sp, vel, life, t: 0, size, grav: grav == null ? 6 : grav }); }
+  function ripple(pos, col, r1) { const m = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.26, 40), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide })); m.rotation.x = -Math.PI / 2; m.position.set(pos.x, 0.02, pos.z); scene.add(m);
+    st.anims.push({ t: 0, dur: 0.6, upd(k) { const s = 1 + k * (r1 || 4); m.scale.set(s, s, s); m.material.opacity = 0.9 * (1 - k); }, end() { scene.remove(m); m.geometry.dispose(); m.material.dispose(); } }); }
+  function burst(pos, col, n, sp) { for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, s = (0.6 + Math.random()) * (sp || 2); spark(pos.clone().setY(0.25), new V3(Math.cos(a) * s, 1.5 + Math.random() * 2.5, Math.sin(a) * s), col, 0.6 + Math.random() * 0.5, 0.14 + Math.random() * 0.1); } }
   const human = side => st.mode === 'pvp' || side === 0;
   function say(t) { if (!el) return; el.querySelector('.ch-say').textContent = t; if (st && st.scene) st.scene.talk = 1.2; }
   const SN = {
@@ -357,50 +440,71 @@ window.Chess = (() => {
     lose: ['……再来一盘！这次我认真了！', '哼，下次我会带更硬的木头。']
   };
   const pickS = a => a[Math.floor(Math.random() * a.length)];
-  function logMove(m, capT, side) { const nm = sq => 'abcdefgh'[sq & 7] + ((sq >> 3) + 1); const t = st.T[m[1]]; const who = side === 0 ? '⚪' : '⚫';
-    const line = document.createElement('div'); line.textContent = `${st.moveN}. ${who} ${GLYPH[t]}${nm(m[0])}→${nm(m[1])}${capT ? ' ×' + NAME[capT] : ''}`; const lg = el.querySelector('.ch-log'); lg.appendChild(line); lg.scrollTop = 1e6; }
+  function logMove(m, capT, side, mover, victim) { const nm = sq => 'abcdefgh'[sq & 7] + ((sq >> 3) + 1); const t = st.T[m[1]];
+    const wn = p => p && p.rec ? sn(p.rec.c) : '木' + NAME[p ? p.t : 'P'];
+    const line = document.createElement('div'); line.style.setProperty('--c', side ? '#5ab0ff' : '#ff8a52'); if (capT) line.className = 'cp';
+    line.innerHTML = `<span class="mn">${st.moveN}</span>${GLYPH[t]} <b>${esc(wn(mover))}</b> ${nm(m[0])}→${nm(m[1])}${capT ? ` <em>斩 ${esc(wn(victim))}</em>` : ''}`;
+    const lg = el.querySelector('.ch-log'); lg.appendChild(line); lg.scrollTop = 1e6; }
   function pieceAt(sq) { return st.pieces.find(p => p.alive && p.sq === sq); }
+  function trayAdd(v) { const tr = el.querySelector('.ch-cap.' + (v.s ? 'b' : 'a')), s = document.createElement('span'), col = v.rec ? RCOL[v.rec.c.rar] : '#c8a070'; s.style.setProperty('--c', col); s.textContent = GLYPH[v.t] + (v.rec ? sn(v.rec.c) : '木' + NAME[v.t]); tr.appendChild(s); }
   function doMove(m) {
     const mover = pieceAt(m[0]), victim = pieceAt(m[1]), capT = st.T[m[1]], side = st.turn;
     st.hist.push({ X: XS.slice(), T: st.T.slice(), S: st.S.slice(), pos: st.pieces.map(p => [p.alive, p.sq, p.t]), last: st.last, turn: st.turn, moveN: st.moveN });
     const u = makeMove(st.T, st.S, m);
-    st.sel = -1; st.targets = []; st.last = [m[0], m[1]];
-    logMove(m, capT, side); st.moveN++;
-    st.busy = true;
-    const from = sqPos(m[0]), to = sqPos(m[1]); const jump = mover.t === 'N' ? 1.0 : 0.35 + from.distanceTo(to) * 0.04;
-    st.anims.push({ t: 0, dur: 0.55, upd(k) { const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; mover.g.position.lerpVectors(from, to, e); mover.g.position.y = Math.sin(Math.PI * k) * jump; if (mover.rec && mover.hb) mover.hb.group.rotation.z = Math.sin(k * Math.PI * 2) * 0.12; },
-      end() { mover.g.position.copy(to); mover.g.position.y = 0; if (mover.hb) mover.hb.group.rotation.z = 0; SFX.thud && SFX.thud(0.5, mover.rec ? 0.8 : 1.3); } });
+    st.sel = -1; st.selP = null; st.targets = []; st.last = [m[0], m[1]];
+    logMove(m, capT, side, mover, victim); st.moveN++;
+    st.busy = true; showInfo(-1); markTargets();
+    const from = sqPos(m[0]), to = sqPos(m[1]), dist = from.distanceTo(to), jump = mover.t === 'N' ? 1.0 : 0.3 + dist * 0.05, dur = 0.42 + Math.min(0.3, dist * 0.06), tc = side ? '#5ab0ff' : '#ff8a52';
+    const yw = mover.g.userData.yaw, hbg = mover.hb && mover.hb.group;
+    if (mover.rec) { face(mover, capT ? 'angry' : 'happy', 1.2); if (Math.random() < 0.6) talk(mover, capT ? 'atk' : 'taunt'); }
+    SFX.select && SFX.select();
+    st.anims.push({ t: 0, dur, upd(k, dt) { const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; mover.g.position.lerpVectors(from, to, e); const y = Math.sin(Math.PI * k) * jump, s = 1 + 0.16 * Math.sin(Math.PI * k);
+        if (yw) { mover.jumpY = y; yw.scale.set(1 / Math.sqrt(s), s, 1 / Math.sqrt(s)); } else mover.g.position.y = y;
+        if (hbg) hbg.rotation.z = Math.sin(k * Math.PI * 2) * 0.12;
+        if (dist > 1.2 && Math.random() < 0.8) spark(mover.g.position.clone().setY(0.15 + y * 0.5), new V3((Math.random() - 0.5) * 0.4, 0.3, (Math.random() - 0.5) * 0.4), tc, 0.45, 0.2, 0); },
+      end() { mover.g.position.copy(to); if (!yw) mover.g.position.y = 0; mover.jumpY = 0; if (hbg) hbg.rotation.z = 0;
+        if (yw) st.anims.push({ t: 0, dur: 0.3, upd(k) { const q = Math.sin(Math.PI * Math.min(1, k * 1.15)) * (1 - k); yw.scale.set(1 + 0.3 * q, 1 - 0.34 * q, 1 + 0.3 * q); }, end() { yw.scale.set(1, 1, 1); } });
+        SFX.thud && SFX.thud(capT ? 0.9 : 0.5, mover.rec ? 0.8 : 1.3); ripple(to, capT ? '#ff5040' : tc, capT ? 5 : 3); burst(to, capT ? '#ff7050' : tc, capT ? 26 : 7, capT ? 3 : 1.2); st.shake = Math.max(st.shake || 0, capT ? 0.3 : 0.07); } });
     mover.sq = m[1];
-    if (victim) { victim.alive = false; knockOff(victim, from, to, 0.28); if (side === 1) say(pickS(SN.cap)); else if (st.mode !== 'pvp') say(pickS(SN.lost)); }
-    if (u[1]) { mover.t = 'Q'; setTimeout(() => { promoteFx(mover); }, 600); }
+    if (victim) { victim.alive = false; const dl = dur * 0.85; knockOff(victim, from, to, dl); trayAdd(victim);
+      if (victim.rec) { face(victim, 'shock', dl); setTimeout(() => { if (!st) return; face(victim, 'hurt', 3); talk(victim, pickS(['die', 'pain', 'hurt'])); }, dl * 1000); }
+      st.streak[side] = (st.streak[side] || 0) + 1; const n = st.streak[side], val = Math.round(VAL[capT] / 100);
+      setTimeout(() => { if (!st) return; floater(capT === 'K' ? '斩首！' : `斩 +${val}`, to, side ? '#7ab8ff' : '#ffb070'); updBar();
+        if (capT === 'K') flash('斩首！', '#ff3a2a', '吃掉了首领'); else if (n >= 2) flash(`连斩 ×${n}`, '#ffb040', mover.rec ? `${esc(sn(mover.rec.c))} 势不可挡` : '地精的木头也会咬人'); else if (VAL[capT] >= 500) flash('重创！', '#ff7a4a', `吃掉${NAME[capT]}（${val}）`); }, dl * 1000);
+      if (side === 1) say(pickS(SN.cap)); else if (st.mode !== 'pvp') say(pickS(SN.lost));
+    } else st.streak[side] = 0;
+    if (u[1]) { mover.t = 'Q'; setTimeout(() => { promoteFx(mover); }, dur * 1000); }
     setTimeout(() => {
-      st.busy = false;
+      if (!st) return; st.busy = false; updThreat(); updBar();
       if (capT === 'K') { finish(side, '吃掉了首领'); return; }
       st.turn = 1 - st.turn; updTurn(); markTargets();
-      const k = kingSq(st.T, st.S, st.turn); if (k >= 0 && attacked(st.T, st.S, k, 1 - st.turn)) { if (st.turn === 0 && st.mode !== 'pvp') say(pickS(SN.check)); SFX.heartbeat && SFX.heartbeat(); }
+      const k = kingSq(st.T, st.S, st.turn);
+      if (k >= 0 && attacked(st.T, st.S, k, 1 - st.turn)) { flash('将军！', '#ff5a3a', st.turn === 0 || st.mode === 'pvp' ? '首领受到攻击，保护她！' : '斯尼克的首领危险了'); const kp = pieceAt(k); if (kp && kp.rec) { face(kp, 'shock', 2); talk(kp, 'low'); } if (st.turn === 0 && st.mode !== 'pvp') say(pickS(SN.check));
+        const v = el.querySelector('.ch-vig'); v.style.opacity = 1; setTimeout(() => { v.style.opacity = 0; }, 1300); SFX.heartbeat && SFX.heartbeat(); }
       if (!gen(st.T, st.S, st.turn).length) { finish(1 - st.turn, '对方无子可动'); return; }
       if (st.mode === 'pvp' && st.autoFlip) st.cam.tt = st.turn === 0 ? 0 : Math.PI;
       if (!human(st.turn)) aiTurn();
-    }, 620);
+    }, Math.round(dur * 1000) + 160);
   }
   function knockOff(p, from, to, delay) {
     const dir = new V3().subVectors(to, from).setY(0); if (dir.lengthSq() < 1e-4) dir.set(0, 0, 1); dir.normalize();
     const v = new V3(dir.x * 2.6 + (Math.random() - 0.5) * 1.5, 3.2, dir.z * 2.6 + (Math.random() - 0.5) * 1.5), av = new V3((Math.random() - 0.5) * 9, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 9);
-    // 首级从底座上滚落：头与底座分离
-    let headObj = null; if (p.hb) { headObj = p.hb.group; const wp = new V3(); headObj.getWorldPosition(wp); const wq = new THREE.Quaternion(); headObj.getWorldQuaternion(wq); const ws = new V3(); headObj.getWorldScale(ws); p.g.remove(headObj); scene.add(headObj); headObj.position.copy(wp); headObj.quaternion.copy(wq); headObj.scale.copy(ws); }
+    // 首级脱离站位：头自己飞出去滚落，脚下的光环/阴影消失
+    let headObj = null; if (p.hb) { headObj = p.hb.group; const wp = new V3(); headObj.getWorldPosition(wp); const wq = new THREE.Quaternion(); headObj.getWorldQuaternion(wq); const ws = new V3(); headObj.getWorldScale(ws); headObj.parent.remove(headObj); scene.add(headObj); headObj.position.copy(wp); headObj.quaternion.copy(wq); headObj.scale.copy(ws); }
     if (p.g.userData.glyph) p.g.userData.glyph.visible = false;
-    const obj = headObj || p.g; const baseObj = headObj ? p.g : null;
+    if (p.g.userData.yaw) p.g.children.forEach(ch => { if (ch !== p.g.userData.yaw && ch !== p.hit) ch.visible = false; });
+    const obj = headObj || p.g;
     let t = -delay, bounced = 0;
     SFX.chop && setTimeout(() => SFX.chop(), delay * 1000);
     st.anims.push({ t: 0, dur: 99, upd(k, dt) { t += dt; if (t < 0) return; v.y -= 9.8 * dt; obj.position.addScaledVector(v, dt); const w = av.length(); if (w > 1e-3) obj.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(av.clone().divideScalar(w), w * dt));
         const out = Math.abs(obj.position.x) > 4.7 || Math.abs(obj.position.z) > 4.7, fy = out ? -1.52 : 0.12;
-        if (obj.position.y < fy) { obj.position.y = fy; if (v.y < -1) { v.y *= -0.35; v.x *= 0.7; v.z *= 0.7; av.multiplyScalar(0.6); bounced++; SFX.thud && SFX.thud(Math.min(1, -v.y / 3), headObj ? 0.9 : 1.4); } else { v.y = 0; v.x *= 0.92; v.z *= 0.92; av.multiplyScalar(0.9); } }
-        if (baseObj) { baseObj.scale.multiplyScalar(Math.max(0, 1 - dt * 4)); if (baseObj.scale.x < 0.02) baseObj.visible = false; }
+        if (obj.position.y < fy) { obj.position.y = fy; if (v.y < -1) { v.y *= -0.35; v.x *= 0.7; v.z *= 0.7; av.multiplyScalar(0.6); bounced++; SFX.thud && SFX.thud(Math.min(1, -v.y / 3), headObj ? 0.9 : 1.4); if (bounced === 1) burst(obj.position.clone().setY(0), '#d8c8a8', 6, 1); } else { v.y = 0; v.x *= 0.92; v.z *= 0.92; av.multiplyScalar(0.9); } }
         if (t > 3.5) { v.set(0, 0, 0); av.set(0, 0, 0); return true; } } });
     p.fallen = obj;
   }
   function promoteFx(p) { const lt = new THREE.PointLight('#ffd060', 3, 3); lt.position.copy(p.g.position).setY(1.2); scene.add(lt); SFX.levelup && SFX.levelup();
-    if (p.g.userData.glyph) { p.g.remove(p.g.userData.glyph); const gs = glyphSprite('Q', p.s); gs.position.copy(p.g.userData.glyph.position); p.g.add(gs); p.g.userData.glyph = gs; }
+    const old = p.g.userData.glyph; if (old) { const par = old.parent; par.remove(old); const gs = glyphSprite('Q', p.s, p.rec ? p.rec.c.rar : 0); gs.position.copy(old.position); par.add(gs); p.g.userData.glyph = gs; }
+    burst(p.g.position, '#ffd060', 30, 2.2); ripple(p.g.position, '#ffd060', 5); flash('晋升！', '#ffd060', p.rec ? `${esc(sn(p.rec.c))} 升为后` : '木兵升为后'); if (p.rec) { face(p, 'happy', 2.5); talk(p, 'taunt'); }
     st.anims.push({ t: 0, dur: 1.2, upd(k) { lt.intensity = 3 * (1 - k); }, end() { scene.remove(lt); } }); say(p.rec ? `她晋升了！${NM(p.rec.c)} 现在是后。` : '我的木兵晋升了！嘿嘿嘿！'); }
   function aiTurn() {
     st.busy = true; say(pickS(['嗯……', '让我想想……', '嘿嘿……', '这步有意思……'])); if (st.scene) st.scene.think = 1;
@@ -409,25 +513,54 @@ window.Chess = (() => {
   function undo() { if (!st || st.busy || !st.hist.length || st.over) return; let n = st.mode === 'pvp' ? 1 : 2; if (st.hist.length < n) n = st.hist.length; let h; for (let i = 0; i < n; i++) h = st.hist.pop();
     if (h.X) for (let i = 0; i < 64; i++) XS[i] = h.X[i]; st.T = h.T; st.S = h.S; st.turn = h.turn; st.last = h.last; st.moveN = h.moveN;
     st.pieces.forEach((p, i) => { const [alive, sq, t] = h.pos[i]; p.sq = sq; if (p.t !== t) { p.t = t; } if (alive && !p.alive) restore(p); p.alive = alive; const q = sqPos(sq); p.g.position.set(q.x, 0, q.z); });
-    st.anims = st.anims.filter(a => a.dur < 99); st.sel = -1; st.targets = []; updTurn(); markTargets(); say('悔棋？嘿嘿，地精很大方的——这次。'); }
-  function restore(p) { if (p.fallen && p.fallen !== p.g) { scene.remove(p.fallen); p.g.add(p.fallen); const hb = p.hb; const S = 2.6; hb.group.scale.setScalar(S); hb.group.quaternion.identity(); hb.group.position.copy(p.headPos); }
-    p.g.scale.setScalar(1); p.g.visible = true; if (p.g.userData.glyph) p.g.userData.glyph.visible = true; if (p.fallen === p.g) p.g.quaternion.identity(); p.fallen = null; if (!p.g.parent) scene.add(p.g); }
-  function updTurn() { const t = el.querySelector('.ch-turn'); if (st.over) return; t.innerHTML = st.mode === 'pvp' ? (st.turn === 0 ? '⚪ 红方（下方）走棋' : '⚫ 蓝方（上方）走棋') : (st.turn === 0 ? '⚪ 你的回合' : '⚫ 斯尼克思考中…'); }
+    st.anims = st.anims.filter(a => a.dur < 99); st.sel = -1; st.selP = null; st.targets = []; st.streak = [0, 0]; el.querySelectorAll('.ch-cap').forEach(x => { x.innerHTML = ''; }); st.pieces.forEach(p => { if (!p.alive) trayAdd(p); }); updThreat(); updBar(); showInfo(-1); updTurn(); markTargets(); say('悔棋？嘿嘿，地精很大方的——这次。'); }
+  function restore(p) { const yw = p.g.userData.yaw; if (p.fallen && p.fallen !== p.g) { scene.remove(p.fallen); (yw || p.g).add(p.fallen); const hb = p.hb; hb.group.scale.setScalar(3.0); hb.group.quaternion.identity(); hb.group.position.copy(p.headPos); }
+    p.g.scale.setScalar(1); p.g.visible = true; p.g.children.forEach(ch => { if (ch !== p.hit) ch.visible = true; }); if (p.g.userData.glyph) p.g.userData.glyph.visible = true; if (yw) yw.scale.set(1, 1, 1); if (p.fallen === p.g) p.g.quaternion.identity(); p.fallen = null; if (!p.g.parent) scene.add(p.g); }
+  function updTurn() { const t = el.querySelector('.ch-turn'); if (st.over) return; const pvp = st.mode === 'pvp', me = human(st.turn);
+    t.style.setProperty('--tc', st.turn ? '#5ab0ff' : '#ff8a52'); t.className = 'ch-turn' + (me ? ' me' : '');
+    t.innerHTML = pvp ? (st.turn === 0 ? '🟠 红方走棋（下方）' : '🔵 蓝方走棋（上方）') : (st.turn === 0 ? '🟠 你的回合' : '🔵 斯尼克思考中…'); }
   function finish(winner, why) {
     st.over = true; const bn = el.querySelector('.ch-banner'); let txt, sub = why;
     if (st.mode === 'pvp') { txt = winner === 0 ? '红方胜' : '蓝方胜'; }
     else if (winner === 0) { const S = G.S; S.chess = S.chess || { best: 0, wins: 0 }; const first = st.lv > S.chess.best; const rw = reward(st.lv) * (first ? 3 : 1); G.addCoins(rw); S.chess.wins++; if (first) S.chess.best = st.lv; G.save();
       txt = '胜利！'; sub = `${why} · 🔮 +${G.fmtN ? G.fmtN(rw) : rw}${first ? '（首胜 ×3）' : ''}${first && st.lv < LEVELS.length ? ' · 解锁下一级' : ''}`; say(pickS(SN.lose)); SFX.levelup && SFX.levelup(); }
     else { txt = '败北'; say(pickS(SN.win)); SFX.deny && SFX.deny(); }
+    st.pieces.forEach(p => { if (p.alive && p.rec) face(p, winner === p.s ? 'happy' : 'hurt', 9); });
+    const ws = st.pieces.filter(p => p.alive && p.rec && p.s === winner); if (ws.length) { talk(pickS(ws), 'taunt'); if (ws.length > 1) setTimeout(() => { if (st) talk(pickS(ws), 'see'); }, 700); }
+    if (winner === 0 || st.mode === 'pvp') for (let i = 0; i < 7; i++) setTimeout(() => { if (st) burst(new V3(Math.random() * 6 - 3, 0.3, Math.random() * 6 - 3), pickS(['#ffd060', '#ff7a4a', '#7aff9a', '#7ab8ff']), 18, 3); }, i * 260);
     bn.innerHTML = `${txt}<small>${sub}</small>`; bn.classList.add('on'); el.querySelector('.ch-turn').textContent = '对局结束';
     setTimeout(() => bn.classList.remove('on'), 4200);
   }
   function loop(t) {
     if (!st) return; raf = requestAnimationFrame(loop); const now = t / 1000, dt = Math.min(0.05, now - (lastT || now)); lastT = now;
-    const c = st.cam; c.t += (c.tt - c.t) * Math.min(1, dt * 5); cam.position.set(Math.sin(c.t) * Math.cos(c.tp) * c.d, Math.sin(c.tp) * c.d, Math.cos(c.t) * Math.cos(c.tp) * c.d); cam.lookAt(0, 0, 0);
+    const c = st.cam; c.t += (c.tt - c.t) * Math.min(1, dt * 5);
+    st.shake = (st.shake || 0) * Math.pow(0.0008, dt); const sh = st.shake > 0.004 ? st.shake : 0;
+    cam.position.set(Math.sin(c.t) * Math.cos(c.tp) * c.d, Math.sin(c.tp) * c.d, Math.cos(c.t) * Math.cos(c.tp) * c.d);
+    if (sh) cam.position.add(new V3((Math.random() - 0.5) * sh, (Math.random() - 0.5) * sh, (Math.random() - 0.5) * sh)); cam.lookAt(0, 0.25, 0);
     for (let i = st.anims.length - 1; i >= 0; i--) { const a = st.anims[i]; a.t += dt; const k = Math.min(1, a.t / a.dur); const r = a.upd(k, dt); if (k >= 1 || r === true) { a.end && a.end(); st.anims.splice(i, 1); } }
-    for (const p of st.pieces) if (p.alive && p.g.userData.glyph) { p.g.userData.glyph.material.opacity = 0.55 + Math.sin(now * 2 + p.sq) * 0.2; }
-    if (markGroup) markGroup.children.forEach(m => { if (m.userData.pulse) m.material.opacity = 0.5 + Math.sin(now * 8) * 0.5; });
+    // 棋子：悬浮起伏 / 转向镜头 / 选中抬起 / 表情
+    const humTurn = human(st.turn) && !st.busy && !st.over;
+    for (const p of st.pieces) { if (!p.alive) continue; const yw = p.g.userData.yaw; if (!yw) continue; const ud = p.g.userData;
+      const selp = st.selP === p, hov = st.hoverP === p, thr = humTurn && st.threat && st.threat.has(p.sq) && p.s === st.turn;
+      p.lift += ((selp ? 0.26 : hov ? 0.11 : 0) - p.lift) * Math.min(1, dt * 12);
+      yw.position.y = p.lift + (p.jumpY || 0) + Math.sin(now * 2 + p.sq * 1.7) * 0.022 + (thr ? Math.sin(now * 16) * 0.012 : 0);
+      let d = c.t + (p.s ? -0.1 : 0.1) - yw.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); yw.rotation.y += d * Math.min(1, dt * 7);
+      const h = yw.position.y; ud.shadow.scale.setScalar(Math.max(0.5, 1 - h * 0.6)); ud.shadow.material.opacity = 0.42 - Math.min(0.2, h * 0.3);
+      ud.ring.scale.setScalar(selp ? 1.12 + Math.sin(now * 7) * 0.08 : thr ? 1 + Math.sin(now * 12) * 0.05 : 1); ud.ring.material.color.set(thr ? '#ff3030' : p.s ? '#5ab0ff' : '#ff8a52');
+      if (p.exT > 0) p.exT -= dt; const key = p.exT > 0 ? p.exTimed : thr ? 'worry' : selp ? 'sel' : hov ? 'hov' : '';
+      if (p.hb && key !== p.exKey) { p.exKey = key; try { p.hb.setExpression(EXMAP[key] || {}); } catch (e) {} } }
+    // 标记动画
+    if (markGroup) markGroup.children.forEach(m => { const k = m.userData.kind, o = m.userData.op; if (k === 'mv') { const s = 1 + Math.sin(now * 5) * 0.15; m.scale.set(s, s, s); } else if (k === 'xs' || k === 'xs2') { m.rotation.z = Math.PI / 4 + Math.sin(now * 3) * 0.25; m.material.opacity = o * (0.7 + 0.3 * Math.sin(now * 6)); }
+      else if (k === 'cap' || k === 'capf' || k === 'thr' || k === 'chk') { m.material.opacity = o * (0.5 + 0.5 * Math.abs(Math.sin(now * 5))); } else if (k === 'sel') { m.rotation.z = now * 1.5; } });
+    // 粒子
+    for (let i = st.parts.length - 1; i >= 0; i--) { const q = st.parts[i]; q.t += dt; const k = q.t / q.life; q.vel.y -= q.grav * dt; q.sp.position.addScaledVector(q.vel, dt); q.sp.material.opacity = Math.max(0, 1 - k); q.sp.scale.setScalar(q.size * (1 - k * 0.5)); if (k >= 1) { scene.remove(q.sp); q.sp.material.dispose(); st.parts.splice(i, 1); } }
+    // 气泡 / 悬停标签
+    for (let i = st.bubs.length - 1; i >= 0; i--) { const b = st.bubs[i]; b.t -= dt; if (b.t <= 0) { b.el.remove(); st.bubs.splice(i, 1); continue; } const wp = new V3(); b.p.g.getWorldPosition(wp); wp.y += 1.3 + (b.p.lift || 0); const s = toScreen(wp); b.el.style.left = Math.max(110, Math.min(innerWidth - 110, s.x)) + 'px'; b.el.style.top = s.y + 'px'; }
+    const tag = el.querySelector('.ch-tag'), hp = st.hoverP;
+    if (hp && hp.alive && hp.rec && !st.over) { const wp = new V3(); hp.g.getWorldPosition(wp); wp.y += 1.15 + hp.lift; const s = toScreen(wp), cc = hp.rec.c; tag.style.display = 'block'; tag.style.left = s.x + 'px'; tag.style.top = s.y + 'px'; tag.style.setProperty('--c', RCOL[cc.rar]);
+      const k = (hp.s ? '蓝' : '红') + NAME[hp.t] + ' · ' + (window.Ranks ? Ranks.short(cc) : RNAME[cc.rar]); if (tag._k !== NM(cc) + k) { tag._k = NM(cc) + k; tag.textContent = NM(cc) + ' · ' + k; } } else tag.style.display = 'none';
+    // 闲聊
+    st.chatT -= dt; if (st.chatT < 0 && !st.busy && !st.over) { st.chatT = 7 + Math.random() * 6; const cand = st.pieces.filter(p => p.alive && p.rec); if (cand.length) { const p = pickS(cand), th = st.threat && st.threat.has(p.sq); talk(p, th ? 'fear' : pickS(['see', 'fight', 'taunt', 'pack'])); if (p.rec) face(p, th ? 'shock' : 'happy', 1.4); } }
     const sc = st.scene; if (sc) { sc.fires.forEach(f => { f.pl.intensity = 0.75 + Math.sin(now * 11 + f.k) * 0.15 + Math.sin(now * 23 + f.k) * 0.1; f.fl.scale.y = 1 + Math.sin(now * 13 + f.k) * 0.15; });
       sc.hd.rotation.z = sc.think ? Math.sin(now * 1.5) * 0.15 : Math.sin(now * 0.8) * 0.04; sc.hd.rotation.x = sc.think ? 0.25 : 0.1; sc.gob.position.y = -0.5 + Math.sin(now * 1.3) * 0.03;
       if (sc.talk > 0) { sc.talk -= dt; sc.mouth.scale.y = 1 + Math.abs(Math.sin(now * 18)) * 1.2; } else sc.mouth.scale.y = 1; }
@@ -436,19 +569,20 @@ window.Chess = (() => {
   }
   function start(opt) { // opt: {mode:'ai'|'pvp', lv, white:{list,leader}, black:{list,leader}|null(wood)}
     ensure(); hitList.length = 0; if (scene) dispose();
-    st = { mode: opt.mode, lv: opt.lv || 1, T: new Array(64).fill(''), S: new Array(64).fill(-1), pieces: [], turn: 0, sel: -1, targets: [], anims: [], hist: [], moveN: 1, cam: { t: 0, tt: 0, tp: 0.62, d: 11 }, autoFlip: opt.mode === 'pvp', over: false, busy: false, last: null };
+    st = { mode: opt.mode, lv: opt.lv || 1, T: new Array(64).fill(''), S: new Array(64).fill(-1), pieces: [], turn: 0, sel: -1, targets: [], anims: [], hist: [], moveN: 1, cam: { t: 0, tt: 0, tp: 0.5, d: 12.5 }, streak: [0, 0], parts: [], bubs: [], chatT: 6, shake: 0, hover: -1, hoverP: null, selP: null, threat: new Set(), autoFlip: opt.mode === 'pvp', over: false, busy: false, last: null };
     st.scene = buildScene(); XS.fill(null);
     const place = (pc, side) => { const sq = pc.r * 8 + pc.f; if (st.T[sq]) return; st.T[sq] = pc.t; st.S[sq] = side; XS[sq] = pc.rec && window.HeadGame ? HeadGame.chessExtra(pc.rec).map(o => o.slice()) : null;
-      const p = { t: pc.t, s: side, sq, rec: pc.rec || null, alive: true }; p.g = pc.rec ? headPiece(p) : woodPiece(pc.t, side); p.hb = p.g.userData.hb || null; if (p.hb) p.headPos = p.hb.group.position.clone();
+      const p = { t: pc.t, s: side, sq, rec: pc.rec || null, alive: true, lift: 0, jumpY: 0 }; p.g = pc.rec ? headPiece(p) : woodPiece(pc.t, side); p.hb = p.g.userData.hb || null; if (p.hb) p.headPos = p.hb.group.position.clone();
       const q = sqPos(sq); p.g.position.copy(q); scene.add(p.g);
       const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 1.2, 8), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 0.6; hit.userData.p = p; p.g.add(hit); p.hit = hit; st.pieces.push(p); };
     headArmy(opt.white.list, opt.white.leader, 0).forEach(pc => place(pc, 0));
     if (opt.black) headArmy(opt.black.list, opt.black.leader, 1).forEach(pc => place(pc, 1)); else woodArmy(LEVELS[st.lv - 1].army).forEach(pc => place(pc, 1));
+    el.querySelectorAll('.ch-bub,.ch-fl').forEach(x => x.remove()); el.querySelectorAll('.ch-cap').forEach(x => { x.innerHTML = ''; }); el.querySelector('.ch-leg').classList.remove('on'); el.querySelector('.ch-flash').classList.remove('on'); el.querySelector('.ch-banner').classList.remove('on'); el.querySelector('.ch-vig').style.opacity = 0;
     el.querySelector('.ch-log').innerHTML = ''; el.querySelector('.ch-snik').style.display = opt.mode === 'pvp' ? 'none' : 'flex';
     el.querySelector('.ch-title').textContent = opt.mode === 'pvp' ? '♟ 头棋殿 · 同屏双人' : `♟ 头棋殿 · 第 ${st.lv} 级「${LEVELS[st.lv - 1].n}」`;
     el.style.display = 'block'; window.__pauseMain = true; G.setUI(true); resize();
     addEventListener('keydown', onKey, true);
-    updTurn(); markTargets(); say(opt.mode === 'pvp' ? '' : pickS(SN.start));
+    updThreat(); updBar(); showInfo(-1); updTurn(); markTargets(); say(opt.mode === 'pvp' ? '' : pickS(SN.start));
     SFX.duck && SFX.duck(true);
     lastT = 0; raf = requestAnimationFrame(loop);
   }
@@ -493,5 +627,5 @@ window.Chess = (() => {
     G.HOOK.e.push((hit) => { if (hit && hit.build && hit.build.type === 'chess' && !G.held) { lobby(); return true; } return false; });
     G.HOOK.tip.push((hit) => hit && hit.build && hit.build.type === 'chess' ? '<b>[E]</b> 头棋殿：和斯尼克下棋 / 双人对弈' : null);
   }, 200);
-  return { lobby, start, close, get active() { return !!st; }, LEVELS, _st: () => st, _move: m => doMove(m), _think: think, _gen: gen, typeOfRec };
+  return { lobby, start, close, get active() { return !!st; }, LEVELS, _st: () => st, _scr: sq => toScreen(sqPos(sq).setY(0.45)), _move: m => doMove(m), _think: think, _gen: gen, typeOfRec };
 })();
