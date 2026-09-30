@@ -1225,3 +1225,11 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **MOD `body_headfit`**（默认开，js/mods.js 紧跟 head_norm2）：foe.js 常量 `BODY_HEADK`（非 VRoid 身体的 skull 倍率，= √(kh·ks)，夹 0.9~1.25；Furina 1.18、YaeMiko 1.137、Rosaria 1.134 … Lisa 1.033、Xiangling 1.034），headFit 里乘上。VRoid 身体（Vita/AvatarSample_A/B/Darkness_Shibu/HairSample_Female/Osage/HikariCape/HikariScholar/Victoria_Rubin）不在表里 = 1。
 - 新增身体时：非 VRoid 身体要补 BODY_HEADK（方法见本节；未在表里 = 不修正）。
 - 改动文件：js/foe.js（headFit 前加 BODY_HEADK）、js/mods.js（+1）、HANDOFF.md。
+
+## 第二十六轮(i) — 用户：“单位血量掉到 0 不死，每次攻击冒出一堆气泡（同时触发特别多次）”（另一个 Arena Agent）
+- **根因（致命）**：`worlds.js foeEvent` 首行 `… CombatFX.event(t, fo, d); // 第二十二轮（续 9）…命中准星 const now = …, st = W.stats = …;` —— `now/st` 的声明被行尾注释吞掉。每次 `hit` 事件 → `st.combo` ReferenceError →
+  1. `foe.js hit()` 在 `fo.hp -= dealt; floatDmg; event('hit')` 处被打断，走不到 `if (fo.hp <= 0) die()` → **永远不死**（beasts.js 同理）；击杀奖励/连击/多杀/成就也全部失效；
+  2. 异常冒到 `combat.js mmHit()`，`w.set.add(tg.id)` 没执行 → 同一刀在出刀期间**每帧重复命中**。测试台复现：旧代码 10 刀 = 80 次命中、HP −1306 仍在追人。
+- **修复**：声明单独成行；`foeEvent` 拆成 `foeEvent → try { foeEvent0 } catch`，Recall.log / CombatFX.event 也各自 try；`combat.js` 两处 `tg.onHit()` 包 try，出错也按“已命中”进冷却（绝不每帧重复结算）。修后测试台：1 刀 1 次命中，6 种操作（click/flick/hold/wave/mash/drift）都正常击杀。
+- **给后续 agent（重要）**：这是本项目第二次“代码被行尾 `//` 注释吞掉”（第一次是 combat.js 屏震）。**不要把新代码接在已有注释的同一行后面**。检查脚本（我放在 /tmp，未入库，思路很简单）：逐行找 `//` 之后含 `const x =` / `a.b =` / `if (…)` 且以 `;`/`}` 结尾的注释。另外我用 eslint `no-undef`（把所有 `window.X =` 当全局）扫了 js/*.js：除 BODY_MODELS/BEAST_GLB（数据文件定义）外只发现 `sanctum.js:581 hs[0].NM(rec.c)`（rec 未定义）→ 已改为 `NM(hs[0].rec.c)`。
+- 测试台用法补充：`tools/test/fight.html` 需要 `big/anim/ual.js` 和部分 `big/body/*.js`（稀疏克隆要 `git sparse-checkout add`）；`bots.js` 不是页面自带，drive.py 第一步用 `(0,eval)(bots源码)` 注入。
