@@ -176,10 +176,11 @@ window.CombatFX = (() => {
   function windup(fo, clip) {
     const P = posOf(fo), s = spatial(P); if (s.d > 16 || !au() || !gate('wu' + (fo && fo.id2), 200)) return; const t = c.currentTime, heavy = /Heavy|Sword_Attack/.test(clip || '') || heavyRole(fo), o = bus(Math.min(1, s.v * 1.1), s.p, 0.22);
     const rv = ROLEV[fo && fo.role] || [330, 420, [850, 1500]];
+    const pv = !!(fo && fo.per && window.VOICE_DATA && window.VOICE_DATA[fo.per.k] && (!window.Mods || Mods.on('persona_voice'))); // 第二十四轮：有真人语音的人设不再叠合成喝声
     if (fo && fo.role === 'assassin') { nz(o, t, 0.3, 0.16, 'bandpass', 2400, 4200, 4, 0.05); tn(o, 'sine', 2600, 3100, t + 0.1, 0.16, 0.04, 0.01); } // 刺客：无声的“嘶”
     else if (fo && fo.boss) { voice(o, t, 120, 80, 0.7, 0.2, [400, 800]); voice(o, t, 122, 82, 0.7, 0.14, [420, 820]); nz(o, t, 0.6, 0.2, 'lowpass', 500, 120, 0.7, 0.1); }
-    else if (heavy) { voice(o, t, rv[0] * 0.7, rv[1] * 0.6, 0.45, 0.16, rv[2]); tn(o, 'sawtooth', 80, 190, t, 0.5, 0.05, 0.08); nz(o, t + 0.05, 0.4, 0.12, 'bandpass', 700, 300, 1, 0.1); }
-    else voice(o, t, rv[0], rv[1], 0.17, 0.11, rv[2]);
+    else if (heavy) { if (!pv) voice(o, t, rv[0] * 0.7, rv[1] * 0.6, 0.45, 0.16, rv[2]); tn(o, 'sawtooth', 80, 190, t, 0.5, 0.05, 0.08); nz(o, t + 0.05, 0.4, 0.12, 'bandpass', 700, 300, 1, 0.1); }
+    else if (!pv) voice(o, t, rv[0], rv[1], 0.17, 0.11, rv[2]);
     if (heavy) { const b = bus(0.6 * s.v, s.p, 0.4); tn(b, 'sine', 160, 240, t + 0.05, 0.38, 0.12, 0.2); ring(b, t + 0.3, 700, 0.04, 0.6, [[1, 1, 1], [1.5, 0.5, 0.8]]); } // 重击预警：低沉升调
     if (fo && fo.role === 'ranged') { tn(o, 'sine', 500, 900, t + 0.1, 0.25, 0.04, 0.01); }
   }

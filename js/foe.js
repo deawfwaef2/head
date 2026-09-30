@@ -61,7 +61,7 @@ window.Foe = (() => {
     src.traverse(o => { if (o.isBone || o.type === 'Object3D' || o.isGroup) map[o.name] = null; });
     clone.traverse(o => { map[o.name] = o; });
     const srcMeshes = [], dstMeshes = []; src.traverse(o => { if (o.isSkinnedMesh) srcMeshes.push(o); }); clone.traverse(o => { if (o.isSkinnedMesh) dstMeshes.push(o); });
-    dstMeshes.forEach((m, i) => { const s = srcMeshes[i]; const bones = s.skeleton.bones.map(b => map[b.name]); m.bind(new THREE.Skeleton(bones, s.skeleton.boneInverses), s.bindMatrix); m.material = Array.isArray(s.material) ? s.material.map(x => x.clone()) : s.material.clone(); });
+    dstMeshes.forEach((m, i) => { const s = srcMeshes[i]; const bones = s.skeleton.bones.map(b => map[b.name]); m.bind(new THREE.Skeleton(bones, s.skeleton.boneInverses), s.bindMatrix); m.material = Array.isArray(s.material) ? s.material.map(x => FF(x.clone())) : FF(s.material.clone()); });
     return clone;
   }
   // 头的尺寸与位置（标定见 HANDOFF：VRoid 真实头骨高 ≈ 4.15×(眼高-头关节高)；首级模型头骨高 0.194、眼在原点下 0.0102、头骨中心在眼骨后 0.02×缩放）
@@ -249,6 +249,7 @@ window.Foe = (() => {
       f.root.position.copy(it.pos); f.root.position.y = ctx.H(it.pos.x, it.pos.z); f.root.rotation.y = fo.yaw;
       ctx.sc.add(f.root); f.play(fo.idleClip, { fade: 0 }); f.mixer.setTime(r() * 3);
       if (window.FoeRoles) FoeRoles.assign(fo, r, it); // 第二十二轮（续 9）：敌人职业
+      if (window.Persona) Persona.apply(fo, r); // 第二十四轮：人设（在职业之后：标题里带职业名）
       FOES.push(fo); out.push(fo);
     }
     evict(used, 5); prewarm(ctx); { const seenB = new Set(); for (const fo of FOES) if (!seenB.has(fo.f.bodyName)) { seenB.add(fo.f.bodyName); sevWarm(fo); } }
@@ -268,11 +269,12 @@ window.Foe = (() => {
     } catch (e) { console.warn('warm', e); }
     finally { R.toneMapping = tm; R.setRenderTarget(rt0); }
   }
+  function FF(m) { return window.FaceFill ? FaceFill.wrap(m, 0.85) : m; } // 第二十四轮：身体也补一点光（与脸一致，不会脸亮身体黑）
   function prewarm(ctx) {
     if (!ctx.renderer || !ctx.camera) return; const grp = new THREE.Group(), geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3)); geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(6), 2)); geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([0, 1, 0, 0, 1, 0, 0, 1, 0]), 3));
     const seen = new Set();
-    for (const fo of FOES) for (const m of fo.mats) { const k = m.type + (m.map ? 1 : 0) + m.side + (m.alphaTest > 0 ? 'a' : ''); if (seen.has(k)) continue; seen.add(k); grp.add(new THREE.Mesh(geo, m.clone())); }
+    for (const fo of FOES) for (const m of fo.mats) { const k = m.type + (m.map ? 1 : 0) + m.side + (m.alphaTest > 0 ? 'a' : ''); if (seen.has(k)) continue; seen.add(k); grp.add(new THREE.Mesh(geo, FF(m.clone()))); }
     bloodMat(); spark(new V3(), 0); grp.add(new THREE.Sprite(blood.mat), new THREE.Mesh(blood.dgeo, blood.dmat), new THREE.Sprite(spark.mat), new THREE.Sprite(warnMat()), new THREE.Sprite(guardMat()));
     const hid = []; for (const fo of FOES) { fo.f.cut.forEach(o => { if (!o.visible) { o.visible = true; hid.push(o); } }); fo.f.hb.group.traverse(o => { if (o.isMesh && o.userData.kind === 'cut' && !o.visible) { o.visible = true; hid.push(o); } }); }
     { const cp = ctx.camera.getWorldPosition(new V3()), cd = ctx.camera.getWorldDirection(new V3()); grp.position.copy(cp).addScaledVector(cd, 3); } // 第十九轮：放在相机前（视锥+阴影相机内），离屏渲染不会被看见
@@ -292,6 +294,7 @@ window.Foe = (() => {
   // ---- 每帧 ----
   const tv = new V3(), tv2 = new V3(), up = new V3(0, 1, 0);
   function update(dt, now) {
+    if (window.FaceFill) FaceFill.world(); // 第二十四轮：野外用更高的面部补光下限
     if (!CTX) return; const ctx = CTX, P = ctx.player;
     CLK += dt; if (window.FoeRoles) FoeRoles.update(dt, ctx);
     if (slowT > 0) { slowT -= dt; dt *= slowK; if (slowT <= 0) slowK = 1; } // 击杀慢动作：只作用于敌人/尸体/头/血，玩家照常
@@ -305,7 +308,7 @@ window.Foe = (() => {
       const dx = P.pos.x - fo.pos.x, dz = P.pos.z - fo.pos.z, d = Math.hypot(dx, dz) || 1e-3;
       const face = Math.atan2(dx, dz);
       const see = ctx.sees(fo.pos, (fo.boss ? 16 : 9 + fo.rar * 2) * (P.crouch > 0.5 ? 0.55 : 1)) && (fo.seen || Math.abs(ang(face - fo.yaw)) < 1.4 || d < 3);
-      if (see && !fo.seen) { alertNear(fo); fo.seen = true; fo.cd = Math.max(fo.cd, 0.5 + (1 - fo.iq) * 0.8); if (fo.boss) ctx.bossMeet(fo); else talk(fo, pickR(Math.random, SAY.see)); if (!fo.boss) fo.state = fo.brave ? 'chase' : 'flee'; else fo.state = 'chase'; }
+      if (see && !fo.seen) { alertNear(fo); fo.seen = true; fo.cd = Math.max(fo.cd, 0.5 + (1 - fo.iq) * 0.8); if (fo.boss) ctx.bossMeet(fo); else { const t = sayP(fo, fo.brave ? 'see' : 'fear', SAY.see); if (t && window.Persona) Persona.meet(fo, t); } if (!fo.boss) fo.state = fo.brave ? 'chase' : 'flee'; else fo.state = 'chase'; }
       if (fo.seen && d > (SMART ? 34 : 26)) { fo.seen = false; fo.state = 'idle'; }
       let spd = 0, turnTo = null, rr = null;
       let strafe = 0, goal = null;
@@ -335,12 +338,12 @@ window.Foe = (() => {
         turnTo = Math.atan2(-dx, -dz); spd = 3.2 + fo.rar * 0.2; f.play('Sprint_Loop', { fade: 0.2 });
         const pr = Math.hypot(fo.pos.x, fo.pos.z);
         if (pr > ctx.R - 3) { const tx = -fo.pos.z / pr, tz = fo.pos.x / pr, sg = (tx * -dx + tz * -dz) > 0 ? 1 : -1; turnTo = Math.atan2(tx * sg * 0.9 - fo.pos.x / pr * 0.3, tz * sg * 0.9 - fo.pos.z / pr * 0.3); if (d < 2.2 && fo.cd <= 0) { fo.state = 'chase'; talk(fo, pickR(Math.random, SAY.fight)); } }
-        else if (fo.sayT <= 0 && Math.random() < 0.006) talk(fo, pickR(Math.random, SAY.flee));
+        else if (fo.sayT <= 0 && Math.random() < 0.006) sayP(fo, 'flee', SAY.flee);
       }
       else if (SMART && fo.state === 'retreat') { // 第二十一轮：重伤后退开整顿（聪明的敌人不会一味送死）
         fo.retT -= dt; turnTo = Math.atan2(-dx, -dz); if (d > 7.5) { turnTo = face; spd = 0; f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.3 }); fo.hp = Math.min(fo.maxHp, fo.hp + fo.maxHp * 0.05 * dt); }
         else { spd = 3.6; f.play('Jog_Fwd_Loop', { fade: 0.25, speed: 0.9 }); }
-        if (fo.retT <= 0 || (d < 2.6 && fo.cd <= 0)) { fo.state = 'chase'; fo.cd = 0.3; talk(fo, pickR(Math.random, SAY2.back)); }
+        if (fo.retT <= 0 || (d < 2.6 && fo.cd <= 0)) { fo.state = 'chase'; fo.cd = 0.3; sayP(fo, 'back', SAY2.back); }
       }
       else if (fo.state === 'chase') {
         // 第二十一轮：更聪明的追击 —— 预判拦截、包抄站位、惩罚逃跑、丢失目标会去搜索；速度足以追上疾跑后没体力的玩家
@@ -348,13 +351,13 @@ window.Foe = (() => {
         const sprint = fo.boss ? 5.9 : 4.9 + fo.iq * 1.1 + fo.rar * 0.15;
         goal = [P.pos.x, P.pos.z, 'P']; const pv = ctx.pvel || { x: 0, z: 0 }, away = (pv.x * dx + pv.z * dz) / d; // 玩家远离我的速度
         const track = see || ((fo.lostT || 0) < 0.05 || fo.t % 0.25 < dt) && d < 22 && ctx.sees(fo.pos, 22); if (track) { fo.lostT = 0; (fo.lastSeen || (fo.lastSeen = new V3())).set(P.pos.x, 0, P.pos.z); } else fo.lostT = (fo.lostT || 0) + dt;
-        if (!fo.boss && fo.hp < fo.maxHp * 0.3 && !fo.retreated && fo.iq > 0.45 && !fo.atk) { fo.retreated = true; fo.state = 'retreat'; fo.retT = 3 + Math.random() * 2.5; talk(fo, pickR(Math.random, SAY2.hurt)); }
+        if (!fo.boss && fo.hp < fo.maxHp * 0.3 && !fo.retreated && fo.iq > 0.45 && !fo.atk) { fo.retreated = true; fo.state = 'retreat'; fo.retT = 3 + Math.random() * 2.5; sayP(fo, 'low', SAY2.hurt); }
         else if (fo.lostT > 1.2 && fo.lastSeen) { // 看不见你了：去最后看见的位置找
           const lx = fo.lastSeen.x - fo.pos.x, lz = fo.lastSeen.z - fo.pos.z, ld = Math.hypot(lx, lz);
           if (ld > 1.2) { turnTo = Math.atan2(lx, lz); goal = [fo.lastSeen.x, fo.lastSeen.z, 'P']; spd = 3.4; f.play('Jog_Fwd_Loop', { fade: 0.3, speed: 0.85 }); } else { turnTo = fo.yaw + Math.sin(fo.t * 1.3) * 1.5; f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.3 }); }
-          if (fo.lostT > 7) { fo.state = 'idle'; fo.seen = false; talk(fo, pickR(Math.random, SAY2.lost)); }
+          if (fo.lostT > 7) { fo.state = 'idle'; fo.seen = false; sayP(fo, 'lost', SAY2.lost); }
         }
-        else if (fo.armed && fo.cd <= 0 && mine && d > 2.3 && d < 5.2 && (away > 2.2 ? Math.random() < 0.06 : fo.iq > 0.6 && Math.random() < 0.01)) { attack(fo, d, 'Sword_Dash'); if (away > 2.2 && fo.atk && fo.sayT <= 0) talk(fo, pickR(Math.random, SAY2.run)); } // 你一转身逃跑，她就冲刺斩
+        else if (fo.armed && fo.cd <= 0 && mine && d > 2.3 && d < 5.2 && (away > 2.2 ? Math.random() < 0.06 : fo.iq > 0.6 && Math.random() < 0.01)) { attack(fo, d, 'Sword_Dash'); if (away > 2.2 && fo.atk && fo.sayT <= 0) sayP(fo, 'run', SAY2.run); } // 你一转身逃跑，她就冲刺斩
         else if (fo.cd <= 0 && mine) { // 轮到我：预判你的走位拦截，到出手距离就起手
           if (d > atkR) { const lead = Math.min(0.9, d / sprint) * (0.3 + fo.iq * 0.7); turnTo = Math.atan2(dx + pv.x * lead, dz + pv.z * lead); spd = d > 4 ? sprint : Math.min(sprint, Math.max(2.2, away + 1.4)); f.play(spd > 3.3 ? 'Sprint_Loop' : 'Walk_Loop', { fade: 0.25, speed: spd > 3.3 ? 1 : 1.2 }); }
           else { turnTo = face; attack(fo, d); }
@@ -373,7 +376,7 @@ window.Foe = (() => {
           } else { fo.strafeT = (fo.strafeT || 0) - dt; if (fo.strafeT <= 0) { fo.strafeT = 1.4 + Math.random() * 1.8; const r0 = Math.random(); fo.strafeDir = r0 < 0.5 ? 0 : r0 < 0.75 ? -1 : 1; }
             strafe = fo.strafeDir || 0; if (d < hold - 0.6) strafe = 2;
             if (strafe === 2) f.play('Walk_Loop', { fade: 0.35, speed: -0.75 }); else if (strafe) f.play('Walk_Loop', { fade: 0.35, speed: 0.7 }); else f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.35 }); }
-          if (fo.sayT <= 0 && Math.random() < 0.004) talk(fo, pickR(Math.random, n > 1 ? SAY2.pack : SAY2.duel));
+          if (fo.sayT <= 0 && Math.random() < 0.004 * (window.Persona ? Persona.tauntK(fo) : 1)) { sayP(fo, n > 1 && Math.random() < 0.5 ? 'pack' : 'taunt', n > 1 ? SAY2.pack : SAY2.duel); if (window.Persona) Persona.gesture(fo); }
         }
       } else if (fo.state === 'flee') { // 第二十一轮：逃向最近的门——跑到门口就真的逃掉了（首级也就没了）
         const doors = DOORESC ? ctx.doors || [] : []; let tg = null, best = 1e9;
@@ -384,12 +387,14 @@ window.Foe = (() => {
           if (fo.flash > 0) fo.doorT = 0; // 开门时挨了一刀：被打断
           if (dd < 1.7) { spd = 0; turnTo = Math.atan2(ddx, ddz); f.play('Idle_Loop', { fade: 0.2 }); if (!fo.doorT) { fo.doorT = 1e-3; if (ctx.toast) ctx.toast(`🚪 ${fo.h.c.name} 正在开门逃跑——快追上砍她！`, '#ffcf80', 1.4); } fo.doorT += dt; if (fo.doorT > 1.2) { escape(fo); continue; } }
           else if (fo.doorT && dd > 2.5) fo.doorT = 0;
-          if (!fo.doorSaid && dd < 8) { fo.doorSaid = true; talk(fo, pickR(Math.random, SAY2.door)); }
+          if (!fo.doorSaid && dd < 8) { fo.doorSaid = true; sayP(fo, 'door', SAY2.door); }
         } else turnTo = Math.atan2(-dx, -dz);
-        if (d < 1.9 && fo.cd <= 0 && Math.random() < 0.02 + fo.iq * 0.02) { fo.state = 'chase'; fo.brave = true; talk(fo, pickR(Math.random, SAY.fight)); } // 被追上：困兽之斗
-        else if (fo.sayT <= 0 && Math.random() < 0.006) talk(fo, pickR(Math.random, SAY.flee));
-      } else { f.play(fo.idleClip, { fade: 0.3 }); }
+        if (d < 1.9 && fo.cd <= 0 && Math.random() < 0.02 + fo.iq * 0.02) { fo.state = 'chase'; fo.brave = true; sayP(fo, 'fight', SAY.fight); } // 被追上：困兽之斗
+        else if (fo.sayT <= 0 && Math.random() < 0.006) sayP(fo, 'flee', SAY.flee);
+      } else if (window.Persona && fo.state === 'idle' && Persona.idle(fo, dt, FOES)) { turnTo = fo.pidle.turnTo; spd = fo.pidle.spd; } // 第二十四轮：日常作息
+      else { f.play(fo.idleClip, { fade: 0.3 }); }
       if (fo.spdMul && fo.spdMul !== 1 && spd > 0.5 && !fo.atk && fo.state !== 'flee') spd *= fo.spdMul;
+      if (window.Persona) { Persona.tick(fo, dt); if (fo.gestT > 0) { spd = 0; strafe = 0; } } // 第二十四轮：点头/摇头时站定
       if (SMART && spd > 0.5 && turnTo != null && !fo.atk) { // 第二十一轮：绕开树/石头/墙，卡住就换方向绕路
         if (fo.sideT > 0) fo.sideT -= dt; if (fo.detour > 0) { fo.detour -= dt; turnTo = fo.detourYaw; } else turnTo = goal ? steer(fo, turnTo, goal) : avoidC(fo, turnTo);
         fo.stuckT = (fo.stuckT || 0) + dt; if (fo.stuckT > 0.5) { const lp = fo.lastP || (fo.lastP = fo.pos.clone()), mv = Math.hypot(fo.pos.x - lp.x, fo.pos.z - lp.z); if (mv < spd * 0.5 * 0.3 && !fo.detour) { fo.detour = 0.9 + Math.random() * 0.6; fo.detourYaw = unstick(fo, turnTo); } lp.copy(fo.pos); fo.stuckT = 0; } }
@@ -475,6 +480,8 @@ window.Foe = (() => {
   function clearRay(fo, yaw, len) { const fx = Math.sin(yaw), fz = Math.cos(yaw); for (const c of CTX.cols) { const rx = c.x - fo.pos.x, rz = c.z - fo.pos.z, along = rx * fx + rz * fz; if (along < -0.2 || along > len + c.r) continue; if (Math.abs(rx * fz - rz * fx) < c.r + 0.45) return false; } const ex = fo.pos.x + fx * len, ez = fo.pos.z + fz * len; return Math.hypot(ex, ez) < CTX.R - 1.5; }
   function unstick(fo, goal) { const pref = fo.side || (Math.random() < 0.5 ? 1 : -1); for (const a of [0.7, 1.3, 1.9, 2.5, 3.1]) for (const sg of [pref, -pref]) { const y = goal + a * sg; if (clearRay(fo, y, 2.6)) { fo.side = sg; fo.sideT = 2; return y; } } return goal + Math.PI; }
   function escape(fo) { fo.dead = true; fo.escaped = true; fo.rag = null; fo.spurt = 0; if (fo.warn) fo.warn.visible = false; if (fo.gs) fo.gs.visible = false; if (fo.f.root.parent) fo.f.root.parent.remove(fo.f.root); talk(fo, ''); if (CTX.escaped) try { CTX.escaped(fo); } catch (e) { console.warn(e); } }
+  // 第二十四轮：人设台词（Persona 开 → 按性格出台词并念出来；关 → 原来的通用台词）
+  function sayP(fo, key, fb, col) { const t = window.Persona && Persona.line(fo, key); talk(fo, t || (fb ? pickR(Math.random, fb) : ''), col); return t; }
   function talk(fo, text, col) { if (!CTX || fo.dead) return; CTX.say(fo.anchor, text, col); fo.sayT = 3 + Math.random() * 2; }
   // 第十六轮：每个攻击动作实测（_tools/fclip.py：右手蓄力位→命中位的位移）得到命中时刻（动作内秒）与来刀方向（玩家屏幕角：0=右 90=上 ±180=左 -90=下）
   const D2R = Math.PI / 180;
@@ -509,7 +516,7 @@ window.Foe = (() => {
       holdAt: Math.min(0.1, hits[0].t * 0.4), hold: fo.boss ? 0.3 : 0.34 - Math.min(0.14, fo.iq * 0.1), feint: !fo.boss && fo.iq > 0.8 && Math.random() < 0.14,
       reach: fo.armed ? 1.8 : 1.35, tot: 0, dmg: Math.max(1, Math.round(s.maxHp * base * (0.85 + Math.random() * 0.3))) };
     if (fo.role && window.FoeRoles) FoeRoles.tune(fo, fo.atk, d);
-    if (fo.sayT <= 0 && Math.random() < 0.25) talk(fo, fo.boss ? '' : pickR(Math.random, SAY.fight), '#ffb0a0');
+    if (fo.sayT <= 0 && Math.random() < 0.25) { if (fo.boss) talk(fo, '', '#ffb0a0'); else sayP(fo, 'fight', SAY.fight, '#ffb0a0'); } else if (!fo.boss && window.Persona && Math.random() < 0.5) Persona.line(fo, 'atk', true); // 第二十四轮：出手喝声
   }
   // 当前这一刀还要多久（真实秒）
   function atkLeft(A) { const h = A.hits[A.hi]; if (!h) return 0; const ct = A.act.time, w = A.hi ? A.ws2 : A.ws, hold = A.hold > 0;
@@ -525,7 +532,7 @@ window.Foe = (() => {
       if (ct >= h.t) { A.hi++; A.tot = 0;
         if (window.CombatFX) CombatFX.enemySwing(fo, h);
         if (A.ranged) FoeRoles.fire(fo, h, d);
-        else if (d < A.reach && Math.abs(ang(face - fo.yaw)) < 0.9) CTX.hitPlayer(fo, Math.round(A.dmg * (h.heavy ? 1.6 : 1)), h);
+        else if (d < A.reach && Math.abs(ang(face - fo.yaw)) < 0.9) { CTX.hitPlayer(fo, Math.round(A.dmg * (h.heavy ? 1.6 : 1)), h); if (window.Persona && fo.sayT <= 0 && Math.random() < 0.35) { sayP(fo, 'hit'); if (Math.random() < 0.5) Persona.gesture(fo); } }
         else if (fo.sayT <= 0 && Math.random() < 0.3) talk(fo, '……躲开了？'); }
     }
     act.timeScale = sc;
@@ -578,7 +585,7 @@ window.Foe = (() => {
   function roar(center, r) { // 战吼：震慑
     let n = 0; for (const fo of FOES) { if (fo.dead) continue; const d = Math.hypot(fo.pos.x - center.x, fo.pos.z - center.z); if (d > r) continue; n++;
       fo.atk = null; fo.block = 0; fo.stag = fo.boss ? 0.8 : 1.6; fo.broken = fo.boss ? 0 : 0.9; fo.f.play('Hit_Knockback', { once: true, fade: 0.05, restart: true });
-      if (!fo.boss && Math.random() < 0.5) { fo.state = 'flee'; fo.brave = false; } setTimeout(() => talk(fo, pickR(Math.random, ['呀啊——！', '怪、怪物……', '别过来！']), '#ffd0a0'), 200 + Math.random() * 400); }
+      if (!fo.boss && Math.random() < 0.5) { fo.state = 'flee'; fo.brave = false; } setTimeout(() => sayP(fo, 'fear', ['呀啊——！', '怪、怪物……', '别过来！'], '#ffd0a0'), 200 + Math.random() * 400); }
     return n;
   }
   // ---- 被砍：部位判定 ----
@@ -642,7 +649,7 @@ window.Foe = (() => {
       const diff = Math.abs(ang((info.from || 0) - (fo.gAng || 0)));
       if (info.charged) { fo.block = 0; fo.atk = null; fo.stag = fo.boss ? 0.9 : 1.4; fo.broken = fo.stag + 0.2; fo.f.play('Hit_Knockback', { once: true, fade: 0.05, restart: true }); ctx.clang && ctx.clang(c.point, 'break'); ctx.event && ctx.event('guardbreak', fo); talk(fo, pickR(Math.random, ['挡、挡不住……！', '什么力气……', '呜——！']), '#ffe0a0'); }
       else if (!slash || diff < 0.95) { // 正好砍在她格挡的那一侧：弹刀
-        if (fo.sayT <= 0) talk(fo, pickR(Math.random, SAY.block)); sfx().thud && sfx().thud(0.8); ctx.clang && ctx.clang(c.point, 'block'); fo.block = Math.max(fo.block, 0.5); fo.cd = Math.min(fo.cd, 0.25); ctx.event && ctx.event('blocked', fo); return true;
+        if (fo.sayT <= 0) sayP(fo, 'block', SAY.block); sfx().thud && sfx().thud(0.8); ctx.clang && ctx.clang(c.point, 'block'); fo.block = Math.max(fo.block, 0.5); fo.cd = Math.min(fo.cd, 0.25); ctx.event && ctx.event('blocked', fo); return true;
       } else { fo.block = 0; side = 1.35; ctx.event && ctx.event('outflank', fo); } // 绕开格挡：破绽伤害
     }
     const q = ctx.power(fo), brk = fo.broken > 0, mult = (zone === 'head' ? 1.6 : zone === 'neck' ? 1.8 : /Arm|Leg/.test(zone) ? 0.7 : 1) * (brk ? 2 : 1) * side * (info.charged ? 2.2 : 1) * (info.mult || 1);
@@ -669,11 +676,13 @@ window.Foe = (() => {
     const poiseBrk = fo.boss && (fo.poise >= (fo.rage ? 34 : 28) || info.charged);
     if (poiseBrk) fo.poise = 0;
     if ((!fo.boss || poiseBrk) && !(fo.role && window.FoeRoles && FoeRoles.hurt(fo, dealt, info, zone))) { fo.atk = null; fo.stag = fo.boss ? 0.35 : 0.55; fo.f.play(zone === 'head' || zone === 'neck' ? 'Hit_Head' : sp > 1.3 ? 'Hit_Knockback' : 'Hit_Chest', { once: true, fade: 0.06, restart: true }); }
-    if (fo.sayT <= 0 && Math.random() < 0.5) talk(fo, fo.boss ? '' : pickR(Math.random, SAY.hit), '#ffb0a0');
+    if (fo.sayT <= 0 && Math.random() < 0.5) { if (fo.boss) talk(fo, '', '#ffb0a0'); else sayP(fo, 'hurt', SAY.hit, '#ffb0a0'); } else if (!fo.boss && window.Persona) Persona.line(fo, 'pain', true); // 第二十四轮：没说话时也会痛呼
+    if (!fo.boss && !fo.dead && window.Persona && fo.state === 'chase' && Persona.fleeHp(fo) && fo.hp < fo.maxHp * Persona.fleeHp(fo) && !fo.fledOnce) { fo.fledOnce = true; fo.state = 'flee'; fo.brave = false; sayP(fo, 'flee', SAY.flee); } // 胆小：挨几刀就跑向门
     if (!(window.CombatFX && CombatFX.on)) { sfx().chop && sfx().chop(); sfx().squish && sfx().squish(0.5); } // 有 combat_fx 时由 CombatFX 合成更丰富的受击音
     return true;
   }
   function die(fo, info, quiet) {
+    if (!fo.boss && window.Persona) { const t = Persona.line(fo, 'die'); if (t) talk(fo, t, '#c8c8d0'); } // 第二十四轮：最后一句
     fo.dead = true; fo.atk = null; fo.anchor.gone = true;
     ragStart(fo, info); // 先按当前动作姿势建粒子，再停动画（停动画会把骨骼还原成 T 姿势）
     fo.f.mixer.stopAllAction(); ragPose(fo);
@@ -904,5 +913,5 @@ window.Foe = (() => {
     const pinv = new M4().copy(par.matrixWorld).invert().multiply(root.matrixWorld); hips.position.copy(want.applyMatrix4(pinv));
   }
   function has(name) { return !!(window.BODY_LIST && BODY_LIST.includes(name)); }
-  return { hasHead: (h) => HEADS.includes(h), warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, attack, ATK, tokenOK, ctx: () => CTX, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
+  return { say: (fo, t, col) => talk(fo, t, col), hasHead: (h) => HEADS.includes(h), warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, attack, ATK, tokenOK, ctx: () => CTX, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
 })();
