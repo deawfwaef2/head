@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8"><title>rt</title>
+<style>body{margin:0;background:linear-gradient(#3a4a5a,#2a3020);height:100vh;color:#eee;font-family:system-ui,"Noto Sans CJK SC",sans-serif}</style></head><body>
+<script src="../../lib/three.min.js"></script>
+<script>
+const stash=[];window.Sack={stashAdd:x=>stash.push(x),mk:(id,n)=>({id,n})};
+window.__game={S:{bosses:{},rq:{minis:{}},hp:100,eq:{}},st:()=>({power:300}),addCoins:c=>(window.__coins=(window.__coins||0)+c),save(){}};
+const V=THREE.Vector3, nodes=[...Array(10).keys()].map(i=>({i,home:i===0,boss:i===9,depth:i,loc:null}));
+window.Worlds={active:true,_W:null,start(trip){this._W={graph:{trip:true,nodes},stats:{decap:0,kill:0},busy:false,B:{R:12},pos:new V(),dom:{boss:{style:{}}},trip:{coins:0}};}};
+</script>
+<script src="../../js/mods.js"></script><script src="../../js/lore.js"></script><script src="../../js/explore.js"></script>
+<script src="../../js/regecon.js"></script><script src="../../js/regionart.js"></script><script src="../../js/regionquest.js"></script>
+<script>
+const errs=[];window.onerror=m=>errs.push(m);
+const loc=Lore.LOCS.find(l=>l.k==='swamp'); nodes.forEach(n=>n.loc=loc);
+const ph=(location.hash.match(/ph=(\d)/)||[])[1]||'1';
+setTimeout(()=>{
+ RegionQuest.pending; Worlds.start({loc});
+ const T=RegionQuest.T; console.log('RES mission='+RegionQuest.mText(T.q)+' minis='+T.minis.map(x=>x.m.n+'@'+x.node.i).join(','));
+ T.minis[0].fo={seen:true,pos:new V(3,0,2),hp:42,maxHp:100,dead:false};
+ if(ph==='2'){ setTimeout(()=>{T.minis[0].fo.dead=true;T.minis[0].fo.hp=0;Worlds._W.stats.decap=9;Worlds._W.stats.kill=9;},900); }
+ setTimeout(()=>{console.log('RES coins='+window.__coins+' stash='+JSON.stringify(stash)+' done='+T.done+' S='+JSON.stringify(__game.S.rq)+' errs='+JSON.stringify(errs));document.title='done'},ph==='2'?2200:1600);
+},300);
+</script></body></html>
