@@ -160,7 +160,7 @@ ${el.length ? `<div>👑 可挑战的精英：${el.map(d => `<b style="color:${d
     const nd = W.graph.nodes[W.cur]; if (nd && !nd.eliteArena && !nd.huntArena) T.deep = Math.max(T.deep, nd.depth || 0);
     if (!T.shown && !W.busy && W.B) {
       T.shown = true;
-      setTimeout(() => { if (!T || (window.Elites && Elites.E) || (nd && nd.eliteArena)) return; if (window.Worlds && Worlds._W && Worlds._W.graph.nodes[Worlds._W.cur].eliteArena) return; open(); }, 700);
+      setTimeout(() => { if (window.Saga && Saga.on()) return; /* R49：剧情电影取代到达大窗口 */ if (!T || (window.Elites && Elites.E) || (nd && nd.eliteArena)) return; if (window.Worlds && Worlds._W && Worlds._W.graph.nodes[Worlds._W.cur].eliteArena) return; open(); }, 700);
     }
     for (const x of T.side) {
       if (x.done) continue; const [a, b] = SQ[x.t].prog(x.q, W);

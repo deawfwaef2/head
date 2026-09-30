@@ -1,0 +1,33 @@
+<!doctype html><meta charset="utf-8"><title>saga harness</title>
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}#hud{position:fixed;left:10px;top:10px;color:#0f0;font:14px monospace}</style>
+<body><script src="../../lib/three.min.js"></script>
+<script>
+// 独立测试页：真 three + 假地形 + 桩 G/Worlds/Lore，验证剧情电影（宽银幕/字幕/运镜/赌注卡/结算卡）。?k=swamp&vis=1&seed=1&envoy=0
+const Q = new URLSearchParams(location.search), K = Q.get('k') || 'swamp', VIS = +(Q.get('vis') || 1);
+window.Mods = { on: () => true };
+const NAMES = { village: '雾溪村', forest: '月光精灵林', wilds: '兽牙荒原', abbey: '圣光修道院', swamp: '黑沼魔女泽', fortress: '铁盔要塞', capital: '金冠王都', abyss: '深渊裂隙', peak: '龙骨圣山' };
+const ID = {}; ['huntress','smithgirl','herbalist','shepherd','barmaid','ranger','druid','archer','singer','moonpriest','wolfwarrior','foxmiko','shaman','chieftess','falconer','catthief','inquisitor','paladin','choir','nun','saint','abbess','novice','hexer','countess','witch','bogwitch','covenlady','alchemist','merc','crossbow','knight','medic','engineer','general','dragonknight','assassin','guard','courtmage','musician','lady','princess','queen','shadow','fallen','succubus','duchess','abyssqueen','dragonslayer','dragonmiko','avatar','archangel','dragonprincess','villager','elfprincess','bard'].forEach(k => ID[k] = { n: { huntress: '女猎户', hexer: '诅咒师', witch: '魔女', alchemist: '药剂师', bogwitch: '沼泽女巫', bard: '流浪吟游诗人', countess: '吸血鬼伯爵夫人', covenlady: '魔女集会之主' }[k] || k });
+window.Lore = { ID, LOCS: Object.keys(NAMES).map(k => ({ k, n: NAMES[k], rec: 100, color: '#fff', icon: '' })) };
+const S = { stats: { kills: 50 }, bosses: {}, heads: [], coins: 500, hp: 80 };
+const cam = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, .1, 400);
+window.G = { S, save() {}, st: () => ({ maxHp: 100 }), camera: cam, player: { yaw: 0.3, pitch: 0 }, setUI(v) { document.getElementById('hud').textContent = 'uiOpen ' + v; }, lockPointer() {}, addCoins(n) { S.coins += n; } };
+const H = (x, z) => 2.2 * Math.sin(x * .09) * Math.cos(z * .07) + 1.4 * Math.sin(x * .21 + z * .13) + Math.max(0, 6 - Math.hypot(x - 22, z + 18) * .35) * 1.5;
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0x8a9ab0); sc.fog = new THREE.FogExp2(0x8a9ab0, 0.012);
+const geo = new THREE.PlaneGeometry(260, 260, 130, 130); geo.rotateX(-Math.PI / 2); const pa = geo.attributes.position, col = new Float32Array(pa.count * 3);
+for (let i = 0; i < pa.count; i++) { const x = pa.getX(i), z = pa.getZ(i), h = H(x, z); pa.setY(i, h); const k = Math.min(1, Math.max(0, (h + 3) / 10)); col[i * 3] = .25 + .3 * k; col[i * 3 + 1] = .4 + .25 * k; col[i * 3 + 2] = .2 + .15 * k; }
+geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals(); sc.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true })));
+sc.add(new THREE.HemisphereLight(0xffffff, 0x334455, 1.0)); const sun = new THREE.DirectionalLight(0xffe0b0, 1.2); sun.position.set(40, 60, 20); sc.add(sun);
+const cols = []; for (let i = 0; i < 70; i++) { const a = i * 2.39996, r = 6 + Math.sqrt(i) * 5; const x = Math.cos(a) * r, z = Math.sin(a) * r; const t = new THREE.Mesh(new THREE.ConeGeometry(1.2, 6, 7), new THREE.MeshLambertMaterial({ color: 0x1f4a2a })); t.position.set(x, H(x, z) + 3, z); sc.add(t); cols.push({ x, z, r: 1 }); }
+sc.add(cam);
+const W = { B: { H, doors: [{ x: 30, z: -10 }, { x: -25, z: 26 }], cols, R: 40 }, pos: new THREE.Vector3(0, H(0, 0), 0), graph: { trip: true, nodes: [{ i: 0, home: true, depth: 0 }] }, busy: false, cur: 0, trip: { coins: 0 }, stats: {} };
+window.Worlds = { active: true, _W: W, start() {} };
+const ren = new THREE.WebGLRenderer({ antialias: false }); ren.setSize(innerWidth, innerHeight); document.body.appendChild(ren.domElement);
+const hud = document.createElement('div'); hud.id = 'hud'; document.body.appendChild(hud);
+let ok = false; (function loop(t) { requestAnimationFrame(loop); cam.position.set(W.pos.x, W.pos.y + 1.45, W.pos.z); cam.rotation.set(0, G.player.yaw, 0, 'YXZ'); if (window.Saga && Saga.cine) Saga.cam(cam, .016, t / 1000); ren.render(sc, cam); })(0);
+</script>
+<script src="../../js/saga_data.js"></script><script src="../../js/saga.js"></script>
+<script>
+const s = Saga.SS(); s.v[K] = VIS; if (Q.get('clues')) s.cl.length = 0;
+window.SG = Saga.gen(K); if (Q.get('envoy') === '1') { /* 强制月使 */ } 
+window.startCine = () => { Saga.play(SG); };
+</script>

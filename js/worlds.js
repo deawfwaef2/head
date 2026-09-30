@@ -883,6 +883,7 @@ window.Worlds = (() => {
     const cam = G.camera; cam.position.set(W.pos.x, W.pos.y + P.h + bob, W.pos.z); cam.rotation.set(P.pitch, P.yaw, 0, 'YXZ');
     if (window.Combat && Combat.state && Combat.state.shake > 0) { cam.position.x += (Math.random() - 0.5) * Combat.state.shake * 0.08; cam.position.y += (Math.random() - 0.5) * Combat.state.shake * 0.08; }
     if (W.shake > 0) { W.shake -= dt; cam.position.x += (Math.random() - 0.5) * W.shake * 0.12; cam.position.y += (Math.random() - 0.5) * W.shake * 0.12; }
+    if (window.Saga && Saga.cine) { try { Saga.cam(cam, dt, now); } catch (e) { console.warn(e); } } /* R49：剧情电影接管相机 */
     // 太阳影子跟随
     B.sun.target.position.set(W.pos.x, W.pos.y, W.pos.z); B.sun.position.copy(B.sun.target.position).addScaledVector(B.sunDir, 70);
     if (B.sc.userData.skyM) B.sc.userData.skyM.position.copy(cam.position);

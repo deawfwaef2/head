@@ -1759,3 +1759,13 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **否决**（见 CREDITS.md）：Ultimate Animated Characters 女性（~1.35m Q 版）、AvatarSample_E（1.17m 幼态）/F/G（同 Vita 款）、Kenney 迷你、Quaternius RPG Characters（Q 版）。Modular Fantasy 的 Noble/Wizard/Knight 在付费版（$20），免费版只有 Ranger/Peasant。
 - **没找到**：合适的 骑士/修女/公主/女王 CC0 身体（骑士暂用 Q_Medieval 黑甲风，其余仍用 pixiv 裙装）。非 CC0 方向（VRoid Hub/Booth/Sketchfab）要登录或付费，未下载。
 - 风格提醒：Q_* 低模（尤其 Modular Women）与动漫头有画风差，这是用户要“职业服贴身份”的取舍；`Q_Ranger/Q_Peasant` 较协调。未验证：真实游戏里的帧率/全流程（只在 fight/heads_fit 台里看过静态与 UAL 动画姿态）。
+
+## R49 · 剧情电影「异变」+ 月之线索（MOD `saga`，默认开，仅中文）
+用户原话：「每进入一个区域来一个电影，字幕，每次都不一样，有地区特色，分镜电影化，二次元女主剧情的感觉；剧情围绕该地点的一个变化，本次主线任务=杀死目标得到头，变化对你有利；没杀死则不利。大师级随机无穷组合。主线还是杀死月之魔女；不同区域会遇到月之魔女使者线索，杀死线索+1，集齐才能挑战；触发某些条件解锁剧情，剧情有线索。战中三选一→做成建筑，出门结算要更好玩。技能改成「回忆」：随机 3 选 1，不同流派。头棋对手太弱没成就感。」
+- 文件：`js/saga_data.js`（地区词库×11 个异变原型×独白/线索/章节模板）、`js/saga.js`（生成器 + 电影播放器 + 目标注入 + 恩/祸 + 线索 + 结算 + 追踪 HUD）。测试：`node tools/test/saga_gen.js`（槽位全填满、约 8600 条不同文本行/3000 次、时长分布），`tools/test/saga.html`（真 three + 假地形 + 桩，`/var/work/pw/saga_shots.js` 截图）。
+- 改动的旧文件（一行级）：`js/worlds.js` frame 末尾调用 `Saga.cam`；`js/arrival2.js` Saga 开时不自动弹大窗；`js/elites.js` victoryState.all=月之魔女已斩（Saga 开时）+ goalHTML 用 Saga；`js/ui.js` 出洞页提示；`index.html`；`mods.js`/`mods_i18n.js`。
+- 流程：`Worlds.start` 包装 → `setupTrip` 生成 saga（槽位随机：名字、头衔、异变类型、地区词库；同地区最近 3 个原型不重复；线索未满时月使概率 0.28+0.2×连续未遇次数），在 depth≥1 的节点注入一名有名有姓的目标（沿用 RegionQuest 的 RPG.foe + Foe.populate 方式，HP 按 FoeAbs.hpK(rec×1.1)，月使更强）。W.B 就绪后播放电影：宽银幕 2.39:1、颗粒/暗角/地区色调、字幕（说话人牌）、6~7 个镜头（航拍/推轨/低角扫摄/环绕/俯瞰/走向门），`Saga.cam` 在 worlds frame 里接管真 3D 相机；空格/点击下一幕，Esc 跳过，最后一幕等玩家按空格出发（保证重新锁定指针有用户手势）。首访约 40 秒，4 次以后逐步缩短（lvl 0/1/2）。
+- 恩/祸（2 趟该地区）：恩 = 敌伤 −12% / 结算魂晶 +35% / 入场回血 30%；祸 = 敌伤 +12% / 敌血 +15% / 仇恨 +6 / 结算时损失 6% 魂晶（≤800）。斩首即平息（大横幅），回洞后 1.6 秒弹出「出门结算」卡（异变结局、恩祸、战利品、线索进度）。死亡不结算。
+- 月之魔女：`Elites.MOON.cond` 改为「月之线索 ≥7」（运行时补丁，Saga 关闭则回到 13 精英）。线索来源：月使（斩首）、8 个章节闪回（kills≥10 / 首个霸主 / 首个猎手 / 首个精英 / 失败≥2 / 成功≥3 / 同地区≥4 次 / 稀有头）。线索列表显示在「精英挑战」面板顶部。
+- 未验证：真实游戏里的相机接管（FPV 手臂/武器是 camera 子节点，进电影时隐藏；FPV 若每帧重设 visible 会露一下）、HUD 隐藏（body 直属子元素 opacity=0）、目标注入在狭长/特殊形状地图上的位置。
+- 待做（同一轮后续）：回忆祭坛建筑（随机 3 选 1 技能，不同流派）、头棋 AI 加强。

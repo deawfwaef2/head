@@ -169,7 +169,7 @@ window.Elites = (() => {
   }
   function victoryState() {
     const S = S_(), b = nB(S), el = nEl(S), h = huDead(S), m = !!(S.el && S.el.dead && S.el.dead.moon);
-    return { b, el, h, m, all: b >= 7 && el >= 13 && h >= 4 && m };
+    return { b, el, h, m, all: (window.Saga && Saga.on()) ? m : (b >= 7 && el >= 13 && h >= 4 && m) }; /* R49：主线=月之魔女 */
   }
   const affH = k => { const A = window.FoeAI2 && FoeAI2.AFF[k]; return `<span class="r3-aff">${A ? A.ic + ' ' + A.n : k}</span>`; };
   const oc = p => p >= 0.6 ? '#9fe89f' : p >= 0.35 ? '#ffd060' : '#ff7a6a';
@@ -188,6 +188,7 @@ ${compact ? '' : `<div class="r3-bio">${esc(d.bio)}</div>`}<div class="r3-meta" 
 ${dead ? '' : `<div class="r3-act"><button class="red" data-ch="${d.id}" ${wild ? 'disabled' : ''}>${wild ? '回洞后才能挑战' : '⚔ 发起挑战'}</button></div>`}</div>`;
   }
   function goalHTML() {
+    if (window.Saga && Saga.on()) return Saga.goalHTML(); /* R49 */
     const v = victoryState(), g = (k, n, a, b, t) => `<div class="${a >= b ? 'ok' : ''}"><div class="k">${k}</div><div class="v">${n}</div><div class="bar"><i style="width:${Math.min(100, a / b * 100)}%"></i></div>${t ? `<div class="k" style="margin-top:3px">${t}</div>` : ''}</div>`;
     return `<div class="r3-goal">${g('地区霸主', `${v.b}<small>/7</small>`, v.b, 7, '任意 7 个地区')}${g('精英', `${v.el}<small>/13</small>`, v.el, 13)}${g('食人魔猎手', `${v.h}<small>/4</small>`, v.h, 4, '猎手页')}${g('月之魔女', v.m ? '✔' : '—', v.m ? 1 : 0, 1, '最终')}
 <div><div class="t">${v.all ? '<b>🎉 全部达成</b><br>回到洞里，你就是魂首窟之主。' : '<b>胜利目标</b><br>斩下 7 名霸主、13 名精英、4 名食人魔猎手与月之魔女，把她们的首级带回洞里。'}</div></div></div>`;
