@@ -109,6 +109,62 @@ window.Saga = (() => {
     return makeShot('push', X);
   }
 
+
+  // ================= 人设介绍蒙太奇（R49d）：真人特写 + 名牌 + 做事，像二次元女主登场 =================
+  const ACT = {
+    witch: ['用指尖碾碎一撮干花', '对着小瓶里的液体轻轻吹气', '把药草一片一片码进布袋'], fight: ['慢慢擦拭刀背上的灰', '握紧又松开刀柄', '单手转了一圈短刃又接住'],
+    bow: ['数着箭袋里的羽箭', '用拇指试了试弓弦', '把箭尖上的露水抹掉'], holy: ['低头抚平衣摆的褶', '合掌默念着什么', '把烛火护在掌心里'],
+    noble: ['整理袖口的刺绣', '看着指尖的戒指出神', '轻轻放下茶盏'], gen: ['把碎发别到耳后', '望着远处出神', '低声哼着一首旧歌', '系紧了靴子的绑带']
+  };
+  const actOf = c => { const id = (c && c.id) || ''; const g = /witch|hexer|coven|alchem|herbal|shaman|druid/.test(id) ? 'witch' : /merc|knight|guard|assassin|general|slayer|warrior|paladin|chieftess|thief|wolf/.test(id) ? 'fight' : /archer|ranger|hunt|falcon|cross/.test(id) ? 'bow' : /nun|saint|priest|abbess|choir|miko|novice|inquisitor|angel/.test(id) ? 'holy' : /queen|princess|lady|countess|duchess|court|musician|singer|bard/.test(id) ? 'noble' : 'gen'; const a = ACT[g].concat(ACT.gen); return a[Math.floor(Math.random() * a.length)]; };
+  const headOf = fo => { try { const b = fo.f.bones && fo.f.bones.head, v = new THREE.Vector3(); b.updateWorldMatrix(true, false); b.getWorldPosition(v); return v; } catch (e) { return new THREE.Vector3(fo.pos.x, fo.pos.y + 1.45, fo.pos.z); } };
+  const frontOf = fo => { try { const b = fo.f.bones.head, q = new THREE.Quaternion(); b.getWorldQuaternion(q); const f = new THREE.Vector3(0, 0, 1).applyQuaternion(q); f.y = 0; if (f.lengthSq() < 0.05) fo.f.root.getWorldQuaternion(q), f.set(0, 0, 1).applyQuaternion(q), f.y = 0; return f.normalize().negate(); } catch (e) { return new THREE.Vector3(0, 0, 1); } };
+  function castPick(sg) {
+    const W = window.Worlds && Worlds._W, P = W && W.pos, out = []; if (!W || !P || !W.foes) return out;
+    const ok = fo => fo && !fo.dead && fo.f && fo.f.root && fo.f.bones && fo.f.bones.head && fo.h && fo.h.c && !fo.boss;
+    const hu = window.Hunters2 && Hunters2.cur && Hunters2.cur(); if (hu && ok(hu)) out.push({ fo: hu, hunter: hu.hunter2 });
+    if (sg.fo && ok(sg.fo) && W.cur === (sg.node && sg.node.i) && !out.some(o => o.fo === sg.fo)) out.push({ fo: sg.fo, target: 1 });
+    const near = W.foes.filter(f => ok(f) && !out.some(o => o.fo === f)).map(f => [Math.hypot(f.pos.x - P.x, f.pos.z - P.z), f]).filter(a => a[0] < 50).sort((a, b) => a[0] - b[0]);
+    for (const [, f] of near) { if (out.length >= 2) break; out.push({ fo: f }); }
+    return out;
+  }
+  function castBeats(cast, lvl) {
+    const beats = [], L = (t, w, col, it) => ({ t, w: w || '', col: col || '', it: !!it }), bio = c => { try { return window.Overhear && Overhear.bio(c); } catch (e) { return null; } };
+    cast.forEach((ct, ci) => {
+      const fo = ct.fo, c = fo.h.c, B = bio(c) || {}, nm = c.name || '无名', idn = (window.Lore && Lore.ID && Lore.ID[c.id] && Lore.ID[c.id].n) || c.idN || c.title || '旅人';
+      let col = '#ffe0a8', chips = [], title = c.title && c.title !== nm ? c.title : idn, quote = B.catch || '……', sub2 = B.secret ? '秘密 · ' + B.secret : '';
+      const AN = (window.Overhear && Overhear.AN) || {}; if (B.arche && AN[B.arche]) chips.push('性格 · ' + AN[B.arche]);
+      if (B.like) chips.push('喜欢 · ' + B.like); if (B.fear) chips.push('怕 · ' + B.fear);
+      if (ct.hunter && window.Hunters2) { const d = Hunters2.BY[ct.hunter]; col = d.col; title = d.t; chips = ['⚔ 猎手 · Lv.' + Hunters2.lvOf(ct.hunter), d.ic + ' 追猎你的人', ...chips.slice(0, 1)]; quote = d.lines[0]; sub2 = d.style; }
+      else if (ct.target) { col = '#ffc8c8'; chips.unshift('🎯 本次讨伐目标'); }
+      const act = actOf(c), k = ct.hunter ? '追 猎 者' : ct.target ? '目 标' : (ci ? '另 一 位' : '这 片 土 地 上 的 人');
+      const card = { k, n: nm, t: title, ch: chips.slice(0, 3), col };
+      const mk = (shot, dur, lines, extra) => beats.push(Object.assign({ shot, castFo: fo, cut: true, cc: card, dur, lines: lines.map((l, i) => Object.assign(l, { at: 0.35 + i * (dur - 0.5) / Math.max(1, lines.length), d: Math.min(2.4, (dur - 0.6) / Math.max(1, lines.length)) })) }, extra || {}));
+      mk('cFace', lvl === 2 ? 2.4 : 3.0, [L(quote, nm, col)], { tag: ct.hunter ? '猎 手 登 场' : '人 设' });
+      if (lvl < 2) mk('cEyes', 1.7, [], { cc2: 1 });
+      mk('cHand', 2.3, [L(`她 ${act}。`, '', '#e8dcc6', true)]);
+      mk(ci % 2 ? 'cOver' : 'cLow', 2.7, [L(sub2 || quote, nm, col, !!sub2)], { cc2: 1 });
+    });
+    if (beats.length) beats[beats.length - 1].cut = false;
+    return beats;
+  }
+  function castShot(type, fo) {
+    const UP = new THREE.Vector3(0, 1, 0), V = THREE.Vector3, sgn = Math.random() < 0.5 ? -1 : 1, H0 = headOf(fo), F0 = frontOf(fo), hs = fo.f && fo.f.bones && fo.f.bones.rightHand;
+    const live = () => { const h = headOf(fo), f = frontOf(fo), side = new V(-f.z, 0, f.x); return { h, f, side }; };
+    const gy = (x, z) => { try { return Worlds._W.B.H(x, z); } catch (e) { return 0; } };
+    const shot = (camF, lookF, fov, roll) => ({ pos: u => { const c = camF(u); c[1] = Math.max(c[1], gy(c[0], c[2]) + 0.35); return c; }, look: lookF, fov, roll: roll || 0 });
+    // 让被拍的人出现在画面右侧（名牌在左）：看向点偏向被拍者左边
+    const off = (h, c, k) => { const dx = h.x - c[0], dz = h.z - c[2], d = Math.hypot(dx, dz) || 1; return [h.x + dz / d * k, h.z - dx / d * k]; };
+    switch (type) {
+      case 'cEyes': return shot(u => { const { h, f, side } = live(); const d = 0.5 - u * 0.08; return [h.x + f.x * d + side.x * 0.06, h.y + 0.02, h.z + f.z * d + side.z * 0.06]; }, u => { const { h, f, side } = live(), c = [h.x + f.x * (0.5 - u * 0.08) + side.x * 0.06, 0, h.z + f.z * (0.5 - u * 0.08) + side.z * 0.06], dx = h.x - c[0], dz = h.z - c[2], d = Math.hypot(dx, dz) || 1, k = 0.11; return [h.x + dz / d * k, h.y + 0.035, h.z - dx / d * k]; }, [24, 17], 0.02 * sgn);
+      case 'cHand': return shot(u => { const { h, f, side } = live(); let t = h; try { if (hs) { hs.updateWorldMatrix(true, false); t = new V(); hs.getWorldPosition(t); } else t = new V(h.x, h.y - 0.55, h.z); } catch (e) { } return [t.x + f.x * 0.85 + side.x * 0.45 * sgn * (1 - u * 0.4), t.y + 0.22, t.z + f.z * 0.85 + side.z * 0.45 * sgn * (1 - u * 0.4)]; }, u => { const { h } = live(); let t = new V(h.x, h.y - 0.55, h.z); try { if (hs) { hs.getWorldPosition(t); } } catch (e) { } return [t.x, t.y, t.z]; }, [44, 36], -0.04 * sgn);
+      case 'cLow': return shot(u => { const { h, f, side } = live(); const d = 2.3 - u * 0.5; return [fo.pos.x + f.x * d + side.x * 0.7 * sgn, fo.pos.y + 0.22, fo.pos.z + f.z * d + side.z * 0.7 * sgn]; }, u => { const { h } = live(); return [h.x, h.y - 0.35, h.z]; }, [62, 52], 0.06 * sgn);
+      case 'cOver': return shot(u => { const { h, f, side } = live(); return [h.x - f.x * 0.9 + side.x * 0.5 * sgn, h.y + 0.12, h.z - f.z * 0.9 + side.z * 0.5 * sgn]; }, u => { const { h, f } = live(); return [h.x + f.x * 6, h.y - 0.1, h.z + f.z * 6]; }, [48, 40], 0.03 * sgn);
+      default: { const cp = u => { const { h, f, side } = live(), d = 1.25 - u * 0.25; return [h.x + f.x * d + side.x * 0.22 * sgn, h.y + 0.05, h.z + f.z * d + side.z * 0.22 * sgn]; };
+        return shot(cp, u => { const { h } = live(), c = cp(u), dx = h.x - c[0], dz = h.z - c[2], d = Math.hypot(dx, dz) || 1, k = 0.24; return [h.x + dz / d * k, h.y - 0.02, h.z - dx / d * k]; }, [38, 30], -0.02 * sgn); }
+    }
+  }
+
   // ================= 电影播放器 =================
   let CN = null; // { sg, beats, bi, t0, shot, saved, done, wait }
   function css() {
@@ -124,6 +180,12 @@ window.Saga = (() => {
 #sgRoot .grain{position:absolute;inset:-50px;z-index:1;pointer-events:none;opacity:.13;background-size:128px;animation:sgGr .5s steps(5) infinite}
 @keyframes sgGr{0%{transform:translate(0,0)}20%{transform:translate(-30px,18px)}40%{transform:translate(22px,-26px)}60%{transform:translate(-14px,-30px)}80%{transform:translate(28px,22px)}}
 #sgRoot .fade{position:absolute;inset:0;background:#000;opacity:1;z-index:3;pointer-events:none;transition:opacity .45s}
+#sgRoot .cc{position:absolute;left:6vw;top:calc(var(--bh,12vh) + 11vh);z-index:4;max-width:42vw;opacity:0;transform:translateX(-30px);transition:opacity .35s,transform .5s cubic-bezier(.2,.7,.2,1);text-shadow:0 2px 14px #000}
+#sgRoot .cc.on{opacity:1;transform:none}
+#sgRoot .cc .k{font-size:clamp(15px,1.4vw,19px);letter-spacing:.5em;color:var(--c,#ffe0a8);padding-left:14px;border-left:4px solid var(--c,#ffe0a8);margin-bottom:10px}
+#sgRoot .cc .n{font-size:clamp(46px,6.4vw,104px);font-weight:900;letter-spacing:.1em;color:#fff;line-height:1.05}
+#sgRoot .cc .t{font-size:clamp(20px,2vw,30px);letter-spacing:.3em;color:var(--c,#ffe0a8);margin:8px 0 14px}
+#sgRoot .cc .ch span{display:inline-block;margin:0 10px 8px 0;padding:5px 14px;font-size:clamp(16px,1.5vw,21px);letter-spacing:.12em;color:#fff;background:rgba(0,0,0,.55);border:1px solid var(--c,#ffe0a8)}
 #sgRoot .tag{position:absolute;left:5vw;z-index:4;top:calc(var(--bh,12vh) + 18px);font-size:clamp(15px,1.5vw,19px);letter-spacing:.42em;color:#f0dcae;text-shadow:0 2px 10px #000;opacity:0;transition:opacity .6s;padding-left:14px;border-left:3px solid var(--tc,#e7c27a)}
 #sgRoot .tag.on{opacity:1}
 #sgRoot .ttl{position:absolute;left:0;right:0;top:32%;text-align:center;z-index:4;opacity:0;transition:opacity 1.2s;pointer-events:none}
@@ -197,12 +259,12 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
   function ensure() {
     css(); if (root) return;
     root = document.createElement('div'); root.id = 'sgRoot';
-    root.innerHTML = `<div class="tint"></div><div class="vig"></div><div class="grain"></div><div class="bar bt"></div><div class="bar bb"></div><div class="tag"></div>
+    root.innerHTML = `<div class="tint"></div><div class="vig"></div><div class="grain"></div><div class="bar bt"></div><div class="bar bb"></div><div class="tag"></div><div class="cc"><div class="k"></div><div class="n"></div><div class="t"></div><div class="ch"></div></div>
 <div class="ttl"><div class="a"></div><div class="ln"></div><div class="b"></div><div class="c"></div></div><div class="stakeh"></div><div class="stake"><div class="sc" data-w="good" style="--c:#ffe28a"><div class="k">✦ 若她倒下</div><div class="v"></div><div class="e"></div></div><div class="sc" data-w="bad" style="--c:#ff8a7a"><div class="k">✧ 若她活着</div><div class="v"></div><div class="e"></div></div></div>
 <div class="sub"><div class="who"></div><div class="txt"></div></div><div class="go">▶ 空格 · 出发</div><div class="dots"></div><div class="hint">空格 / 点击：下一幕　·　Esc：跳过</div><div class="fade"></div>`;
     document.body.appendChild(root);
     root.querySelector('.grain').style.backgroundImage = `url(${grainURL()})`;
-    el = { tag: root.querySelector('.tag'), ttl: root.querySelector('.ttl'), a: root.querySelector('.ttl .a'), b: root.querySelector('.ttl .b'), c: root.querySelector('.ttl .c'), stake: root.querySelector('.stake'), sg: root.querySelector('.stake [data-w=good]'), sb: root.querySelector('.stake [data-w=bad]'), sh: root.querySelector('.stakeh'), who: root.querySelector('.who'), txt: root.querySelector('.txt'), go: root.querySelector('.go'), dots: root.querySelector('.dots'), fade: root.querySelector('.fade') };
+    el = { cc: root.querySelector('.cc'), tag: root.querySelector('.tag'), ttl: root.querySelector('.ttl'), a: root.querySelector('.ttl .a'), b: root.querySelector('.ttl .b'), c: root.querySelector('.ttl .c'), stake: root.querySelector('.stake'), sg: root.querySelector('.stake [data-w=good]'), sb: root.querySelector('.stake [data-w=bad]'), sh: root.querySelector('.stakeh'), who: root.querySelector('.who'), txt: root.querySelector('.txt'), go: root.querySelector('.go'), dots: root.querySelector('.dots'), fade: root.querySelector('.fade') };
     ['mousedown', 'pointerdown', 'wheel', 'contextmenu'].forEach(ev => root.addEventListener(ev, e => e.stopPropagation()));
     root.addEventListener('click', () => { if (CN) next(); });
   }
@@ -213,6 +275,7 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
     const g = G(), W = window.Worlds && Worlds._W; if (!W || !W.B || CN) return false;
     ensure(); sg.shown = true;
     const L = LOC(sg.k), beats = script(sg);
+    try { const cast = castPick(sg), lv = sg.vis <= 2 ? 0 : sg.vis <= 5 ? 1 : 2, cb = castBeats(cast.slice(0, lv === 2 ? 1 : 2), lv); if (cb.length) { let ti = beats.findIndex(b => b.title); ti = ti < 0 ? 0 : ti; beats.splice(ti + 1, 0, ...cb); } } catch (e) { console.warn('Saga cast', e); }
     CN = { sg, beats, bi: -1, t0: 0, bt: 0, shot: null, saved: [], done: false, wait: false, fov0: g.camera.fov, hid: [] };
     root.style.setProperty('--tc', D.REG[sg.k] ? D.REG[sg.k].col : '#e7c27a'); root.classList.remove('flash');
     const bh = Math.max(window.innerHeight * 0.085, (window.innerHeight - window.innerWidth / 2.39) / 2); root.style.setProperty('--bh', bh + 'px');
@@ -225,6 +288,7 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
     return true;
   }
   function shotFor(b) {
+    if (b.castFo) { try { return castShot(b.shot, b.castFo); } catch (e) { console.warn('cast shot', e); } }
     const g = G(), W = Worlds._W, B = W.B, P = g.player, yaw = P.yaw;
     const fw = [-Math.sin(yaw), 0, -Math.cos(yaw)], rt = [Math.cos(yaw), 0, -Math.sin(yaw)];
     if (!CN.anchor) CN.anchor = [W.pos.x, W.pos.y, W.pos.z];
@@ -240,6 +304,7 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
     CN.bi = i; CN.t0 = performance.now(); CN.shot = shotFor(b); CN.ln = -1;
     root.classList.toggle('flash', b.grade === 'flash');
     el.fade.style.opacity = '0';
+    if (b.cc && !b.cc2) { const cc = b.cc; el.cc.style.setProperty('--c', cc.col); el.cc.querySelector('.k').textContent = cc.k; el.cc.querySelector('.n').textContent = cc.n; el.cc.querySelector('.t').textContent = cc.t; el.cc.querySelector('.ch').innerHTML = cc.ch.map(x => `<span>${esc(x)}</span>`).join(''); el.cc.classList.remove('on'); void el.cc.offsetWidth; el.cc.classList.add('on'); } else if (b.cc && b.cc2) { /* 同一人的后续镜头：名牌保留 */ } else el.cc.classList.remove('on');
     el.tag.textContent = b.tag || ''; el.tag.classList.toggle('on', !!b.tag);
     el.dots.querySelectorAll('i').forEach((d, j) => { d.className = j < i ? 'd' : j === i ? 'on' : ''; });
     // 标题
@@ -268,7 +333,7 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
     if (b.stake) { if (t > 0.6) el.sg.classList.add('on'); if (t > 3.6) el.sb.classList.add('on'); el.txt.classList.remove('on'); el.who.classList.remove('on'); }
     else if (idx !== CN.ln) { CN.ln = idx; if (idx >= 0) showLine(b.lines[idx]); }
     if (!b.stake && idx >= 0 && t > b.lines[idx].at + b.lines[idx].d) el.txt.classList.remove('on'), el.who.classList.remove('on');
-    if (t > b.dur - 0.5 && !CN.fadeOut && CN.bi < CN.beats.length - 1) { CN.fadeOut = true; el.fade.style.opacity = '1'; el.txt.classList.remove('on'); el.who.classList.remove('on'); }
+    if (t > b.dur - 0.5 && !CN.fadeOut && !b.cut && CN.bi < CN.beats.length - 1) { CN.fadeOut = true; el.fade.style.opacity = '1'; el.txt.classList.remove('on'); el.who.classList.remove('on'); }
     if (t > b.dur) { if (CN.bi < CN.beats.length - 1) beginBeat(CN.bi + 1); else finishBeats(); }
   }
   function next() { if (!CN || CN.wait) { if (CN && CN.wait) end(); return; } const b = CN.beats[CN.bi]; if (!b) return; const t = (performance.now() - CN.t0) / 1000; if (t < 0.8) return; if (CN.bi >= CN.beats.length - 1) { if (t > b.dur - 0.2 || t > 3.2) finishBeats(); return; } beginBeat(CN.bi + 1); }
@@ -294,7 +359,8 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
   let lastFov = 0;
   function cam(c, dt, now) {
     if (!CN || !CN.shot || CN.bi < 0) return; const b = CN.beats[CN.bi]; const u = Math.max(0, Math.min(1, (performance.now() - CN.t0) / 1000 / b.dur)), e = ez(u);
-    const s = CN.shot, p = s.pos(e), l = s.look(e);
+    try { const S0 = G().S; if (CN.hp0 == null) CN.hp0 = S0.hp; if (S0.hp < CN.hp0) S0.hp = CN.hp0; } catch (e0) { } /* 电影期间不掉血 */
+    const s = CN.shot; let p, l; try { p = s.pos(e); l = s.look(e); } catch (e1) { return; }
     c.position.set(p[0], p[1], p[2]); c.lookAt(l[0], l[1], l[2]); if (s.roll) c.rotateZ(s.roll * Math.sin(u * 3.14));
     const fv = lerp(s.fov[0], s.fov[1], e); if (Math.abs(fv - lastFov) > 0.05) { c.fov = fv; c.updateProjectionMatrix(); lastFov = fv; }
   }
@@ -329,6 +395,7 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
     const m = s.mod[k]; if (m && m.t === 'ward' && m.left > 0) { try { const st = G().st(); G().S.hp = Math.min(st.maxHp, G().S.hp + Math.round(st.maxHp * 0.3)); } catch (e) { } }
     const rc = s.recent[k] = s.recent[k] || []; rc.push(sg.arch.id); while (rc.length > 3) rc.shift();
     if (!sg.envoy) s.since++;
+    try { sg.hunterId = window.Hunters2 && Hunters2.rollOmen ? Hunters2.rollOmen(k) : null; } catch (e) { sg.hunterId = null; }
   }
   function pickNode(sg, W) {
     if (sg.node || !W || !W.graph) return; const g = W.graph, bad = n => n.home || n.boss || n.rqMini || n.eliteArena || n.huntArena;
@@ -457,7 +524,12 @@ ${rwHTML(sg, win)}<div class="go"><button data-sgok>收下结算 ▶</button></d
     if (!W || !on()) { if (trk) trk.style.display = 'none'; if (!W && T && !T.settled && !CN) { /* 非正常退出：不结算 */ } if (!W) T = null; return; }
     if (!T) return; const sg = T; if (!sg.node && !sg.noNode && W.B) pickNode(sg, W); if (sg.noNode) return;
     if (W.trip && W.stats) sg.snap = { coins: W.trip.coins || 0, kill: W.stats.kill || 0, decap: W.stats.decap || 0 };
-    if (!sg.shown && !W.busy && W.B && !CN) { setTimeout(() => { if (T === sg && !sg.cinDone && !CN && Worlds.active) { const nd = Worlds._W.graph.nodes[Worlds._W.cur]; if (nd && nd.eliteArena) return; try { play(sg); } catch (e) { console.warn('Saga play', e); try { end(); } catch (e2) { CN = null; document.body.classList.remove('sgcine'); } } } }, 700); sg.shown = true; }
+    let hold = false;
+    if (sg.hunterId && !sg.hReady && !sg.shown && !W.busy && W.B) { // 猎手入场伏击：先让她出现在场上，再开电影介绍她
+      if (!sg.hAt) { sg.hAt = performance.now(); try { Hunters2.ambush(sg.hunterId); } catch (e) { sg.hReady = true; } }
+      if ((window.Hunters2 && Hunters2.cur()) || performance.now() - sg.hAt > 9000) { sg.hReady = true; sg.hAt2 = performance.now(); } else hold = true;
+    }
+    if (!sg.shown && !hold && !W.busy && W.B && !CN) { setTimeout(() => { if (T === sg && !sg.cinDone && !CN && Worlds.active) { const nd = Worlds._W.graph.nodes[Worlds._W.cur]; if (nd && nd.eliteArena) return; try { play(sg); } catch (e) { console.warn('Saga play', e); try { end(); } catch (e2) { CN = null; document.body.classList.remove('sgcine'); } } } }, 700); sg.shown = true; }
     if (sg.fo && !sg.done) { if (sg.fo.dead || sg.fo.hp <= 0) onKill(sg); else if (sg.fo.escaped) { sg.esc = true; } }
     track(W);
   }

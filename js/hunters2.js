@@ -44,7 +44,7 @@ window.Hunters2 = (() => {
 
   // ================= 本趟状态 =================
   let T = null; // { m, t0, armedAt, k0, d0, cool, fo, id, fleeAt, spawnAt, spawning }
-  function newTrip() { T = { m: 0, last: performance.now(), armedAt: 0, k0: 0, d0: 0, kH: 0, dH: 0, cool: 0, fo: null, id: null, fleeAt: 0, spawnAt: 0, spawning: false, rollT: 0 }; }
+  function newTrip() { T = { omenFired: false,  m: 0, last: performance.now(), armedAt: 0, k0: 0, d0: 0, kH: 0, dH: 0, cool: 0, fo: null, id: null, fleeAt: 0, spawnAt: 0, spawning: false, rollT: 0 }; }
 
   function recFor(id, loc) {
     const S = G_().S, s = SS().L[id], d = BY[id];
@@ -88,6 +88,16 @@ window.Hunters2 = (() => {
   }
   function endEncounter() { T.fo = null; T.id = null; T.m = 0; T.armedAt = 0; T.cool = performance.now() + 40000; }
 
+  // ================= 入场伏击（R49d）：根据地区恶名 + 仇恨，进入地区时可能触发某位猎手；由 Saga 电影引出 =================
+  function rollOmen(k) {
+    if (!on()) return null; const s = SS(), S = G_().S, al = alive(); if (!al.length) return null;
+    const trips = (S.stats && S.stats.trips) || 0; if (trips < 3 || s.hate < 6) return null;
+    if (s.lastOmen != null && trips - s.lastOmen < 2) return null;
+    const inf = (s.reg && s.reg[k]) || 0, p = Math.min(0.6, 0.06 + inf * 0.035 + s.hate * 0.008); if (Math.random() > p) return null;
+    s.lastOmen = trips; const a = al.slice().sort((x, y) => s.L[x.id].meet - s.L[y.id].meet); return a[Math.floor(Math.random() * Math.min(2, a.length))].id;
+  }
+  function ambush(id) { if (!T) newTrip(); T.omenFired = true; T.cool = 0; return spawn(id); }
+  const cur = () => (T && T.fo && !T.fo.dead ? T.fo : null);
   // ================= 主循环 =================
   function tick() {
     const W = window.Worlds && Worlds.active && Worlds._W;
@@ -97,6 +107,8 @@ window.Hunters2 = (() => {
     const now = performance.now(), dt = Math.min(1, (now - T.last) / 1000); T.last = now;
     const st = W.stats || {}, k = st.kill || 0, dc = st.decap || 0, s = SS();
     // 仇恨（永久） + 感应（本趟）
+    const locK = (W.graph.nodes[W.cur] || {}).loc; s.reg = s.reg || {};
+    if (k > T.kH && locK) s.reg[locK] = (s.reg[locK] || 0) + (k - T.kH); if (dc > T.dH && locK) s.reg[locK] = (s.reg[locK] || 0) + (dc - T.dH) * 0.5;
     if (k > T.kH) { s.hate += (k - T.kH) * (window.Gear2 ? Gear2.hateMul() : 1); T.m += (k - T.kH) * 7 * (window.Gear2 ? Gear2.senseMul() : 1); T.kH = k; }
     if (dc > T.dH) { s.hate += (dc - T.dH) * 0.5 * (window.Gear2 ? Gear2.hateMul() : 1); T.m += (dc - T.dH) * 4 * (window.Gear2 ? Gear2.senseMul() : 1); T.dH = dc; }
     const node = W.graph.nodes[W.cur], quiet = !node || node.home || node.huntArena || node.eliteArena || (W.boss && !W.boss.dead) || W.busy || W.dead;
@@ -104,7 +116,9 @@ window.Hunters2 = (() => {
     if (!T.fo && !quiet && now > T.cool) T.m += dt * (0.25 + mins * 0.06) * (window.Gear2 ? Gear2.senseMul() : 1); // 每分钟约 15%，停得越久涨得越快
     T.m = Math.min(100, T.m); T.quiet = !!quiet;
     const al = alive();
-    if (!T.fo && !quiet && T.m >= 100 && al.length && now > T.cool) {
+    const inf = (locK && s.reg[locK]) || 0, gate = s.hate >= 8 && inf >= 6 && mins >= 1.5 && !T.omenFired; /* R49d：开局不刷猎手——要这个地区有足够的“恶名”、仇恨够高、且已停留 1.5 分钟以上；入场伏击由 rollOmen 决定（带电影） */
+    T.gate = gate;
+    if (!T.fo && !quiet && gate && T.m >= 100 && al.length && now > T.cool) {
       if (!T.armedAt) T.armedAt = now;
       T.rollT -= dt; if (T.rollT <= 0) { T.rollT = 5; const p = Math.min(0.9, 0.15 + (now - T.armedAt) / 60000 * 0.12); if (Math.random() < p) spawn(al[Math.floor(Math.random() * al.length)].id); }
     }
@@ -201,5 +215,5 @@ ${dead ? '' : `<div class="r3-odds" style="--oc:${oc(o.p)}"><div class="row"><sp
 
   wrap(); setTimeout(wrap, 0); addEventListener('load', wrap);
   setInterval(() => { try { tick(); } catch (e) { console.warn('Hunters2 tick', e); } }, 100);
-  return { on, D, BY, SS, lvOf, powOf, odds, alive, spawn: id => spawn(id), toggle, get T() { return T; }, HATE_STEP };
+  return { on, D, BY, SS, lvOf, powOf, odds, alive, spawn: id => spawn(id), rollOmen, ambush, cur, infamy: k => (SS().reg && SS().reg[k]) || 0, toggle, get T() { return T; }, HATE_STEP };
 })();

@@ -1803,3 +1803,10 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - `beasts.js`：新增 `prefetch(node)`。
 - `mods.js`/`mods_i18n.js`：新增 fast_load。
 - 没做/后续：着色器预编译（需真机确认变体）、`paint()` 外圈降采样、邻居地点的 body 预载（会在战斗中造成 30–60ms 卡顿，暂不做）、GLB 贴图降分辨率（会改画质）。`renderer.debug.checkShaderErrors=false` 在 r147 里收益很小（getUniforms 仍会等链接），没加。
+
+## R49d（用户反馈：看不到技能栏 / 猎手别开局出现 / 入场电影要有人设 / 大小头 / HP 太偏）
+- **技能栏看不见**：无头环境实测（禁用 pointer lock）：洞里 `#tbBar.on.cave`，出洞后 `W.busy` 很久为 true（加载）期间栏被隐藏（设计如此：`show=!!W&&!W.busy&&!W.dead`）；真机上的具体原因**仍未复现**。已做：① saga 电影隐藏 HUD 改用 `body.sgcine`（42b1eff）；② `hudfix.js` 新增看门狗（野外非加载/非死亡/非电影时，清除 tbBar/tbCol/hud/wHint/hpC 的行内 opacity/visibility、移除残留 sgcine、缺 `.on` 就补）。洞里 Q/E/H 三个格子是**基础动作**（不用学）。
+- **新 MOD `hp_center`（`js/hpcenter.js`，默认开）**：屏幕底部正中大血条 + 魂能条，掉血白色残影，<35% 红光脉动，<20% 屏幕边缘泛红；`hudfix.js` 写 `--tbB`（热键栏高度）并把 `HpCenter.extra()` 并进 `--tbH`，其他贴底提示自动上移。洞里只在受伤时出现；Hub 打开时隐藏。
+- **猎手**（`js/hunters2.js`）：① 感应条触发的随机降临要求「地区恶名 S.h2.reg[loc] ≥ 6 且 仇恨 ≥ 8 且本趟已停留 ≥ 1.5 分钟」（不再开局出现；恶名=在该地区的放倒+0.5×斩首）；② 新 `rollOmen(k)`（trips≥3、仇恨≥6、隔 ≥2 趟、概率 0.06+0.035×恶名+0.008×仇恨，上限 0.6）在 Saga.setupTrip 里决定**入场伏击**；`ambush(id)` 立即刷出猎手，Saga 电影等她出现后（≤9s）用「猎手登场」镜头介绍她；`cur()/infamy(k)` 导出。
+- **入场电影加「人设介绍蒙太奇」**（`saga.js` `castPick/castBeats/castShot`）：从场上活人里挑 1–2 人（优先猎手 > 目标 > 最近的人），每人 3–4 个硬切特写（脸 cFace / 眼睛 cEyes / 手 cHand / 低角度全身 cLow / 过肩 cOver），镜头跟随活体头骨/手骨，被拍者构图在右、名牌在左（大字名字 + 头衔 + 性格/喜欢/怕 chips，来自 `Overhear.bio`，猎手显示等级与战斗风格），字幕=口头禅/秘密/“她 + 做事动作”。电影期间玩家血量锁定。测试：`tools/test/saga.html`（桩角色）+ `/var/work/pw/cast_shots.js`。**未在真实游戏里验证**（沙盒内跑整游戏太慢）。
+- **大头/小头**（`js/foe.js`，MOD `head_norm` 默认开，依附 head_natural）：脸高统一成「身体身高/6.6」（身高=头骨关节高+0.2），夹在原比例 0.8–1.15 倍内，并重算头位置。

@@ -103,7 +103,10 @@ window.Foe = (() => {
     // 挂头：静止姿势下算好相对 H_head 的偏移
     root.updateMatrixWorld(true);
     const fit = headFit(E), headBone = bones.head;
-    if (window.Mods && Mods.on('head_natural')) { try { const bb = new THREE.Box3(); hb.group.updateMatrixWorld(true); hb.group.traverse(o => { if (o.isMesh && o.userData.kind === 'skin') bb.expandByObject(o); }); const hH = bb.max.y - bb.min.y; if (hH > 0.05 && hH < 1) fit.s = Math.min(fit.s, 0.272 / hH); } catch (e) {} } // R43b：个别头模（Vivi/Vita/Victoria）脸比别的高 8%，再压到同一上限，避免偶发大头娃娃
+    if (window.Mods && Mods.on('head_natural')) { try { const bb = new THREE.Box3(); hb.group.updateMatrixWorld(true); hb.group.traverse(o => { if (o.isMesh && o.userData.kind === 'skin') bb.expandByObject(o); }); const hH = bb.max.y - bb.min.y; if (hH > 0.05 && hH < 1) { fit.s = Math.min(fit.s, 0.272 / hH);
+      if (!window.Mods || Mods.on('head_norm') !== false) { /* R49d head_norm：按「身体身高」把脸高统一到 身高/6.6（以前按眼高公式，头模不同就忽大忽小），夹在原比例的 0.8~1.15 倍内防极端 */
+        const hy = new V3().setFromMatrixPosition(headBone.matrixWorld).y - new V3().setFromMatrixPosition(root.matrixWorld).y, tgt = (hy + 0.2) / 6.6, s0 = fit.s; fit.s = Math.max(s0 * 0.8, Math.min(s0 * 1.15, tgt / hH));
+        if (fit.s !== s0) { const ey = E.eyeY != null ? E.eyeY : E.headY + 0.058; fit.pos = new V3(E.headX || 0, ey + 0.0102 * fit.s, (E.eyeZ != null ? E.eyeZ : (E.headZ || 0) + 0.03) - 0.02 * fit.s); } } } } catch (e) {} } // R43b：个别头模（Vivi/Vita/Victoria）脸比别的高 8%，再压到同一上限，避免偶发大头娃娃
     const holder = new THREE.Group(); holder.name = 'headHolder';
     const want = new M4().compose(fit.pos, new Q(), new V3(1, 1, 1));
     const inv = new M4().copy(root.matrixWorld).invert().multiply(headBone.matrixWorld).invert(); // 身体根空间 → 头骨局部

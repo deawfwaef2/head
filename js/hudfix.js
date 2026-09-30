@@ -36,12 +36,21 @@ body.hudl .bar span,body.hudl .pfl{font-size:13.5px}
     if (!st) { st = document.createElement('style'); st.id = 'hudlCss'; st.textContent = CSS; document.head.appendChild(st); }
     document.body.classList.add('hudl');
     tb = tb || document.getElementById('tbBar');
+    try { /* R49d 看门狗：野外（非加载/非死亡/非电影）时，技能栏及相关 HUD 若被行内样式或遗留类藏起来，强制恢复 */
+      const Wd = window.Worlds && Worlds.active && Worlds._W;
+      if (Wd && !Wd.busy && !Wd.dead && !(window.Saga && Saga.cine)) {
+        document.body.classList.remove('sgcine');
+        for (const id of ['tbBar', 'tbCol', 'hud', 'wHint', 'hpC']) { const e = document.getElementById(id); if (e) { if (e.style.opacity === '0') e.style.opacity = ''; if (e.style.visibility === 'hidden') e.style.visibility = ''; if (e.style.pointerEvents === 'none' && id !== 'tbBar') e.style.pointerEvents = ''; } }
+        if (tb && !tb.classList.contains('on') && window.Talents && Talents.on() && (!window.Mods || Mods.on('talent_ui')) && window.G && G.playing && !G.uiOpen) tb.classList.add('on');
+      }
+    } catch (e) { }
     let h = 0;
     if (tb && tb.classList.contains('on')) {
       const r2 = tb.querySelectorAll('.r2 .tbs'); const empty = r2.length && [...r2].every(x => x.classList.contains('em'));
       tb.classList.toggle('r2off', !!(empty && !shift));
       const r = tb.getBoundingClientRect(); h = Math.max(0, Math.round(innerHeight - r.top));
     }
+    document.documentElement.style.setProperty('--tbB', h + 'px'); try { if (window.HpCenter) h += HpCenter.extra(); } catch (e) { }
     document.documentElement.style.setProperty('--tbH', h + 'px');
   }
   setInterval(tick, 200); addEventListener('load', tick);
