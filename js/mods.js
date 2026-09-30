@@ -53,7 +53,7 @@ window.Mods = (() => {
     { id: 'body_headfit', cat: 'look', icon: '🧍', n: '原神身体头身比修正（R31）', d: '头挂到身体上的尺寸原本按 VRoid 身体标定，换到原神身体上头会小 3~18%（芙宁娜最明显）。按身高/头高、头宽/肩宽两个指标给每具原神身体单独校正，VRoid 身体不变。', def: true },
     { id: 'head_qc', cat: 'look', icon: '🔍', n: '怪异头模屏蔽（R31）', d: '逐个目检后仍显怪异、暂不能修的头模（八云紫、黑鸟）不再随机出现，也不借给别的头当发型。已拥有的不受影响。', def: true },
     { id: 'recall_iw', cat: 'look', icon: '🤲', n: '原场景回忆（R33）', d: 'F 回忆不再开新的 3D 界面：就在洞里拉近镜头，主角双手捧着她做动作（对视/抚摸/嗅闻/贴耳/那一战 + 把玩：抛接/转圈/戳脸/拍头），首级不再变表情，每个动作有音效；信息卡与动作栏重做。', def: true },
-    { id: 'dev_mode', cat: 'play', icon: '🛠', n: '开发者模式（R34）', d: '资源无限（魂晶/材料/药剂自动补满）、全部建筑解锁、无敌、体力无限；F8 或右下角 DEV 按钮打开面板：刷首级（可选稀有度）、装备满阶、等级拉满、回忆全开。关掉即恢复正常玩法。', def: true },
+    { id: 'dev_mode', cat: 'play', icon: '🛠', n: '开发者模式（R34）', d: '资源无限（魂晶/材料/药剂自动补满）、全部建筑解锁、无敌、体力无限；F8 或右下角 DEV 按钮打开面板：刷首级（可选稀有度）、装备满阶、等级拉满、回忆全开。关掉即恢复正常玩法。', def: false },
     { id: 'foe_abs', cat: 'play', icon: '⚖️', n: '按地区的绝对强度（R35）', d: '删除两套保险：①敌人伤害不再按你的最大生命百分比算，而是按地区强度的绝对数值（越深越疼）；②删除每刀保底伤害与“普通敌人第 6 刀必死”。新手装备去深处会被秒——要刷装备、练级。', def: true },
     { id: 'hunters2', cat: 'play', icon: '🏹', n: '四名食人魔猎手（R35）', d: '勇者艾琳、追迹者诺薇、守誓人葛温、魔导士米娅。你放倒的人越多仇恨越高，她们全员升级（每 15 仇恨 +1 级）；出猎时猎手感应满了就可能穿越到你所在的地图（洞穴除外），在场时门全部封锁；血量 30% 会逃跑，逃掉就变强。U 查看等级/战力差距/胜率。', def: true, conflicts: ['ogre_hunters'] },
     { id: 'elite_bosses', cat: 'play', icon: '👑', n: '精英挑战 + 月之魔女（R35）', d: '13 名精英（马戏团长/海盗女王/瘟疫医生/竞技场冠军/沙海女王/机关大师/炼金大公/盗贼之主/蛇母/女武神/女法老/剑圣/巨人女王）+ 最终「月之魔女」。满足剧情条件解锁，C 打开面板查看传闻、推荐战力、预估胜率并发起挑战（进入封门决斗场）。', def: true },
@@ -156,6 +156,7 @@ window.Mods = (() => {
   if (st.__v < 4) { for (const id of ['steady_save', 'ground_contact', 'head_repair', 'smooth_faces', 'cave_detail']) st[id] = true; st.__v = 4; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
   if (st.__v < 5) { st.forge_buy = false; st.__v = 5; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R26：装备不能买，只能搜刮 + 强化
   if (st.__v < 6) { st.ogre_hunters = false; st.hunters2 = true; st.__v = 6; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R35：旧食人魔猎手 → 四名主角式猎手
+  if (st.__v < 7) { st.dev_mode = false; st.__v = 7; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R37：开发者模式默认关闭（用户要求），旧存档迁移一次
   for (const m of LIST) if (st[m.id] === undefined) st[m.id] = !!m.def;
   // 修正非法状态（互斥组恰好一个；冲突；依赖）
   function normalize() {
