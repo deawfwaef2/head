@@ -131,7 +131,7 @@ window.Play = (() => {
         G.burst(F.center, '#ff8a3a', 90, 3.2, 1.2, 2); G.burst(F.center, col, 60, 2.4, 1.4, 0.5); G.flash(col + '99');
         setTimeout(() => { G.spawnBeam(h.g.position, col, rec.c.rar, rec.c.shiny); G.gachaCard(rec, isNew); }, 650);
         SFX.play('heavy', 0.6, 0.8); SFX.fanfare(Math.max(1, rec.c.rar)); SFX.soul && SFX.soul();
-        G.toast(`⚗️ 熔炼成功：【${RARN[rec.c.rar]}】${rec.c.name}${rec.c.shiny ? ' ✨异色' : ''}${(rec.c.aff || []).length ? ' · 魂印 ' + rec.c.aff.map(k => RPG.AFF[k] ? RPG.AFF[k].n : k).join('/') : ''}`, col, 4);
+        G.toast(`⚗️ 熔炼成功：【${RARN[rec.c.rar]}】${NM(rec.c)}${rec.c.shiny ? ' ✨异色' : ''}${(rec.c.aff || []).length ? ' · 魂印 ' + rec.c.aff.map(k => RPG.AFF[k] ? RPG.AFF[k].n : k).join('/') : ''}`, col, 4);
         M.fused = (M.fused || 0) + 1; saveM(); G.save();
         setTimeout(() => { F.b.busy = false; if (mol) mol.material.color.set('#ff5a14'); }, 900);
         forging.splice(i, 1);
@@ -246,7 +246,7 @@ window.Play = (() => {
       .replace('{raceA}', A.rec.c.raceN || '').replace('{hwA}', hwA || '头饰').replace('{hwB}', hwB || '头饰');
   }
   function say(h, txt, delay, dur) {
-    const el = document.createElement('div'); el.className = 'hbub'; el.innerHTML = `<small>${h.rec.c.name}</small>${txt}`; document.body.appendChild(el);
+    const el = document.createElement('div'); el.className = 'hbub'; el.innerHTML = `<small>${NM(h.rec.c)}</small>${txt}`; document.body.appendChild(el);
     bubbles.push({ h, el, t: -delay, dur });
   }
   function tickChat(dt) {
@@ -313,7 +313,7 @@ window.Play = (() => {
     const T = makeThief(); const ex = G.cave.exitPos.clone(); T.g.position.set(ex.x, 1.8, ex.z); G.scene.add(T.g);
     const depth = G.S.depth || 1;
     thief = { ...T, tgt, state: 'seek', hp: 6 + depth * 2, hp0: 6 + depth * 2, carry: null, hitT: 0, t: 0 };
-    G.toast('⚠️ 盗魂灵潜进洞窟了！它盯上了「' + tgt.rec.c.name + '」——对准它狂点左键把它打散！', '#c79aff', 5);
+    G.toast('⚠️ 盗魂灵潜进洞窟了！它盯上了「' + NM(tgt.rec.c) + '」——对准它狂点左键把它打散！', '#c79aff', 5);
     sfx('bell', 0.6, 0.5); SFX.heartbeat && SFX.heartbeat();
     return true;
   }
@@ -358,7 +358,7 @@ window.Play = (() => {
       if (L < 0.2) {
         const stolen = Math.round(G.S.coins * 0.06);
         if (stolen > 0) G.addCoins(-stolen);
-        G.toast(`盗魂灵逃走了……偷走 ${fmt(stolen)} 魂晶${T.carry ? `，「${T.carry.rec.c.name}」被丢在了洞口` : ''}。`, '#ff9aa8', 4);
+        G.toast(`盗魂灵逃走了……偷走 ${fmt(stolen)} 魂晶${T.carry ? `，「${NM(T.carry.rec.c)}」被丢在了洞口` : ''}。`, '#ff9aa8', 4);
         killThief(false);
       }
     }
@@ -412,7 +412,7 @@ window.Play = (() => {
     const has = k => hw.some(e => e.k === k);
     const H = ModelHeads.HAIR.slice(0, 24);
     const mk = look.mk || [0, 0, 0];
-    openModal(`<button class="pbtn pclose" data-a="close">✕ 关闭</button><h2>💄 化妆台 · ${h.rec.c.name}</h2>
+    openModal(`<button class="pbtn pclose" data-a="close">✕ 关闭</button><h2>💄 化妆台 · ${NM(h.rec.c)}</h2>
       <div class="sub">头饰 / 染发每次 ${fmt(cost)} 魂晶；表情与妆容免费。当前魂晶 ${fmt(G.S.coins)}</div>
       <h3>🎀 头饰（最多 2 件，帽子与发箍互斥）</h3><div class="prow">${HW_KEYS.map(k => `<button class="pbtn ${has(k) ? 'on' : ''}" data-a="hw:${k}">${HW_ICON[k]} ${HeadWear.N[k]}</button>`).join('')}
         <button class="pbtn" data-a="hwcol">🎨 换配色</button><button class="pbtn" data-a="hwnone">🚫 摘掉全部</button></div>
@@ -592,7 +592,7 @@ window.Play = (() => {
       if (aimThief()) return `<b style="color:#c79aff">👻 盗魂灵</b> · 剩余 ${thief.hp}/${thief.hp0} · <b>左键</b>攻击！`;
       const b = hit && hit.build; if (!b) return null;
       if (b.type === 'forge' && !held && !hit.head) { const P = fusePlan(b); return P ? `<b>⚗️ 熔魂炉</b> · 三颗 → 【${RARN[P.target]}】${P.same ? '（同阶必升）' : `（${Math.round((0.3 + lv('forge') * 0.08) * 100)}% 再升一阶）`} · <b>[E]</b> 开炉 🔮${fmt(P.fee)}` : `<b>⚗️ 熔魂炉</b> · 炉台 ${b.heads.filter(Boolean).length}/3 · 拿着首级按 E 放上炉台`; }
-      if (b.type === 'dresser') return held ? `<b>💄 化妆台</b> · <b>[E]</b> 打扮「${held.rec.c.name}」` : '<b>💄 化妆台</b> · 先拿起一颗首级';
+      if (b.type === 'dresser') return held ? `<b>💄 化妆台</b> · <b>[E]</b> 打扮「${NM(held.rec.c)}」` : '<b>💄 化妆台</b> · 先拿起一颗首级';
       if (b.type === 'altar' && !held) return `<b>♻️ 轮回祭坛</b> · 第 ${M.rb || 0} 世 · 魂核 ${M.cores} · <b>[E]</b> 查看`;
       if (b.type === 'bowling') { const L = b.bowl; return `<b>🎳 魂球道</b> · 拿起首级站在金线后<b>右键</b>扔出${L && L.streak ? ` · 当前 ${L.streak} 连全中` : ''}`; }
       return null;

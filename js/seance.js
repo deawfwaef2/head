@@ -45,13 +45,13 @@ window.Seance = (() => {
   const rng = s => () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296;
 
   function script(rec) {
-    const c = rec.c, gn = c.name.split('·')[0], I = (Lore.ID || {})[c.id] || {}, act = I.act || ['发呆'], tr = (c.traits || [])[0] || '温柔';
+    const c = rec.c, gn = NM(c).split('·')[0], I = (Lore.ID || {})[c.id] || {}, act = I.act || ['发呆'], tr = (c.traits || [])[0] || '温柔';
     const loc = Lore.LOCS.find(l => l.k === c.loc) || Lore.LOCS[0], r = rng(rec.id * 7919 + 13);
     const fill = s => s.replace(/\{gn\}/g, gn).replace(/\{loc\}/g, loc.n);
     const ch = CHILD[c.race] || CHILD.human, T = TR[tr] || ['……', {}];
     const fx = FX[c.race] || 'petal';
     return [
-      { k: 'title', dur: 4.6, bg: [loc.color, '#140c1c'], fx: 'spark', ex: { relaxed: 0.25, happy: 0.15 }, eyesOpen: true, title: (c.title ? '『' + c.title + '』' : '') + '<b>' + c.name + '</b>', sub: `${c.raceN} · ${c.idN} · ${c.age}岁 —— 生前的记忆`, yaw: 0, zoom: 1.05 },
+      { k: 'title', dur: 4.6, bg: [loc.color, '#140c1c'], fx: 'spark', ex: { relaxed: 0.25, happy: 0.15 }, eyesOpen: true, title: (c.title ? '『' + c.title + '』' : '') + '<b>' + NM(c) + '</b>', sub: `${c.raceN} · ${c.idN} · ${c.age}岁 —— 生前的记忆`, yaw: 0, zoom: 1.05 },
       { k: 'child', dur: 5.2, bg: ['#ffe2b0', '#d88a6a'], fx, ex: { happy: 0.85 }, cap: fill(ch[Math.floor(r() * ch.length)]), yaw: 0.25, tilt: 0.1 },
       { k: 'daily', dur: 5.2, bg: [loc.color, '#28384e'], fx, ex: { relaxed: 0.45 }, cap: `长大后的${gn}，每天都${act[0]}。`, cap2: `偶尔，也会${act[1] || act[0]}。`, yaw: -0.3 },
       { k: 'trait', dur: 5.4, bg: ['#ffd0e0', '#7a5aa0'], fx: 'spark', ex: T[1], talk: true, quote: T[0], cap: `大家都说，${gn}是个${tr}的姑娘。`, yaw: 0.1, tilt: -0.12, zoom: 1.12 },
@@ -177,7 +177,7 @@ window.Seance = (() => {
         rec.calm = 1; rec.look.ex = { relaxed: 1, blink: 1, happy: 0.15 }; G.addCoins(first);
         setEx(rec.look.ex, true); el.classList.add('calmed'); SFX.play && SFX.play('bell', 0.6, 1.2); SFX.fanfare && SFX.fanfare(2);
         st.cb.onApply && st.cb.onApply(rec.look.ex, 'calm');
-        done(`🕊️ ${c.name.split('·')[0]} 的表情终于安详了。<br><small>+${first} 魂晶 · 产出永久 ×1.5</small>`, '#cfe8ff');
+        done(`🕊️ ${NM(c).split('·')[0]} 的表情终于安详了。<br><small>+${first} 魂晶 · 产出永久 ×1.5</small>`, '#cfe8ff');
       } else {
         const add = !c.aff.includes('wrath'); if (add) c.aff.push('wrath');
         rec.look.ex = { angry: 0.7, sad: 0.8, surprised: 0.45 }; G.addCoins(first + sq);

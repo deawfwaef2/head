@@ -413,7 +413,7 @@ window.startGame = function () {
     if (film && (e.code === 'BracketLeft' || e.code === 'BracketRight')) { film.sp = Math.max(0.3, Math.min(12, film.sp * (e.code === 'BracketRight' ? 1.4 : 0.7))); toast('镜头速度 ' + film.sp.toFixed(1), '#ccc', 0.8); return; }
     if (e.code === 'KeyE') { if (e.repeat) return; if (hplace) { confirmHP(); return; } eDown = performance.now(); eLong = false; return; } // 短按 = 松开时交互；长按 = 摆放模式
     if (e.code === 'KeyR' && hplace) { hplace.pose = (hplace.pose + (e.shiftKey ? RESTS.length - 1 : 1)) % RESTS.length; SFX.click(); toast('姿势：' + HP_POSE[hplace.pose], '#8fe0a0', 0.9); return; }
-    if (e.code === 'KeyF') { if (window.Combat && Combat.enabled && !held && !hplace && !buildMode && !bagCarrying) Combat.toggle(); else inspectLook(); }
+    if (e.code === 'KeyF') { const lh0 = window.Recall && Recall.on() && !held ? (lookHit() || {}).head : null; if (window.Combat && Combat.enabled && !held && !lh0 && !hplace && !buildMode && !bagCarrying) Combat.toggle(); else inspectLook(); } // 回忆：手里/看着首级时 F = 回忆她
     if (e.code === 'KeyI') inspectLook();
     if (e.code === 'KeyR' && buildMode) { buildRot = ((buildRot + (e.shiftKey ? -0.125 : 0.125)) % 4 + 4) % 4; SFX.click(); toast(`旋转 ${Math.round(buildRot * 90)}°（R / Shift+R，每次 11.25°）`, '#8fe0a0', 0.8); }
     if (e.code === 'KeyQ' && held) throwHeld(true);
@@ -614,7 +614,7 @@ window.startGame = function () {
     const c = rec.c, R = RAR[c.rar];
     const el = document.createElement('div'); el.className = 'gcard r' + c.rar + (c.shiny ? ' shiny' : ''); el.style.setProperty('--c', R.c);
     el.innerHTML = `<div class="gstars">${'★'.repeat(c.rar + 1)}</div>${isNew ? '<div class="gnew">NEW</div>' : ''}
-      <div class="grar">【${R.n}】${c.shiny ? ' ✨异色' : ''}</div>${c.title ? `<div class="gtitle">『${c.title}』</div>` : ''}<div class="gname">${c.name}</div>
+      <div class="grar">【${R.n}】${c.shiny ? ' ✨异色' : ''}</div>${c.title ? `<div class="gtitle">『${c.title}』</div>` : ''}<div class="gname">${NM(c)}</div>
       <div class="gsub">${c.raceN} · ${c.idN} · ${c.age}岁</div>${(c.aff || []).length ? `<div class="gaff">${c.aff.map(k => RPG.AFF[k] ? `${RPG.affHTML(k, 'pill')}` : '').join('')}</div>` : ''}`;
     gachaBox.appendChild(el); requestAnimationFrame(() => el.classList.add('in'));
     while (gachaBox.children.length > 3) gachaBox.firstChild.remove();
@@ -702,7 +702,7 @@ window.startGame = function () {
   }
   function inspectLook() {
     const lh = lookHit() || {}; const h = held || lh.head || (lh.build ? nearestHead(lh.build, lh.point) : null);
-    if (h) { UI.openCard(h.rec); SFX.book(); }
+    if (h) { if (window.Recall && Recall.on()) { Recall.open(h.rec); SFX.book(); return; } UI.openCard(h.rec); SFX.book(); }
   }
   function dropHeld() { if (!held) return; const h = held; held = null; h.sleep = 0; h.vel.multiplyScalar(0.3); SFX.play('sack', 0.3); }
   function throwHeld(soft) {
@@ -717,7 +717,7 @@ window.startGame = function () {
       addCoins(v); floatText('碾碎吸魂 +' + v, h.g.position, '#ff4a6a', 30);
       burst(h.g.position, '#8a0010', 60, 2.5, 1.0, -8); burst(h.g.position, RAR[h.rec.c.rar].c, 40, 2, 1.2, 1);
       bloodSplat(h.g.position.x, 0, h.g.position.z, 0.8); SFX.squish(1.4); SFX.play('heavy', 0.8, 0.7); shake = 0.3;
-      toast(`你捏碎了「${h.rec.c.name}」的头颅，吸干了她最后的残魂。`, '#ff6a7a', 2.5);
+      toast(`你捏碎了「${NM(h.rec.c)}」的头颅，吸干了她最后的残魂。`, '#ff6a7a', 2.5);
       removeHead(h); save();
     } else if (hit.build) {
       const b = hit.build; const refund = Math.round(cost(b.type) / CAT[b.type].grow * 0.5);
@@ -806,7 +806,7 @@ window.startGame = function () {
     const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#d8b060'); gr.addColorStop(1, '#8a6420'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
     g.strokeStyle = '#4a3208'; g.lineWidth = 4; g.strokeRect(5, 5, W - 10, H - 10);
     g.fillStyle = '#2a1a04'; g.textAlign = 'center';
-    if (h) { const c = h.rec.c; g.font = 'bold 15px sans-serif'; g.fillText((c.shiny ? '✦ ' : '') + RAR[c.rar].n + ' · ' + c.raceN, W / 2, 28); g.font = 'bold 26px serif'; g.fillText(c.name, W / 2, 60); g.font = '13px sans-serif'; g.fillText(c.title || c.idN, W / 2, 82); }
+    if (h) { const c = h.rec.c; g.font = 'bold 15px sans-serif'; g.fillText((c.shiny ? '✦ ' : '') + RAR[c.rar].n + ' · ' + c.raceN, W / 2, 28); g.font = 'bold 26px serif'; g.fillText(NM(c), W / 2, 60); g.font = '13px sans-serif'; g.fillText(c.title || c.idN, W / 2, 82); }
     else { g.font = 'bold 20px serif'; g.fillText('— 虚位以待 —', W / 2, 56); }
     P.tex.needsUpdate = true;
   }
@@ -1185,7 +1185,7 @@ window.startGame = function () {
   function frame() {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, clock.getDelta()); const now = clock.elapsedTime;
-    if ((window.Seance && Seance.active) || window.__pauseMain) return; // 通灵 MV / 头棋等全屏小游戏期间暂停主场景渲染
+    if ((window.Seance && Seance.active) || (window.Recall && Recall.active) || window.__pauseMain) return; // 通灵 MV / 头棋等全屏小游戏期间暂停主场景渲染
     if (window.Worlds && Worlds.active) { Worlds.frame(dt, now); return; } // 第十四轮：出猎世界（地点图）接管主循环
     for (const f of HOOK.frame) { try { f(dt, now); } catch (e) { console.warn(e); } }
     if (eDown && !eLong && performance.now() - eDown > 350) { eLong = true; if (playing && !uiOpen && !cine && !bagCarrying) { const tgt = held || targetHead(lookHit()); if (tgt) startHP(tgt); else eLong = false; } }
@@ -1348,14 +1348,14 @@ window.startGame = function () {
         aimHead = th;
         let htip = null; for (const f of HOOK.tip) { try { htip = f(hit, held); } catch (e) {} if (htip) break; }
         if (htip) tip = htip;
-        else if (held) tip = `手持「${held.rec.c.name}」 · <b>左键</b>把玩 · <b>滚轮</b>转向 · <b>V</b>换表情 · <b>E</b>放下/插桩 · <b>长按E</b>精确摆放 · <b>右键</b>扔 · <b>F</b>查看`;
-        else if (hit && hit.head) { const c = hit.head.rec.c; tip = `<span style="color:${RAR[c.rar].c}">【${RAR[c.rar].n}】</span>${c.shiny ? ' <span style="color:#ffe27a">✨异色</span>' : ''} <b>${c.name}</b>${c.title ? ` <small style="color:#e6c7a0">『${c.title}』</small>` : ''} · ${c.raceN}${c.idN}${(c.aff || []).length ? '<br><small>' + c.aff.map(k => RPG.AFF[k] ? RPG.affHTML(k, 'pill') : '').join('') + '</small>' : ''}<br><small>左键把玩 · E 拿起 · 长按E 摆放 · F 查看/回忆 · XX 碾碎</small>`; }
+        else if (held) tip = `手持「${NM(held.rec.c)}」 · <b>左键</b>把玩 · <b>滚轮</b>转向 · <b>V</b>换表情 · <b>E</b>放下/插桩 · <b>长按E</b>精确摆放 · <b>右键</b>扔 · <b>F</b>查看`;
+        else if (hit && hit.head) { const c = hit.head.rec.c; tip = `<span style="color:${RAR[c.rar].c}">【${RAR[c.rar].n}】</span>${c.shiny ? ' <span style="color:#ffe27a">✨异色</span>' : ''} <b>${NM(c)}</b>${c.title ? ` <small style="color:#e6c7a0">『${c.title}』</small>` : ''} · ${c.raceN}${c.idN}${(c.aff || []).length ? '<br><small>' + c.aff.map(k => RPG.AFF[k] ? RPG.affHTML(k, 'pill') : '').join('') + '</small>' : ''}<br><small>左键把玩 · E 拿起 · 长按E 摆放 · F 查看/回忆 · XX 碾碎</small>`; }
         else if (player.pos.distanceTo(cave.exitPos) < 2.6) tip = '<b>[E]</b> 离开洞窟，出去狩猎';
         else if (player.pos.distanceTo(cave.merchantPos) < 2.4) tip = '<b>[E]</b> 和地精行商斯尼克交易';
         else if (hit && hit.build) { const d = CAT[hit.build.type]; tip = `<b>${d.n}</b>` + (d.train ? ' · <b>[E]</b> 开始训练' : '') + (d.mount ? (() => { const n = hit.build.heads.length, k = hit.build.heads.filter(Boolean).length; return (k ? ' · 左键把玩 · E 取下' : '') + (k < n ? ' · 手持首级按 E 插上' : '') + (n > 1 ? ` · ${k}/${n} 位` : ''); })() : '') + ' <small>· XX 拆除</small>'; }
       }
     }
-    if (hplace) tip = `🟩 摆放「${hplace.h.rec.c.name}」 · ${hplace.mount ? '吸附到展位' : HP_POSE[hplace.pose]} · <b>左键/E</b>放下 · <b>滚轮</b>旋转(Shift微调) · <b>R</b>换姿势 · <b>右键/Esc</b>取消`;
+    if (hplace) tip = `🟩 摆放「${NM(hplace.h.rec.c)}」 · ${hplace.mount ? '吸附到展位' : HP_POSE[hplace.pose]} · <b>左键/E</b>放下 · <b>滚轮</b>旋转(Shift微调) · <b>R</b>换姿势 · <b>右键/Esc</b>取消`;
     setH(ui.tip, tip); { const dsp = tip ? 'block' : 'none'; if (ui.tip._d !== dsp) { ui.tip._d = dsp; ui.tip.style.display = dsp; } }
     ui.cross.classList.toggle('active', !!tip && !buildMode);
     ui.vign.style.background = S.hp / s.maxHp < 0.3 ? 'radial-gradient(ellipse at center, transparent 55%, rgba(160,0,0,0.45) 100%)' : '';

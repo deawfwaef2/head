@@ -1,3 +1,4 @@
+window.NM = window.NM || (c => !c ? '？' : (window.Recall ? Recall.nm(c) : c.name)); // 回忆系统：未想起名字的首级显示「无名首级·#hash」
 // 《魂首窟》文本生成：种族/地点/身份/名字/个性/信仰/目的/外貌/背景/「回忆」斩首故事/远征故事
 window.Lore = (() => {
   const pick = (r, a) => a[Math.floor(r() * a.length)];

@@ -66,8 +66,9 @@ window.UI = (() => {
       case 'hpg': HV.page = Math.max(0, HV.page + (+v)); openMenu('heads'); break;
       case 'storeAll': { const n = G.storeLoose(); G.toast(n ? `📥 ${n} 颗散落首级已存入魂库` : '没有散落在地上的首级', n ? '#e8c070' : '#aaa'); openMenu('heads'); break; }
       case 'store': { const h = G.headOf(+v); if (h && G.storeHead(h)) { G.save(); SFX.sack && SFX.sack(); G.toast('📥 已存入魂库', '#e8c070'); openMenu('heads'); } else deny(a); break; }
-      case 'take': { const rec = G.S.heads.find(r => r.id == v); if (rec && G.takeOut(rec)) { G.save(); close(); G.toast('📤 从魂库取出：' + rec.c.name, '#e8c070'); } else deny(a); break; }
+      case 'take': { const rec = G.S.heads.find(r => r.id == v); if (rec && G.takeOut(rec)) { G.save(); close(); G.toast('📤 从魂库取出：' + NM(rec.c), '#e8c070'); } else deny(a); break; }
       case 'mem': showMemory(); break;
+      case 'recall': { const r = cardRec; close(); if (r && window.Recall) Recall.open(r); break; }
       case 'log': openLog(+v); break;
       case 'back': openMenu(menuState.tab); break;
       case 'loc': startTrip(v); break;
@@ -188,7 +189,7 @@ window.UI = (() => {
     if (!all.length) return '<p class="empty">洞里还没有首级。走到洞口（发光的出口）按 E，出去狩猎吧。</p>';
     let nCave = 0, nVault = 0, nBag = 0; for (const r of all) { if (r.inBag) nBag++; else if (r.vault) nVault++; else nCave++; }
     const q = HV.q.trim();
-    let list = all.filter(r => (HV.where === 'all' || (HV.where === 'vault' ? r.vault : HV.where === 'bag' ? r.inBag : (!r.vault && !r.inBag))) && (HV.rar < 0 || r.c.rar === HV.rar) && (!q || (r.c.name + r.c.raceN + r.c.idN + r.c.locN).includes(q)));
+    let list = all.filter(r => (HV.where === 'all' || (HV.where === 'vault' ? r.vault : HV.where === 'bag' ? r.inBag : (!r.vault && !r.inBag))) && (HV.rar < 0 || r.c.rar === HV.rar) && (!q || (NM(r.c) + r.c.raceN + r.c.idN + r.c.locN).includes(q)));
     const Y = r => (G.yieldOf ? G.yieldOf(r) : 0);
     list.sort(HV.sort === 'new' ? (a, b) => b.id - a.id : HV.sort === 'yield' ? (a, b) => Y(b) - Y(a) : (a, b) => b.c.rar - a.c.rar || (b.c.shiny ? 1 : 0) - (a.c.shiny ? 1 : 0) || b.id - a.id);
     const pages = Math.max(1, Math.ceil(list.length / PAGE)); HV.page = Math.min(HV.page, pages - 1);
@@ -201,7 +202,7 @@ window.UI = (() => {
       <input id="hvQ" class="hv-q" placeholder="🔍 名字 / 种族 / 地点" value="${esc(HV.q)}"></div>
       <div class="hv-bar"><button class="hv-chip" data-a="storeAll">📥 一键收纳：散落在地上的首级全部存入魂库</button><span class="hint2">共 ${list.length} 颗 · 魂库上限 ${G.VAULT_MAX} · 入库的首级不占洞内名额、不耗性能，随时可取出。</span></div>`;
     const pager = pages > 1 ? `<div class="hv-pg"><button class="hv-chip" data-a="hpg" data-v="-1" ${HV.page ? '' : 'disabled'}>◀</button><b>${HV.page + 1} / ${pages}</b><button class="hv-chip" data-a="hpg" data-v="1" ${HV.page < pages - 1 ? '' : 'disabled'}>▶</button></div>` : '';
-    return bar + pager + `<div class="hd-grid">` + shown.map(r => `<div class="hd" data-a="card" data-v="${r.id}" style="--c:${RC[r.c.rar]}"><div class="hd-r">${RN[r.c.rar]}${r.c.shiny ? ' ✨' : ''} ${where(r)}</div><div class="hd-n">${esc(r.c.name)}</div><div class="hd-i">${esc(r.c.raceN)} · ${esc(r.c.idN)}</div><div class="hd-l">${esc(r.c.locN)}</div></div>`).join('') + '</div>' + pager;
+    return bar + pager + `<div class="hd-grid">` + shown.map(r => `<div class="hd" data-a="card" data-v="${r.id}" style="--c:${RC[r.c.rar]}"><div class="hd-r">${RN[r.c.rar]}${r.c.shiny ? ' ✨' : ''} ${where(r)}</div><div class="hd-n">${esc(NM(r.c))}</div><div class="hd-i">${window.Recall && !Recall.known(r.c, 'race') ? '？？？' : esc(r.c.raceN) + ' · ' + esc(r.c.idN)}</div><div class="hd-l">${esc(r.c.locN)}</div></div>`).join('') + '</div>' + pager;
   }
   function bindHeads() { const el = document.getElementById('hvQ'); if (!el) return; el.onchange = () => { HV.q = el.value; HV.page = 0; openMenu('heads'); }; el.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') el.onchange(); }; el.onkeyup = e => e.stopPropagation(); }
   function logsBody() {
@@ -225,17 +226,17 @@ window.UI = (() => {
     return `<div class="model-license"><b>模型来源 / 公开状态</b><br>${items.join(' + ') || '程序化生成'}<br><small>本颗首级使用的模型当前允许随本仓库公开分发（须遵守上方原许可/署名）。标为“未公开/受限”的候选模型不会进入随机池。详见根目录 CREDITS.md。</small></div>`;
   }
   function openCard(rec, fromMenu) {
-    cardRec = rec; const c = rec.c;
+    cardRec = rec; const c = rec.c; const K = window.Recall && Recall.on() ? Recall.card(rec) : null, Q = '<span style="opacity:.5">？？？</span>';
     open('card', `<div class="card" style="--c:${RC[c.rar]}">
-      <div class="card-r">【${RN[c.rar]}】${c.shiny ? ' <span class="shiny">✨异色</span>' : ''}${rec.calm ? ' <span class="calm">🕊️已安息</span>' : ''}${rec.seance ? ' <span class="calm">🔮已通灵</span>' : ''}</div>${c.title ? `<div class="card-t">『${esc(c.title)}』</div>` : ''}<h2>${esc(c.name)}</h2>
-      <div class="card-id">${esc(c.raceN)} · ${esc(c.idN)} · ${c.age} 岁 · 得自 ${esc(c.locN)}</div>
-      <div class="kv"><span>性格</span><b>${esc((c.traits || []).join('、'))}</b><span>信仰</span><b>${esc(c.belief)}</b><span>生前目的</span><b>${esc(c.goal)}</b><span>魂晶产出</span><b>×${+G.yieldOf(rec).toFixed(1)}</b></div>
-      ${(c.aff || []).length ? `<div class="affh">🔰 魂印 <b>${c.aff.length}</b><small>${[...new Set(c.aff.map(k => RPG.AFF[k] && RPG.AFF_CAT[RPG.AFF[k].cat].n))].filter(Boolean).join(' · ')}</small></div><div class="affs">${c.aff.map(k => RPG.affHTML(k, 'card')).join('')}</div>` : '<div class="affs none">无魂印 · 读到写着她名字的书或笔记，带到洞里对证，可以为她添上魂印</div>'}
+      <div class="card-r">【${RN[c.rar]}】${c.shiny ? ' <span class="shiny">✨异色</span>' : ''}${rec.calm ? ' <span class="calm">🕊️已安息</span>' : ''}${rec.seance ? ' <span class="calm">🔮已通灵</span>' : ''}</div>${c.title ? `<div class="card-t">『${esc(c.title)}』</div>` : ''}<h2>${esc(NM(c))}</h2>
+      <div class="card-id">${K ? esc(K.idLine) : `${esc(c.raceN)} · ${esc(c.idN)} · ${c.age} 岁 · 得自 ${esc(c.locN)}`}</div>
+      <div class="kv"><span>性格</span><b>${K ? K.trait : esc((c.traits || []).join('、'))}</b><span>信仰</span><b>${K ? K.belief : esc(c.belief)}</b><span>生前目的</span><b>${K ? K.goal : esc(c.goal)}</b><span>魂晶产出</span><b>${K && !K.yield ? Q : '×' + +G.yieldOf(rec).toFixed(1)}</b></div>
+      ${K && !K.aff ? '<div class="affs none">🔰 魂印：想不起来（回忆「魂印与产出」——鉴定 / 通灵）</div>' : (c.aff || []).length ? `<div class="affh">🔰 魂印 <b>${c.aff.length}</b><small>${[...new Set(c.aff.map(k => RPG.AFF[k] && RPG.AFF_CAT[RPG.AFF[k].cat].n))].filter(Boolean).join(' · ')}</small></div><div class="affs">${c.aff.map(k => RPG.affHTML(k, 'card')).join('')}</div>` : '<div class="affs none">无魂印 · 读到写着她名字的书或笔记，带到洞里对证，可以为她添上魂印</div>'}
       ${window.HeadWear && HeadWear.names(rec.look.hw).length ? `<div class="hwl">🎀 ${HeadWear.names(rec.look.hw).join(' · ')}</div>` : ''}
-      <h3>外貌</h3>${para(rec.app)}${modelNote(rec)}
-      <h3>生平</h3>${para(rec.story)}
+      <h3>外貌</h3>${K && !K.app ? para('（你还没有好好看过她的脸。按 F 进入回忆。）') : para(rec.app)}${modelNote(rec)}
+      <h3>生平</h3>${K && !K.story ? para('（她的一生你还想不起来——回忆 / 通灵可以拼出来。）') : para(rec.story)}
       <div id="memBox"></div>
-      <div class="btns"><button class="red" data-a="mem">🩸 回忆：我是怎么得到这颗头的</button>${rec.vault ? `<button data-a="take" data-v="${rec.id}">📤 取出到洞里</button>` : (!rec.inBag && G.headOf(rec.id) && G.held !== G.headOf(rec.id)) ? `<button data-a="store" data-v="${rec.id}">📥 存入魂库</button>` : ''}${fromMenu ? '<button data-a="back">← 返回</button>' : ''}<button data-a="close">关闭</button></div></div>`, 'card-m');
+      <div class="btns">${K ? '<button class="red" data-a="recall">🧠 回忆她（' + K.n + '/' + K.total + '）</button>' : ''}<button class="red" data-a="mem">🩸 回忆：我是怎么得到这颗头的</button>${rec.vault ? `<button data-a="take" data-v="${rec.id}">📤 取出到洞里</button>` : (!rec.inBag && G.headOf(rec.id) && G.held !== G.headOf(rec.id)) ? `<button data-a="store" data-v="${rec.id}">📥 存入魂库</button>` : ''}${fromMenu ? '<button data-a="back">← 返回</button>' : ''}<button data-a="close">关闭</button></div></div>`, 'card-m');
   }
   function showMemory() {
     const box = document.getElementById('memBox'); if (!box || !cardRec) return;
@@ -380,7 +381,7 @@ window.UI = (() => {
       if (b.coin) { G.addCoins(b.coin); trip.coins += b.coin; extra += ` <span class="coin">🔮+${b.coin}</span>`; rec.d = (rec.d ? rec.d + ' ' : '') + `魂晶+${b.coin}`; SFX.coins(); }
       if (b.head) {
         const c = b.head.c; p.classList.add('gethead'); p.style.setProperty('--c', RC[c.rar]);
-        extra += `<div class="gh">💀 获得首级【${RN[c.rar]}】${esc(c.name)}</div>`; rec.cls = 'gethead';
+        extra += `<div class="gh">💀 获得首级【${RN[c.rar]}】${esc(NM(c))}</div>`; rec.cls = 'gethead';
         SFX.chop(); SFX.squish(1); if (c.rar >= 2) SFX.fanfare(c.rar);
       }
       p.innerHTML = esc(b.t) + extra; feed.appendChild(p); trip.log.push(rec);
@@ -409,7 +410,7 @@ window.UI = (() => {
       ['🧪 买瓶药（🔮60）', () => G.S.coins >= 60 ? (G.S.coins -= 60, G.S.items.potion = (G.S.items.potion || 0) + 1, { msg: '地精找零时手抖得把钱撒了一地。获得 🧪×1' }) : { msg: '你的魂晶不够。地精松了口气。' }],
       ['🗣️ 打听消息', () => ({ coin: loot(0.25), msg: '地精告诉你附近有一处无人看守的宝库。' })]] },
     { t: '🩸 血月下，一座古老的献祭祭坛正渴望着首级。', o: [
-      ['💀 献上一颗首级', () => trip.res.heads.length ? (() => { let wi = 0; trip.res.heads.forEach((h, i) => { if (h.c.rar < trip.res.heads[wi].c.rar) wi = i; }); const h = trip.res.heads.splice(wi, 1)[0]; return { coin: loot(2.2 + h.c.rar * 1.2), msg: `你把【${RN[h.c.rar]}】${h.c.name}的首级摆上祭坛。血月一亮，祭坛吐出大把魂晶。` }; })() : { msg: '你的麻袋里还没有首级。祭坛冷冷地沉寂下去。' }],
+      ['💀 献上一颗首级', () => trip.res.heads.length ? (() => { let wi = 0; trip.res.heads.forEach((h, i) => { if (h.c.rar < trip.res.heads[wi].c.rar) wi = i; }); const h = trip.res.heads.splice(wi, 1)[0]; return { coin: loot(2.2 + h.c.rar * 1.2), msg: `你把【${RN[h.c.rar]}】${NM(h.c)}的首级摆上祭坛。血月一亮，祭坛吐出大把魂晶。` }; })() : { msg: '你的麻袋里还没有首级。祭坛冷冷地沉寂下去。' }],
       ['🚶 转身离开', () => ({ msg: '首级是你的战利品，不是贡品。' })]] },
     { t: '⚔️ 你路过一片刚结束厮杀的战场，遍地断矛与破盾。', o: [
       ['🔍 翻找战利品', () => Math.random() < 0.65 ? { coin: loot(0.9), msg: '你从一面破盾后面摸出一只沉甸甸的钱袋。' } : { hurt: 0.16, msg: '一个装死的佣兵突然跳起来砍了你一刀，然后逃了。' }],
@@ -436,7 +437,7 @@ window.UI = (() => {
     if (r.head) {
       const res2 = RPG.expedition(G.S, s, trip.loc, (Math.random() * 4294967296) >>> 0, G.usedNames, G.usedSig);
       const hb = res2.beats.find(b => b.head);
-      if (hb && trip.res.heads.length < s.cap) { const c = hb.head.c; trip.res.heads.push(hb.head); out.head = hb.head; out.headMsg = hb.t + ` 💀 获得首级【${RN[c.rar]}】${c.name}`; trip.log.push({ t: hb.t, cls: 'gethead' }); SFX.chop(); if (c.rar >= 2) SFX.fanfare(c.rar); }
+      if (hb && trip.res.heads.length < s.cap) { const c = hb.head.c; trip.res.heads.push(hb.head); out.head = hb.head; out.headMsg = hb.t + ` 💀 获得首级【${RN[c.rar]}】${NM(c)}`; trip.log.push({ t: hb.t, cls: 'gethead' }); SFX.chop(); if (c.rar >= 2) SFX.fanfare(c.rar); }
       else out.headMsg = trip.res.heads.length >= s.cap ? '可你的麻袋已经装满了，只能目送猎物远去。' : '猎物消失在了夜色里。';
     }
     return out;
@@ -457,7 +458,7 @@ window.UI = (() => {
       const q = document.createElement('div'); q.className = 'beat';
       if (hb && trip.res.heads.length < s.cap) {
         const c = hb.head.c; trip.res.heads.push(hb.head); q.classList.add('gethead'); q.style.setProperty('--c', RC[c.rar]);
-        q.innerHTML = esc(hb.t) + `<div class="gh">💀 获得首级【${RN[c.rar]}】${esc(c.name)}</div>`; trip.log.push({ t: hb.t, cls: 'gethead' });
+        q.innerHTML = esc(hb.t) + `<div class="gh">💀 获得首级【${RN[c.rar]}】${esc(NM(c))}</div>`; trip.log.push({ t: hb.t, cls: 'gethead' });
         SFX.chop(); SFX.squish(1); if (c.rar >= 2) SFX.fanfare(c.rar);
       } else q.textContent = trip.res.heads.length >= s.cap ? '可你的麻袋已经装满了，只能目送猎物远去。' : '猎物消失在了夜色里。';
       feed.appendChild(q); requestAnimationFrame(() => q.classList.add('in'));
@@ -473,7 +474,7 @@ window.UI = (() => {
     const cta = document.getElementById('tripCta');
     cta.innerHTML = `<div class="arrive"><div class="arr-t">🕳️ 回到了魂首窟</div>
       <div>带回首级 <b>${r.heads.length}</b> 颗 · 🔮 +${fmt(trip.coins)} · ❤️ -${hpLost}</div>
-      <div class="arr-h">${r.heads.map(h => `<span style="color:${RC[h.c.rar]}">【${RN[h.c.rar]}】${esc(h.c.name)}</span>`).join('<br>') || '<span style="color:#999">两手空空……</span>'}</div>
+      <div class="arr-h">${r.heads.map(h => `<span style="color:${RC[h.c.rar]}">【${RN[h.c.rar]}】${esc(NM(h.c))}</span>`).join('<br>') || '<span style="color:#999">两手空空……</span>'}</div>
       <button class="red" data-a="arrive">扛起战利品麻袋 ▶</button></div>`;
     SFX.levelup();
   }

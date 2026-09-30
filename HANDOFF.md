@@ -1068,3 +1068,13 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **力竭**：挥砍/刺击/格挡（`worlds.js hitPlayer` 里 CS=null → 完全不能挡）/奔跑/跳跃/闪身/战吼全部失效，只能 1.5 m/s 慢走；刀垂下；全屏红黑暗角脉动 + “力 竭”字 + 喘息声（`CombatFX.stamina`）+ 屏震；歇 0.8s 后开始恢复，回到 30 才解除（约 2.8s）。
 - 原来的两条池子（`W.run` 疾跑、`S.stam` 战斗）合并：`W.run` 现在只是 `Stamina.val()` 的镜像，拔刀时隐藏底部疾跑条（用战斗条）。原来的“握刀 +28/s、举盾 +6/s 回体力”在 MOD 开启时关闭。
 - 关掉 MOD 即回到旧行为（`Mods.on('stamina_all')===false`）。node 测试：连挥 9 下力竭，冲刺 6.7s 力竭，力竭后 2.8s 恢复。
+
+## 第二十五轮（Arena UI Agent）：回忆 / 无名首级（MOD `recall`，默认开）
+用户需求：新首级只显示基础信息；按 **F** 进入回忆界面（主角的手捧着她的头特写、对视、多个动作面板，建筑解锁更多动作）；可回忆那一战（记录她对你造成的伤害）、转头/捏脸、回忆身份属性；头棋/卡牌类型解锁新动作，并显示她自己的棋路/卡牌效果（随机生成、和性格挂钩、不死板）。
+- `js/recall.js`（`window.Recall`）：12 个记忆碎片 `FAC`（性格/外貌/身份/信仰/饰物/那一战/名字/目的/生平/魂印产出/棋路/卡牌），`c.kn={}` 记录已想起的项（**旧存档没有 `kn` 字段 = 全部已知**，不会被遮）。`Recall.nm(c)` 未想起名字时返回「无名首级·#hash」；全局 `NM(c)`（lore.js 顶部定义）就是它的封装，各处显示名字的地方已改成 `NM(c)`（game/ui/worlds/sack/chess/seance/play/sanctum）。**不要把 `c.name` 改成 accessor**（会破坏存档）。
+- 动作：对视/抚摸/嗅闻/贴耳/把玩(拖动转头、点脸颊)/回忆那一战 为徒手；通灵(seance)、茶会(tea_party)、梳妆镜(gothic_commode)、化妆台(dresser)、鉴定(forge/appraisal/auction)、棋盘(chess)、卡牌(card) 由建筑解锁（`G.S.builds[].type`）。数字键 1-9 触发动作，F/Esc 关闭。首次想起一项给魂晶（按稀有度），想起 4 项自动想起名字，7 项想起目的，全部想起有奖励。
+- 战斗记录：`worlds.js` `foeEvent` → `Recall.log(fo,t,d)`；`hitPlayer` → `Recall.hurtBy(fo,n)`；数据写入 `fo.h.c.fight`（她伤你几次/多少、你伤她、头颈命中、破绽、格挡、先手、怎么死的），「那一战」面板显示。
+- `js/headgame.js`（`window.HeadGame`）：`profile(rec)` 由性格/种族/稀有度/种子确定性生成棋路（基础棋子 + 额外走法 XS）和卡牌（费用/攻血/关键词/文本）。`js/chess.js` 新增全局 `XS[64]`（每格额外跳跃偏移），`gen/makeMove/unmake/undo/place` 已支持。
+- 入口：game.js `KeyF`（手里/看着首级 → `Recall.open`，否则仍是 Combat.toggle；I 键同），档案卡新增「🧠 回忆她」按钮并遮罩未想起的项。回忆界面期间主场景暂停渲染（`Recall.active`）。
+- 手模型：`limb_hand_avatar` 染色 + 前臂圆柱 + 护腕（无专用主角模型，未新增资源）。
+- 未做/待做：世界内（Worlds）F 仍是战斗姿态，回忆只在洞内；棋盘/卡牌里实际使用她的 profile 只做了展示（chess 的 XS 由 `HeadGame.chessExtra` 提供，棋局接入需 chess.js 里调用 `place`）。

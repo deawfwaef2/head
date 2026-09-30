@@ -534,7 +534,7 @@ window.Worlds = (() => {
   }
   function foeCtx(B, node) {
     return {
-      sc: B.sc, H: B.H, cols: B.cols, R: B.R, doors: B.doors, pvel: W.vel, escaped: (fo) => { const nd = W.graph.nodes[W.cur], i = nd.prey.indexOf(fo.h); if (i >= 0) nd.prey.splice(i, 1); G.toast && G.toast(`🚪 ${fo.h.c.name} 从门逃走了……（首级没了）`, '#ffb080', 2.4); W.trip.log.push({ t: `${fo.h.c.name}从「${nd.name}」的门逃走了。` }); if (W.stats) W.stats.combo = 0; }, player: { pos: W.pos, get yaw() { return G.player.yaw; }, get crouch() { return G.player.crouch; } },
+      sc: B.sc, H: B.H, cols: B.cols, R: B.R, doors: B.doors, pvel: W.vel, escaped: (fo) => { const nd = W.graph.nodes[W.cur], i = nd.prey.indexOf(fo.h); if (i >= 0) nd.prey.splice(i, 1); G.toast && G.toast(`🚪 ${NM(fo.h.c)} 从门逃走了……（首级没了）`, '#ffb080', 2.4); W.trip.log.push({ t: `${fo.h.c.name}从「${nd.name}」的门逃走了。` }); if (W.stats) W.stats.combo = 0; }, player: { pos: W.pos, get yaw() { return G.player.yaw; }, get crouch() { return G.player.crouch; } },
       st: () => G.st(), sees: (pos, maxD) => sees({ pos }, maxD), say: (anchor, text, col) => { if (text) say(anchor, text, col); },
       floatDmg: (pos, n, big) => floatDmg(pos, n, big), renderer: G.renderer, camera: G.camera, event: (t, fo, d) => foeEvent(t, fo, d), windup: (fo, clip) => { if (window.CombatFX && CombatFX.on) { CombatFX.windup(fo, clip); return; } const dd = W ? Math.hypot(fo.pos.x - W.pos.x, fo.pos.z - W.pos.z) : 5, v = Math.max(0, 1 - dd / 14); if (!v) return; SFX.play && SFX.play('draw', 0.5 * v, 0.62, 0.05); if (/Heavy|Sword_Attack/.test(clip)) SFX.play && SFX.play('heavy', 0.45 * v, 0.7, 0.05); }, // 第十九轮：起手音 toast: (t, c, d) => G.toast && G.toast(t, c, d), shake: (k) => { W.shake = Math.max(W.shake || 0, k); },
       playerSwinging: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.thrust > 0)),
@@ -564,7 +564,7 @@ window.Worlds = (() => {
           else { G.toast && G.toast('❌ 格挡方向错了！', '#ff9080', 0.8); G.flash && G.flash('#a00000', 0.4, 280); W.shake = Math.max(W.shake || 0, 0.25); }
         } else { G.flash && G.flash('#a00000', 0.4, 280); W.shake = Math.max(W.shake || 0, fo.boss ? 0.5 : 0.25); }
         if (W.stats) W.stats.combo = 0;
-        if (n > 0) { if (window.Sack) Sack.interrupt(); if (window.CombatFX) CombatFX.hurt(n, fo, h); G.damage(n); W.trip.log.push({ t: `${fo.h.c.name}${fo.boss ? '' : '反击'}，你受了伤。`, d: `-${n} HP` }); } },
+        if (n > 0) { if (window.Sack) Sack.interrupt(); if (window.CombatFX) CombatFX.hurt(n, fo, h); if (window.Recall) Recall.hurtBy(fo, n); G.damage(n); W.trip.log.push({ t: `${NM(fo.h.c)}${fo.boss ? '' : '反击'}，你受了伤。`, d: `-${n} HP` }); } },
       bossMeet: (fo) => { W.dom.boss.style.display = 'block'; W.boss = { B: fo.boss, pos: fo.pos, foe: fo, hp: 100, dead: false, sayT: 0 }; bossSay(fo.boss.say || pick(Math.random, fo.boss.taunt), 3); },
       bossHp: (fo) => { W.dom.bossHp.style.width = Math.max(0, fo.hp / fo.maxHp * 100) + '%'; if (W.boss && W.boss.sayT <= 0 && Math.random() < 0.3) { bossSay(pick(Math.random, fo.boss.hurt), 2); W.boss.sayT = 4; } },
       onDeath: (fo) => { const nd = W.graph.nodes[W.cur], i = nd.prey.indexOf(fo.h); if (i >= 0) nd.prey.splice(i, 1); if (window.Sack) Sack.corpse(fo, W);
@@ -596,7 +596,7 @@ window.Worlds = (() => {
     achBanner(`升级！Lv.${up.to}`, d || '继续变强'); W && W.trip.log.push({ t: `⬆️ 食人魔升到 Lv.${up.to}（${d}）`, cls: 'gethead' }); SFX.levelup && SFX.levelup(); G.save && G.save();
   }
   function foeEvent(t, fo, d) {
-    if (!W) return; if (window.CombatFX) CombatFX.event(t, fo, d); // 第二十二轮（续 9）：命中/击杀/格挡音效 + 命中准星 const now = performance.now() / 1000, st = W.stats = W.stats || { kill: 0, decap: 0, execute: 0, onecut: 0, sever: 0, halve: 0, parry: 0, combo: 0, maxCombo: 0, lastHit: 0, kills: [] };
+    if (!W) return; if (window.Recall) Recall.log(fo, t, d); if (window.CombatFX) CombatFX.event(t, fo, d); // 第二十二轮（续 9）：命中/击杀/格挡音效 + 命中准星 const now = performance.now() / 1000, st = W.stats = W.stats || { kill: 0, decap: 0, execute: 0, onecut: 0, sever: 0, halve: 0, parry: 0, combo: 0, maxCombo: 0, lastHit: 0, kills: [] };
     if (t === 'hit') { st.combo = now - st.lastHit < 2.5 ? st.combo + 1 : 1; st.lastHit = now; st.maxCombo = Math.max(st.maxCombo, st.combo); showCombo(st.combo, d && d.brk); if (st.combo >= 10) achAdd('combo', st.combo, true); return; }
     const rw = REW[t]; if (rw) { const mul = 1 + (fo.rar || 0) * 0.5 + (fo.boss ? 3 : 0), c = Math.round(rw[0] * mul * (1 + Math.min(1, st.combo / 20))); G.addCoins(c); W.trip.coins += c; gainXp(Math.max(1, Math.round(rw[0] * mul * 0.8)));
       floatDmg(fo.anchor ? fo.anchor.pos : fo.pos, `${rw[1]} +${c}🔮`, t === 'execute' || t === 'onecut'); SFX.coins && SFX.coins(); }
@@ -644,8 +644,8 @@ window.Worlds = (() => {
     if (fo.boss) { bossWin(hd.h, fo.boss); return true; }
     if ((window.Sack && Sack.on())) { /* 麻袋格子：Sack 已把首级放进格子（5 秒翻找完成后才调用这里）*/ }
     else if (W.trip.res.heads.length >= s.cap) { G.toast(`麻袋满了（${s.cap} 颗）`, '#aaa', 2.5); return false; }
-    else W.trip.res.heads.push(hd.h); W.trip.log.push({ t: `你在「${node.name}」砍下了${c.name}的头。`, cls: 'gethead' });
-    G.toast(`💀 获得首级【${RN[c.rar]}】${c.name}`, RC[c.rar], 3); SFX.squish && SFX.squish(1); if (c.rar >= 2) SFX.fanfare && SFX.fanfare(c.rar);
+    else W.trip.res.heads.push(hd.h); W.trip.log.push({ t: `你在「${node.name}」砍下了${NM(c)}的头。`, cls: 'gethead' });
+    G.toast(`💀 获得首级【${RN[c.rar]}】${NM(c)}`, RC[c.rar], 3); SFX.squish && SFX.squish(1); if (c.rar >= 2) SFX.fanfare && SFX.fanfare(c.rar);
     return true;
   }
   function spawnPrey(B, node) {
@@ -893,10 +893,10 @@ window.Worlds = (() => {
     p.gone = true; W.B.sc.remove(p.g);
     const node = W.graph.nodes[W.cur]; node.prey.splice(node.prey.indexOf(p.h), 1);
     const s = G.st(), c = p.h.c;
-    if ((window.Sack && Sack.on())) { if (!Sack.capture(p.h)) { G.toast(`麻袋里没有 2×2 的空位，【${RN[c.rar]}】${c.name}的魂光散去了……`, '#aaa', 3); return; } }
-    else if (W.trip.res.heads.length >= s.cap) { G.toast(`麻袋满了（${s.cap} 颗），【${RN[c.rar]}】${c.name}的魂光散去了……`, '#aaa', 3); return; }
-    else W.trip.res.heads.push(p.h); W.trip.log.push({ t: `你在「${node.name}」追上了${c.name}。`, cls: 'gethead' });
-    G.toast(`💀 获得首级【${RN[c.rar]}】${c.name}`, RC[c.rar], 3); SFX.chop && SFX.chop(); SFX.squish && SFX.squish(1); if (c.rar >= 2) SFX.fanfare && SFX.fanfare(c.rar);
+    if ((window.Sack && Sack.on())) { if (!Sack.capture(p.h)) { G.toast(`麻袋里没有 2×2 的空位，【${RN[c.rar]}】${NM(c)}的魂光散去了……`, '#aaa', 3); return; } }
+    else if (W.trip.res.heads.length >= s.cap) { G.toast(`麻袋满了（${s.cap} 颗），【${RN[c.rar]}】${NM(c)}的魂光散去了……`, '#aaa', 3); return; }
+    else W.trip.res.heads.push(p.h); W.trip.log.push({ t: `你在「${node.name}」追上了${NM(c)}。`, cls: 'gethead' });
+    G.toast(`💀 获得首级【${RN[c.rar]}】${NM(c)}`, RC[c.rar], 3); SFX.chop && SFX.chop(); SFX.squish && SFX.squish(1); if (c.rar >= 2) SFX.fanfare && SFX.fanfare(c.rar);
   }
   // ---- 霸主：实时战斗（手势战斗命中 + 决斗公式）----
   function updateBoss(dt, now) {
@@ -1058,7 +1058,7 @@ window.Worlds = (() => {
     { const w = (clamp(G.S.hp / s.maxHp, 0, 1) * 100).toFixed(1) + '%'; if (DOM.statHp._w !== w) { DOM.statHp._w = w; DOM.statHp.style.width = w; } }
     setH(DOM.statTx, `${lvOn ? `<span title="食人魔等级" style="color:#ffd27a">Lv.${LVI.lv}</span> <span style="opacity:.6;font-size:.85em">${LVI.need ? LVI.cur + '/' + LVI.need : 'MAX'}</span> · ` : ''}❤️ ${Math.round(G.S.hp)}/${s.maxHp} · ${(window.Sack && Sack.on()) ? (() => { const u = Sack.usage(), b = Sack.inv().belt.filter(Boolean); return `🩹${b.reduce((a, o) => a + o.n, 0)}<br>🎒 ${u[0]}/${u[1]}格 · 💀${u[2]}`; })() : `🧪${G.S.items.potion || 0}<br>🧺 ${W.trip.res.heads.length}/${s.cap}`} · 🔮 +${W.trip.coins}${W.stats && W.stats.kill ? `<br>⚔️ 放倒 ${W.stats.kill} · 🩸 斩首 ${W.stats.decap} · 连击 ${W.stats.maxCombo}` : ''}${left ? `<br><span style="color:#9fd0ff">✨ 此地还有 ${left} 缕魂光</span>` : ''}`);
     let h = 'WASD 走动 · <b>F</b> 拔刀（按住左键挥砍 / 连点刺 / 右键格挡）· <b>M</b> 地图 · <b>H</b> 喝药';
-    if (W.headNear) h = `<b>E</b> 拾取首级 · 【${RN[W.headNear.h.c.rar]}】${esc(W.headNear.h.c.name)}`;
+    if (W.headNear) h = `<b>E</b> 拾取首级 · 【${RN[W.headNear.h.c.rar]}】${esc(NM(W.headNear.h.c))}`;
     else if (W.interNear) { const it = W.interNear, L = it.kind === 'loot' ? it.L : null; h = L ? `<b>E</b> ${L.kind === 'corpse' ? '搜身' : L.kind === 'pile' ? '翻' : '搜刮'} · ${esc(L.name)}${L.items && !L.items.length ? ' <span style="color:#999">（空）</span>' : ''}` : '<b>E</b> 打开宝箱'; }
     if ((window.Sack && Sack.on()) && !W.headNear && !W.doorNear) h += ' · <b>Tab</b> 麻袋';
     if (W.doorNear && !W.headNear && !W.interNear) { const d = W.doorNear, cn = W.graph.nodes[W.cur]; h = d.home ? '<b>E</b> 回到魂首窟（结束狩猎，带回首级）' : `<b>E</b> 穿过门 → ${esc(doorName(cn, d))}` + (W.graph.nodes[d.to].region !== cn.region ? ` <span style="color:#f0a060">（推荐战力 ${W.graph.nodes[d.to].loc.rec}）</span>` : ''); }

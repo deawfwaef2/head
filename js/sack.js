@@ -92,7 +92,7 @@ window.Sack = (() => {
   const canAdd = (g, o) => addTo({ w: g.w, h: g.h, items: g.items.map(q => Object.assign({}, q)) }, Object.assign({}, o), false);
   const stashAdd = (o) => { const st = inv().stash, d = IT[o.id]; if (d.st > 1) for (const q of st) if (q.id === o.id && !q.plus) { q.n += o.n; return; } delete o.x; delete o.y; delete o.r; st.push(o); };
   const RN = ['凡魂', '灵魂', '英魂', '圣魂', '神魂'];
-  const nameOf = (o) => o.og && window.Organs ? Organs.name(o) : o.bk ? `《${o.bk.ti}》` : o.id === 'head' && o.h ? `【${RN[o.h.c.rar] || ''}】${o.h.c.name}` : (IT[o.id] ? IT[o.id].n : o.id) + (o.plus ? ` +${o.plus}` : '');
+  const nameOf = (o) => o.og && window.Organs ? Organs.name(o) : o.bk ? `《${o.bk.ti}》` : o.id === 'head' && o.h ? `【${RN[o.h.c.rar] || ''}】${NM(o.h.c)}` : (IT[o.id] ? IT[o.id].n : o.id) + (o.plus ? ` +${o.plus}` : '');
   const rarOf = (o) => o.og ? (o.og.rar | 0) : o.id === 'head' && o.h ? o.h.c.rar : (IT[o.id] ? IT[o.id].rar : 0);
 
   // ---- 掉落 ----
@@ -143,7 +143,7 @@ window.Sack = (() => {
   }
   function corpse(fo, W) { // 敌人死后：尸体可搜
     if (!on() || !W || !W.B) return; const nd = W.graph.nodes[W.cur];
-    const L = { kind: 'corpse', name: `${fo.h.c.name}的尸体`, lv: lvOf(nd), seed: ((((fo.h.look && fo.h.look.seed) || Math.floor(Math.random() * 1e6)) * 2654435761) >>> 0), items: null, extra: { armed: fo.armed, boss: !!fo.boss, B: fo.boss || null }, x: fo.pos.x, z: fo.pos.z, fo };
+    const L = { kind: 'corpse', name: `${NM(fo.h.c)}的尸体`, lv: lvOf(nd), seed: ((((fo.h.look && fo.h.look.seed) || Math.floor(Math.random() * 1e6)) * 2654435761) >>> 0), items: null, extra: { armed: fo.armed, boss: !!fo.boss, B: fo.boss || null }, x: fo.pos.x, z: fo.pos.z, fo };
     W.B.inter.push({ kind: 'loot', L, x: L.x, z: L.z, corpse: true });
   }
   function carcass(b, W) { // 第二十二轮：野兽尸骸（不掉首级，只有材料）
@@ -467,7 +467,7 @@ window.Sack = (() => {
   function mountCave(host) { if (!on() || !host) return; css(); inv(); closePanel(); host.className = 'sk-host'; panel = host; mode = 'cave'; cont = null; render(); if (window.ItemIcons && !ItemIcons.ready) ItemIcons.onReady(() => { if (panel === host && !drag) render(); }); }
   function hud() {
     if (!Q.length) return; if (!hudEl) { hudEl = document.createElement('div'); hudEl.id = 'skHud'; document.body.appendChild(hudEl); css(); }
-    const j = Q[0], nm = j.k === 'head' ? `把首级「${j.hd.h.c.name}」塞进麻袋` : j.k === 'take' ? `装进麻袋：${nameOf(j.o)}` : j.k === 'use' ? `从麻袋里翻出${nameOf(j.o)}` : j.k === 'equip' ? `翻出并换上${nameOf(j.o)}` : `翻找：${nameOf(j.o)}`;
+    const j = Q[0], nm = j.k === 'head' ? `把首级「${NM(j.hd.h.c)}」塞进麻袋` : j.k === 'take' ? `装进麻袋：${nameOf(j.o)}` : j.k === 'use' ? `从麻袋里翻出${nameOf(j.o)}` : j.k === 'equip' ? `翻出并换上${nameOf(j.o)}` : `翻找：${nameOf(j.o)}`;
     hudEl.style.display = 'block'; // 第二十二轮：只在文字变化时重写 DOM，进度条只改宽度（原先每帧 innerHTML 导致闪烁）
     const txt = `🎒 ${esc(nm)} · ${(dur(j) - j.t).toFixed(1)}s${Q.length > 1 ? ` · 还有 ${Q.length - 1} 件` : ''}`;
     if (!hudEl._bar) { hudEl.innerHTML = '<span class="tx"></span><div class="bar"><i></i></div>'; hudEl._bar = hudEl.querySelector('.bar i'); hudEl._tx = hudEl.querySelector('.tx'); }
