@@ -1243,3 +1243,16 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **MOD `head_qc`**（默认开，js/heads.js randomLook 前 QC_BAD + js/mods.js）：CLS_YakumoYukari（PMD 脸皮与全身同一材质→发白发光）、NTE_Blackbird（帽子盖住整张脸）不进随机池/混发池；存档里已有的照常显示。以后修好可从 QC_BAD 移除。
 - 仍可留意：ZZZ_Lucia 下巴下有一片独立切口圆片（装到身体上被脖子挡住，未处理）；CLS_YakumoRan/CLS_RemTda 颈略长（0.04~0.06，装身体上看着正常）。
 - 改动文件：js/heads.js（randomLook 前 +QC_BAD/qcBad，allHair 过滤）、js/mods.js（+head_qc）、tools/vrm2head.py、tools/pmx2vrm.py、models/（21 个）、HANDOFF.md。
+
+## R32 — 用户反馈：“洞里很孤独、要有经营养成感、大量对话互动；孤独主角+一堆人头会有人头恐惧 → 做可爱的神灵/先祖住在洞里”
+**新系统：神灵（先祖）**，MOD `spirits`（默认开，`mods.js` play 类），全部新文件，未改别人的文件（仅 `index.html` 在 `rites.js` 后加 5 个 script、`mods.js` 加一项）。
+- 设定：神灵 = 历代洞主的魂（被洞窟缩成小精灵）。“咒”= 被烧掉的契约条款（洞窟的饿）；玩家因此听得见她们。开局洞里只有斯尼克；把**第一颗头**带回洞 → 小烛（烛火灵）出现，讲诅咒并请玩家收头。
+- 每个地点（village forest wilds abbey swamp fortress capital abyss peak）**首颗头**带回洞里 → 该地神灵到访（自我介绍+被什么吸引）。`rec.sp=1` 标记已计数（经 vault/addHeadRecs 可能丢，丢了会重复计数，无害）。
+- 九魂灯：某地 ≥3 颗头且其中一颗 `Recall.nKnown>=3` → 点亮，播放该神灵的 ward 场景+奖励。5 灯触发 `half`，9 灯且 ≥6 位神灵好感≥45 触发 `ready`，小烛对话里出现“举行解咒仪式”→ `finale`：烧掉契约（free）/留着契约（stay）/再想想。终局后 `S.spirit.end`，初代 `chudai` 入住。
+- 文件：`js/spirit_art.js`（10 张 320px JPEG 立绘，AI 生成，黑底；3D 里用加法混合 Sprite，DOM 里运行时抠成 alpha PNG）/ `spirit_data.js`（名册、评头词池、闲聊、拌嘴、心愿模板）/ `spirit_s1.js`、`spirit_s2.js`（剧本 + `SPIRIT_H` 语法糖）/ `spirits.js`（引擎）。
+- 玩法：对准神灵按 E 对话（手里有头则直接评头）；枢纽菜单：聊聊 / 话题 / 评头 / 心愿 / 小游戏（猜拳、抽头比大小）/ 个人故事（好感 20/45/70 各一段）/ 结缘（好感 90）。评头按喜好（种族/性格/魂阶/异色/故乡）给反应并加好感；心愿可指定“想看某种头/给魂晶/多聊两句”，完成得魂晶。洞里有气泡闲聊、神灵之间拌嘴、对新头/受伤的反应；洞内回血随神灵数增加。
+- **玩家可关**：按 **Y** 打开神灵簿（九灯进度、主线目标、神灵卡片、“让她们躲起来”开关）；隐身后不显示、不自动弹剧情（到访只静默记录）。右下角有 chip。
+- 存档：`G.S.spirit`（随 save）；隐身偏好镜像到 localStorage `soulhead_sp_hide`。
+- 内容边界：立绘可爱、非性化；文案不含成人内容。
+- 待办：初代 `chudai` 立绘（暂用小烛 hue-rotate）；与头棋对弈（需要棋台建筑，暂未接）；更多神灵/剧本。
+- 测试备忘：整页在 2GB 沙箱里只能用精简页（去掉 models/ 大部分 script）+ 低分辨率跑；截图在全屏面板上会超时。
