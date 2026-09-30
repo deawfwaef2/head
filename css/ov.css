@@ -37,3 +37,16 @@
   .ov-top { margin-bottom: 8px; } .ov-pw b { font-size: 46px; } .ov-pots { margin-top: 8px; } .ov-pot { padding: 5px 12px; } .ov-pot i { font-size: 26px; }
   .ov-rl i { font-size: 19px; } .ov-rl b { font-size: 23px; }
 }
+
+/* 装备页：图标数据块 + 底部图例 */
+.g2hp { position: relative; height: 24px; margin-top: 10px; background: rgba(0,0,0,.6); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 100%, 9px 100%); }
+.g2hp span { display: block; height: 100%; background: linear-gradient(180deg, #ff6b73, #c2141f 60%, #7a0a14); }
+.g2hp em { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 900 16px var(--u-serif, serif); font-style: normal; letter-spacing: .06em; text-shadow: 0 1px 3px #000; }
+.g2chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.g2c { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 4px; background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.01)); border: 1px solid rgba(231,194,122,.2); border-top: 2px solid rgba(231,194,122,.55); }
+.g2c i { font-style: normal; font-size: 20px; } .g2c b { font: 900 22px var(--u-serif, serif); color: #fff3cf; }
+.g2c.z { opacity: .4; } .g2c.atk { border-top-color: #ff7a6a; } .g2c.def { border-top-color: #6fb8ff; } .g2c.dod { border-top-color: #9fe6ff; } .g2c.dmg { border-top-color: #ffb03a; } .g2c.crt { border-top-color: #ff6ad0; } .g2c.dr { border-top-color: #86d07f; }
+.hk .g2note, .hk .sk-eq, .hk .sk-foot, .hk .sk-belt small { display: none !important; }
+.hk-leg { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 10px; padding: 8px 12px; background: rgba(0,0,0,.35); border: 1px solid rgba(231,194,122,.18); font-size: 15px; color: #d9c9a8; }
+.hk-leg span { display: inline-flex; align-items: center; gap: 7px; }
+.hk-leg kbd { min-width: 28px; padding: 2px 8px 3px; text-align: center; font: 800 14px var(--u-serif, serif); color: #ffe3a6; background: linear-gradient(180deg, #3a2a1c, #22160f); border: 1px solid #8a6a3a; border-bottom-width: 3px; border-radius: 5px; }

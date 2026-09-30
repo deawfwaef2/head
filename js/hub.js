@@ -108,7 +108,8 @@ body.hudl.tbon #hubBtn{bottom:calc(var(--tbH) + 10px)!important}
   }
   const toggle = () => { if (openPage()) closeAll(); else go(avail(PAGES.find(p => p.id === last) || PAGES[0]) ? last : 'overview'); };
   // ---- 装备与背包页 ----
-  function kitBody() { const g2 = !!(window.Gear2 && Gear2.on && Gear2.on()); return `<div class="hk ${g2 ? '' : 'one'}">${g2 ? '<div class="hk-l" id="hkDoll"></div>' : ''}<div class="hk-r" id="skHost"></div></div>`; }
+  const L3 = (z, j, e) => { const l = (window.I18N && I18N.lang) || 'zh'; return l === 'ja' ? j : l === 'en' ? e : z; };
+  function kitBody() { const g2 = !!(window.Gear2 && Gear2.on && Gear2.on()); return `<div class="hk ${g2 ? '' : 'one'}">${g2 ? '<div class="hk-l" id="hkDoll"></div>' : ''}<div class="hk-r" id="skHost"></div></div><div class="hk-leg"><span><kbd>LMB</kbd>${L3('取出 / 装备 / 使用', '取る・装備・使う', 'Take / equip / use')}</span><span><kbd>⠿</kbd>${L3('拖动整理', 'ドラッグで整理', 'Drag to arrange')}</span><span><kbd>R</kbd>${L3('旋转', '回転', 'Rotate')}</span><span><kbd>H</kbd>${L3('喝腰带药', 'ベルトの薬', 'Belt potion')}</span><span><kbd>Tab</kbd>${L3('关闭', '閉じる', 'Close')}</span></div>`; }
   let kitObs = null;
   function kitMount() {
     const host = document.getElementById('skHost'), doll = document.getElementById('hkDoll'); if (!host) return;

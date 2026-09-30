@@ -221,9 +221,10 @@ window.Gear2 = (() => {
       slotHtml('weapon', '武器', 0, 1), `<div class="g2body"><div class="o">🧌</div><div class="pw">战 力<b>${st.power}</b></div></div>`, slotHtml('armor', '护甲', 0, 1),
       slotHtml('brace1', '左镯', e('brace1')), slotHtml('brace2', '右镯', e('brace2')), slotHtml('ring1', '左戒', e('ring1')), slotHtml('ring2', '右戒', e('ring2')),
       slotHtml('belt', '腰带', e('belt')), slotHtml('boots', '靴子', e('boots')), slotHtml('bag', '背篓', 0, 1)];
-    const r = (n, v, sp, z) => `<div class="${sp ? 'sp' : ''}${z ? ' z' : ''}"><span>${n}</span><b>${v}</b></div>`;
-    const base = r('等级', 'Lv.' + (st.lv || 1)) + r('生命', `${Math.round(G.S.hp)} / ${st.maxHp}`) + r('攻击', st.atk) + r('防御', st.def) + r('闪避', Math.round(st.dodge * 100) + '%') + r('伤害加成', '+' + a.dmg + '%', 1, !a.dmg) + r('暴击率', a.crit + '%', 1, !a.crit) + r('受到伤害', '-' + a.dr + '%', 1, !a.dr);
-    return `<div class="g2doll"><div class="g2grid">${cells.join('')}</div></div><div class="g2tb" style="margin-top:10px">${base}</div><div class="g2note">点格子卸下；穿戴请在右边「物品」里点装备。悬停看词条。</div>`;
+    const hpF = Math.max(0, Math.min(1, G.S.hp / st.maxHp));
+    const c = (ic, v, n, cls, z) => `<div class="g2c ${cls || ''}${z ? ' z' : ''}" title="${n}"><i>${ic}</i><b>${v}</b></div>`; // R44：图标 + 大数字，少文字
+    const chips = c('🗡️', st.atk, '攻击', 'atk') + c('🛡️', st.def, '防御', 'def') + c('💨', Math.round(st.dodge * 100) + '%', '闪避', 'dod') + c('💥', '+' + a.dmg + '%', '伤害加成', 'dmg', !a.dmg) + c('🎯', a.crit + '%', '暴击率', 'crt', !a.crit) + c('🔰', '-' + a.dr + '%', '受到伤害', 'dr', !a.dr);
+    return `<div class="g2doll"><div class="g2grid">${cells.join('')}</div></div><div class="g2hp" title="生命"><span style="width:${hpF * 100}%"></span><em>❤️ ${Math.round(G.S.hp)} / ${st.maxHp}</em></div><div class="g2chips">${chips}</div>`;
   }
   function dollClick(e) { const s = e.target.closest('[data-pos]'); if (!s) return false; showTip(null); unequip(s.dataset.pos); bust(); return true; }
   function render() { if (window.R35UI && R35UI.isOpen('gear')) R35UI.render(); }
