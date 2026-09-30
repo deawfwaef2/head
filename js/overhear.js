@@ -107,48 +107,62 @@
   // 做法：主渲染器 + 离屏 RenderTarget；临时只留这个人（其余顶层物体 visible=false），背景/雾去掉，补一盏柔光；渲完立刻还原。
   const PORT = new Map();
   function foeOf(c) { try { return window.Foe && Foe.foes && Foe.foes.find(f => f && f.h && f.h.c === c && f.f && f.f.root); } catch (e) { return null; } }
+  // R46 防卡：① 与主渲染同状态（后处理开启时：HDR 线性 RT + 不改 toneMapping/灯光/雾类型），这样不会为这个人的材质临时编一遍着色器变体（原来加灯、去雾、改编码，首次必卡几百毫秒）；
+  //           ② 逐个、错开渲染（弹框先出、头像稍后补上），不再一帧里同步渲 3 张；③ 分辨率 192×224；④ 渲染时关阴影自动更新，不重渲阴影。
+  const h2 = (x) => { const v = Math.max(0, x) * 1.25; const a = v * (2.51 * v + 0.03) / (v * (2.43 * v + 0.59) + 0.14); return Math.pow(Math.min(1, a), 1 / 2.2); };
   function portraitOf(c) {
     if (PORT.has(c)) return PORT.get(c);
     const G = window.G, fo = foeOf(c); if (!G || !G.renderer || !fo || !window.THREE) return null;
     const R = G.renderer, root = fo.f.root, hb = fo.f.bones && fo.f.bones.head; if (!hb) return null;
     let top = root, sc = null; while (top.parent && top.parent.type !== 'Scene') top = top.parent; sc = top.parent; if (!sc) return null;
-    const W = 240, H = 280, rt = new THREE.WebGLRenderTarget(W, H); rt.texture.encoding = THREE.sRGBEncoding;
-    const saved = { rt: R.getRenderTarget(), bg: sc.background, fog: sc.fog, ov: sc.overrideMaterial, ca: R.getClearAlpha(), cc: R.getClearColor(new THREE.Color()).clone(), vis: [], rv: root.visible, tv: top.visible };
+    const post = G.post || G.postFx, hdr = !!(post && post.on && R.capabilities && R.capabilities.isWebGL2);
+    const W = 192, H = 224, rt = hdr ? new THREE.WebGLRenderTarget(W, H, { type: THREE.FloatType, depthBuffer: true }) : new THREE.WebGLRenderTarget(W, H);
+    if (!hdr) rt.texture.encoding = THREE.sRGBEncoding;
+    const saved = { rt: R.getRenderTarget(), bg: sc.background, fog: sc.fog, fd: sc.fog && sc.fog.density, fn: sc.fog && sc.fog.near, ff: sc.fog && sc.fog.far, ov: sc.overrideMaterial, ca: R.getClearAlpha(), cc: R.getClearColor(new THREE.Color()).clone(), vis: [], rv: root.visible, tv: top.visible, tm: R.toneMapping, sau: R.shadowMap.autoUpdate };
+    let L1 = null, L2 = null;
     try {
       hb.updateWorldMatrix(true, false); const hp = new THREE.Vector3(); hb.getWorldPosition(hp);
       const q = new THREE.Quaternion(); root.getWorldQuaternion(q); const fw = new THREE.Vector3(0, 0, 1).applyQuaternion(q); fw.y = 0; fw.normalize();
-      // 朝向：取“脸朝的方向”——头模型的 +Z；若脸朝反了，Foe 的根朝向约定不同，用 headBone 的世界朝向兜底
       const hq = new THREE.Quaternion(); hb.getWorldQuaternion(hq); const hf = new THREE.Vector3(0, 0, 1).applyQuaternion(hq); hf.y = 0; if (hf.lengthSq() > 0.05) fw.copy(hf.normalize()); fw.negate();
       const cam = new THREE.PerspectiveCamera(26, W / H, 0.05, 30), tgt = hp.clone(); tgt.y -= 0.06;
       const side = new THREE.Vector3(-fw.z, 0, fw.x); cam.position.copy(tgt).addScaledVector(fw, 1.75).addScaledVector(side, 0.2); cam.position.y = hp.y + 0.08; cam.lookAt(tgt); cam.updateMatrixWorld(true);
       for (const o of sc.children) { if (o === top || o.isLight) continue; saved.vis.push([o, o.visible]); o.visible = false; }
-      top.visible = true; root.visible = true;
-      sc.background = null; sc.fog = null; sc.overrideMaterial = null;
-      const L1 = new THREE.DirectionalLight(0xfff0dd, 0.9), L2 = new THREE.HemisphereLight(0xffffff, 0x665544, 0.55); L1.position.copy(cam.position).add(new THREE.Vector3(0.6, 1.2, 0.4)); L1.target.position.copy(tgt); sc.add(L1, L1.target, L2);
+      top.visible = true; root.visible = true; sc.background = null; sc.overrideMaterial = null;
+      if (sc.fog) { if (sc.fog.isFogExp2) sc.fog.density = 0; else { sc.fog.near = 1e5; sc.fog.far = 2e5; } } // 只改 uniform，不改着色器变体
+      if (hdr) R.toneMapping = THREE.NoToneMapping; // 与后处理开启时的主渲染一致
+      else { L1 = new THREE.DirectionalLight(0xfff0dd, 0.9); L2 = new THREE.HemisphereLight(0xffffff, 0x665544, 0.55); L1.position.copy(cam.position).add(new THREE.Vector3(0.6, 1.2, 0.4)); L1.target.position.copy(tgt); sc.add(L1, L1.target, L2); }
+      R.shadowMap.autoUpdate = false;
       R.setRenderTarget(rt); R.setClearColor(0x000000, 0); R.clear(); R.render(sc, cam);
-      const buf = new Uint8Array(W * H * 4); R.readRenderTargetPixels(rt, 0, 0, W, H, buf);
-      sc.remove(L1, L1.target, L2);
-      const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const cx = cv.getContext('2d'), im = cx.createImageData(W, H);
-      for (let y = 0; y < H; y++) im.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4);
-      cx.putImageData(im, 0, 0); let cnt = 0; for (let k = 3; k < buf.length; k += 400) if (buf[k] > 20) cnt++;
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const cx = cv.getContext('2d'), im = cx.createImageData(W, H); let cnt = 0;
+      if (hdr) {
+        const buf = new Float32Array(W * H * 4); R.readRenderTargetPixels(rt, 0, 0, W, H, buf);
+        for (let y = 0; y < H; y++) { const so = (H - 1 - y) * W * 4, d = y * W * 4; for (let x = 0; x < W; x++) { const k = so + x * 4, o = d + x * 4, a = Math.min(1, Math.max(0, buf[k + 3])); im.data[o] = h2(buf[k]) * 255; im.data[o + 1] = h2(buf[k + 1]) * 255; im.data[o + 2] = h2(buf[k + 2]) * 255; im.data[o + 3] = a * 255; if (a > 0.08 && (x + y) % 6 === 0) cnt++; } }
+      } else {
+        const buf = new Uint8Array(W * H * 4); R.readRenderTargetPixels(rt, 0, 0, W, H, buf);
+        for (let y = 0; y < H; y++) im.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4);
+        for (let k = 3; k < buf.length; k += 400) if (buf[k] > 20) cnt++;
+      }
+      cx.putImageData(im, 0, 0);
       const url = cnt > 12 ? cv.toDataURL('image/png') : null; PORT.set(c, url); return url;
-    } catch (e) { console.warn('portrait', e); return null; }
+    } catch (e) { console.warn('portrait', e); PORT.set(c, null); return null; }
     finally {
-      R.setRenderTarget(saved.rt); R.setClearColor(saved.cc, saved.ca); sc.background = saved.bg; sc.fog = saved.fog; sc.overrideMaterial = saved.ov;
+      if (L1) sc.remove(L1, L1.target, L2);
+      R.setRenderTarget(saved.rt); R.setClearColor(saved.cc, saved.ca); R.toneMapping = saved.tm; R.shadowMap.autoUpdate = saved.sau; sc.background = saved.bg; sc.overrideMaterial = saved.ov;
+      if (sc.fog) { if (sc.fog.isFogExp2) sc.fog.density = saved.fd; else { sc.fog.near = saved.fn; sc.fog.far = saved.ff; } }
       for (const [o, v] of saved.vis) o.visible = v; top.visible = saved.tv; root.visible = saved.rv; rt.dispose();
     }
   }
 
   // ---------- 弹框 UI：屏幕中上的长条（不冻结、不挡视野、自动消失）----------
   let el = null, timers = [], hist = [];
-  const CSS = '#ohear{position:fixed;left:50%;top:clamp(46px,9vh,110px);bottom:auto!important;width:min(1040px,92vw);z-index:66;pointer-events:none;opacity:0;transform:translate(-50%,-18px);transition:opacity .4s,transform .45s cubic-bezier(.2,.9,.25,1.15);font-family:"Noto Serif SC","Songti SC",serif;color:#f3e8d2}#ohear.on{opacity:1;transform:translate(-50%,0)}'
-    + '#ohear .oh-box{display:flex;align-items:stretch;gap:0;min-height:112px;background:linear-gradient(90deg,#1c120cf0 0%,#120b08e6 70%,#120b08b0 100%);border:1.5px solid var(--c,#e0ad5a);border-radius:12px;box-shadow:0 0 0 1px #000,0 10px 36px #000a,0 0 26px #0008;overflow:hidden;position:relative}'
-    + '#ohear .oh-p{flex:0 0 118px;position:relative;background:radial-gradient(ellipse at 50% 35%,color-mix(in srgb,var(--c,#e0ad5a) 38%,#20140e),#0c0706 78%);border-right:1.5px solid var(--c,#e0ad5a);display:flex;align-items:flex-end;justify-content:center}#ohear .oh-p img{height:132px;margin-top:-14px;margin-bottom:-2px;filter:drop-shadow(0 4px 8px #000c);transition:opacity .25s}#ohear .oh-p i{font:700 44px/112px "Noto Serif SC",serif;font-style:normal;color:var(--c);text-shadow:0 0 18px var(--c);position:absolute;inset:0;text-align:center}'
+  const CSS = '#ohear{will-change:transform,opacity;contain:layout paint;position:fixed;left:50%;top:clamp(46px,9vh,110px);bottom:auto!important;width:min(1040px,92vw);z-index:66;pointer-events:none;opacity:0;transform:translate(-50%,-18px);transition:opacity .4s,transform .45s cubic-bezier(.2,.9,.25,1.15);font-family:"Noto Serif SC","Songti SC",serif;color:#f3e8d2}#ohear.on{opacity:1;transform:translate(-50%,0)}'
+    + '#ohear .oh-box{display:flex;align-items:stretch;gap:0;min-height:112px;background:linear-gradient(90deg,#1c120cf0 0%,#120b08e6 70%,#120b08b0 100%);border:1.5px solid var(--c,#e0ad5a);border-radius:12px;box-shadow:0 0 0 1px #000,0 8px 22px #000a;overflow:hidden;position:relative}'
+    + '#ohear .oh-p{flex:0 0 118px;position:relative;background:radial-gradient(ellipse at 50% 35%,color-mix(in srgb,var(--c,#e0ad5a) 38%,#20140e),#0c0706 78%);border-right:1.5px solid var(--c,#e0ad5a);display:flex;align-items:flex-end;justify-content:center}#ohear .oh-p img{height:132px;margin-top:-14px;margin-bottom:-2px;;transition:opacity .25s}#ohear .oh-p i{font:700 44px/112px "Noto Serif SC",serif;font-style:normal;color:var(--c);text-shadow:0 0 18px var(--c);position:absolute;inset:0;text-align:center}'
     + '#ohear .oh-m{flex:1;min-width:0;padding:8px 18px 9px 16px;display:flex;flex-direction:column;justify-content:center;gap:3px}'
     + '#ohear .oh-h{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:13px;color:#d9b676;opacity:.85;letter-spacing:1px;white-space:nowrap;overflow:hidden}#ohear .oh-h em{font-style:normal;color:#ffd890;font-weight:700;letter-spacing:2px}#ohear .oh-h span:last-child{overflow:hidden;text-overflow:ellipsis}#ohear .oh-h u{text-decoration:none;opacity:.45;margin-left:8px}#ohear .oh-h u.cur{opacity:1;color:var(--c);font-weight:700}'
     + '#ohear .oh-n{font-size:15px;color:var(--c);font-weight:700;text-shadow:0 0 8px var(--c);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#ohear .oh-n small{color:#cdbb99;font-weight:400;margin-left:10px;text-shadow:none;font-size:13px}'
     + '#ohear .oh-t{font-size:clamp(18px,1.55vw,22px);line-height:1.5;min-height:1.5em;text-shadow:0 2px 6px #000;transition:opacity .2s}'
-    + '#ohear .oh-f{font-size:13.5px;color:#ffd27a;height:0;opacity:0;overflow:hidden;transition:opacity .5s,height .3s}#ohear .oh-f.on{opacity:1;height:1.4em}';
+    + '#ohear .oh-f{font-size:13.5px;color:#ffd27a;height:1.4em;opacity:0;overflow:hidden;transition:opacity .5s}#ohear .oh-f.on{opacity:1}';
   function build() {
     if (el) return; const s = document.createElement('style'); s.textContent = CSS; document.head.appendChild(s);
     el = document.createElement('div'); el.id = 'ohear'; el.innerHTML = '<div class="oh-box"><div class="oh-p"><img alt=""><i></i></div><div class="oh-m"><div class="oh-h"><span><em>🎧 偷听</em></span><span></span></div><div class="oh-n"></div><div class="oh-t"></div><div class="oh-f"></div></div></div>'; document.body.appendChild(el);
@@ -157,14 +171,15 @@
   const clear = () => { clear0(); try { clearOld(); } catch (e) { } };
   function show(conv, node, ctx) {
     build(); clear(); const q = s => el.querySelector(s), cs = conv.who;
-    const pics = cs.map(c => { try { return portraitOf(c); } catch (e) { return null; } });
+    const pics = cs.map(c => PORT.has(c) ? PORT.get(c) : null); let curI = 0; // R46：头像逐个错开渲染（先出弹框，头像稍后补上）
     const setWho = i => {
-      const c = cs[i], r = window.Ranks ? Ranks.of(c) : null, col = RCOL[c.rar] || '#e0ad5a';
+      curI = i; const c = cs[i], r = window.Ranks ? Ranks.of(c) : null, col = RCOL[c.rar] || '#e0ad5a';
       el.style.setProperty('--c', col); const im = q('.oh-p img'), bd = q('.oh-p i');
       if (pics[i]) { im.style.display = ''; im.src = pics[i]; bd.textContent = ''; } else { im.style.display = 'none'; bd.textContent = sh(c).slice(0, 1); }
       q('.oh-n').innerHTML = `${esc(c.name)}<small>【${RN[c.rar]}】${r ? esc(r.S.ic + ' ' + r.S.n + '·' + r.B.n + ' ' + r.tn + '「' + r.name + '」') : ''}</small>`;
       q('.oh-h span:last-child').innerHTML = `「${esc(node.name)}」· ${esc(conv.rel)}` + cs.map((x, k) => `<u class="${k === i ? 'cur' : ''}">${esc(sh(x))}</u>`).join('');
     };
+    cs.forEach((c, i) => { if (!PORT.has(c)) timers.push(setTimeout(() => { try { pics[i] = portraitOf(c); } catch (e) { } if (curI === i) setWho(i); }, 500 + i * 350)); });
     setWho(cs[conv.lines[0] ? conv.lines[0].i : 0] ? (conv.lines[0] ? conv.lines[0].i : 0) : 0); q('.oh-t').textContent = ''; q('.oh-f').className = 'oh-f'; q('.oh-f').textContent = '';
     requestAnimationFrame(() => el.classList.add('on'));
     let t = 900; conv.lines.forEach((ln, n) => {
