@@ -1788,3 +1788,8 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **棋 AI（`js/chess.js`）大幅增强**：迭代加深 + Zobrist 置换表 + 杀手/历史启发 + PVS + LMR + 静态搜索 6 层 + 新评估（兵形/通路兵/开放线/双象/王盾/残局王活跃/对方重子逼近王/XS 特殊走法加成）。难度阶梯：1–4 级仍是「固定深度+噪声」（新手友好），5–12 级改为 `md`(最大迭代深度 5→10) + `time`(1.8s→4.8s) 无噪声。`tools` 对局测试（节点脚本，取 chess.js 引擎段）：新 5 级 vs 旧 12 级（同 1s 限时）8:0。**不要恢复旧 `nega`/`think`。**
 - 测试页：`tools/test/memory.html`（真 talents_data + 桩 Talents/G；`?altar=1` 模拟有镜子）。
 - 已知：回忆/建筑只在独立页验证（整游戏+世界在 2GB 沙盒会卡死），真实游戏里的建筑菜单出现、E 交互、反引号徽标未实机验证。
+
+## R49c（用户反馈：出洞后看不到技能栏）
+- 加固 `js/saga.js`：电影期间隐藏 HUD 改用 `body.sgcine` 类（不再改元素行内 opacity），`end()` 移除；`tick` 兜底（CN 为空就移除）；`play` 抛错时走 `end()` 恢复（含第一人称武器可见性）。**未能在无头环境复现**（headless 无 pointer lock），若仍看不到技能栏，查 `hub.js` 的 `body.hubon` 与 `talents_ui.js` 的 `show=!!W&&!W.busy&&!W.dead`。
+- 说明：洞里技能栏左侧的 Q(闪避)/E(攻击)/H(药) 是**基础动作**，不需要学习，任何时候都能用；天赋技能（1–0 槽）只在学了之后才出现。
+- 手机：项目目前无触屏控制；`index.html` 同步加载 ~135MB JS（models 100MB + assets 29MB，gzip 后约 65MB）。方案见对话。

@@ -166,6 +166,7 @@ window.Saga = (() => {
 #sgBan .b{font-size:clamp(19px,2vw,26px);margin-top:8px;color:#fff;letter-spacing:.08em;line-height:1.6;padding:0 8vw}
 #sgBan .c{font-size:17px;margin-top:6px;color:#d8c8f0;letter-spacing:.12em}
 /* 结算 */
+body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){opacity:0!important;pointer-events:none!important}
 #sgSet{position:fixed;inset:0;z-index:62;display:none;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 40%,rgba(18,10,24,.6),rgba(0,0,0,.9));backdrop-filter:blur(5px);font-family:var(--u-serif,serif)}
 #sgSet.on{display:flex;animation:arIn .5s ease-out}
 #sgSet .cd{width:min(1040px,94vw);max-height:97vh;overflow:auto;background:linear-gradient(180deg,#16101c,#0c080e);box-shadow:0 0 0 1px var(--c),0 30px 120px #000,0 0 120px color-mix(in srgb,var(--c) 25%,transparent);color:#eee;position:relative}
@@ -217,7 +218,7 @@ window.Saga = (() => {
     const bh = Math.max(window.innerHeight * 0.085, (window.innerHeight - window.innerWidth / 2.39) / 2); root.style.setProperty('--bh', bh + 'px');
     try { g.setUI(true); } catch (e) { }
     // 隐藏 HUD / 第一人称武器
-    try { for (const c of document.body.children) { if (c === root || c.tagName === 'CANVAS' || c.tagName === 'SCRIPT' || c.tagName === 'STYLE' || c.querySelector('canvas')) continue; CN.hid.push([c, c.style.opacity, c.style.pointerEvents]); c.style.opacity = '0'; c.style.pointerEvents = 'none'; } } catch (e) { }
+    document.body.classList.add('sgcine'); /* R49b：改用 body 类隐藏 HUD（不再改各元素的行内样式），电影结束/出错时由 tick 兜底移除 */
     try { for (const c of g.camera.children) { CN.saved.push([c, c.visible]); c.visible = false; } } catch (e) { }
     root.classList.add('on'); el.dots.innerHTML = beats.map(() => '<i></i>').join('');
     setTimeout(() => CN && beginBeat(0), 700); CN.raf = requestAnimationFrame(loop);
@@ -276,7 +277,7 @@ window.Saga = (() => {
     if (!CN) return; const c = CN; CN = null; cancelAnimationFrame(c.raf);
     try { G().camera.fov = c.fov0; G().camera.updateProjectionMatrix(); } catch (e) { }
     root.classList.remove('on'); el.fade.style.opacity = '1';
-    try { for (const [o, op, pe] of c.hid) { o.style.opacity = op; o.style.pointerEvents = pe; } for (const [o, v] of c.saved) o.visible = v; } catch (e) { }
+    document.body.classList.remove('sgcine'); try { for (const [o, v] of c.saved) o.visible = v; } catch (e) { }
     try { G().setUI(false); G().lockPointer && G().lockPointer(); } catch (e) { }
     c.sg.cinDone = true;
     if (c.sg.chap && !c.sg.chapAwarded) awardChapter(c.sg);
@@ -451,12 +452,12 @@ ${rwHTML(sg, win)}<div class="go"><button data-sgok>收下结算 ▶</button></d
     trk.innerHTML = `<div class="k">${sg.arch.ic} ${sg.envoy ? '月蚀之兆' : '异变 · ' + esc(sg.arch.nm)}</div><div class="n">${esc(sg.T.title)}·${esc(sg.T.n)}</div><div class="t">${where}</div><div class="row">${sg.envoy ? `<span class="c" style="color:#c8b8ff">🌙 线索 +1</span>` : `<span class="c" style="color:#ffe28a">✦ ${esc(FX_TXT[sg.arch.boon][0])}</span>`}<span class="c" style="color:#ff9a8a">✧ ${esc(FX_TXT[sg.arch.bane][0])}</span></div>`;
   }
   function tick() {
-    if (!window.G || !G().S) return; document.body.classList.toggle('saga', on());
+    if (!window.G || !G().S) return; document.body.classList.toggle('saga', on()); if (!CN && document.body.classList.contains('sgcine')) document.body.classList.remove('sgcine');
     const W = window.Worlds && Worlds.active && Worlds._W;
     if (!W || !on()) { if (trk) trk.style.display = 'none'; if (!W && T && !T.settled && !CN) { /* 非正常退出：不结算 */ } if (!W) T = null; return; }
     if (!T) return; const sg = T; if (!sg.node && !sg.noNode && W.B) pickNode(sg, W); if (sg.noNode) return;
     if (W.trip && W.stats) sg.snap = { coins: W.trip.coins || 0, kill: W.stats.kill || 0, decap: W.stats.decap || 0 };
-    if (!sg.shown && !W.busy && W.B && !CN) { setTimeout(() => { if (T === sg && !sg.cinDone && !CN && Worlds.active) { const nd = Worlds._W.graph.nodes[Worlds._W.cur]; if (nd && nd.eliteArena) return; try { play(sg); } catch (e) { console.warn('Saga play', e); CN = null; } } }, 700); sg.shown = true; }
+    if (!sg.shown && !W.busy && W.B && !CN) { setTimeout(() => { if (T === sg && !sg.cinDone && !CN && Worlds.active) { const nd = Worlds._W.graph.nodes[Worlds._W.cur]; if (nd && nd.eliteArena) return; try { play(sg); } catch (e) { console.warn('Saga play', e); try { end(); } catch (e2) { CN = null; document.body.classList.remove('sgcine'); } } } }, 700); sg.shown = true; }
     if (sg.fo && !sg.done) { if (sg.fo.dead || sg.fo.hp <= 0) onKill(sg); else if (sg.fo.escaped) { sg.esc = true; } }
     track(W);
   }
