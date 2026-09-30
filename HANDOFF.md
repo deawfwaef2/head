@@ -1038,3 +1038,16 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **血厚**：`hit()` 伤害下限 = maxHp × 17%（霸主 9%）× 挥速(0.8~1.4) × 部位系数 → 人形约 6 刀、霸主约 11 刀；野兽 `beasts.js` 同样加下限（狼/狐 25%、鹿 20%、野牛 15%；以前野牛 hp=90×(1~3.2) 可能要砍 20+ 刀）。模拟（rar2~3 骑士，72% 命中，q=0.4~1）各职业 7~8 秒杀死。
 - 尸体：`kill()` 探针验证死亡瞬间骨骼无跳变（≤5cm/帧）。
 - `combat.js`（续 13）：命中时的 `S.stop`（冻结武器/手部更新 15~50ms）改为 0——那一下冻结会被当成“手上卡了一下”；被弹刀/格挡的 `recoil` 冻结 0.14→0.05s。命中反馈只靠屏震 + CombatFX 音效 + 血花（不要再加顿帧/慢动作）。
+## 第二十四轮(6)(7)（另一个 Arena Agent，和上面的第二十四轮并行处理同一条用户反馈）
+用户原话要点：角色动作单一；更多音效——走路声、女角色说话声、各种声音；丰富角色人设，现在敌人同质化没人设感；很多角色脸还是很暗。
+（人设/手势/作息、脚步、面部补光已由上面第二十四轮(1)–(5) 完成，本 agent 没有重复实现，只补缺口。）
+- **(6) 语音补齐 + 第二套声线**（commit a5e34f0）：
+  - fierce / sly / cheerful 原来“只有文字”→ 现在有真人语音。`tools/voice_lines.py` 里这三项的台词**已换成录音实际念的句子**（22 槽按 KEYS 映射；缺的 taunt/flee/pain 槽复用同一套里的其它句子，文字仍=声音）。**不需要再录这三套**；若要改台词，必须重录。
+  - 新增 `proud2 / cold2 / gentle2 / timid2 / sharp2` 五套（不同句子，声线：proud2/cold2/sharp2=voice-04，gentle2/timid2=voice-01）。`js/persona.js` `apply()`：若 `PERSONA_LINES.p[k+'2']` 存在，按 `hash(名字+'#v')<0.5` 选第二套 → `fo.per.vk`；`line()`/`voice()` 用 `vk`。同性格的两个人会说不同的话、不同的嗓音。
+  - voice.js 现 13 套 × 22 = 286 条，3.1MB（按需加载不变）。响度 loudnorm −16 LUFS，22050Hz 单声道 40kbps；实测新 176 条平均 −19.8…−11.5 dB，峰值 ≤ −1.7 dB；Chrome decodeAudioData 286/286 成功，共 ~450 秒。
+  - 录音工具链教训：切句 ffmpeg 滤镜里**不要写 `afade=t=out:st=0:d=…`**（从 0 秒就淡出 → 整段静音，我第一次就踩了，已修）；loudnorm 后直接进 LAME 会触发 `psymodel.c calc_energy` 断言 → 在 loudnorm 后加 `aresample=22050,aformat=sample_fmts=s16`。Vosk 对齐时看拼音匹配，个别“找到安宁→吵得很你”这类误识别会让边界错位，需要看时间戳手工修（gentle_16/17 就是）。
+  - TTS 内容审核：含威胁/武器/“决斗/看剑/给我站住/我会带人回来”等的整段会被整段拒绝；温和化后通过。
+- **(7) 环境音 `js/ambience.js`（MOD `ambience`，默认开）**：9 种地点 + 洞穴各一套声景，全合成。底噪层：风（布朗噪+低通，阵风随机游走）、树叶沙沙、水声、洞穴低鸣、深渊 43/45.5Hz 低频嗡鸣、风口哨（高 Q 带通扫频）。随机事件：鸟鸣、啄木鸟、猫头鹰、蟋蟀、蛙鸣、气泡、蚊虫、乌鸦、猛禽长鸣、远处狼嚎、旗帜拍打、金属轻响、远钟、滴水（带两次衰减回声）、闷雷、洞穴闷响、蝙蝠。
+  - 不改共享文件逻辑：自带 250ms `setInterval` 轮询（出猎时 `Worlds.frame` 接管主循环，`G.HOOK.frame` 不跑），读 `Worlds._W.graph.nodes[cur].style`；不在出猎=洞穴。`G.playing=false`/切后台 → 淡出，`G.uiOpen` → 40%。接 `SFX.out`，受 SFX 开关控制。
+  - 实测（headless Chrome 真 AudioContext + Analyser）：各场景平均 −42（王城夜）… −23.5 dB（深渊），峰值 ≤0.2（战斗音效峰值≈1，环境音不会盖过战斗）；暂停 −71 dB；事件频率与配置一致；无报错。调试：`Ambience.demo('forest')` 强制场景、`Ambience.debug()`。
+  - index.html 在 steps.js 之后加 `<script src="js/ambience.js">`；mods.js 加条目。

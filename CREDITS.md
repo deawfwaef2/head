@@ -104,3 +104,7 @@ Poly Haven（https://polyhaven.com），CC0：wooden_cutting_board、brass_pot_0
 ## MMD 头模（第二十三轮，grp: mmd）— ⚠ 仅限私人使用
 models/GI_*.js：原神角色 MMD 模型（模型提供 miHoYo，各改造者见原模型 readme），取自 phoshco.github.io 镜像。
 原规约禁止二次配布、禁止血腥猎奇及商用；用户已知悉并表示仓库将设为私人。**不得公开发布/商用。**
+
+## 人设语音 voice/voice.js（第二十四轮）
+- 全部为本项目用 AI 语音合成（TTS）自制的中文女声台词，13 套 × 22 句；文字表见 `tools/voice_lines.py`（与录音一一对应）。无第三方音频素材。
+- 环境音 `js/ambience.js`、脚步 `js/steps.js`、打击音 `js/combatfx.js` 为 WebAudio 现场合成，无音频文件。
