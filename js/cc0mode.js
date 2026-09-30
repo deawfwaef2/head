@@ -13,10 +13,16 @@ window.CC0 = (() => {
   const hash = (s) => { let h = 2166136261; s = String(s); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
   function okHead(file) { return !on() || HS.has(file); }
   function okBody(name) { return !on() || BS.has(name); }
+  // R50 MOD body_qc50：用户“合作者的新身体很怪——身体肤色和头不一样、头没接上、好多坏的”。逐个渲染质检后，
+  // Q_Witch / Q_Medieval / Q_Adventurer / Q_Formal / Q_Soldier（纯色无贴图低模、爪形手、手臂姿势坏、肤色与动漫头不符）停用，
+  // 按身份换成风格相近的好身体。文件不删（规则：永不删身体），关掉 MOD 即恢复。Q_Ranger / Q_Peasant（有贴图）保留。
+  const QBAD = { Q_Witch: 'Darkness_Shibu', Q_Medieval: 'Vita', Q_Adventurer: 'Q_Ranger', Q_Formal: 'Q_Peasant', Q_Soldier: 'Vita' };
+  const qc50 = () => { try { return !window.Mods || !Mods.on || Mods.on('body_qc50') !== false; } catch (e) { return true; } };
   function body(name, seed) {
+    if (QBAD[name] && qc50()) name = QBAD[name];
     if (okBody(name)) return name;
     const have = BODIES.filter(b => !window.BODY_LIST || BODY_LIST.includes(b)); const L = have.length ? have : BODIES;
     return L[hash(name + '|' + (seed || 0)) % L.length];
   }
-  return { on, okHead, okBody, body, hash, HEADS, BODIES, QB };
+  return { on, okHead, okBody, body, hash, HEADS, BODIES, QB, QBAD };
 })();

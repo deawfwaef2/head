@@ -86,7 +86,10 @@ window.Hunters2 = (() => {
     const W = Worlds._W; if (W && W.foes) { const i = W.foes.indexOf(fo); if (i >= 0) W.foes.splice(i, 1); }
     const i2 = Foe.foes.indexOf(fo); if (i2 >= 0) Foe.foes.splice(i2, 1);
   }
-  function endEncounter() { T.fo = null; T.id = null; T.m = 0; T.armedAt = 0; T.cool = performance.now() + 40000; }
+  // R50 MOD hunter_calm：感应大幅放慢（用户：“猎手感应涨得太快”）
+  const calm = () => !!(window.Mods && Mods.on && Mods.on('hunter_calm'));
+  const CALM = { kill: 2.5, decap: 1.5, grace: 120, base: 0.07, ramp: 0.006, rampCap: 10, roll: 12, p0: 0.06, pMin: 0.06, pMax: 0.5, cool: 150000 };
+  function endEncounter() { T.fo = null; T.id = null; T.m = 0; T.armedAt = 0; T.cool = performance.now() + (calm() ? CALM.cool : 40000); }
 
   // ================= 入场伏击（R49d）：根据地区恶名 + 仇恨，进入地区时可能触发某位猎手；由 Saga 电影引出 =================
   function rollOmen(k) {
@@ -109,18 +112,20 @@ window.Hunters2 = (() => {
     // 仇恨（永久） + 感应（本趟）
     const locK = (W.graph.nodes[W.cur] || {}).loc; s.reg = s.reg || {};
     if (k > T.kH && locK) s.reg[locK] = (s.reg[locK] || 0) + (k - T.kH); if (dc > T.dH && locK) s.reg[locK] = (s.reg[locK] || 0) + (dc - T.dH) * 0.5;
-    if (k > T.kH) { s.hate += (k - T.kH) * (window.Gear2 ? Gear2.hateMul() : 1); T.m += (k - T.kH) * 7 * (window.Gear2 ? Gear2.senseMul() : 1); T.kH = k; }
-    if (dc > T.dH) { s.hate += (dc - T.dH) * 0.5 * (window.Gear2 ? Gear2.hateMul() : 1); T.m += (dc - T.dH) * 4 * (window.Gear2 ? Gear2.senseMul() : 1); T.dH = dc; }
+    if (k > T.kH) { s.hate += (k - T.kH) * (window.Gear2 ? Gear2.hateMul() : 1); T.m += (k - T.kH) * (calm() ? CALM.kill : 7) * (window.Gear2 ? Gear2.senseMul() : 1); T.kH = k; }
+    if (dc > T.dH) { s.hate += (dc - T.dH) * 0.5 * (window.Gear2 ? Gear2.hateMul() : 1); T.m += (dc - T.dH) * (calm() ? CALM.decap : 4) * (window.Gear2 ? Gear2.senseMul() : 1); T.dH = dc; }
     const node = W.graph.nodes[W.cur], quiet = !node || node.home || node.huntArena || node.eliteArena || (W.boss && !W.boss.dead) || W.busy || W.dead;
     const mins = (now - (T.t0 || (T.t0 = now))) / 60000;
-    if (!T.fo && !quiet && now > T.cool) T.m += dt * (0.25 + mins * 0.06) * (window.Gear2 ? Gear2.senseMul() : 1); // 每分钟约 15%，停得越久涨得越快
+    const gm = window.Gear2 ? Gear2.senseMul() : 1;
+    if (calm()) { if (!T.fo && !quiet && now > T.cool && mins * 60 > CALM.grace) T.m += dt * (CALM.base + Math.min(mins, CALM.rampCap) * CALM.ramp) * gm; } // R50：前 2 分钟不涨；之后约 4.5%→8%/分钟
+    else if (!T.fo && !quiet && now > T.cool) T.m += dt * (0.25 + mins * 0.06) * gm; // 每分钟约 15%，停得越久涨得越快
     T.m = Math.min(100, T.m); T.quiet = !!quiet;
     const al = alive();
     const inf = (locK && s.reg[locK]) || 0, gate = s.hate >= 8 && inf >= 6 && mins >= 1.5 && !T.omenFired; /* R49d：开局不刷猎手——要这个地区有足够的“恶名”、仇恨够高、且已停留 1.5 分钟以上；入场伏击由 rollOmen 决定（带电影） */
     T.gate = gate;
     if (!T.fo && !quiet && gate && T.m >= 100 && al.length && now > T.cool) {
       if (!T.armedAt) T.armedAt = now;
-      T.rollT -= dt; if (T.rollT <= 0) { T.rollT = 5; const p = Math.min(0.9, 0.15 + (now - T.armedAt) / 60000 * 0.12); if (Math.random() < p) spawn(al[Math.floor(Math.random() * al.length)].id); }
+      T.rollT -= dt; if (T.rollT <= 0) { const c = calm(); T.rollT = c ? CALM.roll : 5; const am = (now - T.armedAt) / 60000; const p = c ? Math.min(CALM.pMax, CALM.p0 + am * CALM.pMin) : Math.min(0.9, 0.15 + am * 0.12); if (Math.random() < p) spawn(al[Math.floor(Math.random() * al.length)].id); }
     }
     // 猎手在场
     const fo = T.fo;
@@ -167,7 +172,28 @@ window.Hunters2 = (() => {
 #h2Bar .hp{height:9px;background:#0009;border:1px solid #fff4;border-radius:5px;overflow:hidden;margin:4px 0 2px}#h2Bar .hp i{display:block;height:100%;background:linear-gradient(90deg,#c02040,#ff7090);transition:width .15s}
 #h2Bar .hp b{display:block;height:100%}#h2Bar .g{font-size:12px}#h2Bar .fl{color:#ffd070;font-weight:800;font-size:15px;animation:h2p .5s infinite}
 #h2Ban{position:absolute;top:30%;left:50%;transform:translate(-50%,-50%);opacity:0;transition:opacity .5s;text-align:center;color:#fff;text-shadow:0 2px 12px #000;padding:16px 40px;background:radial-gradient(ellipse at center,#12060ae8 30%,#12060a00 72%)}
-#h2Ban.on{opacity:1}#h2Ban .a{font-size:26px;font-weight:900;letter-spacing:3px}#h2Ban .b{font-size:15px;margin:4px 0;color:#ffe0d0}#h2Ban .c{font-size:13px;color:#e0c8c0}`;
+#h2Ban.on{opacity:1}#h2Ban .a{font-size:26px;font-weight:900;letter-spacing:3px}#h2Ban .b{font-size:15px;margin:4px 0;color:#ffe0d0}#h2Ban .c{font-size:13px;color:#e0c8c0}
+/* R50 MOD hunter_hud2：紧凑统一重做（ui3a 黑曜石+血金） */
+#h2Hud.v2 #h2Sense{top:64px;width:250px;padding:6px 10px 7px;background:linear-gradient(180deg,rgba(28,19,26,.92),rgba(13,9,12,.88));clip-path:var(--u-ch-in,none);box-shadow:inset 0 0 0 1px rgba(231,194,122,.28);text-shadow:none;letter-spacing:.5px;text-align:left;font:600 12px/1.2 var(--u-serif,serif);color:#eadfca}
+#h2Hud.v2 #h2Sense .r{display:flex;align-items:center;gap:6px}#h2Hud.v2 #h2Sense .l{flex:1;color:#a8977c;letter-spacing:2px}#h2Hud.v2 #h2Sense .pc{font:700 13px/1 ui-monospace,Consolas,monospace;color:#e7c27a}
+#h2Hud.v2 #h2Sense .ic{width:14px;height:14px;flex:none}
+#h2Hud.v2 #h2Sense .b{height:5px;margin-top:5px;border:0;border-radius:0;background:rgba(0,0,0,.6);box-shadow:inset 0 0 0 1px rgba(231,194,122,.18);position:relative}
+#h2Hud.v2 #h2Sense .b::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(25% - 1px),rgba(7,5,10,.95) calc(25% - 1px) 25%)}
+#h2Hud.v2 #h2Sense i{background:linear-gradient(90deg,#5c0710,#c2141f 70%,#ff4a52)}
+#h2Hud.v2 #h2Sense .ft{display:flex;justify-content:space-between;margin-top:4px;font-size:10.5px;color:#a8977c;letter-spacing:.5px}#h2Hud.v2 #h2Sense kbd{font:700 9.5px/1 ui-monospace,monospace;padding:1px 4px;border:1px solid rgba(231,194,122,.4);color:#e7c27a}
+#h2Hud.v2 #h2Sense.full{animation:none;color:#eadfca;box-shadow:inset 0 0 0 1px rgba(255,74,82,.7),0 0 14px rgba(194,20,31,.45)}#h2Hud.v2 #h2Sense.full .l{color:#ff4a52}#h2Hud.v2 #h2Sense.full .pc{color:#ff4a52}
+#h2Hud.v2 #h2Sense.full i{animation:h2p 1.2s ease-in-out infinite}
+#h2Hud.v2 #h2Sense.low{opacity:.72}
+#h2Hud.v2 #h2Bar{top:52px;width:min(440px,60vw);padding:7px 14px 8px;background:linear-gradient(180deg,rgba(28,19,26,.92),rgba(13,9,12,.88));clip-path:var(--u-ch,none);box-shadow:inset 0 0 0 1px rgba(231,194,122,.3);text-shadow:none;font-family:var(--u-serif,serif)}
+#h2Hud.v2 #h2Bar .n{font-size:15px;letter-spacing:3px}#h2Hud.v2 #h2Bar .n span{font:700 11px ui-monospace,monospace;color:#e7c27a;margin-left:6px;letter-spacing:0}
+#h2Hud.v2 #h2Bar .t{font-size:11px;color:#a8977c;opacity:1;margin-top:2px}
+#h2Hud.v2 #h2Bar .hp{height:7px;border:0;border-radius:0;background:rgba(0,0,0,.65);box-shadow:inset 0 0 0 1px rgba(231,194,122,.22);margin:6px 0 4px;position:relative}
+#h2Hud.v2 #h2Bar .hp::before{content:"";position:absolute;left:30%;top:-2px;bottom:-2px;width:1px;background:#e7c27a;opacity:.8}
+#h2Hud.v2 #h2Bar .hp i{background:linear-gradient(90deg,#5c0710,#c2141f 60%,#ff4a52)}
+#h2Hud.v2 #h2Bar .g{font-size:10.5px;color:#a8977c;letter-spacing:.5px}#h2Hud.v2 #h2Bar .fl{font-size:13px;color:#ffd070}
+#h2Hud.v2 #h2Ban{padding:14px 56px 12px;background:linear-gradient(90deg,transparent,rgba(13,9,12,.92) 18%,rgba(13,9,12,.92) 82%,transparent);text-shadow:0 1px 3px #000;font-family:var(--u-serif,serif)}
+#h2Hud.v2 #h2Ban::before,#h2Hud.v2 #h2Ban::after{content:"";position:absolute;left:10%;right:10%;height:1px;background:linear-gradient(90deg,transparent,#e7c27a,transparent)}#h2Hud.v2 #h2Ban::before{top:0}#h2Hud.v2 #h2Ban::after{bottom:0}
+#h2Hud.v2 #h2Ban .a{font-size:24px;letter-spacing:6px}#h2Hud.v2 #h2Ban .b{font-size:14px;color:#e7c27a;letter-spacing:1px}#h2Hud.v2 #h2Ban .c{font-size:12px;color:#a8977c}`;
     document.head.appendChild(s);
     const d = document.createElement('div'); d.id = 'h2Hud'; d.innerHTML = '<div id="h2Sense"></div><div id="h2Bar"></div><div id="h2Ban"></div>';
     document.body.appendChild(d); hud = { root: d, sense: d.querySelector('#h2Sense'), bar: d.querySelector('#h2Bar'), ban: d.querySelector('#h2Ban') };
@@ -179,7 +205,10 @@ window.Hunters2 = (() => {
     if (!al) { h.sense.innerHTML = '🏹 四名猎手已全部斩杀'; h.bar.style.display = 'none'; return; }
     const full = T.m >= 100;
     h.sense.className = (full ? 'full' : '') + (T.fo || T.quiet ? ' off' : ''); // R43：猎手在场 / 首领战 / 擂台 / 洞口时隐藏，不和顶部血条重叠
- h.sense.innerHTML = `🏹 猎手感应 ${Math.floor(T.m)}%${full ? ' <b style="color:#ff7090">· 随时会来</b>' : ''}<div class="b"><i style="width:${T.m}%"></i></div><small>仇恨 ${Math.floor(s.hate)} · 再 ${Math.ceil(HATE_STEP - s.hate % HATE_STEP)} 点全员升级 · U 查看猎手</small>`;
+ const v2 = !!(window.Mods && Mods.on && Mods.on('hunter_hud2')); h.root.classList.toggle('v2', v2);
+    if (v2) { h.sense.classList.toggle('low', !full && T.m < 30); const toLv = Math.ceil(HATE_STEP - s.hate % HATE_STEP);
+      h.sense.innerHTML = `<div class="r"><svg class="ic" viewBox="0 0 16 16"><path d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3" stroke="${full ? '#ff4a52' : '#e7c27a'}" stroke-width="1.4"/><circle cx="8" cy="8" r="4.2" fill="none" stroke="${full ? '#ff4a52' : '#e7c27a'}" stroke-width="1.2"/><circle cx="8" cy="8" r="1.2" fill="${full ? '#ff4a52' : '#e7c27a'}"/></svg><span class="l">${full ? '猎手将至' : '猎手感应'}</span><span class="pc">${Math.floor(T.m)}%</span></div><div class="b"><i style="width:${T.m}%"></i></div><div class="ft"><span>仇恨 ${Math.floor(s.hate)} · 升级还差 ${toLv}</span><span><kbd>U</kbd> 档案</span></div>`;
+    } else h.sense.innerHTML = `🏹 猎手感应 ${Math.floor(T.m)}%${full ? ' <b style="color:#ff7090">· 随时会来</b>' : ''}<div class="b"><i style="width:${T.m}%"></i></div><small>仇恨 ${Math.floor(s.hate)} · 再 ${Math.ceil(HATE_STEP - s.hate % HATE_STEP)} 点全员升级 · U 查看猎手</small>`;
     const fo = T.fo;
     if (fo && !fo.dead) {
       const d = BY[T.id], L = lvOf(T.id), o = odds(T.id), fl = T.fleeAt ? Math.max(0, FLEE_T - (now - T.fleeAt) / 1000) : 0;
