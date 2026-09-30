@@ -154,7 +154,7 @@ window.Sack = (() => {
   const itemsOf = (L) => L.items || (L.items = L.kind === 'pile' ? [] : roll(L.kind, L.lv || 0, L.seed || 1, L.extra));
 
   // ---- 翻找队列 ----
-  const Q = []; let cont = null, panel = null, mode = null, hudEl = null, drag = null, menuEl = null, caveTab = 'items';
+  const Q = []; let cont = null, panel = null, mode = null, hudEl = null, drag = null, menuEl = null, caveTab = 'forge';
   const W_ = () => window.Worlds && Worlds._W;
   function near(L) { const W = W_(); return W && L && L.x != null && Math.hypot(W.pos.x - L.x, W.pos.z - L.z) < 3.2; }
   function queue(j) { if (Q.length >= 8) { toast('一次最多排 8 件', '#ccc'); return; } j.t = 0; Q.push(j); SFX.sack && SFX.sack(); render(); }
@@ -257,14 +257,29 @@ window.Sack = (() => {
   const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const toast = (t, c, d) => G.toast && G.toast(t, c, d);
   function css() {
-    if (document.getElementById('skCSS')) return; CELL = Math.max(44, Math.min(64, Math.floor(Math.min(innerWidth / 19, innerHeight / 12.5)))); const st = document.createElement('style'); st.id = 'skCSS';
+    if (document.getElementById('skCSS')) return; CELL = Math.max(54, Math.min(76, Math.floor(Math.min(innerWidth / 19.5, innerHeight / 11.5)))); const st = document.createElement('style'); st.id = 'skCSS';
     st.textContent = `
+.modal.big:has(.sk-host){width:min(1560px,97vw)}
+.sk-host{font-size:15px}
+.sk-tabs{align-items:center;gap:8px;margin-bottom:14px}.sk-host button.sk-tab{font-size:17px !important;padding:11px 26px !important;letter-spacing:.14em}.sk-host button.sk-tab.on{filter:brightness(1.25) drop-shadow(0 0 10px rgba(255,190,90,.5))}.sk-coin{margin-left:auto;color:#ffe2a0;font:800 22px "Noto Serif CJK SC",serif}
+.sk-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}.sk-chip{background:rgba(255,255,255,.06) !important;border:1px solid rgba(231,194,122,.3) !important;color:#d8cbb2 !important;border-radius:0 !important;font:600 14px system-ui !important;padding:5px 12px !important;cursor:pointer}.sk-chip::before,.sk-chip::after{display:none !important}.sk-chip.on{background:#c89a4a !important;color:#1a0e08 !important;border-color:#ffd890 !important}
+.sk-it i{filter:drop-shadow(0 2px 3px #000c)}
+#skTip{position:fixed;z-index:95;display:none;pointer-events:none;max-width:300px;padding:10px 14px;background:linear-gradient(180deg,rgba(26,18,26,.98),rgba(10,7,12,.98));border:1px solid #b8914a;box-shadow:0 10px 30px rgba(0,0,0,.7);font:14px/1.55 system-ui,"Noto Sans CJK SC",sans-serif;color:#e8dcc8}#skTip .tn{font:800 17px "Noto Serif CJK SC",serif}#skTip .tr{font-size:12px;letter-spacing:.08em;margin-bottom:5px;opacity:.9}#skTip .tb{color:#d8cbb2}
+.wk-sub{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}.sk-host .wk-sub button.sk-btn{font-size:15px !important;padding:8px 18px !important}.sk-host .wk-sub button.on{filter:brightness(1.3)}.wk-only{margin-left:auto;font-size:15px;color:#cfc2a8;cursor:pointer}.wk-only input{width:16px;height:16px;vertical-align:-3px;margin-right:6px}
+.wk-mats{margin:0 0 12px;padding:9px 14px;background:rgba(0,0,0,.3);border:1px solid rgba(231,194,122,.2);font-size:15px;color:#cfc2a8;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center}.wk-mats b{color:#f3d9a0}.wk-mats span b{color:#fff}
+.wk-h{margin:16px 0 8px !important;font:800 18px "Noto Serif CJK SC",serif !important;color:#f3d9a0 !important}.wk-h small{font:13px system-ui;color:#a99d88;margin-left:8px;letter-spacing:0}
+.wk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.wk-card{padding:12px 14px;background:linear-gradient(160deg,color-mix(in srgb,var(--rc) 10%,#1a1219),#100b12);border:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column;gap:8px}.wk-card.can{border-color:color-mix(in srgb,var(--rc) 70%,#fff 0%);box-shadow:inset 0 0 22px color-mix(in srgb,var(--rc) 16%,transparent)}
+.wk-top{display:flex;gap:12px;align-items:center}.wk-ic{flex:0 0 64px;height:64px;display:flex;align-items:center;justify-content:center;border:1px solid var(--rc);background:radial-gradient(circle,color-mix(in srgb,var(--rc) 30%,#2a1e26),#0c080c 75%)}.wk-ic img{width:100%;height:100%;object-fit:contain}.wk-ic i{font-style:normal;font-size:34px}
+.wk-nm{font:800 19px "Noto Serif CJK SC",serif}.wk-ds{font-size:13px;color:#a0957f;line-height:1.45}.wk-note{font-size:14px;color:#cfc2a8}.wk-note b{color:#ffd890}.wk-note .no{color:#ff8f86}
+.wk-need{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:15px}.wk-need .ok{color:#8fe88f}.wk-need .no{color:#ff8f86}
+.sk-host button.wk-go{font-size:16px !important;padding:9px 16px !important;margin-top:auto}
 #skUI{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:70;background:linear-gradient(180deg,rgba(18,14,20,.96),rgba(8,6,10,.97));border:1px solid var(--u-gold,#b8914a);box-shadow:0 20px 60px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,220,150,.15);padding:14px 16px 10px;color:#e8dcc8;font:13px/1.4 system-ui,"Noto Sans CJK SC",sans-serif;user-select:none;max-width:96vw;max-height:94vh;overflow:auto}
 .sk-host{color:#e8dcc8;user-select:none}
 .sk-cols{display:flex;gap:18px;align-items:flex-start}
 .sk-col h4{white-space:nowrap;margin:0 0 8px;font:700 15px "Noto Serif CJK SC","Songti SC",serif;color:#f3d9a0;letter-spacing:1px;display:flex;align-items:center;gap:8px}
 .sk-col h4 small{color:#a99;font:12px system-ui;letter-spacing:0}
-.sk-list{display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;min-width:${CELL * 5}px;max-width:${CELL * 8 + 30}px;min-height:${CELL * 2}px;max-height:${CELL * 8}px;overflow:auto;padding:6px;background:rgba(0,0,0,.35);border:1px solid rgba(184,145,74,.35)}
+.sk-list{display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;min-width:${CELL * 5}px;max-width:${CELL * 8 + 60}px;min-height:${CELL * 2}px;max-height:${CELL * 7}px;overflow:auto;padding:6px;background:rgba(0,0,0,.35);border:1px solid rgba(184,145,74,.35)}
 .sk-grid{position:relative;background-color:rgba(0,0,0,.4);background-image:linear-gradient(rgba(184,145,74,.22) 1px,transparent 1px),linear-gradient(90deg,rgba(184,145,74,.22) 1px,transparent 1px);background-size:${CELL}px ${CELL}px;border:1px solid rgba(184,145,74,.6)}
 .sk-it{position:absolute;box-sizing:border-box;border:1px solid var(--rc);background:linear-gradient(160deg,rgba(255,255,255,.07),rgba(0,0,0,.25)),rgba(30,24,30,.92);box-shadow:inset 0 0 12px color-mix(in srgb,var(--rc) 35%,transparent);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;text-align:center}
 .sk-list .sk-it,.sk-slot .sk-it{position:relative}
@@ -292,7 +307,7 @@ window.Sack = (() => {
   function tile(o, extra) { // 物品方块
     const [w, h] = dims(o), d = IT[o.id] || {}, rc = RARC[Math.min(6, rarOf(o))];
     const q = Q.find(j => j.o === o || (j.hd && o.h && j.hd.h === o.h)), pg = q && Q[0] === q ? `<span class="pg" style="width:${q.t / dur(q) * 100}%"></span>` : '';
-    return `<div class="sk-it${q ? ' q' : ''}${window.ItemIcons && ItemIcons.has(o.id) && ItemIcons.ready ? ' i3' : ''}" data-u="${o.u}" ${extra || ''} style="--rc:${rc};width:${w * CELL - 2}px;height:${h * CELL - 2}px;${o.x != null && extra == null ? `left:${o.x * CELL + 1}px;top:${o.y * CELL + 1}px` : ''}" title="${esc(nameOf(o))}">${(() => { const u = window.ItemIcons && ItemIcons.url(o.id); return u ? `<img src="${u}" alt="">` : `<i>${d.icon || '?'}</i>`; })()}${h > 1 || w > 1 ? `<b>${esc(nameOf(o))}</b>` : ''}${o.n > 1 ? `<em>${o.n}</em>` : ''}${pg}</div>`;
+    return `<div class="sk-it${q ? ' q' : ''}${window.ItemIcons && ItemIcons.has(o.id) && ItemIcons.ready ? ' i3' : ''}" data-u="${o.u}" ${extra || ''} style="--rc:${rc};width:${w * CELL - 2}px;height:${h * CELL - 2}px;${o.x != null && extra == null ? `left:${o.x * CELL + 1}px;top:${o.y * CELL + 1}px` : ''}">${(() => { const u = window.ItemIcons && ItemIcons.url(o.id); return u ? `<img src="${u}" alt="">` : `<i>${d.icon || '?'}</i>`; })()}${h > 1 || w > 1 ? `<b>${esc(nameOf(o))}</b>` : ''}${o.n > 1 ? `<em>${o.n}</em>` : ''}${pg}</div>`;
   }
   function sackHtml(I) {
     const g = I.sack, used = g.items.reduce((a, o) => { const [w, h] = dims(o); return a + w * h; }, 0);
@@ -312,36 +327,83 @@ window.Sack = (() => {
     }
     if (mode === 'cave' && panel && panel.isConnected) renderCave();
   }
+  // 第二十二轮（用户：装备/物品 UI 太小、合成太乱、没有直接花钱升级好玩）：洞里页签重做 —— ⚔️ 装备（铁匠台，js/forge.js） · 🎒 物品（分类筛选 + 悬停详情） · 🔨 工坊（配方分组 + 摆件）
+  let itemFilter = 'all', craftOnly = false;
+  const FILT = [['all', '全部'], ['equip', '⚔️ 装备'], ['mat', '🪨 材料'], ['use', '🧪 药品'], ['body', '💀 首级·器官'], ['book', '📖 典籍'], ['prop', '🧷 摆件']];
+  const catOf = (o) => { const k = (IT[o.id] || {}).kind; return k === 'equip' ? 'equip' : k === 'use' ? 'use' : (k === 'head' || k === 'organ') ? 'body' : k === 'book' ? 'book' : k === 'prop' ? 'prop' : 'mat'; };
+  const RGRP = [['🧪 药品 · 消耗', r => ['potion', 'bandage', 'stew', 'bigpotion'].includes(r.out), '出猎前带上，腰带按 H 瞬间喝'], ['🗡️ 战斗增益', r => r.out === 'whet', '出猎后 120 秒内伤害 +25%'], ['🎒 背篓 · 扩容', r => /^b\d/.test(r.out), '合成后自动换上，麻袋格子变大、能多装东西']];
+  function recipeCard(rc, i) {
+    const S = G.S, d = IT[rc.out], okN = Object.entries(rc.need).every(([k, n]) => have(k) >= n), ok = okN && S.coins >= rc.coin, u = window.ItemIcons && ItemIcons.url && ItemIcons.url(rc.out);
+    const bag = d.slot === 'bag' ? `<div class="wk-note">麻袋 ${inv().sack.w}×${inv().sack.h} → <b>${BAGSZ[d.tier][0]}×${BAGSZ[d.tier][1]}</b>${d.tier <= (S.eq.bag || 0) ? ' <span class="no">（你已有同级或更高）</span>' : ''}</div>` : '';
+    return `<div class="wk-card ${ok ? 'can' : ''}" style="--rc:${RARC[Math.min(6, d.rar)]}"><div class="wk-top"><div class="wk-ic">${u ? `<img src="${u}" alt="">` : `<i>${d.icon}</i>`}</div><div><div class="wk-nm" style="color:${RARC[Math.min(6, d.rar)]}">${esc(d.n)}${rc.n > 1 ? ' ×' + rc.n : ''}</div><div class="wk-ds">${esc(d.desc || '')}</div></div></div>${bag}
+      <div class="wk-need">${Object.entries(rc.need).map(([k, n]) => `<span class="${have(k) >= n ? 'ok' : 'no'}" title="${esc((IT[k] || {}).desc || '')}">${IT[k].icon}${IT[k].n} ${have(k)}/${n}</span>`).join('')}<span class="${S.coins >= rc.coin ? 'ok' : 'no'}">🔮 ${rc.coin.toLocaleString()}</span></div>
+      <button class="sk-btn wk-go" data-craft="${i}" ${ok ? '' : 'disabled'}>${ok ? '合成' : okN ? '魂晶不足' : '材料不足'}</button></div>`;
+  }
   function renderCave() {
     const I = inv(), S = G.S;
     if (I.pending.length) pourPending();
-    const tabs = `<div class="sk-tabs">${[['items', '🎒 储物 · 麻袋'], ['ench', '🔮 附魔强化'], ['craft', '🔨 合成']].concat(window.Books && Books.on() ? [['books', '📖 典籍']] : []).concat(window.Props && Props.on() ? [['props', '🧷 道具']] : []).map(([k, n]) => `<button class="sk-btn ${caveTab === k ? 'on' : ''}" data-tab="${k}">${n}</button>`).join('')}<span style="margin-left:auto;color:#f3d9a0">🔮 ${Math.floor(S.coins).toLocaleString()}</span></div>`;
+    if (caveTab === 'ench' || (caveTab === 'forge' && !window.Forge)) caveTab = window.Forge ? 'forge' : 'items';
+    const top = caveTab === 'props' ? 'craft' : caveTab;
+    const tabs = `<div class="sk-tabs">${[['forge', '⚔️ 装备'], ['items', '🎒 物品'], ['craft', '🔨 工坊']].concat(window.Books && Books.on() ? [['books', '📖 典籍']] : []).map(([k, n]) => `<button class="sk-btn sk-tab ${top === k ? 'on' : ''}" data-tab="${k}">${n}</button>`).join('')}<span class="sk-coin">🔮 ${Math.floor(S.coins).toLocaleString()}</span></div>`;
     let body = '';
-    if (caveTab === 'items') {
-      const st = I.stash.slice().sort((a, b) => ((IT[b.id] || {}).kind === 'equip') - ((IT[a.id] || {}).kind === 'equip') || rarOf(b) - rarOf(a));
-      body = `<div class="sk-cols"><div class="sk-col"><h4>📦 储物箱 <small>点击物品：装进麻袋 / 装备 / 使用 / 分解（洞里整理不计时）</small></h4><div class="sk-list" id="skCont" style="max-width:${CELL * 9}px">${st.map(o => tile(o, '')).join('') || '<span style="color:#877">空空如也——去野外搜刮吧。</span>'}</div></div>${sackHtml(I)}</div>
-        <div class="sk-foot">武器与装备只能在野外搜刮（容器、武器架、尸体、霸主）。回洞倒袋时，麻袋里的所有东西都会倒出来：首级进洞，其余进储物箱。</div>`;
-    } else if (caveTab === 'props' && window.Props) {
-      body = Props.tabHtml();
+    if (caveTab === 'forge') {
+      body = Forge.tabHtml();
+    } else if (caveTab === 'items') {
+      const all = I.stash.slice().sort((a, b) => ((IT[b.id] || {}).kind === 'equip') - ((IT[a.id] || {}).kind === 'equip') || rarOf(b) - rarOf(a));
+      const cnt = {}; for (const o of all) { const c = catOf(o); cnt[c] = (cnt[c] || 0) + 1; }
+      const st = itemFilter === 'all' ? all : all.filter(o => catOf(o) === itemFilter);
+      const chips = FILT.map(([k, n]) => `<button class="sk-chip ${itemFilter === k ? 'on' : ''}" data-ifilt="${k}">${n}${k === 'all' ? ` ${all.length}` : cnt[k] ? ` ${cnt[k]}` : ''}</button>`).join('');
+      body = `<div class="sk-cols"><div class="sk-col"><h4>📦 储物箱 <small>点物品：装进麻袋 / 装备 / 使用 / 放置 · 悬停看详情</small></h4><div class="sk-chips">${chips}</div><div class="sk-list" id="skCont">${st.map(o => tile(o, '')).join('') || `<span style="color:#877;font-size:15px;padding:8px">${all.length ? '这一类是空的。' : '空空如也——去野外搜刮吧。'}</span>`}</div></div>${sackHtml(I)}</div>
+        <div class="sk-foot">装备与首级来自野外（容器、武器架、尸体、霸主）。回洞倒袋时，麻袋里的东西全部倒出：首级进洞，其余进储物箱。想升级装备 → 去「⚔️ 装备」页。</div>`;
+    } else if (caveTab === 'craft' || caveTab === 'props') {
+      const sub = caveTab === 'props' && window.Props ? 'props' : 'rc';
+      const mats = Object.values(IT).filter(d => d.kind === 'mat' && have(d.id) > 0).slice(0, 14).map(d => `<span>${d.icon}${d.n} <b>${have(d.id)}</b></span>`).join('');
+      const head = `<div class="wk-sub"><button class="sk-btn ${sub === 'rc' ? 'on' : ''}" data-wsub="craft">🔨 配方（药品·增益·背篓）</button>${window.Props && Props.on() ? `<button class="sk-btn ${sub === 'props' ? 'on' : ''}" data-wsub="props">🧷 摆件（洞里的 BUFF 道具）</button>` : ''}${sub === 'rc' ? `<label class="wk-only"><input type="checkbox" data-wonly ${craftOnly ? 'checked' : ''}> 只看现在能合成的</label>` : ''}</div>`;
+      if (sub === 'props') body = head + Props.tabHtml();
+      else {
+        const grp = RGRP.map(([nm, f, hint]) => { const rs = RECIPES.map((rc, i) => [rc, i]).filter(([rc]) => f(rc)).filter(([rc]) => !craftOnly || (Object.entries(rc.need).every(([k, n]) => have(k) >= n) && S.coins >= rc.coin)); return rs.length ? `<h4 class="wk-h">${nm} <small>${hint}</small></h4><div class="wk-grid">${rs.map(([rc, i]) => recipeCard(rc, i)).join('')}</div>` : ''; }).join('');
+        body = head + `<div class="wk-mats"><b>库存材料</b> ${mats || '<span style="opacity:.6">还没有材料——去野外容器、尸体、野兽身上翻</span>'}</div>` + (grp || '<p style="color:#a99;font-size:15px">现在没有能合成的配方。取消“只看能合成”看看缺什么。</p>');
+      }
     } else if (caveTab === 'books' && window.Books) {
       body = Books.tabHtml(I.sack.items.concat(I.stash));
-    } else if (caveTab === 'ench') {
-      const p = S.eqPlus.weapon || 0, c = enchCost(p), t = RPG.EQUIP.weapon.tiers[S.eq.weapon || 0];
-      const need = (id, n) => n ? `<span class="${have(id) >= n ? 'ok' : 'no'}">${IT[id].icon}${IT[id].n} ${have(id)}/${n}</span>` : '';
-      const row = (label, pp, key) => { const cc = enchCost(pp); return `<div class="sk-rc"><span class="nm">${label} +${pp}</span><span class="nd">→ +${pp + 1}：攻击 ×${(1 + 0.15 * (pp + 1)).toFixed(2)} · <span class="${S.coins >= cc.coin ? 'ok' : 'no'}">🔮${cc.coin}</span> ${need('iron', cc.iron)} ${need('dust', cc.dust)} ${need('gem', cc.gem)}</span><button class="sk-btn" data-ench="${key}" ${pp >= 10 ? 'disabled' : ''}>${pp >= 10 ? '已满' : '附魔'}</button></div>`; };
-      body = `<p style="color:#bba;margin:0 0 8px">🧌 斯尼克：「装备？嘿嘿，那得你自己去外面扒。魂晶嘛……我只收来<b>附魔</b>武器。」每 +1 攻击 +15%，最高 +10；+5 以上需要血玉。</p>`
-        + row(`⚔️ 当前武器「${t.n}」`, p, 'eq') + I.stash.filter(o => IT[o.id] && IT[o.id].slot === 'weapon').map(o => row(`${IT[o.id].icon} ${IT[o.id].n}（储物箱）`, o.plus || 0, o.u)).join('');
-    } else {
-      body = `<p style="color:#bba;margin:0 0 8px">材料来自野外容器与尸体；魂晶只作手工费。合成出的背篓会自动换上（更大的麻袋）。</p>` + RECIPES.map((rc, i) => { const d = IT[rc.out]; const ok = Object.entries(rc.need).every(([k, n]) => have(k) >= n) && S.coins >= rc.coin;
-        return `<div class="sk-rc"><span class="nm" style="color:${RARC[d.rar]}">${d.icon} ${d.n}${rc.n > 1 ? '×' + rc.n : ''}</span><span class="nd">${Object.entries(rc.need).map(([k, n]) => `<span class="${have(k) >= n ? 'ok' : 'no'}">${IT[k].icon}${IT[k].n} ${have(k)}/${n}</span>`).join(' ')} · <span class="${S.coins >= rc.coin ? 'ok' : 'no'}">🔮${rc.coin}</span><br><small>${esc(d.desc || '')}</small></span><button class="sk-btn" data-craft="${i}" ${ok ? '' : 'disabled'}>合成</button></div>`; }).join('');
     }
     panel.innerHTML = tabs + body; bind(panel);
+    if (caveTab === 'forge' && window.Forge) Forge.bind(panel, render);
     if (caveTab === 'books' && window.Books) Books.bindTab(panel, I.sack.items.concat(I.stash));
-    if (caveTab === 'props' && window.Props) Props.bindTab(panel, render);
+    if ((caveTab === 'props' || caveTab === 'craft') && window.Props && panel.querySelector('[data-pcraft],[data-pplace],[data-precall]')) Props.bindTab(panel, render);
+  }
+  // ---- 悬停详情卡（装备会和身上的对比）----
+  let tipEl = null;
+  const hideTip = () => { if (tipEl) tipEl.style.display = 'none'; };
+  function tipHtml(o) {
+    const d = IT[o.id] || {}, r = Math.min(6, rarOf(o)), RNm = window.RN_ || RARN; let body = '';
+    if (o.og && window.Organs) body = esc(Organs.info(o)).replace(/\n/g, '<br>');
+    else if (o.h) body = `${esc(RN[o.h.c.rar] || '')} · ${esc(o.h.c.raceN || o.h.c.race || '')}<br>回洞倒袋时滚出来`;
+    else if (o.bk) body = esc(`${o.bk.sub || ''}（${o.bk.names.length} 个名字）`);
+    else if (d.kind === 'equip' && window.RPG) {
+      const E = RPG.EQUIP[d.slot], t = E.tiers[d.tier], c = E.tiers[G.S.eq[d.slot] || 0], K = ['atk', 'def', 'hp', 'str', 'con', 'agi', 'ter', 'soul', 'cap'], NM = { atk: '攻击', def: '防御', hp: '生命', str: '力量', con: '体魄', agi: '敏捷', ter: '凶威', soul: '魂力', cap: '背篓' };
+      body = K.filter(k => t[k] || c[k]).map(k => { const a = t[k] || 0, b = c[k] || 0, df = a - b; return `${NM[k]} <b>${a}</b> <span style="color:${df > 0 ? '#8fe88f' : df < 0 ? '#ff8f86' : '#998'}">${df > 0 ? '▲+' + df : df < 0 ? '▼' + df : '＝'}</span>`; }).join('<br>') + `<br><span style="color:#a99">${esc(t.desc || '')}</span>`;
+    } else body = esc(d.desc || '');
+    return `<div class="tn" style="color:${RARC[r]}">${d.icon || ''} ${esc(nameOf(o))}${o.n > 1 ? ' ×' + o.n : ''}</div><div class="tr" style="color:${RARC[r]}">${RARN[r]} · ${({ equip: '装备', use: '消耗品', head: '首级', organ: '人体器官', book: '典籍', prop: '摆件' })[d.kind] || '材料'}${d.st > 1 ? ' · 可堆叠 ' + d.st : ''} · ${dims(o).join('×')} 格</div><div class="tb">${body}</div>`;
+  }
+  function bindTips(root) {
+    hideTip(); if (root._tips) return; root._tips = 1;
+    root.addEventListener('mousemove', (e) => {
+      const el = e.target.closest && e.target.closest('.sk-it'); if (!el || drag || menuEl) { hideTip(); return; }
+      const f = findU(el.dataset.u); if (!f[0]) { hideTip(); return; }
+      if (!tipEl) { tipEl = document.createElement('div'); tipEl.id = 'skTip'; document.body.appendChild(tipEl); }
+      if (tipEl._u !== f[0].u || tipEl._s !== JSON.stringify([f[0].n, f[0].plus])) { tipEl._u = f[0].u; tipEl._s = JSON.stringify([f[0].n, f[0].plus]); tipEl.innerHTML = tipHtml(f[0]); }
+      tipEl.style.display = 'block'; const w = tipEl.offsetWidth, h = tipEl.offsetHeight; tipEl.style.left = Math.max(6, Math.min(innerWidth - w - 8, e.clientX + 18)) + 'px'; tipEl.style.top = Math.max(6, Math.min(innerHeight - h - 8, e.clientY + 14)) + 'px';
+    });
+    root.addEventListener('mouseleave', hideTip); root.addEventListener('mousedown', hideTip);
   }
   function findU(u) { const I = inv(); u = +u; for (const [where, L] of [['sack', I.sack.items], ['stash', I.stash], ['cont', cont ? itemsOf(cont) : []]]) { const o = L.find(q => q.u === u); if (o) return [o, where]; } const bi = I.belt.findIndex(q => q && q.u === u); if (bi >= 0) return [I.belt[bi], 'belt', bi]; return [null]; }
   function bind(root) {
+    bindTips(root);
     root.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { caveTab = b.dataset.tab; SFX.page && SFX.page(); render(); });
+    root.querySelectorAll('[data-ifilt]').forEach(b => b.onclick = () => { itemFilter = b.dataset.ifilt; SFX.page && SFX.page(); render(); });
+    root.querySelectorAll('[data-wsub]').forEach(b => b.onclick = () => { caveTab = b.dataset.wsub; SFX.page && SFX.page(); render(); });
+    root.querySelectorAll('[data-wonly]').forEach(b => b.onchange = () => { craftOnly = b.checked; render(); });
     root.querySelectorAll('[data-ench]').forEach(b => b.onclick = () => { const k = b.dataset.ench; enchant(k === 'eq' ? 'eq' : inv().stash.find(o => o.u === +k)); });
     root.querySelectorAll('[data-craft]').forEach(b => b.onclick = () => craft(RECIPES[+b.dataset.craft]));
     const dsb = root.querySelector('[data-act="dissect"]'); if (dsb) dsb.onclick = () => { if (!near(cont)) { toast('离尸体太远了', '#ccc'); return; } Organs.dissect(cont); render(); };
@@ -423,5 +485,5 @@ window.Sack = (() => {
     if (e.code === 'KeyH') { e.preventDefault(); e.stopImmediatePropagation(); quickUse(); return; }
   }, true);
   function frame(dt) { if (buffT > 0) buffT -= dt; tick(dt); }
-  return { on, IT, def, mk, stashAdd, have, take, RECIPES, inv, lvOf, genLoot, placeLoot, corpse, carcass, openWild, toggleWild, closePanel, mountCave, frame, interrupt, queueHead, capture, heads, tripEnd, onDeath, pourPending, homeArrive, quickUse, dmgMul, usage, itemsOf, roll, addTo, canAdd, get panelOpen() { return mode === 'wild' && !!panel; }, get queue() { return Q; } };
+  return { equip, enchant, enchCost, salvage, resizeSack, nameOf, RARC, on, IT, def, mk, stashAdd, have, take, RECIPES, inv, lvOf, genLoot, placeLoot, corpse, carcass, openWild, toggleWild, closePanel, mountCave, frame, interrupt, queueHead, capture, heads, tripEnd, onDeath, pourPending, homeArrive, quickUse, dmgMul, usage, itemsOf, roll, addTo, canAdd, get panelOpen() { return mode === 'wild' && !!panel; }, get queue() { return Q; } };
 })();

@@ -113,7 +113,7 @@ window.UI = (() => {
 
   // ---------------- 主菜单 ----------------
   const menuState = { tab: 'stats', sub: 'func' };
-  const TABS = [['stats', '👹 属性'], ['equip', window.Sack && Sack.on() ? '🎒 储物·附魔·合成' : '🪓 装备·斯尼克'], ['build', '🔨 建造'], ['heads', '💀 首级收藏'], ['codex', '📖 图鉴·展厅'], ['logs', '📜 狩猎日志']];
+  const TABS = [['stats', '👹 属性'], ['equip', window.Sack && Sack.on() ? '⚔️ 装备·物品·工坊' : '🪓 装备·斯尼克'], ['build', '🔨 建造'], ['heads', '💀 首级收藏'], ['codex', '📖 图鉴·展厅'], ['logs', '📜 狩猎日志']];
   function openMenu(tab = menuState.tab, sub) {
     menuState.tab = tab; if (sub) menuState.sub = sub;
     const S = G.S;
