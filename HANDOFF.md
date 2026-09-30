@@ -1200,3 +1200,10 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   - 实测：猎人身份 青发初音→Vita 74%（原 51%）、金发绘里→Amber 82%。
   - Foe 导出了 `bodyFor`（测试用）。
 - 改动文件：index.html（启动脚本 3 处）、js/mods.js（+3 MOD）、js/heads.js（FaceFill.wrap / 下限、grad、hairColor 接口）、js/foe.js（TOON_GRAD、FF 系数、bodyFor/matchPick/BODY_PAL、导出 bodyFor）、tools/bodypal.py。未碰 UI Agent 文件。
+
+## 第二十六轮(g)(h) — 另一个 Arena Agent：命中 HUD / 音量面板 / 打击感（与 R26c–f 的 combat_master 并行，不改 combat.js/foe.js）
+用户反馈（本轮原话要点）：“战斗效果太烂，打击感非常弱”“每次打就是冒一堆数字”“角色永远打不死”；上一条：“来个各种音效音乐调节选项，音乐太大了”；语音“算了就中文”（日语重录已放弃，不要再做）。
+- **MOD `hit_hud`（js/hithud.js，默认开）**：`worlds.js floatDmg` 首行钩子 `HitHud.dmg(pos,n,big)`（只接管数字；字符串飘字照旧）。同一目标 1.2s 内的命中合并成一个累计数字 + `×N`，每下弹跳。被打中的敌人（`Foe.foes`，非霸主）和野兽（`Beasts.list`）头顶血条：红=当前、白=刚掉的血慢慢缩；5s 不挨打淡出；击杀闪白消失。自带 rAF 循环（出猎时 Worlds 接管主循环），`Worlds.active` 为假或 `body.film` 时隐藏。
+- **MOD `audio_mixer`（js/sfx.js + js/mixer.js，默认开）**：sfx.js 新增分通道 `SFX.bus(k)`：`sfx`（= `SFX.out`，老代码默认进这里）/`ui`/`voice`/`amb`/`steps`/`music`，全部 → master(0.8×总音量) → 压缩器。`SFX.VOL / VDEF / setVol(k,v)`，存 `localStorage.soulhead_vol`。HTMLAudio BGM 音量 = 0.45 × music × master（**默认 music 0.5 = 以前的一半**）；`duck()` 尊重当前音量。已改接：ambience→amb、steps→steps、persona 语音→voice、seance 八音盒→music、ui3a 合成界面音→ui、`SFX.play` 的 click/select/confirm/error/open/close/page/book → ui。面板：右上角 `#musicCorner` 改为「🔊 音量」，`#menu` 里 BGM 按钮后插「🔊 音量」；M 键仍开关 BGM。**新增音效请接 `SFX.bus('对应通道')`，不要直接接 `ctx.destination`。**
+- **MOD `hit_impact`（js/impact.js，默认开）**：包一层 `CombatFX.event`（原函数先执行）。hit：受害者 `mixer.timeScale=0` 60ms（重斩/破绽 115ms），击杀 150ms（只延长不缩短）；沿 `Combat.state.sw.v` 方向在命中处画刃光（DOM，重斩/击杀更宽更红，格挡/弹刀黄色火花）；叠加 115→40Hz 闷响 + 带通噪声（sfx 通道）；击杀红色屏幕边缘脉冲、重斩白色。玩家镜头与操作不冻结（用户以前把慢动作视为卡顿）。
+- 测试：桩页（真 three.js/mods.js/sfx.js + 假 Worlds/Foe/Beasts/Combat）Playwright：数字合并 `54×3`、血条宽度/白条延迟/击杀、面板 7 行滑块实时改 GainNode、顿帧恢复、刃光方向（向右下 = 左上→右下）。**完整 index.html / _t.html 在本沙箱仍 OOM（/tmp 在内存里），未整机测试**——请用户试玩反馈数值（顿帧时长、刃光粗细、血条大小）。
