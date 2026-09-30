@@ -42,7 +42,7 @@ window.I18N = (() => {
   RULES.push({ re: /^(· ?)?([\u3400-\u9fff]{1,6}) ?([≈+\-]? ?[\d.,\/×]+%? ?(?:ms|m|s|\/s|秒)?)$/, f: (m, L, T) => { const o = T(m[2]); return o !== m[2] ? (m[1] || '') + o + ' ' + m[3] : null; } });
 
   // ---------- DOM ----------
-  const SKIP = 'script,style,textarea,[data-copy],.langtabs,#i18nSel,#i18nBtn,[data-noi18n],#credits';
+  const SKIP = 'script,style,textarea,[data-copy],.langtabs,#i18nSel,#i18nBtn,[data-noi18n],#credits,#tut,#tutArrow';
   let FORCE = false; const TN = new WeakMap(), AN = new WeakMap(), ATTRS = ['title', 'placeholder', 'alt', 'aria-label'];
   const skipEl = el => !el || (el.closest && el.closest(SKIP));
   function doText(n) {

@@ -23,3 +23,4 @@ D = [
 ("洞门缓缓开启……","The cave gate slowly opens…","洞窟の扉がゆっくり開く……"),("构建洞窟…","Building the cave…","洞窟を構築中…"),
 ("启动失败：","Failed to start: ","起動に失敗："),("请把这段文字截图发给开发者","Please screenshot this and send it to the developer","この文章のスクリーンショットを開発者に送ってください"),
 ]
+D += [("📖 新手教程 / チュートリアル / Tutorial","📖 Tutorial","📖 チュートリアル")]
