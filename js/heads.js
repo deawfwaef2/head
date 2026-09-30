@@ -33,8 +33,30 @@ window.FaceFill = (() => {
       float _fr = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0);
       reflectedLight.indirectDiffuse += diffuseColor.rgb * 0.3183 * _fr * 0.22 * _dk; }`;
   function animePatch(sh) { if (!animeOn() || sh.fragmentShader.indexOf('ANIME_BLOCK') >= 0 || sh.fragmentShader.indexOf('#include <lights_fragment_end>') < 0) return; sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n' + ANIME_GLSL); }
+  // ===== R36b MOD skin_sss（用户：“头渲染改成 3D shader 那种风格，可以加次表面散射之类的，反正看起来更像人的头，而不是塑料”）=====
+  // 保留 PBR（天空/太阳/篝火/阴影照常），在 lights_fragment_end 之后只对“肤色像素”（由反照率的色相/饱和度/亮度判定，头发衣服不受影响）做：
+  //  ① 明暗交界带染血红色散射（预积分皮肤的经典红晕：受光→背光过渡处偏红橙，而不是灰）；② 背光侧暖色填充（皮下散射回来的光，暗部不发灰发死）；
+  //  ③ 掠射角红色透光边（耳廓/鼻翼/指尖的透光感，只在受光时出现）；④ 高光压到 50~80%、加一圈极淡的宽油脂光泽（去掉塑料硬高光，又保留皮肤的湿润感）。
+  // 极暗环境（洞里/夜里）不抬亮。参数集中在 SSS_GLSL。关 MOD = 原来的 PBR（或 anime_shade）。
+  const sssOn = () => !window.Mods || !Mods.on || Mods.on('skin_sss') !== false;
+  const SSS_GLSL = `// SSS_BLOCK
+    { vec3 _a = diffuseColor.rgb; float _l = dot(_a, vec3(0.299, 0.587, 0.114));
+      float _mx = max(_a.r, max(_a.g, _a.b)), _mn = min(_a.r, min(_a.g, _a.b)), _st = (_mx - _mn) / max(_mx, 1e-3);
+      float _sk = smoothstep(0.09, 0.2, _st) * (1.0 - smoothstep(0.55, 0.75, _st)) * step(_a.g, _a.r + 0.01) * step(_a.b, _a.g + 0.03) * smoothstep(0.14, 0.3, _l);
+      vec3 _litC = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse;
+      float _lr = dot(_litC, vec3(0.299, 0.587, 0.114)) / (max(_l, 1e-3) * 0.3183);
+      float _dk = smoothstep(0.03, 0.30, _lr);
+      float _pen = smoothstep(0.10, 0.50, _lr) * (1.0 - smoothstep(0.55, 1.05, _lr));
+      float _nv = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), _fr = pow(1.0 - _nv, 2.6);
+      vec3 _base = _a * 0.3183;
+      vec3 _add = _base * vec3(1.0, 0.36, 0.22) * (_pen * 0.5 + _fr * smoothstep(0.3, 1.0, _lr) * 0.5)
+                + _base * vec3(1.0, 0.64, 0.52) * (1.0 - smoothstep(0.0, 0.65, _lr)) * 0.2;
+      reflectedLight.indirectDiffuse = reflectedLight.indirectDiffuse * mix(vec3(1.0), vec3(1.05, 0.97, 0.92), _sk * _dk) + _add * _dk * _sk;
+      reflectedLight.directSpecular *= mix(0.3, 0.7, _sk); reflectedLight.indirectSpecular *= mix(0.35, 0.8, _sk); /* 头发/衣服：硬高光压到 30%，不再是一块块塑料反光 */
+      reflectedLight.indirectSpecular += vec3(1.0, 0.93, 0.88) * 0.035 * _fr * _dk * _sk; }`;
+  function sssPatch(sh) { if (!sssOn() || sh.fragmentShader.indexOf('SSS_BLOCK') >= 0 || sh.fragmentShader.indexOf('#include <lights_fragment_end>') < 0) return; sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n' + SSS_GLSL); }
   function inject(sh, k, toon, hp) {
-    if (!toon) animePatch(sh);
+    if (!toon) { animePatch(sh); sssPatch(sh); }
     sh.uniforms.uFill = u; if (hp) sh.uniforms.uHeadK = hk; if (toon) { sh.uniforms.uEnvA = ea; sh.uniforms.uKneeOff = ko; }
     if (toon) sh.fragmentShader = sh.fragmentShader.replace('float _s = clamp(_t / _ex, 0.0, 1.3);', 'float _s = clamp(_t / _ex, 0.0, 1.3); if (uKneeOff > 1.001) { float _t2 = _ex <= 1.0 ? _ex : 1.0 + (uKneeOff - 1.0) * (1.0 - exp((1.0 - _ex) / (uKneeOff - 1.0))); _s = _t2 / _ex; }');
     sh.fragmentShader = sh.fragmentShader.replace('void main() {', (toon ? 'uniform vec3 uEnvA; uniform float uKneeOff;\n' : '') + (hp ? 'uniform float uHeadK;\n' : '') + 'uniform float uFill;\nvoid main() {')
@@ -45,12 +67,12 @@ window.FaceFill = (() => {
         float lr = dot(litC, vec3(0.299, 0.587, 0.114)) / al; float fc = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
         totalEmissiveRadiance += diffuseColor.rgb * 0.3183 * max(0.0, uFill * ${k.toFixed(2)} - lr) * (0.45 + 0.55 * fc); }`);
   }
-  const HPBR_OBC = function (sh) { animePatch(sh); sh.uniforms.uHeadK = hk; sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform float uHeadK;\nvoid main() {').replace('#include <lights_physical_fragment>', 'diffuseColor.rgb *= uHeadK;\n#include <lights_physical_fragment>'); }; // R33：head_pbr 头材质的默认注入（hair/skin 自带 onBeforeCompile 的由 wrap 注入同一句）
+  const HPBR_OBC = function (sh) { animePatch(sh); sssPatch(sh); sh.uniforms.uHeadK = hk; sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform float uHeadK;\nvoid main() {').replace('#include <lights_physical_fragment>', 'diffuseColor.rgb *= uHeadK;\n#include <lights_physical_fragment>'); }; // R33：head_pbr 头材质的默认注入（hair/skin 自带 onBeforeCompile 的由 wrap 注入同一句）
   function wrap(m, k) { // 包一层 onBeforeCompile（clone() 不会复制它：克隆后要重新包）
     if (!m || !(m.isMeshToonMaterial || (m.isMeshStandardMaterial && window.Mods && Mods.on('char_lift'))) || done.has(m)) return m; /* R29 char_lift：身体默认是 PBR 标准材质（foe_toon 关）→ 以前完全没补光，洞里发黑 */ const prev = m.customProgramCacheKey(), o = m.onBeforeCompile;
-    const toon = !!m.isMeshToonMaterial, hp = !!(m.userData && m.userData.hpbr) && o !== HPBR_OBC; m.onBeforeCompile = function (sh, r) { o.call(this, sh, r); inject(sh, k, toon, hp); }; m.customProgramCacheKey = () => prev + '|ff' + k + (toon ? 'e' : '') + (hp ? 'h' : '') + (animeOn() ? 'A' : ''); done.add(m); return m;
+    const toon = !!m.isMeshToonMaterial, hp = !!(m.userData && m.userData.hpbr) && o !== HPBR_OBC; m.onBeforeCompile = function (sh, r) { o.call(this, sh, r); inject(sh, k, toon, hp); }; m.customProgramCacheKey = () => prev + '|ff' + k + (toon ? 'e' : '') + (hp ? 'h' : '') + (animeOn() ? 'A' : '') + (sssOn() ? 'S' : ''); done.add(m); return m;
   }
-  return { u, wrap, tune, hk, HPBR_OBC, animeOn, world() { worldT = performance.now(); }, env(c) { if (c) envA.copy(c).multiplyScalar(0.55); else envA.setRGB(0, 0, 0); } };
+  return { u, wrap, tune, hk, HPBR_OBC, animeOn, sssOn, world() { worldT = performance.now(); }, env(c) { if (c) envA.copy(c).multiplyScalar(0.55); else envA.setRGB(0, 0, 0); } };
 })();
 window.ModelHeads = (() => {
   const T = [];               // templates
@@ -85,7 +107,7 @@ window.ModelHeads = (() => {
   function MTM(p) {
     if (window.Mods && !Mods.on('head_pbr')) return new THREE.MeshToonMaterial(p);
     const q = Object.assign({}, p); delete q.gradientMap; if (q.roughness == null) q.roughness = 0.88; if (q.metalness == null) q.metalness = 0;
-    const m = new THREE.MeshStandardMaterial(q); m.envMapIntensity = 0.55; m.userData.hpbr = 1; m.onBeforeCompile = FaceFill.HPBR_OBC; m.customProgramCacheKey = () => 'hpbr1' + (FaceFill.animeOn() ? 'A' : ''); return m;
+    const m = new THREE.MeshStandardMaterial(q); m.envMapIntensity = 0.55; m.userData.hpbr = 1; m.onBeforeCompile = FaceFill.HPBR_OBC; m.customProgramCacheKey = () => 'hpbr1' + (FaceFill.animeOn() ? 'A' : '') + (FaceFill.sssOn() ? 'S' : ''); return m;
   }
   function b64ToBuf(b64) { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
 

@@ -47,7 +47,8 @@ window.Mods = (() => {
     { id: 'vroid_bodies', cat: 'look', icon: '👗', n: '新身体：VRoid 六套（第二十四轮）', d: '追加 5 具非原神身体（pixiv VRoid 官方 CC0 模型的原装衣服）：Vita 蓝色战斗装、Victoria Rubin 白色礼裙、Darkness Shibu 青花长裙、HairSample 白色连衣裙、AvatarSample B 街头夹克，外加 Iwashi 的浴衣少女（おさげちゃん）。按衣服风格分配给对应身份；皮肤可随首级染色（深肤色也能配）。关闭则只用旧身体。', def: true },
     { id: 'head_norm', cat: 'look', icon: '📏', n: '头模尺寸归一（第二十四轮）', d: 'MMD 管线的头比 VRoid 头小约两成，挂在身体上显得特别小。载入时按脸宽等比放大到标准尺寸（需重新载入）。', def: true },
     { id: 'head_norm2', cat: 'look', icon: '📐', n: '头身比例修正（R30，取代上一项）', d: '所有非 VRoid 头按脸宽+两眼间距双指标归一到 VRoid 标准，可缩可放：星铁/绝区零/异环/经典 MMD 不再是大头娃娃，测歪的头不再是小头怪。开启时上一项“头模尺寸归一”不生效。需重新载入。', def: true },
-    { id: 'anime_shade', cat: 'look', icon: '🎎', n: '二次元光影（R36）', d: '角色（头、头发、身体）的光照改成二次元风格：亮面平涂、暗面统一抬到约 80% 并染暖粉阴影色、中间软过渡，去掉塑料感的高光与环境镜面反射，加一圈淡淡边缘光。天空/太阳/篝火/阴影照常响应，极暗环境仍然是暗的。需重新载入。关闭=R33 的真实 PBR 受光。', def: true },
+    { id: 'anime_shade', cat: 'look', icon: '🎎', n: '二次元光影（R36）', d: '角色（头、头发、身体）的光照改成二次元风格：亮面平涂、暗面统一抬到约 80% 并染暖粉阴影色、中间软过渡，去掉塑料感的高光与环境镜面反射，加一圈淡淡边缘光。天空/太阳/篝火/阴影照常响应，极暗环境仍然是暗的。需重新载入。（R36b：用户要 3D 着色器风格，默认改为关；想要平涂二次元可在这里打开。）关闭=R33 的真实 PBR 受光。', def: false },
+    { id: 'skin_sss', cat: 'look', icon: '🫧', n: '皮肤次表面散射 · 3D 真人质感（R36b）', d: '在 PBR 上只对肤色像素加：明暗交界带的血红色散射、背光侧暖色填充、掠射角的红色透光边（耳朵/鼻翼）、压低塑料硬高光并加一圈极淡的油脂光泽。头发和衣服不受影响，极暗环境不抬亮。需重新载入。', def: true },
     { id: 'head_pbr', cat: 'look', icon: '💡', n: '头部真实受光（R33）', d: '头/头发/眼睛/饰品从“卡通材质”（只有 4 级色阶、不吃天空环境光、不响应光照方向）改为与身体相同的 PBR 材质：同一套灯光、同一张环境图、同一条曲线。阳光/篝火/阴影下头会像身体一样亮暗变化，不再在所有环境里都暗沉发灰。需重新载入。关闭=旧的卡通头。', def: true },
     { id: 'head_norm3', cat: 'look', icon: '📏', n: '头型再收一圈（R33）', d: '在脸宽/眼距对齐 VRoid 之后，非 VRoid 头整体再缩 5%，并且发量/发饰/兽耳撑大整颗头轮廓的（含头发包围盒高超过 VRoid 中位）按比例再收，最多到 82%。需重新载入。', def: true },
     { id: 'body_headfit', cat: 'look', icon: '🧍', n: '原神身体头身比修正（R31）', d: '头挂到身体上的尺寸原本按 VRoid 身体标定，换到原神身体上头会小 3~18%（芙宁娜最明显）。按身高/头高、头宽/肩宽两个指标给每具原神身体单独校正，VRoid 身体不变。', def: true },
@@ -159,6 +160,7 @@ window.Mods = (() => {
   if (st.__v < 5) { st.forge_buy = false; st.__v = 5; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R26：装备不能买，只能搜刮 + 强化
   if (st.__v < 6) { st.ogre_hunters = false; st.hunters2 = true; st.__v = 6; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R35：旧食人魔猎手 → 四名主角式猎手
   if (st.__v < 7) { st.dev_mode = false; st.__v = 7; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R37：开发者模式默认关闭（用户要求），旧存档迁移一次
+  if (st.__v < 8) { st.anime_shade = false; st.__v = 8; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R36b：用户要 3D shader 风格，二次元光影默认关（旧存档迁移一次）
   for (const m of LIST) if (st[m.id] === undefined) st[m.id] = !!m.def;
   // 修正非法状态（互斥组恰好一个；冲突；依赖）
   function normalize() {

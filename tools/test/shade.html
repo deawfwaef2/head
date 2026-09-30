@@ -6,7 +6,7 @@ window.__vt = 0; const _pn = performance.now.bind(performance); performance.now 
 window.SFX = new Proxy({}, { get: (t, k) => k === 'ctx' || k === 'out' ? undefined : () => {} });
 </script>
 <script src="/lib/three.min.js"></script><script src="/lib/GLTFLoader.js"></script>
-<script>try{const q=new URLSearchParams(location.search);const k="soulhead_mods";const st=JSON.parse(localStorage.getItem(k)||"{}");st.anime_shade=q.get("off")?false:true;if(q.get("pbr")==="0")st.head_pbr=false;localStorage.setItem(k,JSON.stringify(st));}catch(e){}</script><script src="/js/mods.js"></script><script src="/js/lore.js"></script><script src="/js/rpg.js"></script>
+<script>try{const q=new URLSearchParams(location.search);const k="soulhead_mods";const st=JSON.parse(localStorage.getItem(k)||"{}");st.anime_shade=q.get("anime")?true:false;st.skin_sss=q.get("sss")==="0"?false:true;st.__v=8;if(q.get("pbr")==="0")st.head_pbr=false;localStorage.setItem(k,JSON.stringify(st));}catch(e){}</script><script src="/js/mods.js"></script><script src="/js/lore.js"></script><script src="/js/rpg.js"></script>
 <script src="/models/AvatarSample_K.js"></script><script src="/js/hair_cover.js"></script><script src="/js/heads.js"></script><script src="/js/headwear.js"></script>
 <script src="/js/combat.js"></script><script src="/js/stamina.js"></script><script src="/js/foe.js"></script><script src="/js/foe_roles.js"></script><script src="/js/foe_roles2.js"></script>
 
