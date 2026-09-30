@@ -1185,3 +1185,18 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
   修复（`combat.js`）：MM 出刀改成 **回拉（80ms，重斩 50ms）→ 挥出** 两段，回拉阶段每帧读鼠标趋势（含按下前 90ms，≥3px 即算），刀朝鼠标移动方向斩：向右下轻移 = 左上→右下。回拉已经在动，所以没有“延迟感”；命中结算推迟到回拉结束后 20ms。按住继续轻移 = 沿该方向连续出刀（R26e 的连斩保留）。测试：drift 右下/左上/上 → 首刀 -45°/135°/90°，后续连斩方向一致。
 - **保险（永不打不死）**：`foe.js` hit()：普通敌人第 4/5/6 刀起按剩余血量 1/3、1/2、全部结算（第 6 刀必死），霸主第 12 刀必死；`beasts.js` 同理（野牛 8 刀）；`worlds.js` 旧式球体 boss（hp 100）伤害下限 ≈9%。不论护甲/角色/回血，都不会“砍 20 刀不死”。
 - 环境说明：本轮沙箱被重置（/var/work 丢失），已重新浅克隆；完整世界在 `_t.html` 里启动需数分钟，未做真机整世界测试，仍只用 `tools/test/fight.html` harness。
+## R29 — 用户：“loading 界面不要看得到在加载什么，换换文本；模型显示仍偏黑，身体衣服色调不搭配”
+- **MOD `load_veil`**（index.html 启动脚本，两个 init 进度回调）：不再显示“加载首级模型 xx% · 文件名”，改为轮换氛围短句（魂火渐明……/洞壁在低语……等 10 句，2.6 秒一换）+ 两段合并的总进度；最后一句“洞门缓缓开启……”。关掉即恢复原文本。
+- **MOD `char_lift`**（偏黑的根因）：`foe_toon` 默认关 → 身体是 PBR 标准材质，而 FaceFill（face_light）只包卡通材质 → **身体在洞里完全没有补光**，头有。修复：
+  - js/heads.js FaceFill.wrap：char_lift 开时也包 MeshStandardMaterial（同单位 albedo/π，同一段注入代码）。
+  - FaceFill 下限：洞里 0.45→0.8、野外 0.75→0.85（uniform getter，不重编译）。js/foe.js FF() 身体系数 0.85→0.95。
+  - 头与身体的卡通色阶暗档 [120,190,235,255]→[165,208,240,255]（heads.js grad、foe.js TOON_GRAD）。
+  - 实测（篝火前 6 人）：最暗的身体亮 10–30%；剩下的“暗”是衣服贴图本身深色 → 交给 body_match 偏好不太暗的身体。
+- **MOD `body_match`**（js/foe.js bodyFor → matchPick）：
+  - `tools/bodypal.py` 离线统计 24 具身体衣服主色（跳过皮肤/头发/脸材质，按三角面积加权采样贴图；材质合并的身体剔除肤色像素）→ 常量 `BODY_PAL`（h 色相 / s 彩度 / c 集中度 / n 中性占比 / d 暗占比 / L 亮度）内嵌在 foe.js。新增身体要重跑：`python3 tools/bodypal.py big/body/*.js`，替换 foe.js 里的 `const BODY_PAL = …;` 一行。
+  - 新接口 `ModelHeads.hairColor(look)`：mmd 发型用贴图平均色（hairAvgCol），其余用 look.hc1。
+  - 权重：色相差 <40° ×1.8、<75° ×1.1、>150°（补色）×0.8、其余（撞色）×0.3；按衣服彩度和发色彩度缩放（黑白灰任一方 → 百搭）；× (0.7+0.6·min(1, L/0.55)) 略偏好不太暗的身体。
+  - 身份候选全撞色（最大权重 <0.9）且本地点身体种类 <3：一半概率改从全部非 Boss 身体中协调度前 5 挑。
+  - 实测：猎人身份 青发初音→Vita 74%（原 51%）、金发绘里→Amber 82%。
+  - Foe 导出了 `bodyFor`（测试用）。
+- 改动文件：index.html（启动脚本 3 处）、js/mods.js（+3 MOD）、js/heads.js（FaceFill.wrap / 下限、grad、hairColor 接口）、js/foe.js（TOON_GRAD、FF 系数、bodyFor/matchPick/BODY_PAL、导出 bodyFor）、tools/bodypal.py。未碰 UI Agent 文件。

@@ -495,10 +495,21 @@
   const fail = (e) => { txt.innerHTML = '启动失败：' + (e && e.message || e) + '<br><small>请把这段文字截图发给开发者</small>'; console.error(e); };
   window.addEventListener('error', ev => { if (document.getElementById('loading')) fail(ev.error || ev.message); });
   try {
-    if (window.Assets) await Assets.init((f, name) => { bar.style.width = (f * 100) + '%'; txt.textContent = '加载场景资产 ' + Math.round(f * 100) + '% · ' + (name || ''); });
-    await ModelHeads.init((f, name) => { bar.style.width = (f * 100) + '%'; txt.textContent = '加载首级模型 ' + Math.round(f * 100) + '% · ' + (name || ''); });
+    // MOD load_veil（R29）：加载界面不暴露正在加载的文件/角色名，只显示氛围文案 + 总进度
+    const veil = !window.Mods || Mods.on('load_veil');
+    const VEIL = ['魂火渐明……', '洞壁在低语……', '石龛上的灰尘被拂开……', '远处传来铁链声……', '烛芯吸饱了油……', '有什么在黑暗里睁开眼……', '祭台上的刻痕被重新描深……', '冷风从更深处吹来……', '供灯一盏接一盏亮起……', '岩缝里渗出幽蓝的光……'];
+    let vi = Math.floor(Math.random() * VEIL.length), vt = 0;
+    const prog = (stage, lbl) => (f, name) => {
+      const NS = window.Assets ? 2 : 1, g = veil ? (stage + f) / NS : f, pct = Math.round(g * 100);
+      bar.style.width = (g * 100) + '%';
+      if (!veil) { txt.textContent = lbl + ' ' + pct + '% · ' + (name || ''); return; }
+      const now = performance.now(); if (now - vt > 2600) { vt = now; vi++; }
+      txt.textContent = VEIL[vi % VEIL.length] + '　' + pct + '%';
+    };
+    if (window.Assets) await Assets.init(prog(0, '加载场景资产'));
+    await ModelHeads.init(prog(window.Assets ? 1 : 0, '加载首级模型'));
     if (!ModelHeads.ready) throw new Error('模型解析失败');
-    txt.textContent = '构建洞窟…'; await new Promise(r => setTimeout(r, 30));
+    txt.textContent = veil ? '洞门缓缓开启……' : '构建洞窟…'; await new Promise(r => setTimeout(r, 30));
     startGame();
   } catch (e) { fail(e); return; }
   document.getElementById('loading').remove();

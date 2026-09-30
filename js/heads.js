@@ -3,7 +3,7 @@
 // 已经被照亮的脸不变；背光/阴天/夜里的脸不再黑成一团。全局共享一个 uniform：开关/强度改变都不会重编译着色器。
 window.FaceFill = (() => {
   let worldT = -1e9; const done = new WeakSet(); // 不能用 userData 标记：clone() 会复制 userData 却不复制 onBeforeCompile
-  const u = { get value() { if (window.Mods && !Mods.on('face_light')) return 0; return performance.now() - worldT < 600 ? 0.75 : 0.45; } }; // 亮度下限（满光≈1.08；白天≈0.9–1.0 不受影响，夜里≈0.5 提到 0.75）：野外 0.75，洞穴 0.45
+  const u = { get value() { if (window.Mods && !Mods.on('face_light')) return 0; const L = !window.Mods || Mods.on('char_lift'); return performance.now() - worldT < 600 ? (L ? 0.85 : 0.75) : (L ? 0.8 : 0.45); } }; /* R29 char_lift：洞里 0.45→0.8、野外 0.75→0.85 */ // 亮度下限（满光≈1.08；白天≈0.9–1.0 不受影响，夜里≈0.5 提到 0.75）：野外 0.75，洞穴 0.45
   function inject(sh, k) {
     sh.uniforms.uFill = u;
     sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform float uFill;\nvoid main() {')
@@ -13,7 +13,7 @@ window.FaceFill = (() => {
         totalEmissiveRadiance += diffuseColor.rgb * 0.3183 * max(0.0, uFill * ${k.toFixed(2)} - lr) * (0.45 + 0.55 * fc); }`);
   }
   function wrap(m, k) { // 包一层 onBeforeCompile（clone() 不会复制它：克隆后要重新包）
-    if (!m || !m.isMeshToonMaterial || done.has(m)) return m; const prev = m.customProgramCacheKey(), o = m.onBeforeCompile;
+    if (!m || !(m.isMeshToonMaterial || (m.isMeshStandardMaterial && window.Mods && Mods.on('char_lift'))) || done.has(m)) return m; /* R29 char_lift：身体默认是 PBR 标准材质（foe_toon 关）→ 以前完全没补光，洞里发黑 */ const prev = m.customProgramCacheKey(), o = m.onBeforeCompile;
     m.onBeforeCompile = function (sh, r) { o.call(this, sh, r); inject(sh, k); }; m.customProgramCacheKey = () => prev + '|ff' + k; done.add(m); return m;
   }
   return { u, wrap, world() { worldT = performance.now(); } };
@@ -44,7 +44,7 @@ window.ModelHeads = (() => {
     '灰紫': '#a8a0c4', '暗青': '#7e86a4', '淡紫': '#e0c4ea', '苍白': '#e8e8ec', '赤红': '#e89a8a', '青灰': '#a8b4b0'
   };
 
-  const grad = (() => { const d = new Uint8Array([120, 190, 235, 255]); const t = new THREE.DataTexture(d, 4, 1, THREE.RedFormat); const sm = !!(window.Mods && Mods.on('smooth_faces')); t.minFilter = t.magFilter = sm ? THREE.LinearFilter : THREE.NearestFilter; t.needsUpdate = true; return t; })();
+  const grad = (() => { const d = new Uint8Array(window.Mods && Mods.on('char_lift') ? [165, 208, 240, 255] : [120, 190, 235, 255]); /* R29 char_lift：洞里角色暗部别发黑（头身同一条色阶） */ const t = new THREE.DataTexture(d, 4, 1, THREE.RedFormat); const sm = !!(window.Mods && Mods.on('smooth_faces')); t.minFilter = t.magFilter = sm ? THREE.LinearFilter : THREE.NearestFilter; t.needsUpdate = true; return t; })();
 
   function b64ToBuf(b64) { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
 
@@ -1164,6 +1164,8 @@ window.ModelHeads = (() => {
 
   return {
     init, create, randomLook, HAIR, EYE, SKIN, tick(t) { GT.value = t; },
+    // R29 body_match：这个头实际显示的发色（mmd 发型用贴图平均色，其他用染发色），给 foe.js 挑配色协调的身体
+    hairColor(look) { try { const H = T[idxOf(look.h || look.f)]; if (H && H.meta.grp === 'mmd') { const c = hairAvgCol(H); if (c) return c.clone().convertLinearToSRGB(); } return new THREE.Color(look.hc1 || '#333333'); } catch (e) { return null; } },
     get ready() { return ready; },
     get count() { return T.length; },
     files: () => T.map(t => t.meta.file),

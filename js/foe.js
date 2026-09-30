@@ -9,7 +9,7 @@ window.Foe = (() => {
     if (LOADED[name]) return LOADED[name];
     return LOADED[name] = new Promise((res, rej) => { if (window.BODY_MODELS && BODY_MODELS[name]) return res(); const s = document.createElement('script'); s.src = 'big/body/' + name + '.js'; s.onload = () => res(); s.onerror = () => rej(new Error('body ' + name)); document.head.appendChild(s); });
   }
-  let _tg = null; const TOON_GRAD = () => _tg || (_tg = (() => { const t = new THREE.DataTexture(new Uint8Array([120, 190, 235, 255]), 4, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })());
+  let _tg = null; const TOON_GRAD = () => _tg || (_tg = (() => { const t = new THREE.DataTexture(new Uint8Array(window.Mods && Mods.on('char_lift') ? [165, 208, 240, 255] : [120, 190, 235, 255]), 4, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })());
   function b64buf(s) { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; }
   // 载入身体模板（只解析一次，之后 SkeletonUtils 式克隆）
   async function template(name) {
@@ -208,8 +208,30 @@ window.Foe = (() => {
     if (used && used.size >= 3) { const hit = list.filter(b => used.has(b)); if (hit.length) list = hit; } // 同一地点最多 ~3 种身体：加载快、省内存
     const light = LIGHT.includes(h.look.sk);
     if (!light) { const t = list.filter(b => TINT[b]); if (t.length) list = t; else if (r() < 0.45) list = ['HikariCape', 'HikariScholar']; }
+    if (window.Mods && Mods.on('body_match')) return matchPick(h, r, list, used);
     const b = pickR(r, list);
     return b;
+  }
+  // R29 MOD body_match：身体衣服主色（tools/bodypal.py 离线统计：h 色相° / s 平均彩度 / c 色相集中度 / n 中性色占比 / L 平均亮度）
+  const BODY_PAL = {"Amber":{"h":8,"s":0.117,"c":0.96,"n":0.72,"d":0.42,"L":0.25},"AvatarSample_A":{"h":26,"s":0.075,"c":0.78,"n":0.98,"d":0.19,"L":0.752},"AvatarSample_B":{"h":321,"s":0.087,"c":0.78,"n":0.78,"d":0.33,"L":0.507},"Beidou":{"h":359,"s":0.107,"c":0.94,"n":0.75,"d":0.48,"L":0.249},"Darkness_Shibu":{"h":254,"s":0.242,"c":0.82,"n":0.44,"d":0.37,"L":0.239},"Eula":{"h":212,"s":0.102,"c":0.63,"n":0.76,"d":0.27,"L":0.342},"Furina":{"h":222,"s":0.159,"c":0.66,"n":0.6,"d":0.06,"L":0.608},"HairSample_Female":{"h":263,"s":0.058,"c":0.74,"n":0.94,"d":0.0,"L":0.836},"HikariCape":{"h":307,"s":0.038,"c":0.56,"n":0.99,"d":0.11,"L":0.567},"HikariScholar":{"h":357,"s":0.108,"c":0.28,"n":0.89,"d":0.28,"L":0.577},"Jean":{"h":227,"s":0.085,"c":0.5,"n":0.95,"d":0.33,"L":0.31},"Kokomi":{"h":247,"s":0.124,"c":0.81,"n":0.81,"d":0.07,"L":0.412},"Lisa":{"h":269,"s":0.122,"c":0.57,"n":0.73,"d":0.12,"L":0.535},"Mona":{"h":323,"s":0.207,"c":0.62,"n":0.45,"d":0.06,"L":0.343},"Ningguang":{"h":35,"s":0.178,"c":0.99,"n":0.71,"d":0.29,"L":0.562},"Noelle":{"h":351,"s":0.088,"c":0.91,"n":0.82,"d":0.44,"L":0.271},"Osage":{"h":226,"s":0.118,"c":0.55,"n":0.79,"d":0.0,"L":0.606},"Rosaria":{"h":334,"s":0.065,"c":0.89,"n":0.93,"d":0.52,"L":0.256},"Shenhe":{"h":211,"s":0.119,"c":0.23,"n":0.7,"d":0.24,"L":0.473},"Sucrose":{"h":216,"s":0.137,"c":0.62,"n":0.64,"d":0.12,"L":0.478},"Victoria_Rubin":{"h":3,"s":0.116,"c":0.88,"n":0.72,"d":0.0,"L":0.908},"Vita":{"h":184,"s":0.341,"c":0.88,"n":0.2,"d":0.0,"L":0.647},"Xiangling":{"h":26,"s":0.249,"c":0.97,"n":0.58,"d":0.24,"L":0.569},"YaeMiko":{"h":5,"s":0.16,"c":0.95,"n":0.62,"d":0.09,"L":0.609}};
+  // 按“发色 ↔ 衣服主色”协调度加权随机：同色系 > 邻近色 > 补色 > 撞色；黑白灰衣服、黑白灰头发百搭；略偏好不太暗的身体
+  const matchCache = new Map();
+  function matchPick(h, r, list, used) {
+    const hc = window.ModelHeads && ModelHeads.hairColor ? ModelHeads.hairColor(h.look) : null; if (!hc) return pickR(r, list);
+    const hsl = {}; hc.getHSL(hsl); const hh = hsl.h * 360, hs = hsl.s * Math.min(1, 2 * Math.min(hsl.l, 1 - hsl.l) * 1.6);
+    const score = b => { const P = BODY_PAL[b]; if (!P) return 1;
+      const cb = P.s * P.c, k = Math.min(1, cb / 0.1) * Math.min(1, hs / 0.35);
+      const d = Math.abs(((hh - P.h) % 360 + 540) % 360 - 180);
+      const base = d < 40 ? 1.8 : d < 75 ? 1.1 : d > 150 ? 0.8 : 0.3;
+      return (1 + (base - 1) * k) * (0.7 + 0.6 * Math.min(1, P.L / 0.55)); };
+    let w = list.map(score);
+    // 身份候选全撞色（只有 1–2 具身体时常见）：一半概率改从全部身体里协调度前 5 的挑（同地点已满 3 种身体时不扩）
+    if (Math.max(...w) < 0.9 && !(used && used.size >= 3) && r() < 0.5) {
+      const all = Object.keys(BODY_PAL).filter(b => !Object.values(BOSS_BODY).includes(b) || list.includes(b)).map(b => [b, score(b)]).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      list = all.map(x => x[0]); w = all.map(x => x[1]);
+    }
+    let t = r() * w.reduce((a, b) => a + b, 0); for (let i = 0; i < list.length; i++) if ((t -= w[i]) <= 0) return list[i];
+    return list[list.length - 1];
   }
   // 武器：静止姿势（T）下剑身朝前(+Z)握在右手里，之后动作的世界旋转增量会把它带到原动作里的位置
   function weaponModel(name) {
@@ -280,7 +302,7 @@ window.Foe = (() => {
     } catch (e) { console.warn('warm', e); }
     finally { R.toneMapping = tm; R.setRenderTarget(rt0); }
   }
-  function FF(m) { return window.FaceFill ? FaceFill.wrap(m, 0.85) : m; } // 第二十四轮：身体也补一点光（与脸一致，不会脸亮身体黑）
+  function FF(m) { return window.FaceFill ? FaceFill.wrap(m, window.Mods && Mods.on('char_lift') ? 0.95 : 0.85) : m; } // 第二十四轮：身体也补一点光（与脸一致，不会脸亮身体黑）
   function prewarm(ctx) {
     if (!ctx.renderer || !ctx.camera) return; const grp = new THREE.Group(), geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3)); geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(6), 2)); geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([0, 1, 0, 0, 1, 0, 0, 1, 0]), 3));
@@ -939,5 +961,5 @@ window.Foe = (() => {
     const pinv = new M4().copy(par.matrixWorld).invert().multiply(root.matrixWorld); hips.position.copy(want.applyMatrix4(pinv));
   }
   function has(name) { return !!(window.BODY_LIST && BODY_LIST.includes(name)); }
-  return { say: (fo, t, col) => talk(fo, t, col), hasHead: (h) => HEADS.includes(h), warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, attack, ATK, tokenOK, ctx: () => CTX, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
+  return { bodyFor, say: (fo, t, col) => talk(fo, t, col), hasHead: (h) => HEADS.includes(h), warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, attack, ATK, tokenOK, ctx: () => CTX, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
 })();
