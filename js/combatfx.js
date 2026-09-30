@@ -113,11 +113,12 @@ window.CombatFX = (() => {
   }
   // 命中准星
   let mk = null, mkT = 0;
+  // 第二十六轮(j) 修“打击的红圈没法消失”：命中十字的 i 原来没有默认 opacity:0、动画也没 forwards → 0.28s 动画放完弹回完全可见并一直留在准星上（击杀=红色）
   function marker(kind) { // white 普通 / crit 弱点 / kill 击杀 / block 被挡
     if (!modOn()) return; if (!mk) {
-      const st = document.createElement('style'); st.textContent = '#cfxMk{position:fixed;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:9}#cfxMk i{position:absolute;left:-2px;top:-2px;width:4px;height:15px;background:currentColor;border-radius:2px;box-shadow:0 0 6px #000a;transform-origin:2px 2px}'
-        + '#cfxMk.go i{animation:cfxm .28s ease-out}@keyframes cfxm{0%{opacity:1;margin-top:0}100%{opacity:0;margin-top:0}}'
-        + '#cfxMk.go{animation:cfxs .28s ease-out}@keyframes cfxs{0%{transform:scale(.6)}35%{transform:scale(1.25)}100%{transform:scale(1.45)}}';
+      const st = document.createElement('style'); st.textContent = '#cfxMk{position:fixed;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:9}#cfxMk i{position:absolute;left:-2px;top:-2px;width:4px;height:15px;background:currentColor;border-radius:2px;box-shadow:0 0 6px #000a;transform-origin:2px 2px;opacity:0}'
+        + '#cfxMk.go i{animation:cfxm .28s ease-out forwards}@keyframes cfxm{0%{opacity:1;margin-top:0}100%{opacity:0;margin-top:0}}'
+        + '#cfxMk.go{animation:cfxs .28s ease-out forwards}@keyframes cfxs{0%{transform:scale(.6)}35%{transform:scale(1.25)}100%{transform:scale(1.45)}}';
       document.head.appendChild(st); mk = document.createElement('div'); mk.id = 'cfxMk'; for (let a = 0; a < 4; a++) { const i = document.createElement('i'); i.style.transform = `rotate(${45 + a * 90}deg) translateY(9px)`; mk.appendChild(i); } document.body.appendChild(mk); }
     mk.style.color = kind === 'kill' ? '#ff3a2a' : kind === 'crit' ? '#ffd040' : kind === 'block' ? '#8fd0ff' : '#ffffff'; mk.style.filter = kind === 'kill' ? 'drop-shadow(0 0 4px #f00)' : ''; mk.firstChild.style.height = kind === 'kill' ? '20px' : '15px';
     mk.classList.remove('go'); void mk.offsetWidth; mk.classList.add('go'); mkT = performance.now();
