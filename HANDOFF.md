@@ -1549,3 +1549,8 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - `tools/balance/sim.js`：TUNES.new 同步；新增 ③ 熟练度阶梯表。结果：Lv1 平均出刀间隔 831ms → Lv27 403ms → Lv30 353ms；仅熟练度就使 DPS 约 ×5.2（伤害 45%→100%）。Lv1 对 rar1 TTK 5.8s，早期 Lv2–5 有少量死亡（罚 10% 金币）。
 - 与 R35 不冲突：仍是绝对数值，无百分比伤害、无保底刀数。未在真机验证。
 - **R43b（用户：“小字看得眼瞎、UI 太普通、不够大师级”）**：武技熟练度 UI 重做。`Balance.card(lv)`（js/balance.js）生成卡片：带进度环的境界印章（壹~伍）、按境界变色的大标题（最大 68px）、五境界路线图、四条大进度条（前摇/收招/体力/伤害，大字百分比 + ×倍率 → 满熟练）；样式 `css/mastery.css`（已在 index.html 引入；字号下限 15px；矮屏 ≤940px 自动紧凑）。升阶改为全屏宽大横幅 `#msUp`（3.6s），不再用小字 toast。测试页：`tools/test/mastery.html`（五阶段静态预览，?lang=zh|en|ja）、`tools/test/hub.html`（已加载 balance.js / mastery.css）。教训：read_file 会缓存同名截图，换文件名再看。
+- **R44（用户：“很多地方文字太多，要搭配图形语言，把 UI 改得更好看”）**：
+  - 总览页（`js/ui.js statsBody`）重做：等级经验环 + 大战力数字 + 血条；五维属性改成**雷达图**（SVG + HTML 标签，悬停显示基础/装备/建筑明细）；攻防闪避/魂晶产出/回复/背篓、出猎/斩首/累计魂晶/把玩 改成图标数据块；药剂改成图标按钮（保留 `data-a="use"`）。样式 `css/ov.css`（已在 index.html 引入，tools/test/hub.html 也加载）。长说明文字（“提升属性：在洞里建造训练器械…”）已删，放进悬停提示。
+  - 按键一览（`js/keyguide.js`）：顶部“先做这三件事”文字条换成三张**操作图**（WASD 十字键帽 + Shift/Space/C + 鼠标；战斗：鼠标左右键高亮“斩/挡”+ F/Q/E/H；首级·菜单：E/LMB/RMB/Tab/Esc/F1），一键一字；下面的详细列表保留并把字号提到 15px；按下的键会在大键帽上亮起（data-c）。
+  - 装备页（`js/gear2.js dollHTML`、`js/hub.js kitBody`）：文字属性表换成血条 + 6 个图标数据块（零值变暗）；删掉说明段落，改成底部键帽图例条（LMB 取出/装备 · 拖动整理 · R 旋转 · H 喝药 · Tab 关闭；三语）。CSS 用 `.hk .sk-eq/.sk-foot/.g2note {display:none}` 隐藏了麻袋里的重复文字，非 hub 场景的旧面板不受影响。
+  - 教训：`Hub.go('logs'|'codex')` 在测试页里不会渲染（harness 缺 UI 依赖，截图其实还是上一页）；这两页、首级收藏、MOD 列表、天赋页的“图形化”还没做，下一轮继续。
