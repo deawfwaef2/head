@@ -74,3 +74,8 @@ D = [
 ("· 自重","· Weight","· 自重"),("· 握长","· Grip","· 握り長"),("轻击 前摇","Light wind-up","軽攻撃 予備動作"),("· 出刀","· Strike","· 斬撃"),("ms · 间隔","ms · interval","ms · 間隔"),
 ("/ 收招","/ finisher","/ フィニッシュ"),("/ 重击","/ heavy","/ 強攻撃"),("· 体力","· Stamina","· スタミナ"),("· 连击 ≈","· Combo ≈","· コンボ ≈"),("（完整数据：铁匠台）","(full data: at the forge)","（詳細データ：鍛冶台）"),
 ]
+D += [("链锤","Flail","フレイル"),("体力","Stamina","スタミナ"),
+("略沉：比木棒慢一丝，但单击更扎实。","Slightly heavy: a touch slower than the club, but each hit lands firmer.","やや重い：棍棒より僅かに遅いが、一撃はしっかりしている。"),
+("偏沉：出手稍慢，一下砸得很重——别被人抢了空档。","Heavy: slightly slow to swing, but it smashes hard — don't get caught in the gap.","重め：振りはやや遅いが、叩きつける一撃は重い——隙を突かれるな。"),
+("（体力耗尽：所有前摇/收招 ×1.3）","(Out of stamina: all wind-ups / recoveries ×1.3)","（スタミナ切れ：全ての予備動作・戻りが×1.3）"),
+("（攻击冷却 MOD 已关：间隔 = 出刀时长）","(Attack-cooldown MOD off: interval = strike time)","（攻撃クールダウンMODがオフ：間隔＝斬撃時間）")]
