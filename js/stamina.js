@@ -42,9 +42,10 @@ window.Stamina = (() => {
     if (o.run && !R.ex && o.moving) drain(15 * dt);                 // 奔跑
     if (guarding && !R.ex) drain(5 * dt);                           // 举着格挡也累
     if (o.moving && o.alert && !o.run && !R.ex) drain(0.9 * dt);   // 战斗中走位也慢慢耗
-    const rest = now - R.last > (R.ex ? 0.8 : 0.45) && !guarding && !(o.run && o.moving);
-    if (rest) { const rate = R.ex ? 15 : o.moving ? (o.alert ? 9 : 17) : 28; set(val() + rate * dt); }
-    if (R.ex && val() >= 30) { R.ex = false; const g = GG(); g.toast && g.toast('缓过来了', '#cfe8c0', 0.9); }
+    const MMx = !window.Mods || Mods.on('combat_master') !== false; // R26：大师战斗——喘息更快
+    const rest = now - R.last > (R.ex ? (MMx ? 0.6 : 0.8) : (MMx ? 0.3 : 0.45)) && !guarding && !(o.run && o.moving);
+    if (rest) { const rate = MMx ? (R.ex ? 22 : o.moving ? (o.alert ? 16 : 24) : 38) : (R.ex ? 15 : o.moving ? (o.alert ? 9 : 17) : 28); set(val() + rate * dt); }
+    if (R.ex && val() >= (MMx ? 22 : 30)) { R.ex = false; const g = GG(); g.toast && g.toast('缓过来了', '#cfe8c0', 0.9); }
     // 屏幕反馈
     const low = val() < 20 ? (20 - val()) / 20 : 0, tgt = R.ex ? 0.75 + Math.sin(now * 5) * 0.12 : low * 0.35;
     if (tgt > 0.01 || fxO > 0.01) { R.pulse += (tgt - R.pulse) * Math.min(1, dt * 6); const e = el(), v = Math.round(R.pulse * 100) / 100; if (v !== fxO) { fxO = v; e.style.opacity = v; e.firstChild.style.opacity = R.ex ? 1 : 0; } }

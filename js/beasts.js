@@ -187,7 +187,7 @@ window.Beasts = (() => {
     if (!b.alive || !C) return false; const slash = info.kind !== 'thrust', sp = Math.max(0.5, Math.min(1.8, (info.speed || 5) / 8));
     const q = C.power(b.stub), mult = (b.broken > 0 ? 2 : 1) * (info.charged ? 2.2 : 1) * (info.mult || 1);
     let dealt = Math.max(1, Math.round(12 * q * sp * mult * (slash ? 1 : 0.8) * rnd(0.85, 1.15)));
-    dealt = Math.max(dealt, Math.round(b.maxHp * (b.k === 'bull' ? 0.15 : b.k === 'stag' ? 0.2 : 0.25) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：狼/狐约 4 刀、鹿 5 刀、野牛 7 刀（以前野牛要 20+ 刀）
+    dealt = Math.max(dealt, Math.round(b.maxHp * (b.k === 'bull' ? 0.15 : b.k === 'stag' ? 0.2 : 0.25) * (info.fmul || 1) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：狼/狐约 4 刀、鹿 5 刀、野牛 7 刀（以前野牛要 20+ 刀）
     b.hp -= dealt; b.flash = 0.12; b.provoked = true; const fp = b.pos.clone(); fp.y += b.T.h * 0.8; C.floatDmg(fp, dealt, sp > 1.2 || b.broken > 0);
     { const kv = (info.vel || new V3()).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((b.k === 'bull' ? 0.1 : 0.28) * sp); b.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退分 0.16 秒推完（以前一帧瞬移）
     C.event && C.event('hit', b.stub, { dealt, zone: 'body', brk: b.broken > 0 });

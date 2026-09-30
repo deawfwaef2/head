@@ -27,7 +27,7 @@ async function setup(opts) {
     window.__game = G; window.G = G; Combat.init(G); Combat.toggle(true);
     window.CTXH = { sc: scene, H: () => 0, cols: [], R: 40, doors: [], pvel: new V3(), escaped() { }, player: { pos: player.pos, get yaw() { return player.yaw; }, get crouch() { return false; } },
       st: G.st, sees: () => true, say() { }, floatDmg(pos, n, big) { H.dmgOut += n; H.hits++; }, renderer, camera,
-      event(t, fo, d) { H.log.push(t); if (t === 'kill') H.kills++; }, windup() { }, playerSwinging: () => false, playerAiming: () => false, handAng: () => null, clang() { if (window.Combat) Combat.recoil(1); },
+      event(t, fo, d) { H.log.push(t === 'hit' && d ? 'hit:' + d.zone : t); if (t === 'kill') H.kills++; }, windup() { }, playerSwinging: () => false, playerAiming: () => false, handAng: () => null, clang() { if (window.Combat) Combat.recoil(1); },
       power: (fo) => __opts.q || 1, toast() { }, shake() { }, bossMeet() { }, bossHp() { }, onDeath() { },
       hitPlayer(fo, n, h) { H.dmgIn += n; H.log.push('hurt'); } };
     Combat.addProvider(() => Foe.targets());
