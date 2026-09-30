@@ -26,7 +26,7 @@ window.WpnSpec = (() => {
   function spec(tier, plus) {
     tier = clamp(tier | 0, 0, WT.length - 1); plus = plus || 0; const T = RPG.EQUIP.weapon.tiers[tier], st = stAt(tier, plus);
     const wt = WT[tier], len = LEN[tier], ex = window.Stamina && Stamina.ex ? 1.3 : 1, kk = CT().WK(wt) * ex;
-    const q = Math.pow(Math.max(5, st.power || 50) / 40, 0.8) * (window.Sack && Sack.dmgMul ? Sack.dmgMul() : 1);
+    const q = Math.pow(Math.max(5, st.power || 50) / 40, 0.8) * (window.Sack && Sack.dmgMul ? Sack.dmgMul() : 1) * (window.Balance && Balance.on() ? Balance.earlyDmg(st.power || 50) : 1); // R41：与 foe_abs.power() 一致
     const base = 12 * q, cdk = CT().WK(wt) * ex, C = CT(), sp = v => clamp(v / 8, 0.5, 1.8);
     const mk = (wu, swing, cd, stam, spd, mult, reach) => ({ wu: Math.round(wu * 1000), swing: Math.round((wu + swing) * 1000), cd: Math.round(cd), stam, reach: +reach.toFixed(2), dmg: Math.round(base * sp(spd) * mult) });
     const L = mk(C.WU.light * kk, C.SW.light * kk, C.CDB.light * cdk, 4, 8.2, 1, 1.5 + len * 0.8);

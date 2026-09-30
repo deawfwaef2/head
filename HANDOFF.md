@@ -1520,3 +1520,14 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 实测（headless，标题界面 en/ja）：标题页已无中文残留（除语言页签“中文/日本語”）；MOD 面板 en 无中文残留。
 - **仍未覆盖（请后续轮次继续）**：静态扫描（`/var/work/pw/static.js` 思路：抽取 js/*.js 中文字面量喂给 `I18N.tr`）显示约 9000 个中文片段没有译文，主要是长文本：`lore.js`(800)、`ranks.js`(400)、`overhear.js`、`spirit_*.js`、`persona_lines.js`、`bookdata.js`、`tale.js`、`worlds.js`/`play.js`/`explore.js` 的提示与事件、`regionecho.js`（本 agent 上一轮写的，190 段，建议直接改成 {zh,en,ja} 模板）、`gear2.js`、`elites.js`、`chess.js`、`seance.js`…… 这些在日/英模式下仍是中文。另：含 `<b>` 的句子被 DOM 引擎按文本节点拆碎，译文会不通顺——这类要像开场故事那样整段三语。
 **② 宣传图**：`tools/promo/make2.py` → `promo/{zh,ja,en}/{sq,p23}_0N_*.png`，sq=1080×1080，p23=1080×1620，3 主题（01 hook 主视觉：爽点卡片 + 实机标题界面 + 6 键；02 combat：格挡→破绽→处决四步 + 武器面板实机截图；03 keys：全键位速查）× 2 比例 × 3 语言 = 18 张。另有 UI agent 的 16:9 六张（`promo/*/01_key…06_spirits.png`）。运行：仓库根起 `python3 -m http.server 8080`；`pip install playwright pillow`；`python3 tools/promo/make2.py [zh|ja|en]`。素材：`tools/promo/cap/title_{zh,ja,en}.png`（真实标题界面，1280×720，`/var/work/pw/boot3.js` 抓取，约 70s/张）、`wpn_*.png`（UI agent 的真实武器面板截图）、`js/regionart.js` 做虚化背景。**没有 3D 战斗/洞窟实机截图**：2GB 沙盒里一进游戏就 OOM（会把整个沙盒卡死）。你在本机截到图后放进 `tools/promo/cap/cave.png`，重跑 make2 即自动替换 01 号的实机图（`combat.png` 预留）。
+
+## R40b/R41（用户：“按 F 底部 UI 栏被挡住、UI 看不清；初期攻速太快太强，模拟游戏/升级过程，调数值”）
+**① 底栏不被挡（MOD `hud_legible`，`js/hudfix.js`，默认开）**：真因 = F 拔刀弹出一段 ~130 字的 22px 长字幕盖住画面 + 整行底部 `#hint` 从热键栏槽位缝隙透出来糊在栏上 + 多个贴底小部件（手持书/灵契/按键按钮/[E] 提示/麻袋HUD）与 162px 高的热键栏重叠。
+做法：JS 每 200ms 量 `#tbBar` 顶边 → CSS 变量 `--tbH`；`body.tbon` 时 `#wHint/#wRun/#tbCast/#skHud/#propHint/#gacha/#ohear/#bkHeld/#kgBtn/#spchip` 都抬到 `--tbH` 之上并上下错开；热键栏显示时隐藏 `#hint/#hintTag`；第二排（Shift+1~0）全空且没按 Shift 时折叠；`#toast` 改深底板 19px；`combat.js` 拔刀字幕改一行短字（前 2 次 4 秒，之后 2.4 秒；localStorage `sh_drawN` 计数，三语）。关 MOD = 回到旧长字幕。
+**② 前期平衡（MOD `balance_r41`，`js/balance.js`，默认开）**：`tools/balance/sim.js`（蒙特卡洛，直接 require 真实 rpg.js）`node tools/balance/sim.js base|new`，结果存 `tools/balance/REPORT.md`。
+ 现状(base)：Lv1 木棒打村庄普通敌 TTK 1.3~1.7 秒、敌人一下只削 4% 血（25 下才倒），5 分钟就 Lv5，基本不会死。
+ 新(new)：① 出刀节奏倍率 `Balance.tempo()` Lv1 ×1.5 → Lv26 ×1.0（接进 combat.js 的 `WK()`，前摇/出刀/冷却/体力节奏都跟着变；wpnspec 显示同步）；② `Balance.earlyDmg(power)` 战力 55 → 伤害 ×0.5，170 起 ×1（接进 `FoeAbs.power()`，foe.js/精英/猎手估算一致）；③ `Balance.foeDmgK(rec)` 村庄 ×2.0 → 推荐战力 200 起 ×1.0（接进 `FoeAbs.conv()`，霸主/猎手/精英不加成）；④ 升级经验 40+11·lv^1.6（原 28+9·lv^1.6），深层地区经验 ×(rec/40)^0.3（≤2.2，接进 worlds.js gainXp）；⑤ 旧存档第一次进入按等级迁移 S.xp（`S.balV=41`），等级不降。
+ 结果：Lv1 对 rar1 TTK ≈ 4 秒、敌人 8% 血/下（13 下倒）、1 对 3 掉血 ~30%；Lv5≈8 分钟、Lv10≈25 分钟、Lv20≈100 分钟。
+ **R35 仍有效**：伤害/血量是 FoeAbs 绝对值，没有 %最大生命伤害、没有保底刀数。调数值只改 `balance.js` 的 `TUNE` 和 `sim.js` 的 `TUNES.new`（两处同值）。
+ 改动文件：combat.js(WK×TK)、foe_abs.js(power/conv)、talents.js(need)、worlds.js(gainXp)、wpnspec.js(q)、mods.js/mods_i18n.js、index.html(加载 hudfix.js / balance.js)。
+ 测试：tools/test/talents.html 加假 hint/kgBtn 等元素的截图对比（前后）；整机仍无法在沙箱里跑，请用户实机确认 F 拔刀后的底栏、前期战斗手感（太慢/太难可调 `TUNE.tempo[0]`、`earlyDmg[0]`）。

@@ -11,7 +11,8 @@ window.Combat = (() => {
   let G = null, cam = null, vm = null, wpn = null, fist = null;
   let drawn = false, enabled = false;
   const WEIGHT = [0.85, 0.95, 0.8, 1.2, 1.25, 0.9, 1.0]; /* R37：废铁武器减重（以前钉头棒1.3/流星锤1.5，前摇+冷却太长，只能按住左键晃鼠标才出刀） */
-  const WK = (w) => Math.pow(Math.max(0.6, w || 1), 0.35); /* R37：重量对节奏的影响（以前 sqrt） */
+  const TK = () => (window.Balance && Balance.on()) ? Balance.tempo() : 1; /* R41：新手出刀更慢（Lv1 ×1.5 → Lv26 ×1.0），见 js/balance.js */
+  const WK = (w) => Math.pow(Math.max(0.6, w || 1), 0.35) * TK(); /* R37：重量对节奏的影响（以前 sqrt） */
   const CDB = { light: 380, fin: 560, heavy: 800 }; /* R37：冷却基数（以前 500/750/950） */
   window.CombatTune = { WEIGHT, WK, CDB, WU: { light: 0.06, fin: 0.08, heavy: 0.05 }, SW: { light: 0.14, fin: 0.2, heavy: 0.24 } };
   // 相机空间：x 右，y 上，-z 前

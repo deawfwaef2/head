@@ -596,7 +596,7 @@ window.Worlds = (() => {
     W.dom.root.appendChild(el); SFX.fanfare && SFX.fanfare(3); setTimeout(() => el.classList.add('out'), 2600); setTimeout(() => el.remove(), 3400);
   }
   function gainXp(n) { // 食人魔升级：经验来自战斗事件；升级永久加属性，回一部分血
-    const S = G.S, s0 = G.st(); if (G.xpMul) { const x = n * G.xpMul() + (S._xf || 0); n = Math.floor(x); S._xf = x - n; if (n < 1) return; } const up = RPG.addXp(S, n); if (!up) return; if (window.Talents) Talents.onLevel(up); const s1 = G.st();
+    const S = G.S, s0 = G.st(); if (window.Balance && Balance.on()) { try { const nd = W && W.graph && W.graph.nodes[W.cur]; n = n * Balance.xpK(nd && nd.loc ? nd.loc.rec : 40); } catch (e) { } } if (G.xpMul) { const x = n * G.xpMul() + (S._xf || 0); n = Math.floor(x); S._xf = x - n; if (n < 1) return; } const up = RPG.addXp(S, n); if (!up) return; if (window.Talents) Talents.onLevel(up); const s1 = G.st();
     S.hp = Math.min(s1.maxHp, S.hp + Math.round(s1.maxHp * 0.35));
     const d = [['str', '力量'], ['con', '体魄'], ['agi', '敏捷'], ['ter', '凶威'], ['soul', '魂力']].filter(([k]) => s1[k] > s0[k]).map(([k, n]) => `${n}+${s1[k] - s0[k]}`).concat(s1.maxHp > s0.maxHp ? [`生命+${s1.maxHp - s0.maxHp}`] : []).join(' · ');
     achBanner(`升级！Lv.${up.to}`, d || '继续变强'); W && W.trip.log.push({ t: `⬆️ 食人魔升到 Lv.${up.to}（${d}）`, cls: 'gethead' }); SFX.levelup && SFX.levelup(); G.save && G.save();

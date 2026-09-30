@@ -14,8 +14,8 @@ window.FoeAbs = (() => {
     const r = locRec || 40; if (!fo) return r;
     return r * (fo.boss ? (fo.boss.pow || 2) : RAR[Math.max(0, Math.min(4, fo.rar | 0))] || 1);
   }
-  function conv(fo, n, s, locRec) { const mh = Math.max(1, s.maxHp || 140); return Math.max(1, Math.round(n / mh * REF(recOf(fo, locRec)))); }
-  function power() { const st = window.G && G.st ? G.st() : { power: 50 }; return Math.pow(Math.max(5, st.power || 50) / 40, 0.8) * (window.Sack && Sack.dmgMul ? Sack.dmgMul() : 1); }
+  function conv(fo, n, s, locRec) { const mh = Math.max(1, s.maxHp || 140); const eb = window.Balance && Balance.on() && fo && !fo.boss && !fo.hunter && !fo.absRec ? Balance.foeDmgK(locRec || 40) : 1; /* R41：前期敌人出手更疼 */ return Math.max(1, Math.round(n / mh * REF(recOf(fo, locRec)) * eb)); }
+  function power() { const st = window.G && G.st ? G.st() : { power: 50 }; return Math.pow(Math.max(5, st.power || 50) / 40, 0.8) * (window.Sack && Sack.dmgMul ? Sack.dmgMul() : 1) * (window.Balance && Balance.on() ? Balance.earlyDmg(st.power || 50) : 1); /* R41：低战力时伤害打折，见 js/balance.js */ }
   // 小BOSS（regionquest 在 populate 后把血设成固定 100）→ 也按地区缩放一次
   setInterval(() => {
     if (!modOn() || !window.Foe || !Foe.foes || !window.Worlds || !Worlds.active) return; const W = Worlds._W, node = W && W.graph && W.graph.nodes[W.cur]; if (!node || !node.loc) return;

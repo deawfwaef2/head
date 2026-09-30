@@ -21,7 +21,7 @@ window.Talents = (() => {
   const bump = () => { const t = tal(); t.ver = (t.ver || 0) + 1; _agg = null; };
 
   // ================= 等级 / 点数 =================
-  const need = lv => Math.round(28 + 9 * Math.pow(lv, 1.6)); // 升到下一级所需经验（比旧曲线后期平缓，保证 Lv 30+ 也练得到）
+  const need = lv => (window.Balance && Balance.on()) ? Balance.need(lv) : Math.round(28 + 9 * Math.pow(lv, 1.6)); // R41：前期升级更慢一点（40 + 11·lv^1.6） // 升到下一级所需经验（比旧曲线后期平缓，保证 Lv 30+ 也练得到）
   const lv = () => (window.RPG && G0() && G0().S ? RPG.lvOf(G0().S.xp).lv : 1);
   function pts() {
     const S = G0().S, l = lv(), b = Math.min(10, Object.keys(S.bosses || {}).length), el = Math.min(6, S.el && S.el.dead ? Object.keys(S.el.dead).length : 0);
