@@ -306,6 +306,10 @@ window.Foe = (() => {
         if (fo.spurt > 0 && !fo.headOnPiece) { fo.spurt -= dt; const nb = f.bones.neck; if (nb && Math.random() < 0.8) { nb.getWorldPosition(tv2); const up = tv.set(0, 1, 0).applyQuaternion(nb.getWorldQuaternion(_q)); blood(tv2.addScaledVector(up, 0.05), 1, up, 0.9 + fo.spurt * 0.3); } }
         continue; }
       fo.t += dt; fo.cd -= dt; fo.sayT -= dt; if (fo.stag > 0) fo.stag -= dt; if (fo.block > 0) fo.block -= dt;
+      if (fo.stag > 0 && fo.f.clips.LayToIdle && (fo.f.cur === 'Hit_Knockback' || fo.f.cur === 'LayToIdle')) { // 击倒：倒地(0.8s) → 起身(LayToIdle) 播完才恢复行动；以前倒到一半被硬切回走路 = 躺着的人瞬间弹起来
+        const A = fo.f.mixer.clipAction(fo.f.clips[fo.f.cur]);
+        if (fo.f.cur === 'Hit_Knockback') { if (A.time >= 0.78) fo.f.play('LayToIdle', { once: true, fade: 0.12, restart: true, speed: 1.8 }); else fo.stag = Math.max(fo.stag, 0.78 - A.time + 0.88); }
+        else fo.stag = Math.max(fo.stag, Math.max(0, 1.5 - A.time) / 1.8 + 0.03); }
       const dx = P.pos.x - fo.pos.x, dz = P.pos.z - fo.pos.z, d = Math.hypot(dx, dz) || 1e-3;
       const face = Math.atan2(dx, dz);
       const see = ctx.sees(fo.pos, (fo.boss ? 16 : 9 + fo.rar * 2) * (P.crouch > 0.5 ? 0.55 : 1)) && (fo.seen || Math.abs(ang(face - fo.yaw)) < 1.4 || d < 3);
@@ -659,7 +663,7 @@ window.Foe = (() => {
     }
     const q = ctx.power(fo), brk = fo.broken > 0, mult = (zone === 'head' ? 1.6 : zone === 'neck' ? 1.8 : /Arm|Leg/.test(zone) ? 0.7 : 1) * (brk ? 2 : 1) * side * (info.charged ? 2.2 : 1) * (info.mult || 1);
     let dealt = Math.max(1, Math.round((fo.boss ? 11 : 12) * q * sp * mult * (slash ? 1 : 0.8) * (0.85 + Math.random() * 0.3)));
-    if (!fo.boss) dealt = Math.max(dealt, Math.round(fo.maxHp * 0.10 * sp * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：一记正常的砍至少削掉 ~10% 血
+    dealt = Math.max(dealt, Math.round(fo.maxHp * (fo.boss ? 0.09 : 0.17) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：一记正常的砍至少削掉 ~17% 血（≈6 刀），霸主 ~9%（≈11 刀）——实力差距再大也不会出现“砍 20 刀不死”
     const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.12; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk);
     { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp); fo.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退：0.16 秒内推完（以前是一帧内整段位移 = “瞬移”）
     ctx.event && ctx.event('hit', fo, { dealt, zone, brk, kind: info.kind, spd, charged: info.charged });
@@ -681,7 +685,9 @@ window.Foe = (() => {
       if (!fo.rage && fo.hp <= fo.maxHp * 0.5) { fo.rage = true; fo.poise = 0; fo.atk = null; fo.stag = 0.9; fo.f.play('Hit_Knockback', { once: true, fade: 0.05, restart: true }); ctx.shake && ctx.shake(0.5); ctx.toast && ctx.toast('👑 霸主被激怒了——出手更快更狠！', '#ff9a60', 2.4); sfx().roar && sfx().roar(1); if (fo.sayT <= 0) talk(fo, pickR(Math.random, ['……有意思。', '你惹怒我了。', '玩够了。']), '#ffb0a0'); } }
     const poiseBrk = fo.boss && (fo.poise >= (fo.rage ? 34 : 28) || info.charged);
     if (poiseBrk) fo.poise = 0;
-    if ((!fo.boss || poiseBrk) && !(fo.role && window.FoeRoles && FoeRoles.hurt(fo, dealt, info, zone))) { fo.atk = null; fo.stag = fo.boss ? 0.35 : 0.55; fo.f.play(zone === 'head' || zone === 'neck' ? 'Hit_Head' : sp > 1.3 ? 'Hit_Knockback' : 'Hit_Chest', { once: true, fade: 0.06, restart: true }); }
+    if ((!fo.boss || poiseBrk) && !(fo.role && window.FoeRoles && FoeRoles.hurt(fo, dealt, info, zone))) { fo.atk = null;
+      if (fo.stag > 0 && (fo.f.cur === 'Hit_Knockback' || fo.f.cur === 'LayToIdle')) { /* 躺着/起身时再挨一刀：不要重播受击动作（会把人从地上瞬间拽起来） */ }
+      else { fo.stag = fo.boss ? 0.35 : 0.45; fo.f.play(zone === 'head' || zone === 'neck' ? 'Hit_Head' : 'Hit_Chest', { once: true, fade: 0.06, restart: true }); } } // 普通受击只用短的 Hit_Chest/Hit_Head（Hit_Knockback 是整个倒地动作，0.55s 就被切掉 = 瞬间弹起）
     if (fo.sayT <= 0 && Math.random() < 0.5) { if (fo.boss) talk(fo, '', '#ffb0a0'); else sayP(fo, 'hurt', SAY.hit, '#ffb0a0'); } else if (!fo.boss && window.Persona) Persona.line(fo, 'pain', true); // 第二十四轮：没说话时也会痛呼
     if (!fo.boss && !fo.dead && window.Persona && fo.state === 'chase' && Persona.fleeHp(fo) && fo.hp < fo.maxHp * Persona.fleeHp(fo) && !fo.fledOnce) { fo.fledOnce = true; fo.state = 'flee'; fo.brave = false; sayP(fo, 'flee', SAY.flee); } // 胆小：挨几刀就跑向门
     if (!(window.CombatFX && CombatFX.on)) { sfx().chop && sfx().chop(); sfx().squish && sfx().squish(0.5); } // 有 combat_fx 时由 CombatFX 合成更丰富的受击音

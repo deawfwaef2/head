@@ -1030,3 +1030,10 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **MOD head_norm**（默认开，look）：离线量了全部头模元数据 skinW（脸宽）：VRoid 0.134~0.173（多数 0.16），MMD 管线 0.116~0.133（--sc 0.75 固定缩放造成），GI_LaSignora 0.033（面具导致测不准）。**改了 js/heads.js**：新增 normK/normSize，parseOne 解析后对 grp==='mmd' 的头把几何体（含 morph position）与元数据（cut/bottom/skullTop/hairTop/front/skinW/eye/box）等比放大到脸宽 0.155（k∈[1,1.4]，测不准用 1.2）。这些 GLB 无节点变换/蒙皮，放大安全。手持/插桩/敌人身体上一致。
 - **MOD eye_white**（默认开，look）：根因 = 眼白材质 depthWrite:false → Master 管线 SAO（ultra/high 档 ao:1）在眼白处读到眼窝后面的深度，当成深洞压黑。**改了 js/heads.js** 眼白分支：写深度 + 颜色 0.62/自发光 0.62（原 0.9/0.28）。q=mid（无 AO）看不出问题，测试要用 ?q=ultra。
 - 测试工具（/home/user/bak/tools）：mk_s.py（只带指定头模的轻量页 _s.html，避免 63 个头全载 OOM）、bodyshot.py（头装到身体上并排渲染，ZOOM 特写）、eyeshot.py（游戏内手持首级大图，Q=ultra EW=true/false）、hsize.py（离线读 GLB/元数据量头尺寸）。
+
+### 第二十二轮（续 13）：“砍怪血厚 / 被砍瞬移 / 手感差”——野兽 + 击倒修复（Arena UI Agent）
+用户原话：砍所有怪血量都好厚；砍了之后那个单位会瞬间移动；手感很差。用真实 foe.js + 真实身体 + UAL 动画逐帧测量（`_tools/wv/fight.html` 的 `tele()/off()/kill()` 探针）后的根因：
+- **瞬移①（野兽）**：`beasts.js` 命中时 `move(b, 0.28m)` 一帧内整段位移，且离玩家 <0.85m 时一帧硬弹 → 改 `b.kb` 0.16s 内推完 + 软推开（≤7m/s）。
+- **瞬移②（人形，最主要）**：`sp>1.3`（快刀）时受击播的是 `Hit_Knockback`——它其实是**整个倒地动作**（0.83s，髋部 y 0.75→0.03 趴到地上），而 `stag` 只有 0.55s，动作被半路切回走路 = **趴在地上的人 0.2 秒内弹起来站好**。现在：普通受击只播短的 `Hit_Chest`(0.3s)/`Hit_Head`(0.4s)；真正的击倒（破防/战吼/霸主激怒）播 `Hit_Knockback` → 倒地 0.8s → **`LayToIdle` 起身动画（×1.8 速）**播完才恢复行动（`fo.stag` 自动延长）；躺着/起身时再挨刀**不重播受击动作**（以前会把人从地上拽起来）。实测髋部每帧位移 ≤4cm（之前起身一帧 13cm+）。
+- **血厚**：`hit()` 伤害下限 = maxHp × 17%（霸主 9%）× 挥速(0.8~1.4) × 部位系数 → 人形约 6 刀、霸主约 11 刀；野兽 `beasts.js` 同样加下限（狼/狐 25%、鹿 20%、野牛 15%；以前野牛 hp=90×(1~3.2) 可能要砍 20+ 刀）。模拟（rar2~3 骑士，72% 命中，q=0.4~1）各职业 7~8 秒杀死。
+- 尸体：`kill()` 探针验证死亡瞬间骨骼无跳变（≤5cm/帧）。
