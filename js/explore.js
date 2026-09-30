@@ -131,7 +131,7 @@ window.Explore = (() => {
       arms.push({ sh, el, hand, s });
     }
     // 脖子（伸进头的断面里，藏住截面）
-    const cut = (window.ModelHeads && ModelHeads.meta(look.f) || {}).cut || { x: 0, y: -0.097, z: -0.027, r: 0.03 };
+    const cut = (window.ModelHeads && ModelHeads.meta(look) || {}).cut || { x: 0, y: -0.097, z: -0.027, r: 0.03 };
     const HSc = opts.headScale || 1.2, neckTop = 1.44;
     const neck = mesh(G(new THREE.CylinderGeometry(Math.max(0.036, cut.r * HSc * 1.12), 0.05, neckTop - 1.3 + 0.03, 12)), mSkin, 0, (neckTop + 1.3) / 2 + 0.012, 0);
     // 披风

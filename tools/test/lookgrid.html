@@ -1,0 +1,41 @@
+<!doctype html><meta charset="utf-8"><title>look grid</title><base href="/">
+<!-- R38：随机外观目检台。?cc0=1|0&collage=1|0&list=GI_Eula,Vita,...&n=12&seed=1 → 用真 randomLook 生成 n 个头，正面网格渲染到 #cv；window.__grid() 返回统计。
+     ?old=GI_Eula,GI_Furina → 额外按“旧存档外观 {f,h:f}” create，检查 CC0 替换/拼图。 -->
+<body style="margin:0;background:#222"><canvas id="cv" width="960" height="720" style="width:960px;height:720px"></canvas>
+<script>
+const q = new URLSearchParams(location.search);
+const st = JSON.parse(localStorage.getItem('soulhead_mods') || '{}'); st.__v = 99; st.cc0_only = q.get('cc0') !== '0'; st.head_collage = q.get('collage') !== '0'; st.head_native = false; st.hair_mix2 = true; st.acc_mix = true; st.tier_look = true;
+localStorage.setItem('soulhead_mods', JSON.stringify(st));
+</script>
+<script src="/lib/three.min.js"></script><script src="/lib/GLTFLoader.js"></script>
+<script src="/js/mods.js"></script><script src="/js/cc0mode.js"></script><script src="/js/hair_cover.js"></script>
+<script>
+window.HEAD_MODELS = window.HEAD_MODELS || [];
+document.write('<script src="/js/heads.js"><\/script>');
+for (const n of (q.get('list') || '').split(',').filter(Boolean)) document.write('<script src="/models/' + n + '.js" onerror="this.remove()"><\/script>');
+</script>
+<script>
+window.__grid = async function () {
+  const cv = document.getElementById('cv'); const R = new THREE.WebGLRenderer({ canvas: cv, antialias: true, preserveDrawingBuffer: true });
+  R.setSize(960, 720, false); R.outputEncoding = THREE.sRGBEncoding; R.setScissorTest(true);
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(0x4a525c);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8078, 1.2)); const dl = new THREE.DirectionalLight(0xffffff, 1.5); dl.position.set(1, 2, 3); scene.add(dl);
+  await ModelHeads.init();
+  const n = +(q.get('n') || 12), seed = +(q.get('seed') || 1), looks = [];
+  let a = seed * 9301 + 49297; const rr = () => (a = (a * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < n; i++) looks.push(ModelHeads.randomLook(rr, {}, i % 5));
+  for (const f of (q.get('old') || '').split(',').filter(Boolean)) { const b = ModelHeads.randomLook(rr, {}, 2); looks.push(Object.assign({}, b, { f, h: f, ax: undefined, seed: 5 + looks.length })); }
+  const stat = { files: ModelHeads.files(), looks: [] }; const cam = new THREE.PerspectiveCamera(28, 1, 0.02, 20);
+  const NC = looks.length <= 12 ? 4 : 6, W = 960 / NC;
+  looks.forEach((L0, i) => {
+    const L = ModelHeads.resolve(L0); stat.looks.push({ f0: L0.f, h0: L0.h, f: L.f, h: L.h, ax: (L.ax || []).map(x => x.f + ':' + x.n) });
+    let hb; try { hb = ModelHeads.create(L0); } catch (e) { stat.looks[i].err = e.message; return; }
+    const g = hb.group; scene.add(g); g.updateMatrixWorld(true);
+    const bb = new THREE.Box3().setFromObject(g), c = bb.getCenter(new THREE.Vector3()), sz = bb.getSize(new THREE.Vector3());
+    const col = i % NC, row = Math.floor(i / NC); R.setViewport(col * W, 720 - (row + 1) * W, W, W); R.setScissor(col * W, 720 - (row + 1) * W, W, W);
+    const r = Math.max(sz.x, sz.y) * 2.3, yaw = 0.35; cam.position.set(c.x + Math.sin(yaw) * r, c.y + 0.02, c.z + Math.cos(yaw) * r); cam.lookAt(c);
+    R.render(scene, cam); scene.remove(g);
+  });
+  return stat;
+};
+</script>

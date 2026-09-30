@@ -221,7 +221,7 @@ window.UI = (() => {
   // ---------------- 首级档案 ----------------
   let cardRec = null;
   function modelNote(rec) {
-    const a = ModelHeads.meta(rec.look && rec.look.f), b = ModelHeads.meta(rec.look && rec.look.h);
+    const _L = rec.look && ModelHeads.resolve ? ModelHeads.resolve(rec.look) : rec.look, a = ModelHeads.meta(_L && _L.f), b = ModelHeads.meta(_L && _L.h); // R38 CC0/拼图
     const items = [...new Set([a,b].filter(Boolean).map(m => `${esc(m.name)}（${esc(m.credit || '许可见 CREDITS.md')}）`))];
     return `<div class="model-license"><b>模型来源 / 公开状态</b><br>${items.join(' + ') || '程序化生成'}<br><small>本颗首级使用的模型当前允许随本仓库公开分发（须遵守上方原许可/署名）。标为“未公开/受限”的候选模型不会进入随机池。详见根目录 CREDITS.md。</small></div>`;
   }

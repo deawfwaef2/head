@@ -48,7 +48,9 @@ window.Mods = (() => {
     { id: 'head_norm', cat: 'look', icon: '📏', n: '头模尺寸归一（第二十四轮）', d: 'MMD 管线的头比 VRoid 头小约两成，挂在身体上显得特别小。载入时按脸宽等比放大到标准尺寸（需重新载入）。', def: true },
     { id: 'head_norm2', cat: 'look', icon: '📐', n: '头身比例修正（R30，取代上一项）', d: '所有非 VRoid 头按脸宽+两眼间距双指标归一到 VRoid 标准，可缩可放：星铁/绝区零/异环/经典 MMD 不再是大头娃娃，测歪的头不再是小头怪。开启时上一项“头模尺寸归一”不生效。需重新载入。', def: true },
     { id: 'anime_shade', cat: 'look', icon: '🎎', n: '二次元光影（R36）', d: '角色（头、头发、身体）的光照改成二次元风格：亮面平涂、暗面统一抬到约 80% 并染暖粉阴影色、中间软过渡，去掉塑料感的高光与环境镜面反射，加一圈淡淡边缘光。天空/太阳/篝火/阴影照常响应，极暗环境仍然是暗的。需重新载入。（R36b：用户要 3D 着色器风格，默认改为关；想要平涂二次元可在这里打开。）关闭=R33 的真实 PBR 受光。', def: false },
-    { id: 'head_native', cat: 'look', icon: '🧷', n: '头保持原样：不混搭发型/饰品（R36b）', d: '每颗头就是它自己：脸、发型、头饰来自同一个模型，不再把别的头的发型/饰品拼上去（原神等 MMD 头拼起来很违和）；MMD 头也不再额外叠程序化头饰。这个 MOD 会在读档时把“跨头发型 hair_mix2 / 跨头饰品库 acc_mix”关掉；想要混搭就关本 MOD 并手动打开那两项。需重新载入。', def: true },
+    { id: 'head_native', cat: 'look', icon: '🧷', n: '头保持原样：不混搭发型/饰品（R36b）', d: '每颗头就是它自己：脸、发型、头饰来自同一个模型，不再把别的头的发型/饰品拼上去（原神等 MMD 头拼起来很违和）；MMD 头也不再额外叠程序化头饰。这个 MOD 会在读档时把“跨头发型 hair_mix2 / 跨头饰品库 acc_mix”关掉；想要混搭就关本 MOD 并手动打开那两项。需重新载入。', def: false },
+    { id: 'cc0_only', cat: 'look', icon: '🆓', n: 'CC0 模式：只用 CC0 模型（R38）', d: '游戏里只出现 CC0（公有领域）授权的人物：9 个 pixiv 官方 CC0 头 + 4 具 CC0 身体；旧存档里的其他头也按种子换成 CC0 头显示（存档不改）。关掉 = 使用全部模型（含仅限私人使用的原神/MMD/VRoid Hub 模型）。动作/场景/道具本来就是 CC0。', def: true },
+    { id: 'head_collage', cat: 'look', icon: '🧩', n: '拼图混搭：原神/MMD 头不戴自己的头发（R38）', d: '每颗 MMD/原神脸都换上另一个头的发型（发饰跟着发型走），还常拼上第三个头的饰品——看不出是哪个原作角色。只在关闭「CC0 模式」时有效果（CC0 模式下没有这些头）。', def: true, conflicts: ['head_native'] },
     { id: 'skin_sss', cat: 'look', icon: '🫧', n: '皮肤次表面散射 · 3D 真人质感（R36b）', d: '在 PBR 上只对肤色像素加：明暗交界带的血红色散射、背光侧暖色填充、掠射角的红色透光边（耳朵/鼻翼）、压低塑料硬高光并加一圈极淡的油脂光泽。头发和衣服不受影响，极暗环境不抬亮。需重新载入。', def: true },
     { id: 'head_pbr', cat: 'look', icon: '💡', n: '头部真实受光（R33）', d: '头/头发/眼睛/饰品从“卡通材质”（只有 4 级色阶、不吃天空环境光、不响应光照方向）改为与身体相同的 PBR 材质：同一套灯光、同一张环境图、同一条曲线。阳光/篝火/阴影下头会像身体一样亮暗变化，不再在所有环境里都暗沉发灰。需重新载入。关闭=旧的卡通头。', def: true },
     { id: 'head_norm3', cat: 'look', icon: '📏', n: '头型再收一圈（R33）', d: '在脸宽/眼距对齐 VRoid 之后，非 VRoid 头整体再缩 5%，并且发量/发饰/兽耳撑大整颗头轮廓的（含头发包围盒高超过 VRoid 中位）按比例再收，最多到 82%。需重新载入。', def: true },
@@ -166,6 +168,7 @@ window.Mods = (() => {
   if (st.__v < 7) { st.dev_mode = false; st.__v = 7; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R37：开发者模式默认关闭（用户要求），旧存档迁移一次
   if (st.__v < 8) { st.anime_shade = false; st.__v = 8; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R36b：用户要 3D shader 风格，二次元光影默认关（旧存档迁移一次）
   if (st.__v < 9) { st.hair_mix2 = false; st.acc_mix = false; st.__v = 9; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R36b：用户不要头发/头/饰品混搭绑定（原神头搭配很违和）
+  if (st.__v < 10) { st.cc0_only = true; st.head_collage = true; st.head_native = false; st.hair_mix2 = true; st.acc_mix = true; st.__v = 10; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R38：用户要 CC0 模式默认开；不要“头发-头-饰品”原样绑定，要拼图混搭
   for (const m of LIST) if (st[m.id] === undefined) st[m.id] = !!m.def;
   // 修正非法状态（互斥组恰好一个；冲突；依赖）
   function normalize() {

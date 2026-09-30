@@ -718,12 +718,15 @@ window.ModelHeads = (() => {
   /* R31 MOD head_qc：逐个目检后仍然怪异、暂不能修的头模（八云紫 PMD 脸皮与全身同一材质→发白发光；黑鸟 帽子整个盖住脸），不进随机池/混发池；已存档的头照常显示 */
   const QC_BAD = ['CLS_YakumoYukari', 'NTE_Blackbird'];
   const qcBad = (i) => !!(T[i] && QC_BAD.includes(T[i].meta.file) && window.Mods && Mods.on('head_qc'));
+  const OK = (i) => !!T[i] && (!window.CC0 || CC0.okHead(T[i].meta.file)); // R38 CC0 模式：只用 CC0 模型
+  const okList = () => { const a = T.map((t, i) => i).filter(OK); return a.length ? a : T.map((t, i) => i); };
   function randomLook(r, race = {}, rarity = 0) {
     let faceIdx = race.faces ? Math.max(0, idxOf(pick(r, race.faces))) : tierFace(r(), rarity); // 第二十五轮 MOD tier_look：按魂阶加权挑脸模
     for (let k = 0; k < 12 && qcBad(faceIdx); k++) faceIdx = tierFace(r(), rarity);
+    if (!OK(faceIdx)) { const L = okList(); faceIdx = L[Math.floor(r() * L.length)]; } // R38 CC0
     const face = T[faceIdx];
     const grp = face.meta.grp || 'vroid';
-    const allHair = T.map((t, i) => i).filter(i => T[i].hairMeshes.length && !T[i].meta.noHair && !qcBad(i));
+    const allHair = T.map((t, i) => i).filter(i => T[i].hairMeshes.length && !T[i].meta.noHair && !qcBad(i) && OK(i));
     const compatible = allHair.filter(i => (MIX[grp] || [grp]).includes(T[i].meta.grp || 'vroid'));
     const hairCands = compatible.length ? compatible : allHair;
     const nativeHair = face.hairMeshes.length > 0 && !face.meta.noHair;
@@ -785,18 +788,18 @@ window.ModelHeads = (() => {
     }
     if (window.Mods && (Mods.on('hair_mix2') || Mods.on('acc_mix'))) mixLook(LOOK, faceIdx, grp, rarity);
     if (window.Mods && Mods.on('tier_look')) tierLook(LOOK, race, rarity, grp);
-    return LOOK;
+    return resolve(LOOK); // R38 CC0 / 拼图混搭
   }
   function mixLook(L, fi, grp, rarity) {
     let s2 = ((L.seed || 1) * 4271 + 99991) % 2147483647 || 1; const r = () => (s2 = (s2 * 16807) % 2147483647) / 2147483647;
     const F = T[fi], k = Math.max(0, Math.min(4, Math.round(+rarity || 0)));
     if (Mods.on('hair_mix2') && grp !== 'godette' && r() < (grp === 'mmd' ? 0.3 : 0.22)) { // MMD 发型（原作配色、自带发饰）
-      const c = T.map((t, i) => i).filter(i => i !== fi && T[i].meta.grp === 'mmd' && T[i].hairMeshes.length);
+      const c = T.map((t, i) => i).filter(i => i !== fi && T[i].meta.grp === 'mmd' && T[i].hairMeshes.length && OK(i));
       for (let tries = 0; tries < 6 && c.length; tries++) { const j = c.splice(Math.floor(r() * c.length), 1)[0];
         if (hairFitOK(F, T[j])) { L.h = T[j].meta.file; delete L.hx; delete L.hn3; L.hn = '原色'; break; } }
     }
-    if (Mods.on('acc_mix') && grp !== 'godette' && r() < [0.06, 0.14, 0.26, 0.4, 0.55][k]) { // 饰品：同一头最多 2 件，大件（帽子）最多 1 件
-      const lib = accLib().filter(a => a.f !== L.h && a.f !== L.f); const ax = []; let big = accLib().some(x => x.f === F.meta.file && x.big); // 脸自带大件（帽子/大头冠）就不再叠
+    if (Mods.on('acc_mix') && grp !== 'godette' && r() < (grp === 'mmd' && Mods.on('head_collage') ? 0.45 + k * 0.1 : [0.06, 0.14, 0.26, 0.4, 0.55][k])) { /* R38 拼图：MMD 脸更常拼第三个头的饰品 */ // 饰品：同一头最多 2 件，大件（帽子）最多 1 件
+      const lib = accLib().filter(a => a.f !== L.h && a.f !== L.f && OK(idxOf(a.f))); const ax = []; let big = accLib().some(x => x.f === F.meta.file && x.big); // 脸自带大件（帽子/大头冠）就不再叠
       let hi = idxOf(L.h); if (hi < 0) hi = fi; hi = coverHair(fi, hi, L); const H = T[hi];
       const S = hairShell(F, H, F.meta.file + '|' + H.meta.file + (hi === fi ? '|own' : ''), hi !== fi ? fitHair(F, H) : H.hairMeshes.map(m => m.geometry));
       const want = r() < 0.3 + k * 0.08 ? 2 : 1;
@@ -811,8 +814,8 @@ window.ModelHeads = (() => {
   const TIER_MMD = [0.15, 0.45, 1, 2.2, 3.5], TIER_STD = [1.5, 1.2, 1, 0.7, 0.45];
   const tierOf = rar => Math.max(0, Math.min(4, Math.round(+rar || 0)));
   function tierFace(u, rarity) {
-    if (!(window.Mods && Mods.on('tier_look'))) return Math.floor(u * T.length);
-    const k = tierOf(rarity); let sum = 0; const w = T.map(t => { const x = t.meta.grp === 'mmd' ? TIER_MMD[k] : TIER_STD[k]; sum += x; return x; });
+    if (!(window.Mods && Mods.on('tier_look'))) { const L = okList(); return L[Math.floor(u * L.length)]; }
+    const k = tierOf(rarity); let sum = 0; const w = T.map((t, i) => { const x = !OK(i) ? 0 : t.meta.grp === 'mmd' ? TIER_MMD[k] : TIER_STD[k]; sum += x; return x; });
     let t = u * sum; for (let i = 0; i < w.length; i++) { if ((t -= w[i]) <= 0) return i; } return T.length - 1;
   }
   const PLAIN_HAIR = ['乌黑', '深褐', '栗棕', '灰烬', '焦糖', '青灰', '奶茶', '亚麻金', '墨蓝'];
@@ -1116,7 +1119,7 @@ window.ModelHeads = (() => {
     if (!window.HAIR_COVER || !(window.Mods && Mods.on('hair_cover'))) return hi;
     if (coverScore(fi, hi) < 0.055) return hi;
     const face = T[fi];
-    const hasHair = i => T[i].hairMeshes.length && !T[i].meta.noHair;
+    const hasHair = i => T[i].hairMeshes.length && !T[i].meta.noHair && OK(i);
     if (hasHair(fi) && coverScore(fi, fi) <= 0.03) return fi;
     const grp = face.meta.grp || 'vroid';
     const all = T.map((t, i) => i).filter(hasHair);
@@ -1170,7 +1173,28 @@ window.ModelHeads = (() => {
     geo.deleteAttribute('uv'); geo.computeVertexNormals(); geo.computeBoundingSphere();
     return (t.napeGeo = geo);
   }
+  // R38：外观解析——① CC0 模式：非 CC0 脸/发型按种子固定换成 CC0（旧存档也不再出现非 CC0 头），非 CC0 饰品去掉；
+  // ② MOD head_collage（拼图混搭，CC0 关闭时才有意义）：MMD/原神脸不戴自己的头发，固定换成另一个头的发型（发饰随发型）→ 认不出是哪个角色。
+  const COLL = new Map();
+  function collageHair(fi, seed) {
+    const key = fi + '|' + seed; if (COLL.has(key)) return COLL.get(key);
+    const c = T.map((t, i) => i).filter(i => i !== fi && T[i].meta.grp === 'mmd' && T[i].hairMeshes.length && !T[i].meta.noHair && OK(i) && !qcBad(i));
+    let a = (seed * 2654435761 >>> 0) || 1; const rr = () => (a = Math.imul(a ^ a >>> 13, 1274126177) >>> 0) / 4294967296; let out = -1;
+    for (let k = 0; k < 14 && c.length; k++) { const j = c.splice(Math.floor(rr() * c.length), 1)[0]; try { if (hairFitOK(T[fi], T[j])) { out = j; break; } } catch (e) {} }
+    COLL.set(key, out); return out;
+  }
+  function resolve(look) {
+    if (!look || !T.length) return look; let L = look, cp = false; const w = () => { if (!cp) { L = Object.assign({}, look); cp = true; } };
+    let fi = idxOf(look.f); const hi = idxOf(look.h);
+    const gone = fi < 0 && look.f && window.CC0 && CC0.on(); // 非 CC0 模型在 CC0 模式下根本没加载
+    if ((fi >= 0 && !OK(fi)) || gone) { const ok = okList(), hs = ok.filter(i => T[i].hairMeshes.length && !T[i].meta.noHair), h = window.CC0 ? CC0.hash(look.f + '|' + (look.seed || 0)) : 7; w(); fi = ok[h % ok.length]; L.f = T[fi].meta.file; L.h = (!hs.length || (h >>> 9) % 3 === 0) ? L.f : T[hs[(h >>> 4) % hs.length]].meta.file; delete L.ax; if (L.hn === '原色') L.hn = look.hn2 || '乌黑'; }
+    else if ((hi >= 0 && !OK(hi)) || (hi < 0 && look.h && look.h !== look.f && window.CC0 && CC0.on())) { w(); L.h = L.f; }
+    if (L.ax && L.ax.some(e => !OK(idxOf(e.f)))) { w(); L.ax = L.ax.filter(e => OK(idxOf(e.f))); }
+    if (fi >= 0 && T[fi].meta.grp === 'mmd' && window.Mods && Mods.on('head_collage') && idxOf(L.h) === fi) { const j = collageHair(fi, (look.seed || 0) + 17); if (j >= 0) { w(); L.h = T[j].meta.file; L.hn = '原色'; delete L.hx; delete L.hn3; } }
+    return L;
+  }
   function create(look, opts = {}) {
+    look = resolve(look);
     let fi = idxOf(look.f); if (fi < 0) fi = 0;
     let hi = idxOf(look.h); if (hi < 0) hi = fi;
     hi = coverHair(fi, hi, look); // 第二十一轮 MOD hair_cover：避免借来的头发盖不住后脑 → 后颈/后脑露洞
@@ -1303,15 +1327,15 @@ window.ModelHeads = (() => {
   return {
     MTM, init, create, randomLook, HAIR, EYE, SKIN, faceSkin, tick(t) { GT.value = t; },
     // R29 body_match：这个头实际显示的发色（mmd 发型用贴图平均色，其他用染发色），给 foe.js 挑配色协调的身体
-    hairColor(look) { try { const H = T[idxOf(look.h || look.f)]; if (H && H.meta.grp === 'mmd') { const c = hairAvgCol(H); if (c) return c.clone().convertLinearToSRGB(); } return new THREE.Color(look.hc1 || '#333333'); } catch (e) { return null; } },
+    hairColor(look) { try { look = resolve(look); const H = T[idxOf(look.h || look.f)]; if (H && H.meta.grp === 'mmd') { const c = hairAvgCol(H); if (c) return c.clone().convertLinearToSRGB(); } return new THREE.Color(look.hc1 || '#333333'); } catch (e) { return null; } },
     get ready() { return ready; },
     get count() { return T.length; },
     files: () => T.map(t => t.meta.file),
     mixDebug: { hairOK: (f, h) => hairFitOK(T[idxOf(f)], T[idxOf(h)]), hairSc: (f, h) => (hairFitOK(T[idxOf(f)], T[idxOf(h)]), FITSC.get(f + '|' + h)), acc: () => accLib().map(a => ({ f: a.f, n: a.n, big: a.big, src: (SRC.get(a.m) || {}).name, vc: a.m.geometry.attributes.position.count })), why: () => [...ACCWHY].map(([k, v]) => k + ' ' + JSON.stringify(v)) },
     debug: () => T.map(t => ({ f: t.meta.file, eye: !!t.eyeC, m: t.faceMeshes.map(m => m.name + ':' + ((SRC.get(m) || {}).name) + ':' + m.userData.kind + ':' + (m.geometry.attributes.position.count)) })),
     // 第十六轮（总管理师）：某个外观会用到的脸/发型贴图 —— 倒袋前逐帧 renderer.initTexture 预上传，避免首次渲染时同步解码大贴图卡顿
-    mapsFor(look) { const out = new Set(); for (const k of [look.f, look.h]) { let i = idxOf(k); if (i < 0) i = 0; const t = T[i]; if (t) t.meshes.forEach(m => { const s = SRC.get(m) || m.material; if (s && s.map) out.add(s.map); }); } return [...out]; },
-    meta: (file) => { const i = idxOf(file); return i >= 0 ? T[i].meta : null; },
+    resolve, mapsFor(look) { look = resolve(look); const out = new Set(); for (const k of [look.f, look.h]) { let i = idxOf(k); if (i < 0) i = 0; const t = T[i]; if (t) t.meshes.forEach(m => { const s = SRC.get(m) || m.material; if (s && s.map) out.add(s.map); }); } return [...out]; },
+    meta: (file) => { if (file && typeof file === 'object') file = resolve(file).f; /* R38：可传外观对象（CC0 替换后的脸） */ const i = idxOf(file); return i >= 0 ? T[i].meta : null; },
     cutDbg: () => T.map(t => t.meta.file + ' ' + JSON.stringify(t.meta._cutDbg || null)),
     credits: () => T.map(t => t.meta.name + ' — ' + t.meta.credit)
   };

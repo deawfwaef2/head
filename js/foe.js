@@ -76,6 +76,7 @@ window.Foe = (() => {
   }
   // 组装一个活人：身体 + 组合头
   async function build(bodyName, look, opts = {}) {
+    if (window.CC0) bodyName = CC0.body(bodyName, (look && look.seed) || 0); /* R38 */
     const T = await template(bodyName); const E = T.E;
     const root = cloneSkinned(T.root); root.name = 'foe_' + bodyName;
     const bones = {}; root.traverse(o => { if (o.name && o.name.startsWith('H_')) bones[o.name.slice(2)] = o; });
@@ -205,7 +206,8 @@ window.Foe = (() => {
       T.root.traverse(o => { if (o.isMesh) { o.geometry.dispose(); [].concat(o.material).forEach(m => { for (const k in m) if (m[k] && m[k].isTexture) m[k].dispose(); m.dispose(); }); } });
       delete TMPL[n]; delete LOADED[n]; if (window.BODY_MODELS) delete BODY_MODELS[n]; document.querySelectorAll('script[src="big/body/' + n + '.js"]').forEach(e => e.remove()); }
   }
-  function bodyFor(h, r, bossK, used) {
+  function bodyFor(h, r, bossK, used) { const b = bodyFor0(h, r, bossK, used); return window.CC0 ? CC0.body(b, (h && h.look && h.look.seed) || 0) : b; } /* R38 CC0 模式：只用 CC0 身体 */
+  function bodyFor0(h, r, bossK, used) {
     if (bossK) return BOSS_BODY[bossK] || 'Jean';
     let list = IDENT[h.c.id] || ['Jean', 'Noelle', 'HikariCape'];
     if (VB_ID[h.c.id] && window.Mods && Mods.on('vroid_bodies')) list = list.concat(VB_ID[h.c.id]);

@@ -13,6 +13,7 @@
   };
   var on = function (id) { try { return !window.Mods || Mods.on(id); } catch (e) { return true; } };
   var html = '';
+  try { if (window.Mods && Mods.on('cc0_only') !== false) return; } catch (e) {} // R38 CC0 模式：MMD 头包都不是 CC0，不加载
   for (var id in P) if (on(id)) for (var i = 0; i < P[id].length; i++) html += '<script src="models/' + P[id][i] + '.js" onerror="this.remove()"><\/script>';
   if (html) document.write(html);
 })();
