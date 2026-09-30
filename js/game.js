@@ -333,7 +333,7 @@ window.startGame = function () {
     return g;
   }
   // 第十三轮：Poly Haven CC0 武器模型（自动找长轴、细端为握柄），缺失时退回旧模型
-  const WPN_ASSET = [['baseball_bat', 0.8], ['ornate_medieval_mace', 0.72], ['machete', 0.72], ['ornate_war_hammer', 0.8], ['wooden_axe_02', 0.85], ['antique_katana_01', 1.0, '#6a4aff'], ['antique_estoc', 1.08, '#ff2020']];
+  const WPN_ASSET = [['baseball_bat', 0.8], ['ornate_medieval_mace', 0.72], ['machete', 0.72, null, 1], ['ornate_war_hammer', 0.8], ['wooden_axe_02', 0.85, null, 1], ['antique_katana_01', 1.0, '#6a4aff'], ['antique_estoc', 1.08, '#ff2020', 1]];
   function assetWeapon(tier) {
     const W = WPN_ASSET[Math.min(tier, WPN_ASSET.length - 1)]; if (!window.Assets || !Assets.has(W[0])) return null;
     const src = Assets.clone(W[0]); src.updateMatrixWorld(true);
@@ -343,7 +343,8 @@ window.startGame = function () {
     // 两端 15% 段的横截面散布：细的一端是握柄
     let lo = 0, hi = 0, nl = 0, nh = 0; const others = ['x', 'y', 'z'].filter(k => k !== ax);
     for (const q of pts) { const t = (q[ax] - bb.min[ax]) / len; const w = Math.hypot(q[others[0]] - c[others[0]], q[others[1]] - c[others[1]]); if (t < 0.15) { lo += w; nl++; } else if (t > 0.85) { hi += w; nh++; } }
-    const handleAtMin = (lo / Math.max(1, nl)) < (hi / Math.max(1, nh));
+    const handleAtMin = ((lo / Math.max(1, nl)) < (hi / Math.max(1, nh))) !== !!W[3]; // W[3]=1：自动判断反了（R41主管：砍刀的扁刀身比木柄“细”，原来握在刀刃上）
+    { let sx = 0, sy = 0, n = 0; for (const q of pts) { const t = (q[ax] - bb.min[ax]) / len; if (handleAtMin ? t < 0.12 : t > 0.88) { sx += q[others[0]]; sy += q[others[1]]; n++; } } if (n > 3) { c[others[0]] = sx / n; c[others[1]] = sy / n; } } // R41主管：以握柄那端的截面中心为轴（弯柄斧子/偏心刀头以前手够不到柄）
     const inner = new THREE.Group(); src.position.sub(c); inner.add(src);
     const dir = new V3(ax === 'x' ? 1 : 0, ax === 'y' ? 1 : 0, ax === 'z' ? 1 : 0).multiplyScalar(handleAtMin ? 1 : -1);
     inner.quaternion.setFromUnitVectors(dir, new V3(0, 1, 0));

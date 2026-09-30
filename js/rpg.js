@@ -10,7 +10,7 @@ window.RPG = (() => {
   // 装备：每槽多个档位
   const EQUIP = {
     weapon: { n: '武器', icon: '🪓', tiers: [
-      { n: '粗木棒', cost: 0, atk: 4, desc: '随手折的树干。' },
+      { n: '粗木棒', cost: 0, atk: 4, desc: '随手捡的烂木棒，打人不太疼（伤害 ×0.6）。换一把真武器吧。' },
       { n: '钉头棒', cost: 150, atk: 12, desc: '木棒上钉满了生锈的铁钉。' },
       { n: '骨刃砍刀', cost: 700, atk: 26, desc: '巨兽肩胛骨磨成的砍刀，斩首利器。' },
       { n: '铁链流星锤', cost: 2600, atk: 48, desc: '一甩就是一片血雾。' },
@@ -249,5 +249,7 @@ window.RPG = (() => {
     const mem = Lore.memory(r, c, { weapon: wpn, q: 1, hurt: 0.1 });
     return { c, look, sig, mem, story: Lore.backstory(r, c), app: Lore.appearance(c, look), date: Date.now() };
   }
-  return { lvOf, lvBonus, addXp, lvNeed, STATS, EQUIP, SLOTS, CONSUM, TRAIN, AFF, AFF_CAT, AFF_WILD, AFF_LORE, affHTML, stats, eqSum, plusAdd, trainCost, expedition, sigOf, rollExtras, luckOf, forgeHead, bossHead, foe };
+  // R41主管（用户：“新手武器应该更弱”）MOD weak_starter：初始的粗木棒只有 60% 伤害，换第一把真武器会明显变强
+  const wpnK = (t) => { if (window.Mods && Mods.on && Mods.on('weak_starter') === false) return 1; if (t == null) t = (window.G && G.S && G.S.eq && G.S.eq.weapon) || 0; return t === 0 ? 0.6 : 1; };
+  return { wpnK, lvOf, lvBonus, addXp, lvNeed, STATS, EQUIP, SLOTS, CONSUM, TRAIN, AFF, AFF_CAT, AFF_WILD, AFF_LORE, affHTML, stats, eqSum, plusAdd, trainCost, expedition, sigOf, rollExtras, luckOf, forgeHead, bossHead, foe };
 })();

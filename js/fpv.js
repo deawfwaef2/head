@@ -11,7 +11,7 @@ window.FPV = (() => {
   const onHands = () => modOn('fp_hands'), onView = () => modOn('view_toggle');
   let G = null, cam = null, vm = null, hooked = false;
   const HS = 1.35; // 兽人手比 VRM 手大
-  const GL = new V3(0.008, -0.05, -0.085); // 握持点（手模型局部，缩放前）：柄穿过握紧的手指里
+  const GL = new V3(-0.01, -0.024, -0.058); // 握持点（手模型局部，缩放前）= 卷指圆弧的圆心，柄穿过拳心（R41主管修：原 (0.008,-0.05,-0.085) 在拳外 3.5cm，手浮在柄旁边）
   const ELB_R = new V3(0.55, -1.0, 0.35), ELB_L = new V3(-0.55, -1.0, 0.35); // 相机空间的肘部锚点（画面外）
   const _a = new V3(), _b = new V3(), _c = new V3(), _X = new V3(), _Y = new V3(), _Z = new V3(), _m = new M4(), _mw = new M4(), _inv = new M4(), _q = new Q();
   const smooth = (cur, tgt, k, dt) => cur.lerp(tgt, 1 - Math.exp(-k * dt));
@@ -64,7 +64,7 @@ window.FPV = (() => {
   function ensureRig() {
     if (rig) return rig; loadHandSrc(); if (!HSRC) return null;
     const g = new THREE.Group(); g.name = 'fpHands'; g.renderOrder = 2;
-    const R = buildHand(true, 2.5), L = buildHand(false, 2.5);
+    const R = buildHand(true, 3.0), L = buildHand(false, 3.0); // R41主管：2.5→3.0 拳握得更紧，贴住柄
     for (const H of [R, L]) { g.add(H.hand); g.add(H.arm); } cam.add(g); return rig = { g, R, L, lgrip: new V3(-0.3, -0.38, -0.44), lb: new V3(0, 1, 0) };
   }
   // 把一只手放到 cam 空间：握点 grip、柄轴 b、肘锚点 elbow

@@ -1632,3 +1632,22 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 调色：`master.js` 每帧把 `P`（sat/contrast/shadowTint/highTint/vig/grain）同步进着色器；WorldMaster 按地区缓入目标值、离场恢复。
 - `game.js`：`G.postFx = post`、`G.renderer`（供读取档位）。
 注意：worlds.js 已有叶片/草的风（WIND）；不要重复做。下一步候选：远景雾层/地面薄雾、云影、水面、地标构图、草卡片 LOD。
+### R41（主管）c：用户反馈修正（提示贴底 / 技能栏缩小 / 手握住武器 / 新手武器更弱）
+用户原话：“底部那一大串文本应该放在底部不然很卡眼，那个技能槽有点大，然后主角手没按住武器。新手武器应该更弱。”
+- **MOD `hud_bottom`**（新文件 `js/hudbot.js`，index.html 里放在 hudfix.js 后面）：只加 CSS，用 `body.hbot` 前缀加 `!important`，没改任何 DOM id。
+  - 野外 `#wHint` 和洞里 `#hint` 改成贴屏幕最底的一条细字（13px，超长省略），技能栏 `bottom` 由 10px 改为 34px 让出位置。之前 hudfix 和 talents_ui 会把这行字抬到技能栏上方，正挡视线。
+  - 技能栏 `--u` 改为 clamp(50,4.6vw,72)。R45 的 60–88 在 960px 宽的屏幕上已经超出屏幕宽度。
+  - `.tbhint` 字号 18→15；洞里"出洞后才能释放技能"改成栏上方的小字。
+  - `worlds.js hud()`：MOD 开启时，野外默认提示去掉括号里那一长段战斗说明（F1 里有）。
+- **手握住武器**（`js/fpv.js`，另一个 agent 的文件，只改了 2 处）：
+  - 握持点 `GL` 由 (0.008,-0.05,-0.085) 改为 (-0.01,-0.024,-0.058)，也就是卷指圆弧的圆心。原来的点在拳外约 3.5cm，手浮在柄旁边，手指也没包住柄。
+  - 卷指角 2.5→3.0，拳握得更紧。
+- **武器握反了**（`js/game.js`）：
+  - `WPN_ASSET` 新增第 4 项 flip。自动判断"细端 = 柄"对砍刀、斧头、刺剑判反了，原来握在刀刃、斧头、剑尖上。
+  - `assetWeapon` 改为以握柄端的截面中心为轴，弯柄斧子原来手够不到柄。
+  - 测试页：`tools/test/fpv.html#<tier>`，配合 `/var/work/s/fpv.js` 截第一人称画面。7 把武器已逐一目检。
+- **MOD `weak_starter`**：`RPG.wpnK(tier)` 让粗木棒（tier 0）伤害 ×0.6。
+  - 生效位置：`worlds.js` 的 `ctx.power`（FoeAbs 和旧公式两条路径、野兽都走它），以及 `wpnspec.js` 武器属性页的显示（另一个 agent 的文件，只改了 1 处乘数）。
+  - 另外改了 rpg.js 里粗木棒的描述。
+  - 和 Balance（熟练度，Lv1 伤害 ×0.45）叠加。
+- 测试页 `tools/test/hud.html`：talents 测试台加上 hudfix、hudbot、ui3a.css，截 HUD。`#off` 为 R45 原样，默认为新样式。
