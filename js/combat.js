@@ -87,7 +87,9 @@ window.Combat = (() => {
       vm.userData.rest = vm.userData.rest || { p: vm.position.clone(), r: vm.rotation.clone() };
       vm.position.set(0, 0, 0); vm.rotation.set(0, 0, 0); if (fist) fist.visible = false;
       M.combo = 0; M.buf = 0; M.endT = -9999; S.hand.set(0.2, -0.55, -0.35); S.hv.set(0, 0, 0); S.blade.copy(IDLE_B); S.lastTip = null; trail.pts.length = 0; S.stam = Math.max(S.stam, 30);
-      if (window.CombatFX && CombatFX.on) CombatFX.draw(true); else SFX.play('draw', 0.7); G.toast && G.toast((MM() ? '⚔️ 拔刀：点左键＝立刻出刀，连点三下＝三连斩（终结更重）· 按住左键甩一下鼠标＝朝那个方向斩 · 按住不动 0.6 秒再松开＝重斩（破防）· 右键格挡 · Q 闪身 · 准星指哪打哪（对准脖子可斩首）' : RS() ? '⚔️ 拔刀：按住左键＝蓄势（刀向反方向拉开）· 微微带一下鼠标定方向 · 松开＝沿该方向挥出（蓄满 0.7 秒=重斩，不带方向=直劈）· 点一下=刺' : '⚔️ 拔刀：按住左键＝刀尖锁在准星上，转动视角挥砍（不动 0.7 秒=蓄力重斩）· 连点刺') + ' · 右键格挡并转动鼠标对准红色来刀弧 · Q 闪身 · 破绽时 E 处决 · F 收刀', '#ffd27a', 4);
+      if (window.CombatFX && CombatFX.on) CombatFX.draw(true); else SFX.play('draw', 0.7); if (G.toast) { const n = +(localStorage.getItem('sh_drawN') || 0); try { localStorage.setItem('sh_drawN', n + 1); } catch (e) { } // R40b：完整说明只在前 2 次拔刀显示，之后只给一行短提示（长字幕会盖住画面/底栏）
+        if (!(window.Mods && Mods.on('hud_legible') === false)) { const L = (window.I18N && I18N.lang) || localStorage.getItem('soulhead_lang') || 'zh'; const SH = { zh: '⚔️ 拔刀 · 左键出刀 · 右键格挡 · Q 闪身 · F 收刀 · F1 按键表', ja: '⚔️ 抜刀 · 左クリック=斬る · 右=ガード · Q=回避 · F=納刀 · F1=操作一覧', en: '⚔️ Drawn · LMB slash · RMB block · Q dodge · F sheathe · F1 all keys' }; G.toast(SH[L] || SH.zh, '#ffd27a', n >= 2 ? 2.4 : 4); }
+        else G.toast((MM() ? '⚔️ 拔刀：点左键＝立刻出刀，连点三下＝三连斩（终结更重）· 按住左键甩一下鼠标＝朝那个方向斩 · 按住不动 0.6 秒再松开＝重斩（破防）· 右键格挡 · Q 闪身 · 准星指哪打哪（对准脖子可斩首）' : RS() ? '⚔️ 拔刀：按住左键＝蓄势（刀向反方向拉开）· 微微带一下鼠标定方向 · 松开＝沿该方向挥出（蓄满 0.7 秒=重斩，不带方向=直劈）· 点一下=刺' : '⚔️ 拔刀：按住左键＝刀尖锁在准星上，转动视角挥砍（不动 0.7 秒=蓄力重斩）· 连点刺') + ' · 右键格挡并转动鼠标对准红色来刀弧 · Q 闪身 · 破绽时 E 处决 · F 收刀', '#ffd27a', 4); }
     } else {
       const r = vm.userData.rest; if (r) { vm.position.copy(r.p); vm.rotation.copy(r.r); }
       if (wpn && wpn.userData.rest) { wpn.position.copy(wpn.userData.rest.p); wpn.rotation.copy(wpn.userData.rest.r); }
