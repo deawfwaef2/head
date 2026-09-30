@@ -228,7 +228,7 @@ window.RegionQuest = (() => {
   function dangerOf(l) { const q = ctxP.power / l.rec; return ctxP.danger(q); }
   function itemHTML(l) {
     const [dn, dc] = dangerOf(l), img = window.RegionArt && RegionArt[l.k], won = (G().S.bosses || {})[l.k];
-    return `<div class="rq-it${l.k === sel ? ' on' : ''}" data-rq="${l.k}" style="--lc:${l.color};${img ? `background-image:url(${img})` : `background:${l.color}`}"><div class="t">${l.icon} ${esc(l.n)}${window.Elites && Elites.regionBadge ? Elites.regionBadge(l.k) : '' /* R35b */}</div><div class="d" style="color:${dc}">${dn} · ${l.rec}</div>${won ? '<div class="cr" title="已征服">👑</div>' : ''}</div>`;
+    return `<div class="rq-it${l.k === sel ? ' on' : ''}" data-rq="${l.k}" style="--lc:${l.color};${img ? `background-image:url(${img})` : `background:${l.color}`}"><div class="t">${l.icon} ${esc(l.n)}${window.Elites && Elites.regionBadge ? Elites.regionBadge(l.k) : '' /* R35b */}${window.RegionEcho ? RegionEcho.badge(l.k) : '' /* R39 名声称号 */}</div><div class="d" style="color:${dc}">${dn} · ${l.rec}</div>${won ? '<div class="cr" title="已征服">👑</div>' : ''}</div>`;
   }
   function detHTML(k) {
     const l = LOC(k), D = DATA[k] || { tag: '', minis: [], why: '' }, B = BOSS(k), S = G().S, [dn, dc] = dangerOf(l), img = window.RegionArt && RegionArt[k];
@@ -243,7 +243,7 @@ window.RegionQuest = (() => {
     const q = peek(k);
     const mis = `<div class="rq-sec"><h4>📜 到达后的任务</h4><div class="rq-mis">📜 <b>${esc(mText(q))}</b><small>${esc(D.why)}</small><small>奖励 ${rText(q)}</small></div></div>`;
     return `<div class="rq-hero" style="--lc:${l.color};${img ? `background-image:url(${img})` : `background:${l.color}`}"><div class="chips"><span class="rq-chip" style="color:${dc}">${dn}</span><span class="rq-chip" style="color:#e8dcc8">推荐战力 ${l.rec}</span></div><div class="x"><div class="g">${esc(D.tag)}</div><div class="n">${l.icon} ${esc(l.n)}</div></div></div>
-      <div class="rq-desc">${esc(l.desc)}</div>${bossH}${minis}${window.Elites && Elites.regionHTML ? Elites.regionHTML(k) : '' /* R35b 精英 */}${ppl}${mats}${mis}
+      <div class="rq-desc">${esc(l.desc)}</div>${bossH}${window.RegionEcho ? RegionEcho.detHTML(k) : '' /* R39 地区回响：名声/关系/后继故事 */}${minis}${window.Elites && Elites.regionHTML ? Elites.regionHTML(k) : '' /* R35b 精英 */}${ppl}${mats}${mis}
       <button class="rq-go" data-a="loc" data-v="${k}" style="--lc:${l.color}">出发 · 前往${esc(l.n)} ▶</button>`;
   }
   function pickHTML(ctx) {

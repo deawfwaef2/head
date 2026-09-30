@@ -1482,3 +1482,12 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - mods.js：迁移 `__v10` → cc0_only / head_collage / hair_mix2 / acc_mix = true，head_native = false；三项 def 同步。
 - 测试台 `tools/test/lookgrid.html?cc0=1|0&collage=1|0&list=…&n=12&seed=…&old=GI_Eula,…`，`__grid()` 返回每个头的 f/h/ax。结果：CC0 模式 12 随机 + 3 旧原神存档 → 全部 CC0；关 CC0 → 24 张 MMD/原神脸 0 张戴自己头发，12 张带借用饰品，目检截图正常。
 - 已知：特征特别强的发型（雷电紫辫、千织红饰棕发、飞霄狐耳）换到别的脸上仍有辨识度；下一步可对借来的发型整体换色。
+### ③ 探索 UI：地区回响 `js/regionecho.js`（window.RegionEcho，MOD `region_echo`，默认开）
+- 用户：“探索UI加入更多文本：地区对你的反馈、名声、你杀的角色的后继故事（影响-关系）。反馈还会随机 + 资源”。
+- 数据：`G.S.echo.reg[地区k] = {fame, fear, rel:{folk,arms,faith,arcane,noble}, kills, heads, big, trips, grudges[], legends, news[≤14], recv}`。
+- 出猎中：包装 `Recall.log`，对 `t==='kill'` 且 `fo.h.c`（有身份的人，排除 `fo.hunter`）记录 {name,id,idN,rar,traits,goal,belief,boss/mini/elite/decap}。`Worlds.start` 被包装（和 RegionQuest 同法）：建 `T`，并把 `api.finish` 包一层 → 回洞时先 `settle(trip)` 再走原 finishTrip（死亡 `api.die` 不结算，存档本来就清零）。
+- `settle`：名声 = Σ(1+稀有度+斩首1+霸主8+小BOSS4+精英6)；恐惧同理；选至多 3 人生成“后继故事”，立场 7 种（哀悼/复仇/恐惧/传说/纪念/遗产/继任，按 c.traits 性格加权；文案模板 ST、亲属 KIN 按势力分，含心愿 GOAL_LN）；每段随机结果（魂晶/地区材料 `Sack.stashAdd(Sack.mk(RegEcon.BY[k].c[0],n))`/药水/无；复仇另加 `S.h2.hate` 并添加“仇家”）；势力关系：死者所属势力下降（`facOf(c)` 由 idN 关键词判定），`RIPPLE` 波及他方（杀术士→圣职+，等）；写入 `trip.log`（狩猎日志页可看）并弹 `#reRet` 卡片（左侧，26 秒，非阻塞）。
+- 抵达 `arrive(k)`：按名声/恐惧/仇家/关系加权掷“地区的反应”：供品/警告/馈赠/信徒/沉默/无人认识，随机给魂晶/材料/药水或 +1~2 猎手仇恨（并消耗仇家等级）；同一趟同一地区只结算一次（`r.recv.key = 总出猎数:k`）。arrival2 打开时显示（`paras`+`arrHTML`），没有 arrival2 时 2.6 秒后 toast。
+- UI 接入（各 1~2 行）：`regionquest.js` `detHTML` 在霸主栏后插 `RegionEcho.detHTML(k)`（称号+名声/恐惧+5 势力关系条+仇家+最近 4 段故事+说明），`itemHTML` 加 `RegionEcho.badge`；`arrival2.js` `html()` 的 paras 与右栏各加一处。
+- 测试：`tools/test/regionecho.html`（假 G/Worlds/Sack，Lore.makeCharacter 造人）；完整游戏在 2GB 沙盒跑不动，未做整包实机测试。
+- 已知限制：仅 Worlds 出猎（默认）记录；Explore 3D 旧模式和文字旅途不记录。

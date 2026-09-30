@@ -121,10 +121,10 @@ ${el.length ? `<div>👑 可挑战的精英：${el.map(d => `<b style="color:${d
     const [dn, dc] = q < 0.45 ? ['必死无疑', '#ff2020'] : q < 0.7 ? ['九死一生', '#ff5a3a'] : q < 0.95 ? ['危险', '#ffa030'] : q < 1.4 ? ['势均力敌', '#ffe060'] : q < 2.2 ? ['轻松', '#8fe080'] : ['屠宰场', '#60d0ff'];
     const RT = window.RegionQuest && RegionQuest.T, main = RT && RT.q ? `<div class="ar-it" style="--qc:#e7c27a"><div class="k">主 线</div><div class="n">📜 ${esc(RegionQuest.mText(RT.q))}</div><div class="w">${esc(D ? D.why : '')}</div><div class="r">奖励 🔮${RT.q.coin}${(RT.q.mats || []).length ? ' + 地区材料' : ''}</div></div>` : '';
     const side = T.side.map(x => `<div class="ar-it" style="--qc:#9ab0c8"><div class="k">支 线</div><div class="n">${esc(SQ[x.t].n(x.q))}</div><div class="w">${esc(SQ[x.t].why)}</div><div class="r">奖励 🔮${x.coin}${x.gear ? ' + 一件饰品' : ''}</div></div>`).join('');
-    const paras = [['', X.scene], ['lo', X.lore], ['you', youLine(k)], ['ru', '「' + X.rumors[Math.floor(Math.random() * X.rumors.length)] + '」']];
+    const paras = [['', X.scene], ['lo', X.lore], ['you', youLine(k)], ...(window.RegionEcho ? RegionEcho.paras(k) /* R39 地区回响 */ : []), ['ru', '「' + X.rumors[Math.floor(Math.random() * X.rumors.length)] + '」']];
     return { h: `<div class="ar-hero" style="--lc:${L.color || '#e7c27a'};${img ? `background-image:url(${img})` : `background:${L.color}`}"><div class="ar-hx"><div class="ar-tag">${esc(D ? D.tag : '')}</div><div class="ar-nm">${L.icon || ''} ${esc(L.n)}</div>
 <div class="ar-chips"><span class="ar-chip" style="color:${dc}">${dn}</span><span class="ar-chip" style="color:#e8dcc8">推荐战力 ${L.rec} · 你 ${st.power}</span><span class="ar-chip" style="color:#c8b8e0">第 ${SS().v[k] || 1} 次踏入</span></div></div></div>
-<div class="ar-body"><div class="ar-st"><h5>抵 达</h5><div id="arText"></div></div><div class="ar-q"><h5>任 务</h5>${main}${side}<h5 style="margin-top:16px">威 胁</h5>${threatHTML(k)}</div></div>
+<div class="ar-body"><div class="ar-st"><h5>抵 达</h5><div id="arText"></div></div><div class="ar-q"><h5>任 务</h5>${main}${side}<h5 style="margin-top:16px">威 胁</h5>${threatHTML(k)}${window.RegionEcho ? RegionEcho.arrHTML(k) : ''}</div></div>
 <div class="ar-go"><button class="red" data-argo>踏入${esc(L.n)} ▶</button><small>空格 / E / 回车</small></div>`, paras };
   }
   function type(paras) {

@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8"><title>region echo</title><body style="margin:0;background:#1c120c;color:#ead8b8;font:14px system-ui">
+<!-- R39：地区回响的桩测试：假 G/Worlds/Recall/Sack，用 Lore.makeCharacter 造人，模拟一趟出猎 → settle → 回洞卡 + 选地点面板 + 抵达反应。 -->
+<div id="det" style="width:760px;padding:16px"></div>
+<script src="/js/lore.js"></script>
+<script>
+window.Mods = { on: () => true };
+window.G = { S: { stats: { trips: 3 }, logs: [], h2: { hate: 2 }, items: {} }, coins: 0, addCoins(n) { this.coins += n; }, save() {}, toast(t) { console.log('toast', t.replace(/<[^>]+>/g, ' ')); } };
+window.Recall = { log() {} };
+window.Sack = { stash: [], mk: (id, n) => ({ id, n }), stashAdd(x) { this.stash.push(x); } };
+window.RegEcon = { BY: { village: { c: ['rm_straw', '稻草人稻草', '🌾'] }, abbey: { c: ['rm_x', '圣水瓶', '💧'] } } };
+window.Worlds = { start() {}, active: false };
+</script>
+<script src="/js/regionecho.js"></script>
+<script>
+window.__run = function (k) {
+  const r = () => Math.random; const used = new Set(); const loc = Lore.LOCS.find(l => l.k === k);
+  const trip = { loc, res: { heads: [1, 2, 3] }, log: [] }; const api = { finish() { console.log('finish'); } };
+  Worlds.start(trip, api);
+  for (let i = 0; i < 5; i++) { const c = Lore.makeCharacter(Math.random, loc, used, 1); RegionEcho.cap({ h: { c }, rqMini: i === 0 }, 'kill'); }
+  api.finish();
+  return JSON.stringify({ log: trip.log.map(x => x.t), coins: G.coins, hate: G.S.h2.hate, stash: Sack.stash });
+};
+window.__det = function (k) { document.getElementById('det').innerHTML = RegionEcho.detHTML(k); return RegionEcho.arrive(k).txt; };
+</script>
