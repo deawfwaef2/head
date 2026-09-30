@@ -2,12 +2,27 @@
 window.SFX = (() => {
   let ctx = null, master = null, sfxOn = true;
   const buf = {};
+  // 第二十六轮(g)：分通道音量（MOD audio_mixer，默认开）。master → 压缩器；各通道 GainNode → master。
+  //   sfx=战斗/动作音效（SFX.out 默认就是它，老代码不用改） ui=界面 voice=角色语音 amb=环境音 steps=脚步 music=BGM（HTMLAudio 用 element.volume；合成音乐走 music 通道）
+  const VDEF = { master: 1, music: 0.5, sfx: 1, voice: 1, amb: 0.8, steps: 1, ui: 0.8 };
+  const VOL = Object.assign({}, VDEF, (() => { try { return JSON.parse(localStorage.getItem('soulhead_vol') || '{}'); } catch (e) { return {}; } })());
+  const mixOn = () => !window.Mods || !Mods.on || Mods.on('audio_mixer') !== false;
+  const vv = (k) => mixOn() ? Math.max(0, Math.min(1.5, +VOL[k] || 0)) : (k === 'music' ? 1 : 1);
+  const BUS = {};
+  function applyVol() {
+    if (master) master.gain.setTargetAtTime(0.8 * vv('master'), ctx.currentTime, 0.03);
+    for (const k in BUS) BUS[k].gain.setTargetAtTime(vv(k), ctx.currentTime, 0.03);
+    if (cur && !ducked) cur.volume = musicVol();
+  }
+  function setVol(k, v) { if (!(k in VDEF)) return; VOL[k] = Math.max(0, Math.min(1.5, +v || 0)); try { localStorage.setItem('soulhead_vol', JSON.stringify(VOL)); } catch (e) { } applyVol(); }
+  function bus(k) { if (!ctx) return null; if (!BUS[k]) { const g = ctx.createGain(); g.gain.value = vv(k); g.connect(master); BUS[k] = g; } return BUS[k]; }
+  const UI_SND = { click: 1, select: 1, confirm: 1, error: 1, open: 1, close: 1, page: 1, book: 1 };
   async function init() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
     ctx = new (window.AudioContext || window.webkitAudioContext)();
-    master = ctx.createGain(); master.gain.value = 0.8;
+    master = ctx.createGain(); master.gain.value = 0.8 * vv('master');
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
-    master.connect(comp); comp.connect(ctx.destination);
+    master.connect(comp); comp.connect(ctx.destination); ['sfx', 'ui', 'voice', 'amb', 'steps', 'music'].forEach(bus);
     const D = window.SFX_DATA || {};
     for (const k in D) {
       buf[k] = [];
@@ -21,18 +36,18 @@ window.SFX = (() => {
     if (!ok() || !buf[name] || !buf[name].length) return;
     const s = ctx.createBufferSource(); s.buffer = buf[name][Math.floor(Math.random() * buf[name].length)];
     s.playbackRate.value = rate * (1 + (Math.random() - 0.5) * 2 * jitter);
-    const g = ctx.createGain(); g.gain.value = vol; s.connect(g); g.connect(master); s.start();
+    const g = ctx.createGain(); g.gain.value = vol; s.connect(g); g.connect(UI_SND[name] ? BUS.ui : BUS.sfx); s.start();
   }
   function osc(type, f0, f1, t, dur, vol) {
     const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05);
+    o.connect(g); g.connect(BUS.sfx); o.start(t); o.stop(t + dur + 0.05);
   }
   function noise(t, dur, vol, type = 'lowpass', freq = 800) {
     // 第十八轮：复用一段 3 秒噪声（原来每次现生成缓冲区，击杀时连放多个音效会卡）
     if (!noise.b) { noise.b = ctx.createBuffer(1, ctx.sampleRate * 3, ctx.sampleRate); const d = noise.b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
     const n = ctx.createBufferSource(); n.buffer = noise.b; const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    n.connect(f); f.connect(g); g.connect(master); const d = Math.min(dur, 2.9); n.start(t, Math.random() * (3 - d), d);
+    n.connect(f); f.connect(g); g.connect(BUS.sfx); const d = Math.min(dur, 2.9); n.start(t, Math.random() * (3 - d), d);
   }
   // 魂晶叮：音高随连击上升（多巴胺）
   const SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
@@ -55,7 +70,8 @@ window.SFX = (() => {
 
   // ---------------- 音乐 ----------------
   const LISTS = { cave: ['music/volatile_reaction.mp3', 'music/metalmania.mp3'], expedition: ['music/clash_defiant.mp3', 'music/unholy_knight.mp3'] };
-  let cur = null, curList = null, idx = 0, musicOn = (() => { try { return localStorage.getItem('soulhead_music') !== '0'; } catch (e) { return true; } })(), vol = 0.45;
+  let cur = null, curList = null, idx = 0, musicOn = (() => { try { return localStorage.getItem('soulhead_music') !== '0'; } catch (e) { return true; } })(), vol = 0.45, ducked = false;
+  const musicVol = () => Math.max(0, Math.min(1, vol * vv('music') * vv('master')));
   function fade(a, to, ms, done) { const from = a.volume, t0 = performance.now(); const step = () => { const k = Math.min(1, (performance.now() - t0) / ms); a.volume = Math.max(0, Math.min(1, from + (to - from) * k)); if (k < 1) requestAnimationFrame(step); else done && done(); }; step(); }
   function music(list) {
     if (curList === list && cur) return;
@@ -67,13 +83,13 @@ window.SFX = (() => {
   function startTrack() {
     const a = new Audio(LISTS[curList][idx % LISTS[curList].length]); a.volume = 0; cur = a;
     a.addEventListener('ended', () => { if (cur === a) { idx++; startTrack(); } });
-    a.play().then(() => fade(a, vol, 1200)).catch(() => { });
+    a.play().then(() => fade(a, ducked ? 0 : musicVol(), 1200)).catch(() => { });
   }
   function toggleMusic() { musicOn = !musicOn; try { localStorage.setItem('soulhead_music', musicOn ? '1' : '0'); } catch (e) {} document.querySelectorAll('.musicBtn').forEach(b => b.textContent = musicOn ? '🎵 BGM 开' : '🔇 BGM 关'); if (!musicOn && cur) { const a = cur; fade(a, 0, 400, () => a.pause()); cur = null; } else if (musicOn && curList) startTrack(); return musicOn; }
   function toggleSfx() { sfxOn = !sfxOn; return sfxOn; }
 
   return {
-    get musicOn() { return musicOn; }, get on() { return sfxOn; }, get ctx() { return ctx; }, get out() { return master; }, duck(d) { if (cur) fade(cur, d ? 0 : vol, 700); }, init, play, soul, squish, roar, thud, levelup, heartbeat, fanfare, music, toggleMusic, toggleSfx,
+    get musicOn() { return musicOn; }, get on() { return sfxOn; }, get ctx() { return ctx; }, get out() { return BUS.sfx || master; }, bus: (k) => bus(k) || master, VOL, VDEF, setVol, applyVol, mixOn, duck(d) { ducked = !!d; if (cur) fade(cur, d ? 0 : musicVol(), 700); }, init, play, soul, squish, roar, thud, levelup, heartbeat, fanfare, music, toggleMusic, toggleSfx,
     punch: () => play('punch', 0.6), coins: () => play('coins', 0.6), chop: () => play('chop', 0.8), wood: () => play('wood', 0.7), mine: () => play('mine', 0.8),
     click: () => play('click', 0.5), select: () => play('select', 0.5), confirm: () => play('confirm', 0.6), deny: () => play('error', 0.6), open: () => play('open', 0.5), close: () => play('close', 0.5),
     page: () => play('page', 0.6), book: () => play('book', 0.6), step: () => play('step', 0.25, 1, 0.15), sack: () => play('sack', 0.8), latch: () => play('latch', 0.6), metal: () => play('metal', 0.6), bell: () => play('bell', 0.5), plate: () => play('plate', 0.5)

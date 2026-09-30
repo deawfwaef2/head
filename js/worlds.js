@@ -961,7 +961,7 @@ window.Worlds = (() => {
   // ---- 说话气泡 ----
   function say(p, text, col) { const el = document.createElement('div'); el.className = 'wsay'; el.textContent = text; el.style.color = col || '#fff'; W.dom.root.appendChild(el); W.say.push({ el, p, t: 2.6 }); }
   function bossSay(text, t) { if (!W || !W.boss) return; const el = document.createElement('div'); el.className = 'wsay boss'; el.innerHTML = `<b style="color:${W.boss.B.col}">${esc(W.boss.B.n)}</b>「${esc(text)}」`; W.dom.root.appendChild(el); W.say.push({ el, p: W.boss, t: t || 3, off: 1.2 }); }
-  function floatDmg(pos, n, big) { const rew = typeof n === 'string', el = document.createElement('div'); el.className = 'wsay dmg' + (rew ? ' rew' : ''); el.textContent = n; if (big) el.style.fontSize = rew ? '28px' : '32px'; if (big && !rew) el.style.color = '#ff6a4a'; W.dom.root.appendChild(el); W.say.push({ el, p: { pos: pos.clone().add(new V3(rew ? (Math.random() - 0.5) * 0.5 : 0, rew ? 0.3 + Math.random() * 0.3 : 0, 0)) }, t: rew ? 1.5 : 0.8, rise: 1 }); }
+  function floatDmg(pos, n, big) { if (window.HitHud && HitHud.dmg(pos, n, big)) return; const rew = typeof n === 'string', el = document.createElement('div'); el.className = 'wsay dmg' + (rew ? ' rew' : ''); el.textContent = n; if (big) el.style.fontSize = rew ? '28px' : '32px'; if (big && !rew) el.style.color = '#ff6a4a'; W.dom.root.appendChild(el); W.say.push({ el, p: { pos: pos.clone().add(new V3(rew ? (Math.random() - 0.5) * 0.5 : 0, rew ? 0.3 + Math.random() * 0.3 : 0, 0)) }, t: rew ? 1.5 : 0.8, rise: 1 }); }
   const sv = new V3();
   function updateSay() {
     for (let i = W.say.length - 1; i >= 0; i--) { const s = W.say[i]; s.t -= 1 / 60; if (s.t <= 0 || s.p.gone) { s.el.remove(); W.say.splice(i, 1); continue; }

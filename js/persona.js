@@ -88,7 +88,7 @@ window.Persona = (() => {
       const g = ac.createGain(), yaw = Math.atan2(dx, dz), cy = window.G && G.player ? G.player.yaw : 0; // 相机朝 -Z 旋转 yaw
       const rel = Math.sin(yaw - (cy + Math.PI)); g.gain.value = Math.min(1, 1.25 / (1 + dist * 0.16)) * 0.95;
       let out = g; if (ac.createStereoPanner) { const pn = ac.createStereoPanner(); pn.pan.value = Math.max(-0.8, Math.min(0.8, -rel * 0.8)); g.connect(pn); out = pn; }
-      s.connect(g); out.connect(SFX.out || ac.destination); s.start(); slot.end = performance.now() + b.duration / fo.per.pitch * 1000;
+      s.connect(g); out.connect((SFX.bus && SFX.bus('voice')) || SFX.out || ac.destination); s.start(); slot.end = performance.now() + b.duration / fo.per.pitch * 1000;
       fo._pv = performance.now(); // 告诉 CombatFX：这一下已经有真人喝声了，不再叠合成的“哈”
     });
   }

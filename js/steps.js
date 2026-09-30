@@ -8,7 +8,7 @@ window.Steps = (() => {
   let noiseBuf = null, lr = 1;
   function ac() { const c = window.SFX && SFX.ctx; return c && c.state !== 'closed' && SFX.on !== false ? c : null; }
   function noise(c) { if (noiseBuf) return noiseBuf; const n = c.sampleRate * 0.6 | 0, b = c.createBuffer(1, n, c.sampleRate), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1; return noiseBuf = b; }
-  function bus(c, vol, pan) { const g = c.createGain(); g.gain.value = vol; let o = g; if (c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = Math.max(-0.9, Math.min(0.9, pan)); g.connect(p); o = p; } o.connect(SFX.out || c.destination); return g; }
+  function bus(c, vol, pan) { const g = c.createGain(); g.gain.value = vol; let o = g; if (c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = Math.max(-0.9, Math.min(0.9, pan)); g.connect(p); o = p; } o.connect((SFX.bus && SFX.bus('steps')) || SFX.out || c.destination); return g; }
   function nz(c, o, t, dur, vol, type, f0, f1, q, att) {
     const s = c.createBufferSource(); s.buffer = noise(c); s.playbackRate.value = 0.8 + Math.random() * 0.4; const f = c.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + dur);
     const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + att); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);

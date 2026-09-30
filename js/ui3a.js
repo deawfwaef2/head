@@ -172,7 +172,7 @@ window.UI3A = (() => {
       if (!A.ok()) return; const c = SFX.ctx, t = c.currentTime + delay, o = c.createOscillator(), g = c.createGain();
       o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(SFX.out); o.start(t); o.stop(t + dur + 0.03);
+      o.connect(g); g.connect((SFX.bus && SFX.bus('ui')) || SFX.out); o.start(t); o.stop(t + dur + 0.03);
     },
     tick() { A.osc('sine', 2600 + Math.random() * 300, 1800, 0.05, 0.028); },
     press() { A.osc('sine', 170, 55, 0.14, 0.16); A.osc('triangle', 900, 500, 0.05, 0.05); },

@@ -64,7 +64,7 @@ window.Seance = (() => {
 
   // ---------------- 八音盒 ----------------
   function musicBox() {
-    const ac = SFX.ctx, out = SFX.out; if (!ac || !out) return null;
+    const ac = SFX.ctx, out = (SFX.bus && SFX.bus('music')) || SFX.out; if (!ac || !out) return null;
     const g = ac.createGain(); g.gain.value = 0; g.connect(out); g.gain.linearRampToValueAtTime(0.55, ac.currentTime + 1.2);
     const dl = ac.createDelay(1); dl.delayTime.value = 0.29; const fb = ac.createGain(); fb.gain.value = 0.33; const lp = ac.createBiquadFilter(); lp.frequency.value = 2200;
     g.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); const wet = ac.createGain(); wet.gain.value = 0.5; lp.connect(wet); wet.connect(out);

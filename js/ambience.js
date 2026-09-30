@@ -31,7 +31,7 @@ window.Ambience = (() => {
   function bed(buf, type, f, q) { const s = ac.createBufferSource(); s.buffer = buf; s.loop = true; s.loopStart = 0.05; s.loopEnd = 3.95; const fl = ac.createBiquadFilter(); fl.type = type; fl.frequency.value = f; fl.Q.value = q || 0.7; const g = ac.createGain(); g.gain.value = 0; s.connect(fl); fl.connect(g); g.connect(bus); s.start(0, Math.random() * 3); return { s, fl, g }; }
   function build() {
     ac = SFX.ctx; noiseBufs();
-    bus = ac.createGain(); bus.gain.value = 0; bus.connect(SFX.out);
+    bus = ac.createGain(); bus.gain.value = 0; bus.connect(SFX.bus ? SFX.bus('amb') : SFX.out);
     L = {
       wind: bed(bb, 'lowpass', 520, 0.6), leaves: bed(nb, 'bandpass', 4200, 0.5), water: bed(nb, 'bandpass', 900, 0.4),
       room: bed(bb, 'lowpass', 160, 0.5), whistle: bed(nb, 'bandpass', 900, 18),
