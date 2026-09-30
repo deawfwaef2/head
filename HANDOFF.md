@@ -1256,3 +1256,15 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - 内容边界：立绘可爱、非性化；文案不含成人内容。
 - 待办：初代 `chudai` 立绘（暂用小烛 hue-rotate）；与头棋对弈（需要棋台建筑，暂未接）；更多神灵/剧本。
 - 测试备忘：整页在 2GB 沙箱里只能用精简页（去掉 models/ 大部分 script）+ 低分辨率跑；截图在全屏面板上会超时。
+## 第二十六轮(j) — 另一个 Arena Agent：击杀红圈不消失 / 攻击冷却 / 头比身体暗
+用户：“打击那个红圈没法消失了；攻击你最好设计CD；这个头为什么一直偏暗，和身体颜色不一样”
+- **红圈**（a59a90a）：js/combatfx.js `marker()` 的 `#cfxMk i` 刻线没有默认 `opacity:0`、动画也没 `forwards` → 0.28s 放完弹回可见，永远挂在准星上（击杀色是红的）。已修，Playwright 验证 1→0.64→0 并保持。
+- **MOD `atk_cd`**（170d658，js/combat.js + mods.js）：轻斩 0.5s / 连段终结 0.75s / 重斩 0.95s，×√max(0.6, 武器重量)，力竭 ×1.3。CD 中按键缓冲一刀（窗口 480ms），不吞输入；drift 连斩分支也受 CD 限制；准星外圈 SVG 进度弧 `#atkCd`。实测（假时钟 bench、打不到人）：连点/按住轻移 3.5 → ~1.7 刀/秒，击杀仍 1–2 刀。
+- **MOD `head_tone`**（头比身体暗的根因，js/heads.js FaceFill + worlds.js parseSky）：
+  1. heads.js 的 ShaderLib.toon“软膝盖”把卡通材质的受光倍数压成 `(1-e^(-1.2x))·1.08`：满光 x=1 时头只有 0.755，烈日封顶 1.08；它是身体也用卡通材质那时加的，现在身体是 PBR（foe_toon 关）不压缩 → 野外头恒比身体暗 25%+。
+  2. 野外 `scene.environment`（天空 PMREM）给 PBR 身体间接光（envMapIntensity 0.55），MeshToon 不吃环境图 → 头少一块光、偏灰。
+  - 修：野外（`FaceFill.world()` 600ms 内）头的软膝盖改为满光以内线性、超过后柔性压到 `FaceFill.tune.knee`=1.35 倍；并给卡通材质加 `uEnvA`（天空平均辐亮度 sky.amb × 0.55 × tune.env 0.4 × FaceFill 系数 k：脸 1.0、头发 0.6）。都是共享 uniform getter，开关不重编译；洞里（只有陈列首级、篝火）两项都为 0，保持原样。
+  - worlds.js parseSky 新增 `sky.amb`（环境图按纬度 cos 加权平均辐亮度），设 `sc.environment` 时 `FaceFill.env(sky.amb)`。
+  - 实测（草甸/松林，脸颊 vs 脖子亮度）：0.91→1.05、0.82→0.97；试过 knee1.45+env1 发白、env0 偏黄。
+  - **死路**：按“身体脖子贴图肤色 ÷ 脸贴图肤色”逐个校 albedo —— 原神身体脖子贴图画了阴影（香菱 #cc9f8d，手臂远更亮），校完脸发棕；Osage 发白。别再试。`ModelHeads.faceSkin(look)` 留作工具（未用）。
+- 测试方法（/tmp，会被清）：fight.html bench 里 `skeleton.pose()` 摆正、相机对准脖子骨骼 0.55m，分别只渲染头/身体、按肤色像素算亮度；天空脚本需 `git sparse-checkout add /big/world/sky_evening_meadow.js /big/world/sky_misty_pines.js`。/tmp 是 1GB tmpfs：Playwright 浏览器放 /var/tmp。

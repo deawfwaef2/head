@@ -254,14 +254,16 @@ window.Worlds = (() => {
     const bg = new THREE.Texture(await loadImg(v.bg)); bg.encoding = THREE.sRGBEncoding; bg.minFilter = THREE.LinearFilter; bg.generateMipmaps = false; bg.needsUpdate = true;
     const im = await loadImg(v.env); const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.drawImage(im, 0, 0);
     const d = g.getImageData(0, 0, c.width, c.height).data; const n = c.width * c.height; const hf = new Uint16Array(n * 4);
+    let aR = 0, aG = 0, aB = 0, aW = 0; // 第二十六轮(j) head_tone：环境图平均辐亮度（按纬度 cos 加权）→ sky.amb，给卡通头补同量间接光
     for (let i = 0; i < n; i++) { const e = d[i * 4 + 3]; let f = e ? Math.pow(2, e - 136) : 0; const mx = Math.max(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]) * f; if (mx > 3) f *= 3 / mx;
+      { const w = Math.cos(((Math.floor(i / c.width) + 0.5) / c.height - 0.5) * Math.PI); aR += d[i * 4] * f * w; aG += d[i * 4 + 1] * f * w; aB += d[i * 4 + 2] * f * w; aW += w; }
       hf[i * 4] = THREE.DataUtils.toHalfFloat(d[i * 4] * f); hf[i * 4 + 1] = THREE.DataUtils.toHalfFloat(d[i * 4 + 1] * f); hf[i * 4 + 2] = THREE.DataUtils.toHalfFloat(d[i * 4 + 2] * f); hf[i * 4 + 3] = THREE.DataUtils.toHalfFloat(1); }
     const t = new THREE.DataTexture(hf, c.width, c.height, THREE.RGBAFormat, THREE.HalfFloatType); t.mapping = THREE.EquirectangularReflectionMapping; t.magFilter = t.minFilter = THREE.LinearFilter; t.flipY = true; t.needsUpdate = true;
     const pm = new THREE.PMREMGenerator((G || window.__game).renderer); const env = pm.fromEquirectangular(t).texture; pm.dispose(); t.dispose();
     // 地平线颜色（雾）/ 天顶 / 地面平均色：从背景 JPEG 取
     const bi = bg.image, cc = document.createElement('canvas'); cc.width = 64; cc.height = 32; const g2 = cc.getContext('2d'); g2.drawImage(bi, 0, 0, 64, 32);
     const px = g2.getImageData(0, 0, 64, 32).data; const avg = (y0, y1) => { let r = 0, gg = 0, b = 0, k = 0; for (let y = y0; y < y1; y++) for (let x = 0; x < 64; x++) { const i = (y * 64 + x) * 4; r += px[i]; gg += px[i + 1]; b += px[i + 2]; k++; } return new THREE.Color(r / k / 255, gg / k / 255, b / k / 255); };
-    return { bg, env, sun: v.sun, mean: v.mean, horizon: avg(14, 17), zenith: avg(0, 5), ground: avg(20, 28) };
+    return { bg, env, sun: v.sun, mean: v.mean, amb: new THREE.Color(aR / aW, aG / aW, aB / aW), horizon: avg(14, 17), zenith: avg(0, 5), ground: avg(20, 28) };
   }
   // 模型 → 实例化模板：[{geo, mat, m(相对矩阵)}] + 尺寸
   function templates(name) {
@@ -406,7 +408,7 @@ window.Worlds = (() => {
         vertexShader: 'varying vec3 vD; void main(){ vD = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }',
         fragmentShader: 'uniform sampler2D map; uniform float k; uniform vec3 tint; varying vec3 vD; void main(){ vec3 d = normalize(vD); vec2 uv = vec2(atan(d.z, d.x) * 0.1591549 + 0.5, asin(clamp(d.y, -1.0, 1.0)) * 0.3183099 + 0.5); gl_FragColor = vec4(texture2D(map, uv).rgb * k * tint, 1.0); }' });
       const skyM = new THREE.Mesh(new THREE.SphereGeometry(300, 48, 24), sm); skyM.frustumCulled = false; skyM.renderOrder = -10; if (g) skyM.rotation.y = g.yaw; skyM.userData.sky = 1; sc.add(skyM); sc.userData.skyM = skyM;
-      sc.environment = sky.env; sc.fog = g ? new THREE.FogExp2(sky.horizon.clone().multiplyScalar(st.night ? 0.6 : 0.78).multiply(g.fogMul), Math.max(0.006, Math.min(st.fog * (R > 30 ? 0.7 : 1) * (LP ? LP.fog : 1) * g.fk, (st.night ? 1.5 : 1.15) / (R + 14)))) : new THREE.FogExp2(sky.horizon.clone().multiplyScalar(st.night ? 0.6 : 0.78), Math.min(st.fog * (R > 30 ? 0.7 : 1) * (LP ? LP.fog : 1), Math.max(st.fog, 0.032)));
+      sc.environment = sky.env; if (window.FaceFill && FaceFill.env) FaceFill.env(sky.amb); sc.fog = g ? new THREE.FogExp2(sky.horizon.clone().multiplyScalar(st.night ? 0.6 : 0.78).multiply(g.fogMul), Math.max(0.006, Math.min(st.fog * (R > 30 ? 0.7 : 1) * (LP ? LP.fog : 1) * g.fk, (st.night ? 1.5 : 1.15) / (R + 14)))) : new THREE.FogExp2(sky.horizon.clone().multiplyScalar(st.night ? 0.6 : 0.78), Math.min(st.fog * (R > 30 ? 0.7 : 1) * (LP ? LP.fog : 1), Math.max(st.fog, 0.032)));
     } else { sc.fog = new THREE.FogExp2('#8899aa', 0.02); }
     // 光：太阳（从 HDRI 最亮方向）+ 半球补光
     let el = sky ? (0.5 - sky.sun[1]) * Math.PI : 0.8, az = sky ? (sky.sun[0] - 0.5) * Math.PI * 2 : 0.5; if (el < 0.35) el = 0.35 + (st.night ? 0.5 : 0); if (g) az -= g.yaw;

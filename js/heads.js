@@ -4,19 +4,30 @@
 window.FaceFill = (() => {
   let worldT = -1e9; const done = new WeakSet(); // 不能用 userData 标记：clone() 会复制 userData 却不复制 onBeforeCompile
   const u = { get value() { if (window.Mods && !Mods.on('face_light')) return 0; const L = !window.Mods || Mods.on('char_lift'); return performance.now() - worldT < 600 ? (L ? 0.85 : 0.75) : (L ? 0.8 : 0.45); } }; /* R29 char_lift：洞里 0.45→0.8、野外 0.75→0.85 */ // 亮度下限（满光≈1.08；白天≈0.9–1.0 不受影响，夜里≈0.5 提到 0.75）：野外 0.75，洞穴 0.45
-  function inject(sh, k) {
-    sh.uniforms.uFill = u;
-    sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform float uFill;\nvoid main() {')
-      .replace('#include <aomap_fragment>', `#include <aomap_fragment>
+  // 第二十六轮(j) MOD head_tone：野外 PBR 身体从天空环境图（scene.environment × envMapIntensity 0.55）得到间接光，卡通头拿不到 → 头比身体暗。
+  // 给卡通材质补同量的天空平均辐亮度（worlds.js parseSky 算出 sky.amb）；洞里/关 MOD 为 0。共享 uniform，不重编译。
+  const ZERO = new THREE.Color(0, 0, 0), envA = new THREE.Color(0, 0, 0);
+  // 卡通软膝盖（下面 ShaderLib.toon 补丁，满光只到 ≈0.76、烈日封顶 ≈1.08）当初是身体也用卡通材质时加的；现在身体是 PBR 不压缩 → 野外头比身体暗 25%+。
+  // head_tone：野外（活人头长在身体上）关掉头的软膝盖；洞里（只有陈列首级、篝火）保留，防止被火光冲白。
+  // 野外改成：满光以内线性（与 PBR 身体同一条响应），超过满光再柔性压到 tune.knee 倍封顶。
+  const tune = { knee: 1.35, env: 0.4 }; // 实测（草甸/松林，脸颊 vs 脖子）：1.45/1 发白，1.45/0 偏黄，1.3/0.5 最接近
+  const ko = { get value() { return (window.Mods && !Mods.on('head_tone')) || performance.now() - worldT > 600 ? 0 : tune.knee; } };
+  const envT = new THREE.Color(); const ea = { get value() { return (window.Mods && !Mods.on('head_tone')) || performance.now() - worldT > 600 ? ZERO : envT.copy(envA).multiplyScalar(tune.env); } };
+  function inject(sh, k, toon) {
+    sh.uniforms.uFill = u; if (toon) { sh.uniforms.uEnvA = ea; sh.uniforms.uKneeOff = ko; }
+    if (toon) sh.fragmentShader = sh.fragmentShader.replace('float _s = clamp(_t / _ex, 0.0, 1.3);', 'float _s = clamp(_t / _ex, 0.0, 1.3); if (uKneeOff > 1.001) { float _t2 = _ex <= 1.0 ? _ex : 1.0 + (uKneeOff - 1.0) * (1.0 - exp((1.0 - _ex) / (uKneeOff - 1.0))); _s = _t2 / _ex; }');
+    sh.fragmentShader = sh.fragmentShader.replace('void main() {', (toon ? 'uniform vec3 uEnvA; uniform float uKneeOff;\n' : '') + 'uniform float uFill;\nvoid main() {')
+      .replace('#include <aomap_fragment>', `${toon ? 'reflectedLight.indirectDiffuse += uEnvA * ' + k.toFixed(2) + ' * diffuseColor.rgb;' : ''}
+      #include <aomap_fragment>
       { vec3 litC = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse; float al = max(dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)), 1e-3) * 0.3183; // 与上面软膝盖同单位：满光≈1.08
         float lr = dot(litC, vec3(0.299, 0.587, 0.114)) / al; float fc = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
         totalEmissiveRadiance += diffuseColor.rgb * 0.3183 * max(0.0, uFill * ${k.toFixed(2)} - lr) * (0.45 + 0.55 * fc); }`);
   }
   function wrap(m, k) { // 包一层 onBeforeCompile（clone() 不会复制它：克隆后要重新包）
     if (!m || !(m.isMeshToonMaterial || (m.isMeshStandardMaterial && window.Mods && Mods.on('char_lift'))) || done.has(m)) return m; /* R29 char_lift：身体默认是 PBR 标准材质（foe_toon 关）→ 以前完全没补光，洞里发黑 */ const prev = m.customProgramCacheKey(), o = m.onBeforeCompile;
-    m.onBeforeCompile = function (sh, r) { o.call(this, sh, r); inject(sh, k); }; m.customProgramCacheKey = () => prev + '|ff' + k; done.add(m); return m;
+    const toon = !!m.isMeshToonMaterial; m.onBeforeCompile = function (sh, r) { o.call(this, sh, r); inject(sh, k, toon); }; m.customProgramCacheKey = () => prev + '|ff' + k + (toon ? 'e' : ''); done.add(m); return m;
   }
-  return { u, wrap, world() { worldT = performance.now(); } };
+  return { u, wrap, tune, world() { worldT = performance.now(); }, env(c) { if (c) envA.copy(c).multiplyScalar(0.55); else envA.setRGB(0, 0, 0); } };
 })();
 window.ModelHeads = (() => {
   const T = [];               // templates
@@ -584,6 +595,29 @@ window.ModelHeads = (() => {
   // 可换发型的组
   const MIX = { mmd: ['mmd'], vroid: ['vroid', 'twist', 'seed'], twist: ['vroid', 'twist'], seed: ['seed', 'vroid'], godette: ['godette'] };
   function idxOf(file) { return T.findIndex(t => t.meta.file === file); }
+  // 第二十六轮(j)：脸部贴图下颌一圈的真实肤色（当前未用：试过按“身体脖子肤色÷脸肤色”校色，原神身体脖子贴图画了阴影、反而更糟；留作工具）（线性空间，含 uSkinFix 去绿），与 foe.js sampleSkin 同一取法（取亮的一半）
+  const _fs = new Map(), _s2l = c => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  function faceSkin(look) {
+    const fi = idxOf(look && look.f); if (fi < 0) return null; const t = T[fi]; if (_fs.has(t)) return _fs.get(t);
+    let out = null;
+    try {
+      const bot = t.meta.bottom != null ? t.meta.bottom : null, band = [], all = [], cvs = new Map();
+      t.meshes.forEach(m => {
+        if (m.userData.kind !== 'skin') return; const src = SRC.get(m) || m.material; const img = src && src.map && src.map.image; const uv = m.geometry.attributes.uv, pa = m.geometry.attributes.position; if (!img || !uv || !pa) return;
+        let cv = cvs.get(img); if (!cv) { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0, 256, 256); cv = g.getImageData(0, 0, 256, 256).data; cvs.set(img, cv); }
+        const fix = (window.Mods && Mods.on('head_repair') && src.userData && src.userData._headGreenFix) || 0, step = Math.max(1, Math.floor(pa.count / 4000));
+        for (let i = 0; i < pa.count; i += step) {
+          const X = Math.min(255, Math.max(0, Math.floor(uv.getX(i) * 256))), Y = Math.min(255, Math.max(0, Math.floor(uv.getY(i) * 256))), k = (Y * 256 + X) * 4; if (cv[k + 3] < 128) continue;
+          let r = cv[k] / 255, g = cv[k + 1] / 255, b = cv[k + 2] / 255; if (!(r > 0.45 && r >= g && g >= b * 0.85 && r - b < 0.45)) continue;
+          if (fix) { const y = r * 0.299 + g * 0.587 + b * 0.114; r += (y - r) * fix; g += (y - g) * fix; b += (y - b) * fix; }
+          const p = [_s2l(r), _s2l(g), _s2l(b)]; all.push(p); const vy = pa.getY(i); if (bot != null && vy > bot + 0.004 && vy < bot + 0.07) band.push(p);
+        }
+      });
+      const px = band.length >= 12 ? band : all;
+      if (px.length >= 6) { px.sort((a, b) => (b[0] + b[1] + b[2]) - (a[0] + a[1] + a[2])); const top = px.slice(0, Math.max(4, Math.floor(px.length * 0.5))); out = [0, 1, 2].map(j => top.reduce((s, p) => s + p[j], 0) / top.length); }
+    } catch (e) { console.warn('faceSkin', e); }
+    _fs.set(t, out); return out;
+  }
 
   // ---------- 随机外观（种族约束由 lore 传入） ----------
   // race: {skins:[名], feat:[...], hair:[名], eye:[名], acc:{name:prob}, faces:[file]?}
@@ -1189,7 +1223,7 @@ window.ModelHeads = (() => {
   }
 
   return {
-    init, create, randomLook, HAIR, EYE, SKIN, tick(t) { GT.value = t; },
+    init, create, randomLook, HAIR, EYE, SKIN, faceSkin, tick(t) { GT.value = t; },
     // R29 body_match：这个头实际显示的发色（mmd 发型用贴图平均色，其他用染发色），给 foe.js 挑配色协调的身体
     hairColor(look) { try { const H = T[idxOf(look.h || look.f)]; if (H && H.meta.grp === 'mmd') { const c = hairAvgCol(H); if (c) return c.clone().convertLinearToSRGB(); } return new THREE.Color(look.hc1 || '#333333'); } catch (e) { return null; } },
     get ready() { return ready; },
