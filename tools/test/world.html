@@ -85,12 +85,13 @@
 <script src="/js/master.js"></script><script src="/js/worldmaster.js"></script><script src="/js/wterrain.js"></script><script src="/js/worlds.js"></script><script src="/js/beasts.js"></script><script src="/js/beasts_reg.js"></script>
 <script>
 const q = new URLSearchParams(location.search);
+if (q.get('w')) { const c = document.getElementById('cv'); c.width = +q.get('w'); c.height = +(q.get('h') || Math.round(c.width * 9 / 16)); } // R52：?w=&h= 画布尺寸
 const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('cv'), antialias: false, preserveDrawingBuffer: true });
-const POST = /[?&]post=0/.test(location.search) || !window.Master ? null : Master.create(renderer, { tier: 'high' }); // R41主管：和游戏一样走大师画质合成（ACES/曝光/调色），否则人物观感不准
+const POST = /[?&]post=0/.test(location.search) || !window.Master ? null : Master.create(renderer, { tier: q.get('tier') || 'high' }); // R41主管：和游戏一样走大师画质合成（ACES/曝光/调色），否则人物观感不准；R52：?tier=ultra|high|mid
 const RND = (sc, cam) => POST ? POST.render(sc, cam) : renderer.render(sc, cam);
 renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
-const camera = new THREE.PerspectiveCamera(62, 960 / 540, 0.1, 400);
-window.__game = { S: { bosses: {}, stats: {}, heads: [] }, st: () => ({ power: 300, maxHp: 100 }), camera, renderer, player: { yaw: 0, pitch: 0 } };
+const camera = new THREE.PerspectiveCamera(62, renderer.domElement.width / renderer.domElement.height, 0.1, 400);
+window.__game = { S: { bosses: {}, stats: {}, heads: [] }, st: () => ({ power: 300, maxHp: 100 }), camera, renderer, player: { yaw: 0, pitch: 0 }, postFx: POST };
 window.G = window.__game;
 const loc = Lore.LOCS.find(l => l.k === (q.get('reg') || 'forest'));
 const graph = window.__graph = Worlds.genGraph(loc, +(q.get('seed') || 7));
