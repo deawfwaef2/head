@@ -1972,3 +1972,10 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - `living_region` + `foe_levels`（js/living.js）：`S.liv[k]` 1000 居民/各地点 alive、alert、corrupt、nk、last；局面（集市/葬礼/民兵/驱魔/逃难/废村）；首次看见你说等级与记忆台词；地区基础等级 = 1+4×地区序号，老兵/精英/冠军 HP/伤害按等级差缩放，阶位越高 duel 连斩/佯攻/重击越多。钩子：worlds.populate→`Living.count`，foe.populate→`Living.foe`，foeEvent→`Living.event`，进场→`Living.enter`，每帧→`Living.frame`。
 - `nemesis` / `soul_rite` / `head_boon`（js/nemesis.js）：洞里“宿敌逼近”条（~5 分钟满 → 下一趟第一个地点必遇）；每 8 分钟猎手全体 +1 级（Hunters2 hate）；出猎中每 4~7 分钟来袭；30%/猎手死光 → 月之巫女分身；选地点面板里的血祭（下一趟 伤害/生命/移速）；摆出的首级给微弱永久加成（`Nemesis.dmgK/hpK/spdK` 乘进 worlds power/移速与 RPG.stats.maxHp）。
 - 循环：出猎斩首 → 首级摆出（永久小加成 + 产魂晶）→ 魂晶买装备 / 血祭 → 更高等级地区；洞里待久宿敌必来且越来越强。
+
+## R54i/j（用户最新取舍，覆盖 R54c–h 中冲突部分）
+- **用户洞察（重要设计原则）**：玩家潜意识在算收益率。资源可无限刷 → 单个首级价值趋零 → 没兴趣收集；改成**轮制**（每轮定量产出，有上限）后，首级才有价值。以后所有资源都遵守：有上限、按轮结算、溢出转为下一轮小加成，不允许无限刷。
+- `run_loop`（js/loop.js，默认开）：章节 = 2 个地区 + 第 3 趟 BOSS 战（出发面板显示 BOSS Lv / HP× / 伤害×，每章 +5 级）；洞穴魂晶每轮上限 `Loop.capCave()`（game.js addCoins 经 `Loop.caveGate`），溢出 → 下一轮加成（最多 +60%）；回洞结算 `Loop.payout`（按摆出首级）；地点清剿奖励按清剿率²；每存档随机 2 条“世道”；离开地点时追你的 tier≥1 敌人变成新宿敌。宿敌条出猎时也涨，BOSS 趟不涨不来袭（hunters2 同步）。
+- 地图回到老版每趟随机生成（`region_persist`/`region_big` 默认关，迁移 v18），`small_maps` 地图更小。
+- 用户：老版敌人战斗更好、程序化举刀姿势不好看 → `foe_duel`/`duel_all` 默认关（迁移 v19）。用户：还是要传送门 → `gate_portal`（默认开，山口雾幕 + 光）。
+- 未做：建筑需资源 + 战利品显示相关配方；月之巫女 ≥7 线索胜利 + 结局动画；头棋盘→下一轮加成；建筑组合效果；精英 BOSS 聚会。
