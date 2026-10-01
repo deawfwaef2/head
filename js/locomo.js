@@ -66,14 +66,17 @@ window.Locomo = (() => {
     const p = fo.pos; if (!L.lastP) L.lastP = p.clone();
     const dx = p.x - L.lastP.x, dz = p.z - L.lastP.z; L.lastP.copy(p);
     if (dt > 0) { const inst = Math.min(Math.hypot(dx, dz) / dt, 9), k = 1 - Math.exp(-10 * dt); L.s += (inst - L.s) * k;
-      const fw = (dx * Math.sin(fo.yaw) + dz * Math.cos(fo.yaw)) / Math.max(dt, 1e-4); L.vf += (clamp(fw, -9, 9) - L.vf) * k; }
+      const fw = (dx * Math.sin(fo.yaw) + dz * Math.cos(fo.yaw)) / Math.max(dt, 1e-4); L.vf += (clamp(fw, -9, 9) - L.vf) * k;
+      // R51 npc_strafe：平滑速度向量 → 相对朝向的移动角 rel；后退判定带滞回（>110° 进入，<95° 退出）
+      L.vx = (L.vx || 0) + (clamp(dx / dt, -9, 9) - (L.vx || 0)) * k; L.vz = (L.vz || 0) + (clamp(dz / dt, -9, 9) - (L.vz || 0)) * k;
+      if (Math.hypot(L.vx, L.vz) > 0.15) { L.rel = ang(Math.atan2(L.vx, L.vz) - fo.yaw); const ar = Math.abs(L.rel); if (!L.bk && ar > 1.92) L.bk = true; else if (L.bk && ar < 1.66) L.bk = false; } }
     if (fo.dead || fo.rag) { if (L.active) deactivate(f, L, 0.1); f.root.rotation.z = 0; return; }
     // 倾身：向转弯内侧，随速度
     const lean = clamp(-(fo.yawV || 0) * L.s * 0.03, -0.12, 0.12); f.root.rotation.z += (lean - f.root.rotation.z) * (1 - Math.exp(-6 * dt));
     if (!L.active) return;
     L.want -= dt;
     if (L.pend && L.s < 0.35) { const [n, o] = L.pend; L.pend = null; f.play(n, o); return; }
-    const A = acts(f, L), s = L.s, hy = L.hipY, back = L.dir < 0 || L.vf < -0.3 * s;
+    const A = acts(f, L), s = L.s, hy = L.hipY, strafe = window.Stance && Stance.onS(), back = strafe && s > 0.3 && L.rel != null ? !!L.bk : (L.dir < 0 || L.vf < -0.3 * s);
     const W = G[0].vk * hy, J = G[1].vk * hy, R = G[2].vk * hy;
     // 步态权重（后退只用走路）
     let w0 = 1, w1 = 0, w2 = 0;

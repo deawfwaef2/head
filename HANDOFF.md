@@ -1861,3 +1861,13 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 **本机环境（Windows，`E:\farhead`）**：系统没有 git → 便携 MinGit `E:\tools\MinGit\cmd\git.exe`；仓库是 partial clone（`--filter=blob:none`）+ 非 cone 稀疏检出（本地不含 models/ big/ promo/ music/ voice/ beasts/ 的文件，提交不受影响）。本地测试服务器 `node E:\tools\serve.js`（本地缺的文件从 raw.githubusercontent.com 拉一次缓存到 `E:\tools\rawcache`），测试页 `http://127.0.0.1:8765/tools/test/world.html?reg=meadow&seed=5`。
 
 **本轮计划（每完成一项就推送并在下面追加记录）**：① 壳层草地 v2（重写 `js/wgrass.js`）② 天空高清化 ③ 大气层（太阳光束 / 空气透视 / 低地薄雾，后处理）④ 调色与曝光。
+
+## R41（主管）j — R51 战斗动作：方向性移动 + 架势个性化
+用户：“战斗时左右移动，步行动画却是前后走，很奇怪；每次战斗姿势都一样，违和”。
+- 查证：UAL 免费版（UAL1/UAL2 Standard）**没有**横移/后退动作（Pro 才有），别再找；试烘了 NinjaJump_Idle（空中跳跃姿势）/ Zombie_Idle / Pistol_Idle，均不适合战斗架势，已撤回，`big/anim/ual.js` 与 `tools/anim_bake.py` **未改**。
+- 新文件 `js/stance.js`（两个 MOD，默认开）：
+  - `npc_strafe`：mixer 更新后，胯骨绕世界竖轴转向实际移动方向（≤±77°，速度越快越小），spine/chest/upperChest/neck 按 30/30/25/15% 反扭 → 脚顺着移动方向迈步、胸口和脸仍对着玩家；移动方向在身后 >110°（<95° 退出，滞回）时用倒放走路。依赖 `npc_locomo`。
+  - `npc_stance`：只替换“对峙中”（state==='chase' && seen）的 `Sword_Idle`/`Idle_Loop`；按身份（CASTER/PROUD/FIGHTER 集合）+种子给主/副架势（Sword_Idle、Idle_Shield_Loop（空手=举拳护架）、Spell_Simple_Idle_Loop、Idle_FoldArms_Loop），4–9 s 可能换；节奏 0.8–1.25、随机相位；侧身/前压后仰/歪头体态，出手/硬直时淡出。
+  - **坑**：UAL 重定向不给部分体型的 spine/chest 写轨道，mixer 不会每帧覆盖 → 程序化偏移会逐帧累积（整个人转过去）。stance.js 的 restore()/commit() 记录每根被改骨骼的改前/改后值，下一帧若未被 mixer 覆盖先还原。以后谁在 mixer 后改骨骼都要注意这一点。
+- 改动他处（最小）：`js/locomo.js` tick 多记平滑速度 L.vx/L.vz、相对移动角 L.rel、后退判定 L.bk（滞回），npc_strafe 开时 back 取 L.bk；`js/foe.js` animate() 末尾 `Stance.install(f)`、`f.mixer.update(dt)` 之后 `Stance.post(fo, dt)`；`index.html` 与 `tools/test/world.html` 在 locomo.js 后加 `<script src="js/stance.js">`；`js/mods.js`/`js/mods_i18n.js` 两条 MOD。
+- 验证：横移胶片（关/开/后退）、5 人对峙截图对比，ai.py / index 启动无报错。

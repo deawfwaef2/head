@@ -170,6 +170,7 @@ window.Foe = (() => {
       cur = a; f.cur = name; return a;
     };
     f._cur = () => cur; f._setCur = a => { cur = a; }; if (window.Locomo) Locomo.install(f); // R47 npc_locomo：移动动作按实际速度混合
+    if (window.Stance) Stance.install(f); // R51 npc_stance：战斗对峙架势个性化
     return f;
   }
   const sfx = () => window.SFX || {};
@@ -518,6 +519,7 @@ window.Foe = (() => {
       collide(fo.pos, 0.35); fo.pos.y = ctx.H(fo.pos.x, fo.pos.z) + (fo.yOff || 0); f.root.rotation.y = fo.yaw;
       if (window.Locomo) Locomo.tick(fo, dt); // R47 npc_locomo
       f.mixer.update(dt);
+      if (window.Stance) Stance.post(fo, dt); // R51 npc_strafe / npc_stance：下肢朝移动方向+上身扭回、架势体态
       fo.f.bones.head.getWorldPosition(fo.anchor.pos); fo.anchor.pos.y -= 0.3;
       { // 受击闪红 + 第十九轮：蓄力时身体渐亮（红=普通，橙=重击），出手瞬间最亮 —— 只改 uniform，不新建材质
         if (fo.flash > 0) fo.flash -= dt; let er = 0, eg = 0, eb = 0;
