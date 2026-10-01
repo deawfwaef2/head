@@ -34,7 +34,8 @@ window.Loop = (() => {
   const RG = k => (window.Rogue && Rogue.on && Rogue.on() && Rogue[k] ? Rogue[k]() : 1);
   let wc = { t: 0, v: 0 };
   function ward() { const n = performance.now(); if (n - wc.t < 2000) return wc.v; wc.t = n; let k = 0; try { for (const h of G().heads || []) if (h && h.mount && h.mount.type === 'rh_palisade') k++; } catch (e) { } wc.v = Math.min(0.45, k * 0.08); return wc.v; }
-  const runDmg = () => (1 + mod('dmg', 0) + (nb().dmg || 0)) * RG('dmgK'), runHp = () => (1 + mod('hp', 0) + (nb().hp || 0)) * RG('hpK'), runSpd = () => (1 + mod('spd', 0) + (nb().spd || 0)) * RG('spdK');
+  const MK = k => (window.Momentum && Momentum[k] ? Momentum[k]() : 1);
+  const runDmg = () => (1 + mod('dmg', 0) + (nb().dmg || 0)) * RG('dmgK') * MK('dmgK'), runHp = () => (1 + mod('hp', 0) + (nb().hp || 0)) * RG('hpK'), runSpd = () => (1 + mod('spd', 0) + (nb().spd || 0)) * RG('spdK') * MK('spdK');
   const enemyHp = () => mod('ehp', 1) * (1 - Math.min(0.3, nb().fear || 0)), enemyDmg = () => mod('edmg', 1), nemRate = () => mod('nem', 1) * (1 - ward()), enemyLv = () => mod('elv', 0);
   const chapLv = () => on() ? (R().chap - 1) * 5 : 0;
   // ---- 章节 BOSS：月之巫女的使徒，无限随机生成（下面是角色模板；名字/种族/长相/称号/擂台/词缀每局每章都不同），各有独立擂台 ----
@@ -177,6 +178,14 @@ window.Loop = (() => {
     const M = new Map(); for (const l of P.lines) { const o = M.get(l.t) || { ic: l.ic, n: l.n, k: 0, v: 0, b: 0, nt: new Set() }; o.k += l.k; o.v += l.v; o.b++; if (l.note) o.nt.add(l.note); M.set(l.t, o); }
     const rows = [...M.values()].sort((a, b) => b.v - a.v).map(o => `<tr><td>${o.ic} ${o.n}${o.b > 1 ? ` ×${o.b}` : ''}<span class="nt">${[...o.nt].slice(0, 2).join('；')}</span></td><td class="c">${o.k} 颗</td><td class="v">+${o.v}</td></tr>`).join('');
     const src = Object.keys(P.src || {}).filter(k => P.src[k] > 0).map(k => `${SRCN[k] || k} +${Math.round(P.src[k])}`).join(' · ');
+    if (window.GrandUI && GrandUI.on()) {
+      const rw = [...M.values()].sort((a, b) => b.v - a.v).map(o => ({ ic: o.ic, n: o.n + (o.b > 1 ? ` ×${o.b}` : ''), sub: `${o.k} 颗首级在岗${o.nt.size ? ' · ' + [...o.nt].slice(0, 2).join('；') : ''}`, v: '+' + o.v }));
+      if (P.stash) rw.push({ ic: '📦', n: '洞内活动', sub: src || '存着的收益', v: '+' + P.stash });
+      if (!rw.length) rw.push({ ic: '🕸️', n: '空荡的洞穴', sub: '没有首级在岗——把首级插到建筑上，下次回洞就有产出', v: '+0' });
+      const ex = [...P.sets, ...P.notes, P.boons ? `🎴 额外祝福抉择 ×${P.boons}` : '', nbText(P.nb) ? `🎐 下一趟祝福：${nbText(P.nb)}` : '', `第 ${R().chap} 章 ×${P.mul.chK.toFixed(2)} · 世道 ×${P.mul.pay.toFixed(2)} · 展厅 ×${P.mul.ex.toFixed(2)}${P.mul.inc > 1 ? ` · 回合香 ×${P.mul.inc.toFixed(2)}` : ''}`].filter(Boolean);
+      GrandUI.ceremony({ kicker: `第 ${R().round} 回 合`, title: P.died ? '你倒下了，但首级还在' : '魂首归窟', sub: '洞里的首级替你干完了这一回合的活', rows: rw, extras: ex, total: P.tot, ok: '收下', onClose: () => { try { if (window.Rogue && Rogue.st().pend > 0) setTimeout(Rogue.openBoon, 300); } catch (e) { } } });
+      try { SFX.coins && SFX.coins(); } catch (e) { } return;
+    }
     el.innerHTML = `<div class="h">🔄 第 ${R().round} 回合结算${P.died ? ' <small style="color:#ff9a8a">（你倒下了——首级照常结算）</small>' : ''}</div>
 ${rows ? `<table>${rows}</table>` : '<div class="m">没有首级在岗。把首级插到建筑上，下次回洞就有产出——不同建筑规则不同。</div>'}
 ${P.sets.length ? `<div class="s">${P.sets.join('<br>')}</div>` : '<div class="m">套装：同族 3/5/7 颗、同身份 2/3 颗、五阶齐全都有加成。</div>'}

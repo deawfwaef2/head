@@ -151,7 +151,7 @@ window.Combat = (() => {
     if (!drawn || S.rmb || S.sw) return false; const heavy = type === 'heavy', fin = type === 'fin';
     if (CDM() && performance.now() < (M.cdUntil || 0)) { M.buf = performance.now(); M.bufType = heavy ? 'heavy' : null; if (heavy) M.bufD = [d[0], d[1]]; return false; } // CD 中：缓冲
     const as = mmPick(); // 第二十六轮（用户：一直点就没力气、砍不动）：体力 6/9/16 → 4/6/12；范围内没有敌人时空挥只耗 35%（追人、试刀不会被掏空）
-    const msA = performance.now(), SC = !(window.Mods && Mods.on && Mods.on('stam_chain') === false); if (SC) { M.chain = msA - (M.lastAtk || -9999) < 1300 ? Math.min(8, (M.chain || 0) + 1) : 0; } const chainK = SC ? 1 + 0.3 * (M.chain || 0) : 1; // R54b stam_chain：越连续越费体力
+    const msA = performance.now(), SC = !(window.Mods && Mods.on && Mods.on('stam_chain') === false); if (SC) { M.chain = msA - (M.lastAtk || -9999) < 1300 ? Math.min(6, (M.chain || 0) + 1) : 0; } const chainK = (SC ? 1 + 0.15 * (M.chain || 0) : 1) * (window.Momentum && Momentum.stamK ? Momentum.stamK() : 1); // R54b stam_chain； R54m：涨幅减半，杀意高时更省力
     const mt = MT(), pf = PF(); if (!mmSpend((heavy ? 12 : fin ? 6 : 4) * (as ? 1 : 0.35) * mt.st * (pf ? pf.st : 1) * chainK, heavy ? 'charged' : 'swing')) return false;
     M.lastAtk = msA;
     const ex = ((window.Stamina && Stamina.ex) ? 1.3 : 1), kk = WK(S.wt) * ex, wu = (heavy ? 0.05 : fin ? 0.08 : 0.06) * (pf ? pf.wu * ex : kk) * mt.wu, dur = wu + (heavy ? 0.24 : fin ? 0.2 : 0.14) * (pf ? pf.sw * ex : kk) * mt.sw, pw = heavy ? 1 : fin ? 0.95 : 0.85;

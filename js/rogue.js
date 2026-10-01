@@ -46,6 +46,8 @@ window.Rogue = (() => {
     { k: 'k_combo', ic: '🔁', n: '连斩', tag: '刃', d: l => `2 秒内连续命中，每层 +${4 * l}%（最多 5 层）` }
   ];
   const SETS = { 血: '血契：每杀一人再回复 3% 生命', 雷: '雷网：每一刀 10% 几率闪电跳跃', 霜: '永冻：对冻住的敌人再 +15% 伤害', 火: '焚城：每次击杀都会爆炸', 魂: '魂潮：暴击回复 1% 生命、暴击率 +5%', 影: '无形：移速 +8%、10% 闪避', 铁: '铁壁：受到伤害再 -10%', 刃: '屠夫：伤害 +10%' };
+  const LORE = { blood: ['放血人', '她们说你挥刀之后，血会自己继续流。'], thunder: ['风暴屠夫', '每第三下，天空会替你补刀。'], frost: ['冬日收割者', '被你砍过的人，连逃跑都变得很慢。'], flame: ['焚城者', '你的斗落下的地方，草三年不长。'], soul: ['月下刺客', '月光偏爱一击必杀的人。'], reaper: ['行刑官', '她快不行了的时候，你最有精神。'], warden: ['铁壁', '先让她砍，再让她后悔。'], shadow: ['无影者', '她们只看见一阵风，然后就看不见了。'] };
+  const TAGN = { 血: '血契之道', 雷: '雷鸣之道', 霜: '凛冬之道', 火: '烈焰之道', 魂: '魂月之道', 影: '暗影之道', 铁: '铁骨之道', 刃: '刀锋之道' };
   const BY = {}; BOON.forEach(b => BY[b.k] = b);
   const lv = k => (on() && st().b[k]) || 0;
   const arch = () => (on() && st().arch) || '';
@@ -130,21 +132,39 @@ window.Rogue = (() => {
   function panelHTML() {
     const s = st(), A = ARCH.find(a => a.k === s.arch), tcn = tagCount();
     let h = '';
+    if (!A && GU()) return `<button class="cd" data-rgopen="1" style="--c:#e7c27a;width:100%;padding:14px;font-size:16px"><b>⚔️ 选择本局杀法</b></button>`;
     if (!A) { h += `<div class="h">⚔️ 本局武器流派 <small>（选一个，整局有效——每局随机给 3 个）</small></div><div class="cards">${pickArchOffer().map(a => `<button class="cd" data-rga="${a.k}" style="--c:${TAG[a.tag]}"><b>${a.ic} ${a.n}</b><i>标签：${a.tag}</i><span>${a.d}</span></button>`).join('')}</div>`; return h; }
     h += `<div class="h">⚔️ 流派：<span style="color:${TAG[A.tag]}">${A.ic} ${A.n}</span> <small>${A.d}</small></div>`;
     const ks = Object.keys(s.b); h += `<div class="chips">${ks.length ? ks.map(k => { const B = BY[k]; return B ? `<span class="chip" style="--c:${TAG[B.tag]}" title="${B.d(s.b[k])}">${B.ic} ${B.n} Lv${s.b[k]}</span>` : ''; }).join('') : '<span style="color:#8a7a98;font-size:12px">还没有祝福——每次回洞结算后可以挑一个</span>'}</div>`;
     const sets = Object.keys(TAG).filter(t => (tcn[t] || 0) >= 1).map(t => `${(tcn[t] || 0) >= 3 ? `<b>${t}×${tcn[t]} ✔ ${SETS[t]}</b>` : `${t} ${tcn[t]}/3`}`).join(' · '); if (sets) h += `<div class="sets">套装：${sets}</div>`;
-    if (s.pend > 0) h += `<div class="h" style="margin-top:8px">🎴 祝福抉择 ×${s.pend} <small>（3 选 1；同一个可升到 Lv3，同标签 3 种成套）</small></div><div class="cards">${boonOffer().map(b => `<button class="cd" data-rgb="${b.k}" style="--c:${TAG[b.tag]}"><b>${b.ic} ${b.n}${s.b[b.k] ? ` → Lv${s.b[b.k] + 1}` : ''}</b><i>标签：${b.tag}${(tcn[b.tag] || 0) === 2 && !s.b[b.k] ? ' · 选它成套！' : ''}</i><span>${b.d((s.b[b.k] || 0) + 1)}</span></button>`).join('')}</div>`;
+    if (s.pend > 0 && GU()) h += `<button class="cd" data-rgopen="1" style="--c:#c9a2ff;width:100%;margin-top:8px;padding:12px;font-size:15px"><b>🎴 祝福抉择 ×${s.pend} —— 点击展开</b></button>`;
+    else if (s.pend > 0) h += `<div class="h" style="margin-top:8px">🎴 祝福抉择 ×${s.pend} <small>（3 选 1；同一个可升到 Lv3，同标签 3 种成套）</small></div><div class="cards">${boonOffer().map(b => `<button class="cd" data-rgb="${b.k}" style="--c:${TAG[b.tag]}"><b>${b.ic} ${b.n}${s.b[b.k] ? ` → Lv${s.b[b.k] + 1}` : ''}</b><i>标签：${b.tag}${(tcn[b.tag] || 0) === 2 && !s.b[b.k] ? ' · 选它成套！' : ''}</i><span>${b.d((s.b[b.k] || 0) + 1)}</span></button>`).join('')}</div>`;
     return h;
   }
   function inject() {
     if (!on() || W()) return; const host = document.querySelector('.rq-pick') || document.querySelector('.locs'); if (!host || !host.offsetParent || document.getElementById('rgPanel')) return; css();
     const d = document.createElement('div'); d.id = 'rgPanel'; d.innerHTML = panelHTML(); host.parentNode.insertBefore(d, host);
-    d.addEventListener('click', e => { const a = e.target.closest('[data-rga]'), b = e.target.closest('[data-rgb]'); if (!a && !b) return; e.stopPropagation(); const s = st();
-      if (a && !s.arch) { s.arch = a.dataset.rga; s.archOffer = null; const A = ARCH.find(x => x.k === s.arch); toast(`⚔️ 本局流派：${A.ic} ${A.n}——${A.d}`, TAG[A.tag], 4); }
-      if (b && s.pend > 0) { const k = b.dataset.rgb, B = BY[k]; s.b[k] = Math.min(3, (s.b[k] || 0) + 1); s.pend--; s.offer = null; tc.t = 0; toast(`🎴 ${B.ic} ${B.n} Lv${s.b[k]}：${B.d(s.b[k])}`, TAG[B.tag], 3); if (tagCount()[B.tag] === 3) setTimeout(() => toast(`✨ 套装成型「${B.tag}」：${SETS[B.tag]}`, '#ffe08a', 4), 600); }
-      try { SFX.page && SFX.page(); G().save(); } catch (er) { } d.innerHTML = panelHTML(); });
+    if (GU() && !st().arch) setTimeout(openArch, 250); else if (GU() && st().pend > 0 && !inject.asked) { inject.asked = 1; setTimeout(openBoon, 250); }
+    d.addEventListener('click', e => { if (GU() && e.target.closest('[data-rgopen]')) { e.stopPropagation(); if (!st().arch) openArch(); else openBoon(); return; } const a = e.target.closest('[data-rga]'), b = e.target.closest('[data-rgb]'); if (!a && !b) return; e.stopPropagation(); const s = st();
+      if (a && !s.arch) pickArch(a.dataset.rga);
+      if (b && s.pend > 0) pickBoon(b.dataset.rgb);
+      d.innerHTML = panelHTML(); });
+  }
+  const GU = () => !!(window.GrandUI && GrandUI.on());
+  function refresh() { const d = document.getElementById('rgPanel'); if (d) d.innerHTML = panelHTML(); }
+  function pickArch(k) { const s = st(); if (s.arch) return; s.arch = k; s.archOffer = null; const A = ARCH.find(x => x.k === k); toast(`⚔️ 本局流派：${A.ic} ${A.n}「${LORE[k][0]}」——${A.d}`, TAG[A.tag], 4); try { SFX.page && SFX.page(); G().save(); } catch (e) { } refresh(); }
+  function pickBoon(k) { const s = st(); if (!(s.pend > 0)) return; const B = BY[k]; s.b[k] = Math.min(3, (s.b[k] || 0) + 1); s.pend--; s.offer = null; tc.t = 0; toast(`🎴 ${B.ic} ${B.n} Lv${s.b[k]}：${B.d(s.b[k])}`, TAG[B.tag], 3); if (tagCount()[B.tag] === 3) setTimeout(() => toast(`✨ 套装成型「${B.tag}」：${SETS[B.tag]}`, '#ffe08a', 4), 600); try { G().save(); } catch (e) { } refresh(); }
+  function openArch() {
+    if (!on() || !GU() || st().arch || GrandUI.isOpen()) return;
+    GrandUI.choose({ kicker: '新 的 一 局', title: '选择你的杀法', sub: '这一局你会怎么杀人？三种流派随机摆在面前——选定之后整局不变，之后的祝福会偏向它的标签。',
+      cards: pickArchOffer().map(a => ({ k: a.k, ic: a.ic, col: TAG[a.tag], name: a.n, epi: LORE[a.k][0], rib: a.tag, html: a.d, fl: LORE[a.k][1] })), onPick: pickArch });
+  }
+  function openBoon() {
+    if (!on() || !GU() || !(st().pend > 0) || GrandUI.isOpen()) return; const s = st(), tcn = tagCount();
+    GrandUI.choose({ kicker: `祝 福 抉 择 · 还有 ${s.pend} 次`, title: '月光给你三条路', sub: `三选一。同一个祝福可以升到 Lv3；同一标签凑齐 3 种触发套装。${s.arch ? `你的流派：<b style="color:${TAG[(ARCH.find(a => a.k === s.arch) || {}).tag]}">${(ARCH.find(a => a.k === s.arch) || {}).n}</b>` : ''}`,
+      cards: boonOffer().map(b => ({ k: b.k, ic: b.ic, col: TAG[b.tag], name: b.n, epi: TAGN[b.tag], rib: b.tag, lv: s.b[b.k] ? `Lv${s.b[b.k]} → Lv${s.b[b.k] + 1}` : '新祝福', html: `${b.d((s.b[b.k] || 0) + 1)}${(tcn[b.tag] || 0) === 2 && !s.b[b.k] ? `<br><br><span class="hl">选它就成套：${SETS[b.tag]}</span>` : `<br><br><small>${b.tag} 标签 ${tcn[b.tag] || 0}/3 · 套装：${SETS[b.tag]}</small>`}` })),
+      later: '稍后再选', onPick: k => { pickBoon(k); if (st().pend > 0) setTimeout(openBoon, 350); } });
   }
   setInterval(() => { try { inject(); } catch (e) { } }, 400);
-  return { on, outDmg, event, inDmg, hpK, spdK, dmgK, grant, roundPick, st, ARCH, BOON, SETS, tagCount, lv };
+  return { on, outDmg, event, inDmg, hpK, spdK, dmgK, grant, roundPick, st, ARCH, BOON, SETS, tagCount, lv, openArch, openBoon };
 })();

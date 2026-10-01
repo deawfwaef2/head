@@ -2008,3 +2008,10 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 内脏（心/肠/肝…）本来就有：`organs.js` 的「解剖」尸体。**子宫等生殖/性相关器官不做**（organs.js / props.js 既有内容边界，保持）。
 - sack.js：新增 `Sack.defMul/spdMul/buffList`（防御/疾行/再生/暴伤 BUFF，`worlds.js` 受击与移速处调用），`use()` 支持 `mana` 与 `bf`；配方分组 RGRP 按 `rc.g` 分七组；工坊文字放大提亮（名称 21px、说明 15px、材料 16px）；缺图标/缺物品的配方自动隐藏。itemicons.js：去掉 potion/bigpotion/bandage 的错配 3D 图标（显示成了木棒/勺子），改用 emoji。
 - 肢体 3D 摆件（Props）未做：现有 limb_hand_* 是从角色身体切出的资源，无同类工具；下一步可考虑用 foe.js 的 sever 网格快照生成摆件。
+
+## R54m 大师级UI + 爽感
+- 新 js/grandui.js（MOD grand_ui）：GrandUI.choose 全屏卡牌（1/2/3 键）/ ceremony 结算逐行累加。rogue.js 流派(LORE 称号+典故)/祝福(TAGN)走全屏，出发面板只留按钮；Loop.showSettle 走 ceremony，关闭后若有祝福待选自动弹出。
+- 新 js/momentum.js（MOD momentum）：杀意连斩 5.5s 窗口，档位加伤/移速/省体力，≥3 层回血；中心大字 #mmSlam，右侧 #mmBox。
+- fast_ttk：普通敌人≤4 刀；combat chainK 体力更便宜。
+- corridor 默认关（不走走廊）、nat_gates 默认关（回到铁门），迁移 v21。野兽与敌人并行生成加快换图（实测约 1s）。
+- arrival2 抵达大窗口恢复（等 Saga 电影结束后弹）。

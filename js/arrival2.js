@@ -160,7 +160,7 @@ ${el.length ? `<div>👑 可挑战的精英：${el.map(d => `<b style="color:${d
     const nd = W.graph.nodes[W.cur]; if (nd && !nd.eliteArena && !nd.huntArena) T.deep = Math.max(T.deep, nd.depth || 0);
     if (!T.shown && !W.busy && W.B) {
       T.shown = true;
-      setTimeout(() => { if (window.Saga && Saga.on()) return; /* R49：剧情电影取代到达大窗口 */ if (!T || (window.Elites && Elites.E) || (nd && nd.eliteArena)) return; if (window.Worlds && Worlds._W && Worlds._W.graph.nodes[Worlds._W.cur].eliteArena) return; open(); }, 700);
+      setTimeout(() => { if (!T || (window.Elites && Elites.E) || (nd && nd.eliteArena)) return; const W2 = window.Worlds && Worlds._W; if (!W2 || W2.graph.arena || W2.graph.nodes[W2.cur].eliteArena) return; const go = () => { if (!T) return; if (window.Saga && Saga.cine) { setTimeout(go, 400); return; } open(); }; go(); }, 700); // R54m：用户最喜欢的到达大窗口回来了（剧情电影播完再弹）
     }
     for (const x of T.side) {
       if (x.done) continue; const [a, b] = SQ[x.t].prog(x.q, W);
