@@ -910,7 +910,7 @@ window.Foe = (() => {
     if (fo.rag) { for (const k of Object.keys(fo.rag.idx)) { const b = f.bones[k]; if (b && sub.has(b)) fo.rag.act[k] = false; } }
     const vel = (info.vel || info.dir || new V3()).clone().multiplyScalar(0.25); vel.y += 2;
     PIECES.push({ g: piece, vel, av: new V3((Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9), rad: zone === 'spine' ? 0.18 : 0.06, rest: 0, fo, headPiece: zone === 'spine' && !fo.decap });
-    blood(center, 12, info.vel); sfx().chop && sfx().chop(); sfx().squish && sfx().squish(1); CTX.event && CTX.event(zone === 'spine' ? 'halve' : 'sever', fo);
+    blood(center, 12, info.vel); sfx().chop && sfx().chop(); sfx().squish && sfx().squish(1); fo.lastSev = zone; CTX.event && CTX.event(zone === 'spine' ? 'halve' : 'sever', fo);
   }
   // 头/残肢的简单刚体：重力、落地弹跳、摩擦、滚动
   function bodyPhys(b, dt, rad) {

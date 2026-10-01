@@ -1988,3 +1988,10 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 章节 BOSS：`Loop.CHB` 七位「月之使徒」（独立形象/台词/擂台），`worlds.genArena()` 单地点擂台（`node.chB`/`node.arena`，只有回洞门），`BOf(node)` 统一查 BOSS，`mkBossH` 设 `c.boss='chN'`；击杀不写 `S.bosses`（地区霸主不受影响）；Lv = 5 + 6×(章-1)；赢了 `Saga.giveClue('chapboss')`（saga.js 新导出）+ 1 次祝福抉择。foe.js `bodyFor` 对未知 bossK 按她的身份挑身体。
 - `small_maps` 默认关（迁移 v20）。
 - 顺手修复：worlds.js `foeCtx` 里 `toast`/`shake` 一直被上一句 `//` 注释吞掉 → 非斩首击杀 `die()` 和每次斩首 `decapitate()` 都会抛异常（之后的 decap 事件、布娃娃击飞没执行）。
+## R54 workshop_plus（工坊扩充，MOD 默认开）
+- 用户：合成内容太少、工坊文字有问题；想要更多断肢/器官（肠、胸、心脏、上臂、下臂、大腿、小腿）。
+- **新 js/workshop.js**：配方 12 → 47（药品 / 料理 / 战斗增益 / 护具·饰品 / 材料转化 / 拆解·肢体）；新物品 tonic、salve、soulwine、manadraught(魂能)、bonebroth、jerky、huntstew、ironskin(受伤-25%)、swiftdust(移速+18%)、bloodoil(伤害+40%)、regenbalm(每秒2%) 与肢体材料 ua/la/th/ca/torso。**不做武器配方**（武器只来自搜刮 + 铁匠台强化，用户旧约束）。
+- 砍断 上臂/下臂/大腿/小腿（80%）与腰斩残胸（100%）→ 自动收进麻袋（`foe.js` 设置 `fo.lastSev`，`worlds.js` 事件 → `Workshop.onSever`），在工坊「拆解·肢体」拆成骨/指骨/筋/皮。
+- 内脏（心/肠/肝…）本来就有：`organs.js` 的「解剖」尸体。**子宫等生殖/性相关器官不做**（organs.js / props.js 既有内容边界，保持）。
+- sack.js：新增 `Sack.defMul/spdMul/buffList`（防御/疾行/再生/暴伤 BUFF，`worlds.js` 受击与移速处调用），`use()` 支持 `mana` 与 `bf`；配方分组 RGRP 按 `rc.g` 分七组；工坊文字放大提亮（名称 21px、说明 15px、材料 16px）；缺图标/缺物品的配方自动隐藏。itemicons.js：去掉 potion/bigpotion/bandage 的错配 3D 图标（显示成了木棒/勺子），改用 emoji。
+- 肢体 3D 摆件（Props）未做：现有 limb_hand_* 是从角色身体切出的资源，无同类工具；下一步可考虑用 foe.js 的 sever 网格快照生成摆件。

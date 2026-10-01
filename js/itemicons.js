@@ -3,7 +3,7 @@
 window.ItemIcons = (() => {
   const MAP = { w0: 'WoodenStaff', w1: 'Hammer_Small', w2: 'Sword_2', w3: 'Hammer_Double', w4: 'Axe_Double', w5: 'Scythe', w6: 'Claymore',
     a1: 'Shield_Round', a2: 'Shield_Heater', a3: 'Shield_Heater_2', a4: 'Shield_Celtic_Golden', a5: 'Shield_Round_2',
-    iron: 'Bars', cloth: 'Rollofpaper', herb: 'Potion5', dust: 'Potion2', hide: 'Carpet', bone: 'Bones', wood: 'Barrel', gem: 'Gems#2', potion: 'Potion', bigpotion: 'Potion3', bandage: 'Scroll', note: 'Book', book: 'Book2', tome: 'Book3', whet: 'Rock1',
+    iron: 'Bars', cloth: 'Rollofpaper', herb: 'Potion5', dust: 'Potion2', hide: 'Carpet', bone: 'Bones', wood: 'Barrel', gem: 'Gems#2', note: 'Book', book: 'Book2', tome: 'Book3', whet: 'Rock1',
     pr_bonehand: 'Bones', pr_bonefoot: 'Bones', pr_chime: 'Bones', pr_scroll: 'Scroll', pr_candle: 'Rock1', pr_urn: 'Barrel', pr_thread: 'Rollofpaper', pr_bunting: 'Carpet', pr_garland: 'Gems#2', pr_shield: 'Shield_Celtic_Golden', pr_blade: 'Claymore', pr_cache: 'Chest' };
   const nameOf = (id) => MAP[id] || (/^h\d/.test(id) ? 'KnightHelmet' : /^c\d/.test(id) ? 'Gems#' + [0, 1, 3, 4, 5, 6][(+id.slice(1) - 1) % 6] : /^b\d/.test(id) ? 'Chest' : null);
   const on = () => !(window.Mods && Mods.on('item_3d') === false);

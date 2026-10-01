@@ -199,10 +199,13 @@ window.Sack = (() => {
     const d = IT[id], S = G.S, s = G.st();
     if (d.heal) { S.hp = Math.min(s.maxHp, S.hp + Math.round(s.maxHp * d.heal)); SFX.play && SFX.play('sack', 0.3, 1.5); SFX.soul && SFX.soul(5, 2); G.flash && G.flash('#3aff6a'); toast(`用了${d.n}，生命恢复`, '#6aff8a', 1.5); }
     if (d.buff) { buffT = 120; toast('🪨 刀刃磨得雪亮：120 秒内伤害 +25%', '#ffd27a', 2); }
+    if (d.mana && window.Talents && Talents.addMana) { Talents.addMana(d.mana); SFX.soul && SFX.soul(6, 2); G.flash && G.flash('#5ab8ff'); toast(`用了${d.n}，魂能 +${d.mana}`, '#8fd0ff', 1.6); } /* R54：魂能药 */
+    if (d.bf) { addBuff(d.bf.kind, d.bf.k, d.bf.t); toast(`${d.icon} ${d.bf.msg}`, '#ffd27a', 2.2); } /* R54：新增益（防御/疾行/再生/暴伤） */
     G.save && G.save();
   }
-  let buffT = 0;
-  function dmgMul() { return buffT > 0 ? 1.25 : 1; }
+  let buffT = 0; const BF = {}; const addBuff = (kind, k, t) => { BF[kind] = { k, t, t0: t }; };
+  function dmgMul() { return (buffT > 0 ? 1.25 : 1) * (BF.dmg ? BF.dmg.k : 1); }
+  const defMul = () => BF.def ? BF.def.k : 1, spdMul = () => BF.spd ? BF.spd.k : 1, buffList = () => Object.entries(BF).map(([kind, b]) => ({ kind, k: b.k, t: b.t }));
   function quickUse() { // H：腰带里的药瞬间喝
     const I = inv(), S = G.S, s = G.st(), miss = s.maxHp - S.hp; const pref = miss > s.maxHp * 0.6 ? ['bigpotion', 'potion', 'bandage'] : miss > s.maxHp * 0.3 ? ['potion', 'bandage', 'bigpotion'] : ['bandage', 'potion', 'bigpotion'];
     for (const id of pref) { const i = I.belt.findIndex(q => q && q.id === id); if (i >= 0) { const q = I.belt[i]; if (--q.n <= 0) I.belt[i] = null; use(id); render(); return true; } }
@@ -274,12 +277,12 @@ window.Sack = (() => {
 #skTip{position:fixed;z-index:95;display:none;pointer-events:none;max-width:300px;padding:10px 14px;background:linear-gradient(180deg,rgba(26,18,26,.98),rgba(10,7,12,.98));border:1px solid #b8914a;box-shadow:0 10px 30px rgba(0,0,0,.7);font:14px/1.55 system-ui,"Noto Sans CJK SC",sans-serif;color:#e8dcc8}#skTip .tn{font:800 17px "Noto Serif CJK SC",serif}#skTip .tr{font-size:12px;letter-spacing:.08em;margin-bottom:5px;opacity:.9}#skTip .tb{color:#d8cbb2}
 .wk-sub{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}.sk-host .wk-sub button.sk-btn{font-size:15px !important;padding:8px 18px !important}.sk-host .wk-sub button.on{filter:brightness(1.3)}.wk-only{margin-left:auto;font-size:15px;color:#cfc2a8;cursor:pointer}.wk-only input{width:16px;height:16px;vertical-align:-3px;margin-right:6px}
 .wk-mats{margin:0 0 12px;padding:9px 14px;background:rgba(0,0,0,.3);border:1px solid rgba(231,194,122,.2);font-size:15px;color:#cfc2a8;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center}.wk-mats b{color:#f3d9a0}.wk-mats span b{color:#fff}
-.wk-h{margin:16px 0 8px !important;font:800 18px "Noto Serif CJK SC",serif !important;color:#f3d9a0 !important}.wk-h small{font:13px system-ui;color:#a99d88;margin-left:8px;letter-spacing:0}
-.wk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.wk-h{margin:16px 0 8px !important;font:800 18px "Noto Serif CJK SC",serif !important;color:#f3d9a0 !important}.wk-h small{font:15px system-ui;color:#a99d88;margin-left:8px;letter-spacing:0}
+.wk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
 .wk-card{padding:12px 14px;background:linear-gradient(160deg,color-mix(in srgb,var(--rc) 10%,#1a1219),#100b12);border:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column;gap:8px}.wk-card.can{border-color:color-mix(in srgb,var(--rc) 70%,#fff 0%);box-shadow:inset 0 0 22px color-mix(in srgb,var(--rc) 16%,transparent)}
 .wk-top{display:flex;gap:12px;align-items:center}.wk-ic{flex:0 0 64px;height:64px;display:flex;align-items:center;justify-content:center;border:1px solid var(--rc);background:radial-gradient(circle,color-mix(in srgb,var(--rc) 30%,#2a1e26),#0c080c 75%)}.wk-ic img{width:100%;height:100%;object-fit:contain}.wk-ic i{font-style:normal;font-size:34px}
-.wk-nm{font:800 19px "Noto Serif CJK SC",serif}.wk-ds{font-size:13px;color:#a0957f;line-height:1.45}.wk-note{font-size:14px;color:#cfc2a8}.wk-note b{color:#ffd890}.wk-note .no{color:#ff8f86}
-.wk-need{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:15px}.wk-need .ok{color:#8fe88f}.wk-need .no{color:#ff8f86}
+.wk-nm{font:800 21px "Noto Serif CJK SC",serif;filter:brightness(1.25);text-shadow:0 1px 6px #000a}.wk-ds{font-size:15px;color:#cdbfa6;line-height:1.5}.wk-note{font-size:14px;color:#cfc2a8}.wk-note b{color:#ffd890}.wk-note .no{color:#ff8f86}
+.wk-need{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:16px;font-weight:600}.wk-need .ok{color:#8fe88f}.wk-need .no{color:#ff8f86}
 .sk-host button.wk-go{font-size:16px !important;padding:9px 16px !important;margin-top:auto}
 #skUI{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:70;background:linear-gradient(180deg,rgba(18,14,20,.96),rgba(8,6,10,.97));border:1px solid var(--u-gold,#b8914a);box-shadow:0 20px 60px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,220,150,.15);padding:14px 16px 10px;color:#e8dcc8;font:13px/1.4 system-ui,"Noto Sans CJK SC",sans-serif;user-select:none;max-width:96vw;max-height:94vh;overflow:auto}
 .sk-host{color:#e8dcc8;user-select:none}
@@ -338,7 +341,7 @@ window.Sack = (() => {
   let itemFilter = 'all', craftOnly = false;
   const FILT = [['all', '全部'], ['equip', '⚔️ 装备'], ['mat', '🪨 材料'], ['use', '🧪 药品'], ['body', '💀 首级·器官'], ['book', '📖 典籍'], ['prop', '🧷 摆件']];
   const catOf = (o) => { const k = (IT[o.id] || {}).kind; return k === 'equip' ? 'equip' : k === 'use' ? 'use' : (k === 'head' || k === 'organ') ? 'body' : k === 'book' ? 'book' : k === 'prop' ? 'prop' : 'mat'; };
-  const RGRP = [['🧪 药品 · 消耗', r => ['potion', 'bandage', 'stew', 'bigpotion'].includes(r.out), '出猎前带上，腰带按 H 瞬间喝'], ['🗡️ 战斗增益', r => r.out === 'whet', '出猎后 120 秒内伤害 +25%'], ['🎒 背篓 · 扩容', r => /^b\d/.test(r.out), '合成后自动换上，麻袋格子变大、能多装东西']];
+  const RGRP = [['🧪 药品 · 消耗', r => r.g === 'med' || ['potion', 'bandage', 'stew', 'bigpotion'].includes(r.out), '出猎前带上，腰带按 H 瞬间喝'], ['🍲 料理 · 汤食', r => r.g === 'food', '便宜顶饱，出猎前多备几份'], ['🗡️ 战斗增益', r => r.g === 'buff' || r.out === 'whet', '喝下 / 使用后限时生效：伤害、防御、疾行、再生'], ['🛡️ 护具 · 饰品', r => r.g === 'gear', '用野外材料直接打造；做好后在「装备」页穿上'], ['♻️ 材料转化', r => r.g === 'conv', '把多余的材料换成缺的那一种'], ['🩸 拆解 · 肢体', r => r.g === 'body', '砍断的肢体会收进麻袋；在这里拆成骨、筋、皮'], ['🎒 背篓 · 扩容', r => /^b\d/.test(r.out), '合成后自动换上，麻袋格子变大、能多装东西']];
   function recipeCard(rc, i) {
     const S = G.S, d = IT[rc.out], okN = Object.entries(rc.need).every(([k, n]) => have(k) >= n), ok = okN && S.coins >= rc.coin, u = window.ItemIcons && ItemIcons.url && ItemIcons.url(rc.out);
     const bag = d.slot === 'bag' ? `<div class="wk-note">麻袋 ${inv().sack.w}×${inv().sack.h} → <b>${BAGSZ[d.tier][0]}×${BAGSZ[d.tier][1]}</b>${d.tier <= (S.eq.bag || 0) ? ' <span class="no">（你已有同级或更高）</span>' : ''}</div>` : '';
@@ -364,11 +367,11 @@ window.Sack = (() => {
         <div class="sk-foot">装备与首级来自野外（容器、武器架、尸体、霸主）。回洞倒袋时，麻袋里的东西全部倒出：首级进洞，其余进储物箱。想升级装备 → 去「⚔️ 装备」页。</div>`;
     } else if (caveTab === 'craft' || caveTab === 'props') {
       const sub = caveTab === 'props' && window.Props ? 'props' : 'rc';
-      const mats = Object.values(IT).filter(d => d.kind === 'mat' && have(d.id) > 0).slice(0, 14).map(d => `<span>${d.icon}${d.n} <b>${have(d.id)}</b></span>`).join('');
+      const mats = Object.values(IT).filter(d => d.kind === 'mat' && have(d.id) > 0).slice(0, 26).map(d => `<span>${d.icon}${d.n} <b>${have(d.id)}</b></span>`).join('');
       const head = `<div class="wk-sub"><button class="sk-btn ${sub === 'rc' ? 'on' : ''}" data-wsub="craft">🔨 配方（药品·增益·背篓）</button>${window.Props && Props.on() ? `<button class="sk-btn ${sub === 'props' ? 'on' : ''}" data-wsub="props">🧷 摆件（洞里的 BUFF 道具）</button>` : ''}${sub === 'rc' ? `<label class="wk-only"><input type="checkbox" data-wonly ${craftOnly ? 'checked' : ''}> 只看现在能合成的</label>` : ''}</div>`;
       if (sub === 'props') body = head + Props.tabHtml();
       else {
-        const grp = RGRP.map(([nm, f, hint]) => { const rs = RECIPES.map((rc, i) => [rc, i]).filter(([rc]) => f(rc)).filter(([rc]) => !craftOnly || (Object.entries(rc.need).every(([k, n]) => have(k) >= n) && S.coins >= rc.coin)); return rs.length ? `<h4 class="wk-h">${nm} <small>${hint}</small></h4><div class="wk-grid">${rs.map(([rc, i]) => recipeCard(rc, i)).join('')}</div>` : ''; }).join('');
+        const grp = RGRP.map(([nm, f, hint]) => { const rs = RECIPES.map((rc, i) => [rc, i]).filter(([rc]) => IT[rc.out] && Object.keys(rc.need).every(k => IT[k])).filter(([rc]) => f(rc)).filter(([rc]) => !craftOnly || (Object.entries(rc.need).every(([k, n]) => have(k) >= n) && S.coins >= rc.coin)); return rs.length ? `<h4 class="wk-h">${nm} <small>${hint}</small></h4><div class="wk-grid">${rs.map(([rc, i]) => recipeCard(rc, i)).join('')}</div>` : ''; }).join('');
         body = head + `<div class="wk-mats"><b>库存材料</b> ${mats || '<span style="opacity:.6">还没有材料——去野外容器、尸体、野兽身上翻</span>'}</div>` + (grp || '<p style="color:#a99;font-size:15px">现在没有能合成的配方。取消“只看能合成”看看缺什么。</p>');
       }
     } else if (caveTab === 'books' && window.Books) {
@@ -495,6 +498,6 @@ window.Sack = (() => {
     if (e.code === 'Tab' || e.code === 'KeyB' || e.code === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); closePanel(true); return; }
     if (e.code === 'KeyH') { e.preventDefault(); e.stopImmediatePropagation(); quickUse(); return; }
   }, true);
-  function frame(dt) { if (buffT > 0) buffT -= dt; tick(dt); }
-  return { equip, enchant, enchCost, salvage, resizeSack, nameOf, RARC, on, IT, def, mk, stashAdd, have, take, RECIPES, inv, lvOf, genLoot, placeLoot, corpse, carcass, openWild, toggleWild, closePanel, mountCave, mountWild, unmount, frame, interrupt, queueHead, capture, heads, tripEnd, onDeath, pourPending, homeArrive, quickUse, dmgMul, usage, itemsOf, roll, addTo, canAdd, get panelOpen() { return mode === 'wild' && !!panel; }, get queue() { return Q; } };
+  function frame(dt) { if (buffT > 0) buffT -= dt; for (const k in BF) { BF[k].t -= dt; if (BF[k].t <= 0) delete BF[k]; } if (BF.regen && W_() && G.S.hp > 0) { const mx = G.st().maxHp; G.S.hp = Math.min(mx, G.S.hp + mx * BF.regen.k * dt); } tick(dt); }
+  return { equip, enchant, enchCost, salvage, resizeSack, nameOf, RARC, on, IT, def, mk, stashAdd, have, take, RECIPES, defMul, spdMul, buffList, inv, lvOf, genLoot, placeLoot, corpse, carcass, openWild, toggleWild, closePanel, mountCave, mountWild, unmount, frame, interrupt, queueHead, capture, heads, tripEnd, onDeath, pourPending, homeArrive, quickUse, dmgMul, usage, itemsOf, roll, addTo, canAdd, get panelOpen() { return mode === 'wild' && !!panel; }, get queue() { return Q; } };
 })();
