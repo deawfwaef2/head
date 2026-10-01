@@ -70,7 +70,7 @@ void RE_Direct_Fol( const in IncidentLight directLight, const in GeometricContex
             float cy = cos(uSkyYaw), sy = sin(uSkyYaw); vec3 d = vec3(cy * rW.x - sy * rW.z, rW.y, sy * rW.x + cy * rW.z);
             vec3 sk = texture2D(uSkyMap, vec2(atan(d.z, d.x) * 0.1591549 + 0.5, asin(clamp(d.y, -1.0, 1.0)) * 0.3183099 + 0.5)).rgb * uSkyK * uSkyT;
             float fr = 0.02 + 0.98 * pow(1.0 - saturate(dot(nW, -vW)), 5.0);
-            outgoingLight = mix(outgoingLight, sk * 0.85, fr * 0.8); diffuseColor.a = mix(diffuseColor.a, 1.0, fr * 0.7); }
+            outgoingLight = mix(outgoingLight, sk * 0.6, fr * 0.55); diffuseColor.a = mix(diffuseColor.a, 1.0, fr * 0.6); }
           #include <output_fragment>`); };
       const k = m.customProgramCacheKey; m.customProgramCacheKey = () => (k ? k.call(m) : '') + 'w52'; m.needsUpdate = true; });
   }

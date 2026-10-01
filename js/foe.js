@@ -54,6 +54,10 @@ window.Foe = (() => {
         const r = cv[k] / 255, g = cv[k + 1] / 255, b = cv[k + 2] / 255; if (cv[k + 3] < 128) continue;
         if (r > 0.45 && r >= g && g >= b * 0.85 && r - b < 0.45) px.push([r, g, b]); }
     });
+    if (px.length < 6) { // R54 skin_match：脖子一圈取不到时，改取整张皮肤材质上的肤色
+      root.traverse(o => { if (!o.isMesh || o.userData.cut) return; const m = Array.isArray(o.material) ? o.material[0] : o.material; if (!m || !m.userData || !m.userData.skin) return; const img = m.map && m.map.image, uv = o.geometry.attributes.uv; if (!img || !uv) return; const cv = cvs.get(img); if (!cv) return;
+        const st = Math.max(1, Math.floor(uv.count / 400)); for (let i = 0; i < uv.count; i += st) { const X = Math.min(511, Math.max(0, Math.floor(uv.getX(i) * 512))), Y = Math.min(511, Math.max(0, Math.floor(uv.getY(i) * 512))), k = (Y * 512 + X) * 4; const r = cv[k] / 255, g = cv[k + 1] / 255, b = cv[k + 2] / 255; if (cv[k + 3] >= 128 && r > 0.45 && r >= g && g >= b * 0.85 && r - b < 0.45) px.push([r, g, b]); } });
+    }
     if (px.length < 6) return;
     px.sort((a, b) => (b[0] + b[1] + b[2]) - (a[0] + a[1] + a[2])); const top = px.slice(0, Math.max(4, Math.floor(px.length * 0.5))); // 取亮的一半：避开贴图里画好的下巴阴影
     const avg = [0, 1, 2].map(j => top.reduce((s, p) => s + p[j], 0) / top.length);
@@ -88,11 +92,16 @@ window.Foe = (() => {
     // 身体皮肤跟头的肤色一致
     const alive = opts.alive !== false;
     if (T.skin && !TINT[bodyName]) { look.skinHex = '#' + T.skin; look.sk = look.sk || '象牙'; } // 身体不能染色：头随身体
+    let tintBody = !!TINT[bodyName];
+    if (tintBody && T.skin && look.skinHex && (!window.Mods || Mods.on('skin_match') !== false)) { // R54 skin_match：肤色接近时头直接用身体贴图的肤色（染身体受贴图阴影/上限 1.6 限制，常常对不齐）；只有深浅差很大的身份才染身体
+      const lu = c => c.r * 0.3 + c.g * 0.59 + c.b * 0.11, hc0 = new THREE.Color(look.skinHex), bc0 = new THREE.Color('#' + T.skin);
+      if (Math.abs(lu(hc0) - lu(bc0)) < 0.24) { look.skinHex = '#' + T.skin; tintBody = false; }
+    }
     { const f = SKIN_FIX[bodyName] || [1, 1, 1], L = f[0] * 0.3 + f[1] * 0.59 + f[2] * 0.11, n = L < 1 ? L : 1; look.skinMul = f.map(x => +((L + (x - L) * 0.25) / n * LIFT).toFixed(3)); } // 第十八轮：头只随身体变亮、不再被压暗 // 主要校亮度，色相只跟 25%（避免脸发绿/发黄） // 渲染标定（_tools/calib.py）：脸颊与脖子渲染出来同色
     const hb = ModelHeads.create(alive ? Object.assign({}, look, { ex: {}, pale: 0, blood: 0, spat: 0 }) : look, { alive });
     hb.group.traverse(o => { if (o.isMesh && o.userData.kind === 'cut') o.visible = false; }); // 活人：头自己的断口盖藏起来
     const sk = hb.U && hb.U.skin && hb.U.skin.value;
-    if (TINT[bodyName]) { // 可染色身体：身体皮肤 × (头肤色 / 身体贴图肤色)，两边精确一致
+    if (tintBody) { // 可染色身体：身体皮肤 × (头肤色 / 身体贴图肤色)，两边精确一致
       const hc = new THREE.Color(look.skinHex).convertSRGBToLinear(), bc = T.skin ? new THREE.Color('#' + T.skin).convertSRGBToLinear() : null;
       const k = bc ? [hc.r / bc.r, hc.g / bc.g, hc.b / bc.b] : (sk ? [sk.x, sk.y, sk.z] : [1, 1, 1]);
       root.traverse(o => { if (o.isMesh && o.material && o.material.userData && o.material.userData.skin) o.material.color.setRGB(Math.min(1.6, k[0]) * (T.gain || 1), Math.min(1.6, k[1]) * (T.gain || 1), Math.min(1.6, k[2]) * (T.gain || 1)); });

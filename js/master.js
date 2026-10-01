@@ -16,8 +16,8 @@ window.Master = (() => {
     rayStr: 0.55, rayDecay: 0.965, rayDensity: 0.9,
     sat: 1.08, contrast: 1.07, shadowTint: [0.93, 0.98, 1.08], highTint: [1.06, 1.0, 0.9], vig: 0.42, grain: 0.028, ca: 0.0007,
     // R52 world_atmos：空气透视（朝太阳的 Mie 散射）/ 低地薄雾 / 太阳光束
-    mie: 0.4, mieG: 0.78, mieDist: 0.007, mist: 0.15, mistH: 1.8, mistDist: 0.03, sunRay: 0.85, sunRayDecay: 0.972, black: 0.022,
-    cloud: 0.3, cas: 0.55, agxExp: 1.5, agxSat: 1.24, flare: 0.05
+    mie: 0.22, mieG: 0.78, mieDist: 0.005, mist: 0.1, mistH: 1.8, mistDist: 0.03, sunRay: 0.55, sunRayDecay: 0.972, black: 0.03,
+    cloud: 0.3, cas: 0.55, agxExp: 1.5, agxSat: 1.24, flare: 0.025
   };
   const MOD = (id) => !(window.Mods && Mods.on && Mods.on(id) === false);
   const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
