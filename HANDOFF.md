@@ -1937,3 +1937,21 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 ## R49h-2 (decap_cam: much slower + witness reactions)
 - User: wants the slow-mo to be *very* slow so the head's whole flight is watchable, and nearby characters to talk. js/decapcam.js: timeline now 5.8s real (k≈0.075→0.115 hold 4.6s, ease out to 1), ~13x slow; expression keyframes, heartbeat, spray pulses (0.16 game-s) and head blood trail retimed for slow-mo; camera push eases over 1.3s.
 - Witnesses: up to 3 nearest live foes within 24m say a line at t=0.8/2.1/3.4s via `Foe.say` (bubble) + large subtitle `.sub` (name + 「line」); first speaker uses shock lines containing the victim's name, brave foes taunt, others panic, bosses menace. Files: js/decapcam.js, js/mods.js, js/mods_i18n.js, tools/test/decapcam.html.
+
+## R54（画质/性能 Agent · 2026-10-01）— 性能 / 秒加载 / BUG / 战斗 / 新敌人 / 山口 / UI 精修（全部 MOD，默认开）
+用户原话要点（长期有效）：“显卡跑得很大声 → 性能消耗更少”“场景读取更快、能秒读取”“初始技能点为 0”“铁门太突兀”“战斗要大师级：反馈、敌人更聪明、动作更好”“UI 到 3A 标准”“性能/快速加载/BUG 修复优先”“改了就以 MOD 提交 GitHub”“有时进图所有角色都不动”“敌人头和身体肤色常不一致”“按住左键进入攻击模式（变慢）→ 轻移鼠标定角度 → 松开才攻击；有后摇；低级武器前摇长”“新敌人近战不要播动画，而是显示她准备攻击的角度”。
+| MOD | 文件 | 要点 |
+|---|---|---|
+| `eco_gpu` | `js/eco.js`（mods.js 之后加载）| 全局 rAF 包装：按刷新率整数分频到 ~60fps；菜单/暂停 30、失焦 15、2 分钟无输入 30；分辨率上限 1.0 且只由 GPU 计时（EXT_disjoint_timer_query_webgl2）管理（旧的 FPS 调档会被加载卡顿误导停在 0.7）；野外阴影 2048。`?fps=0` 不限帧。`Eco.stats()`。 |
+| `instant_load` | `js/worlds.js` + `js/eco.js` | 进场后空闲预取相邻地点（资产 + `kickAhead` 敌人身体/动画/野兽），走近门 12m 立即预取；图片 `decode()` 异步解码 + 空闲 `initTexture`；`renderer.debug.checkShaderErrors=false`（实测切图 7.6s 卡在 getProgramInfoLog；`?shadercheck` 恢复）；着色器程序常驻（`usedTimes++`，切图不再删了重编）。`need()` 30s 超时不再永远卡加载框。PROF 新增 `foes`/`beasts`。 |
+| `stuck_guard` | `js/guard54.js` | uiOpen 卡住且屏幕无面板 3s → `G.unstick`；W.busy 卡住 6s → 解除。另：`Foe.update` 每个敌人 try/catch、`Worlds.frame` 子系统 try/catch、game.js 出错仍出画面（“全场定格”根因防护）。 |
+| `sp_zero` | `js/talents.js pts()` | 开局 0 技能点（旧档已花掉的旧开局点保留，不出负数）。 |
+| `skin_match` | `js/foe.js build()/sampleSkin()` | 头身肤色接近时头直接用身体贴图取样肤色（以前染身体受 1.6 上限/贴图阴影限制 → 脸白身橙）；脖子圈取不到时取整张皮肤贴图。 |
+| `hold_strike`（需 combat_master）| `js/combat.js`（HS/hsStart/hsTick/hsFire/hsUi）| 按住左键 = 姿态（移动 ×0.55、镜头 ×0.3），轻移鼠标 = 斩击角度（准星箭头 + 前摇环），松开出刀；前摇 0.18–0.65s、后摇（攻击 CD）按武器档次 `TIERK`；蓄满后再 0.55s = 重斩；右键取消（佯攻）。敌人 `handAng` 读蓄势方向。`Combat.aimMove()` 乘到 worlds 移速。 |
+| `foe_duel` | `js/duel.js`（`window.FoeDuel`）| ~42% 普通敌人变成 剑斗士/重剑卫/疾刃手（没武器的会配刀，`Foe.attachWeapon` 已导出）：攻击不播动画，假 action（`act.time` 由 post 推进）喂给原 atkStep；右臂两节 IK + 刀身朝向把刀举到来刀一侧，身前丝带弧显示刀路，佯攻会在最后一刻变向。`foe_roles.assign` 对 `fo.duel` 跳过。 |
+| `hit_react` / `foe_read` | `js/feel54.js` | 受击按刀向程序化后仰/侧倾/扭转（弹簧，带 mixer 不写骨头的还原）；空挥被抢攻、蓄重斩被侧闪（`fo.rv`）。 |
+| `nat_gates` | `js/worlds.js`（natOk / veil）| 铁门 → 两块巨石（废墟/要塞/王城 = 两尊石像）夹出的山口 + 流动雾幕 + 地面微光；穿门淡入白雾（死亡仍黑屏）。必须在“实例化”之前 put。 |
+| `ui_refine` | `js/ui54.js` | 纯 CSS 层（body.u54）：细血条/魂能条、细金边技能格、命中数字、敌人细血条、极简准星、横幅提示、毛玻璃面板、衬线标题。 |
+- 其他：画面去灰（水面天空反射、Mie、薄雾、光束、镜头光晕都调弱）。
+- 测试（本机）：真实游戏 `index.html` + Playwright：`UI._startTrip('village')`、`Worlds._debug.goto(i)`、`Foe.attack(fo,d)`、`Feel54.impulse(fo,{charged:true})`、`Combat.onDown(0)/onMove/onUp(0)`（先 `G.setUIOpen(false)`）。本机素材经代理拉取，加载时间偏长，不代表用户本地。
+- 待做：地形系统进一步强化；更多敌人 AI（包围/轮换）；HUD 实机目检（本轮截图预算用完，UI 只做了数值校验）。
