@@ -1825,12 +1825,6 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 - **`shell_grass`（新文件 js/wgrass.js，index.html 与 world.html 已加 script）**：壳层草（shell texturing）：同一地形网格沿法线外推 12 层（只覆盖玩家可达区域、≤27m），片元着色器按哈希格子丢弃像素 → 一根根变细的草，顶端随风摆，`MeshLambert` 所以太阳/阴影/雾都正常；路、水边、陡坡自动不长；干旱地区稀疏偏枯黄；颜色 = 基色 × `g.grassMul`（季节）。无草模型、无贴图。新增 1 个着色器程序。**没有真机帧率数据**（沙箱软件渲染）；如太卡：减 `N`（wgrass.js）或在 MOD 里关 shell_grass。
 - master.js 色差 `ca` 0.0016→0.0007（细铁栏杆在屏幕边缘出现洋红/绿色条纹）。
 - 未做：① 用户说"违和的音效人物语音/人物模型"——太笼统，已向用户追问具体哪里违和；② 丘陵仍是 1.1m 网格 + 固定对角线三角化；③ 大块岩石（rock_face）上的黑斑是阴影/法线问题，未查。
-## R41（主管）i — R51 用户：“头身比不对、把男性身体也加进来了快删除，只要 VRoid 女性身体；全网找，非 CC0 也行”
-- **删除** `big/body/Q_*.js` 全部 7 个（用户明确下令删除；这是对“永不删身体”规则的用户本人覆盖）。给合作者：请不要再加非 VRoid 身体。`js/foe.js` OUTFIT 里的 Q_ 条目删掉、OUTFIT_BOSS 改回 VRoid；`js/cc0mode.js` QB=[]，QBAD 映射保留（旧存档/旧引用一律换走）。R50 的 MOD body_qc50 已并入并移除。
-- **MOD `vroid_only`**（默认开，`js/cc0mode.js` VRF/vroidOnly，`CC0.body()` 第一行；`js/foe.js` `bodyFor()` 开头 VR_ID/VR_BOSS）：所有身体只从 8 具 VRoid 女性身体里按身份挑：Vita、Victoria_Rubin、Darkness_Shibu、HairSample_Female、AvatarSample_A、AvatarSample_B、Osage、**V_KF（新增）**。不管 cc0_only。`Foe.build` 入口也经 CC0.body，所以猎手/剧情等写死的原神身体名同样被换走。300 次抽样只出这 8 具。
-- 排除：HikariCape/HikariScholar（到头骨只有 1.13m，幼态比例，手臂 V 形姿势坏）、原神 MMD 身体（不是 VRoid）。文件留着，只是 vroid_only 下不出现。
-- **全网搜 VRoid 女性身体的结果**（逐个读 VRM 内嵌授权；标准：允许暴力 + 允许改造 + 允许再分发，因为游戏要斩首=改造，推到 GitHub=再分发）：
-  - 收：AvatarSample_K_F（pixiv，VRM PL，全允许）。
-  - 转了但外观否决：AvatarSample_L（1.9m 黑色战术服，显男性化）、VRM1_Constraint_Twist_Sample（白色方块大 T 恤）。
-  - 授权不合格：AvatarSample_F / M（禁止暴力/改造/再分发）、nikechan v1/v2（OnlyAuthor、禁暴力）、杉山巨樹 2 个（禁暴力/再分发）、スタンダードピンク（禁改造/再分发）、モブ子E（校服+禁再分发）、Whingles（禁改造）、fem_vroid（无衣服素体）、Seed-san（非 VRoid，机器人手臂）、vroid-sample-d = 千驮谷涩（校服）。
-  - 仍待：VRoid Hub 上作者允许暴力+改造+再分发的模型需要 pixiv 登录下载（tools/r40_vroidhub_cc0.md）。
+
+### R50-gfx (b) shell grass variety
+`js/wgrass.js`: each node seeds its own look (mulberry of g.seed): palette pair from per-biome pools (fresh/yg/lime/bg/olive/straw/moss/rust), density 11–23, height, blade width, colour-patch + height-patch noise, per-blade brightness jitter, optional flower tips. Same MOD `shell_grass`; still shader-only (no models/textures). Tip colours of straw/yg/rust were darkened to avoid washed-out fields. Not verified on real GPU.
