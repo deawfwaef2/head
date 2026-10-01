@@ -377,12 +377,13 @@ window.Worlds = (() => {
     let home = 0; P.forEach((p, i) => { if (p.x < P[home].x) home = i; });
     const depth = new Array(n).fill(-1); depth[home] = 0; const qu = [home]; while (qu.length) { const a = qu.shift(); for (const b of adj[a]) if (depth[b] < 0) { depth[b] = depth[a] + 1; qu.push(b); } }
     let far = home; depth.forEach((d, i) => { if (d > depth[far] || (d === depth[far] && P[i].x > P[far].x)) far = i; });
-    const pool = REGION[loc.k] || ['meadow'], usedN = new Set(), hasBoss = !!(window.Explore && Explore.BOSSES[loc.k]) && !(((G || window.__game).S.bosses) || {})[loc.k];
+    const pool = REGION[loc.k] || ['meadow'], usedN = new Set(), hasBoss = !!(window.Explore && Explore.BOSSES[loc.k]) && (!(((G || window.__game).S.bosses) || {})[loc.k] || BT());
+    const SMALL = !BIG && !(window.Mods && Mods.on && Mods.on('small_maps') === false); // R54i small_maps：换回每趟随机生成后，地点小一点
     const nodes = P.map((p, i) => {
       const style = Worlds._forceStyle || (i === far ? pool[0] : pick(r, pool));
       const sz = i === home ? 's' : i === far ? 'l' : (() => { const x = r(); return x < 0.55 ? 's' : x < 0.88 ? 'm' : 'l'; })();
       let nm; for (let t = 0; t < 30; t++) { const NM = NAMES[style]; nm = (t > 8 || r() < 0.15 ? pick(r, ['北', '南', '东', '西', '上', '下', '旧', '深', '远']) : '') + pick(r, NM[0]) + pick(r, NM[1]); if (!usedN.has(nm)) break; } usedN.add(nm);
-      const Rr = (SIZES[sz].R[0] + r() * (SIZES[sz].R[1] - SIZES[sz].R[0])) * (BIG && sz !== 's' ? 1.25 : 1);
+      const Rr = (SIZES[sz].R[0] + r() * (SIZES[sz].R[1] - SIZES[sz].R[0])) * (BIG && sz !== 's' ? 1.25 : SMALL && sz !== 's' ? 0.85 : 1);
       return { i, x: p.x, y: p.y, region: loc.k, loc, style, size: sz, R: Rr, name: nm, seed: (seed ^ Math.imul(i + 1, 2654435761)) >>> 0, adj: adj[i], depth: depth[i],
         visited: false, known: false, home: i === home, stone: false, boss: i === far && hasBoss, prey: null, chests: null };
     });
@@ -602,7 +603,8 @@ window.Worlds = (() => {
       const gate = !nat && window.Assets && Assets.fit(home ? 'large_castle_door' : 'large_iron_gate', { h: home ? 3.4 : 3.2 }); if (gate) { g.add(gate); }
       // 门两侧灯笼 + 火光
       if (!nat) for (const sx of [-1, 1]) { const ln = window.Assets && Assets.fit('Lantern_01', { h: 0.45, x: sx * 1.7, y: 2.2, z: 0.2 }); if (ln) g.add(ln); }
-      if (!nat) { const pl = new THREE.PointLight(home ? '#ffb070' : '#9ab8ff', 1.4, 7, 2); pl.position.set(0, 2.4, 1.0); g.add(pl); } // R54e：山口不要传送门感（无雾幕、无光晕）
+      if (!nat) { const pl = new THREE.PointLight(home ? '#ffb070' : '#9ab8ff', 1.4, 7, 2); pl.position.set(0, 2.4, 1.0); g.add(pl); }
+      else if (!(window.Mods && Mods.on && Mods.on('gate_portal') === false)) { veil(g, home); const pl = new THREE.PointLight(home ? '#ffb070' : '#9ab8ff', 1.0, 7, 2); pl.position.set(0, 1.6, 1.0); g.add(pl); } // R54j：用户还是要传送门（山口里的流动雾幕）
       const label = makeLabel('', home ? '#ffd9a0' : '#cfe0ff'); label.position.set(0, nat ? 3.9 : 4.4, 0); g.add(label);
       if (!nat) cols.push({ x: d.x + Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z + Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 }, { x: d.x - Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z - Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 });
       return Object.assign(d, { g, label, home, nat });
@@ -721,7 +723,7 @@ window.Worlds = (() => {
   //   现在：声明单独成行；整个事件处理包 try/catch——音效/日志/成就里的任何 bug 都不能再打断伤害结算。
   function foeEvent(t, fo, d) { try { foeEvent0(t, fo, d); } catch (e) { console.warn('foeEvent', t, e); } }
   function foeEvent0(t, fo, d) {
-    if (!W) return; if (t === 'decap' && window.DecapCam) { try { DecapCam.onEvent(t, fo, d); } catch (e) { } } /* R49h */ if (window.WpnX) { try { WpnX.onEvent(t, fo, d); } catch (e) { } } /* R41主管：单武器熟练度经验 */ if (window.Talents) { try { Talents.onEvent(t, fo, d); } catch (e) { console.warn('Talents', e); } } /* R36 天赋事件（吸血/魂能/暴击联动） */ if (window.Recall) { try { Recall.log(fo, t, d); } catch (e) { console.warn(e); } } if (window.CombatFX) { try { CombatFX.event(t, fo, d); } catch (e) { console.warn(e); } } if (window.Feel54) { try { Feel54.event(t, fo, d); } catch (e) { } } if (window.Living) { try { Living.event(t, fo, d); } catch (e) { } } // 第二十二轮（续 9）：命中/击杀/格挡音效 + 命中准星；R54 受击反应
+    if (!W) return; if (t === 'decap' && window.DecapCam) { try { DecapCam.onEvent(t, fo, d); } catch (e) { } } /* R49h */ if (window.WpnX) { try { WpnX.onEvent(t, fo, d); } catch (e) { } } /* R41主管：单武器熟练度经验 */ if (window.Talents) { try { Talents.onEvent(t, fo, d); } catch (e) { console.warn('Talents', e); } } /* R36 天赋事件（吸血/魂能/暴击联动） */ if (window.Recall) { try { Recall.log(fo, t, d); } catch (e) { console.warn(e); } } if (window.CombatFX) { try { CombatFX.event(t, fo, d); } catch (e) { console.warn(e); } } if (window.Feel54) { try { Feel54.event(t, fo, d); } catch (e) { } } if (window.Living) { try { Living.event(t, fo, d); } catch (e) { } } if (window.Loop && t === 'kill') { try { Loop.onKill(fo); } catch (e) { } } // 第二十二轮（续 9）：命中/击杀/格挡音效 + 命中准星；R54 受击反应
     const now = performance.now() / 1000, st = W.stats = W.stats || { kill: 0, decap: 0, execute: 0, onecut: 0, sever: 0, halve: 0, parry: 0, combo: 0, maxCombo: 0, lastHit: 0, kills: [] };
     if (t === 'hit') { st.combo = now - st.lastHit < 2.5 ? st.combo + 1 : 1; st.lastHit = now; st.maxCombo = Math.max(st.maxCombo, st.combo); showCombo(st.combo, d && d.brk); if (st.combo >= 10) achAdd('combo', st.combo, true); return; }
     const rw = REW[t]; if (rw) { const tm = window.Talents ? Talents.rewardMul(fo) : { c: 1, x: 1 }, mul = 1 + (fo.rar || 0) * 0.5 + (fo.boss ? 3 : 0), c = Math.round(rw[0] * mul * (1 + Math.min(1, st.combo / 20)) * tm.c); G.addCoins(c); W.trip.coins += c; gainXp(Math.max(1, Math.round(rw[0] * mul * 0.8 * tm.x)));
@@ -818,7 +820,8 @@ window.Worlds = (() => {
     if (!provReg && window.Combat) { Combat.addProvider(targets); provReg = true; }
     if (window.Combat && Combat.setThreats) Combat.setThreats(() => (W && W.foes && window.Foe) ? Foe.threats() : []);
     SFX.music && SFX.music('expedition'); SFX.roar && SFX.roar(0.6);
-    const st0 = !graph.trip && graph.nodes[S.world.stone] && graph.nodes[S.world.stone].stone ? S.world.stone : graph.home;
+    if (graph.trip && BT()) { const f = graph.nodes[graph.far]; f.boss = true; f.stone = true; f.known = true; } // R54i run_loop：章节 BOSS 回合直接从最深处开始（有魂门可回洞）
+    const st0 = graph.trip && BT() ? graph.far : !graph.trip && graph.nodes[S.world.stone] && graph.nodes[S.world.stone].stone ? S.world.stone : graph.home;
     goto(st0, -1).catch(e => { console.warn('Worlds', e); stop(); api.fallback && api.fallback(); });
   }
   function doorName(node, d) {
@@ -857,7 +860,7 @@ window.Worlds = (() => {
     if (!node.prey) populate(node);
     if (node.home) return;
     if (window.Foe && Foe.preload && !/[?&]nofoe=1/.test(location.search) && !(window.Mods && !Mods.on('foe_bodies'))) {
-      const list = node.prey.map(h => ({ h })), Bo = node.boss && !(G.S.bosses || {})[node.region] && window.Explore && Explore.BOSSES[node.region];
+      const list = node.prey.map(h => ({ h })), Bo = node.boss && (!(G.S.bosses || {})[node.region] || BT()) && window.Explore && Explore.BOSSES[node.region];
       if (Bo) list.push({ h: node.bossH || null, boss: Bo, bossK: node.region });
       Foe.preload(list).then(a => { if (a) a.forEach(T => T && T.root && upload(T.root)); }).catch(() => { });
     }
@@ -883,7 +886,7 @@ window.Worlds = (() => {
     if (!node.prey) populate(node);
     const tb0 = performance.now(); const B = W.B = buildNode(node); tp('build', tb0);
     W.foes = null; W.prey = []; W.boss = null;
-    const wantBoss = node.boss && !(G.S.bosses || {})[node.region] && window.Explore && Explore.BOSSES[node.region];
+    const wantBoss = node.boss && (!(G.S.bosses || {})[node.region] || BT()) && window.Explore && Explore.BOSSES[node.region];
     if (window.Foe && !/[?&]nofoe=1/.test(location.search) && !(window.Mods && !Mods.on('foe_bodies'))) {
       try {
         const r = mulberry(node.seed ^ 0x5bd1e995), list = [];
@@ -917,7 +920,8 @@ window.Worlds = (() => {
   }
   // ================= R54 MOD corridor：穿门走进即时生成的弯曲走廊，后台准备下一个地点，走到雾门出口就到（不再有加载画面）=================
   const CORR = () => !!window.Corridor && !(window.Mods && Mods.on && Mods.on('corridor') === false) && !/[?&]nocorr=1/.test(location.search);
-  function travel(i, from) { if (CORR() && W && W.B && !W.B.corr) return gotoCorr(i, from).catch(e => { console.warn('corridor', e); if (W) goto(i, from); }); return goto(i, from); }
+  const BT = () => !!(window.Loop && Loop.isBossTrip());
+  function travel(i, from) { if (window.Loop) try { Loop.leaveNode(); } catch (e) { } if (CORR() && W && W.B && !W.B.corr) return gotoCorr(i, from).catch(e => { console.warn('corridor', e); if (W) goto(i, from); }); return goto(i, from); }
   const KIT = { templates: (n) => templates(n), veil: (g, home) => veil(g, home) };
   function corrSize(n) { const t = templates(n)[0]; return t ? { x: t.size.x, z: t.size.z, big: t.size.y > 1.5 || Math.max(t.size.x, t.size.z) > 2.5 } : { x: 1, z: 1, big: false }; }
   async function gotoCorr(i, from) {
@@ -947,7 +951,7 @@ window.Worlds = (() => {
     if (!node.prey) populate(node);
     await wait(30); if (!W) return null;
     const tb0 = performance.now(); const B = buildNode(node); tp('build', tb0);
-    let foes = null; const wantBoss = node.boss && !(G.S.bosses || {})[node.region] && window.Explore && Explore.BOSSES[node.region];
+    let foes = null; const wantBoss = node.boss && (!(G.S.bosses || {})[node.region] || BT()) && window.Explore && Explore.BOSSES[node.region];
     if (window.Foe && !/[?&]nofoe=1/.test(location.search) && !(window.Mods && !Mods.on('foe_bodies'))) {
       try {
         const r = mulberry(node.seed ^ 0x5bd1e995), list = [], SL = B.site && B.site.slots;
@@ -1000,6 +1004,7 @@ window.Worlds = (() => {
   }
   const wait = (ms) => new Promise(r => setTimeout(r, ms));
   function leaveHome() {
+    if (window.Loop) try { Loop.leaveNode(); } catch (e) { }
     const api = W.api, won = window.Explore && Explore.checkVictory ? Explore.checkVictory() : false;
     W.busy = true; fadeTo(1, true);
     if ((window.Sack && Sack.on())) { W.trip.res.heads = W.trip.res.heads.filter(h => h.__boss).concat(Sack.heads()); Sack.tripEnd(); }

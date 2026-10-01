@@ -845,9 +845,10 @@ window.startGame = function () {
     else if ((src === 'manual' || src === 'hold') && hasAff(h, 'lucky') && Math.random() < 0.06) { v *= 10; tag = '🍀幸运 ×10！'; SFX.fanfare(2); }
     if ((src === 'manual' || src === 'hold') && hasAff(h, 'echo') && Math.random() < 0.25) { v *= 1.6; tag = tag || '🔔回响'; }
     if ((src === 'manual' || src === 'hold') && hasAff(h, 'scholar') && Math.random() < 0.25 && window.RPG && RPG.addXp) { const up = RPG.addXp(S, 1); floatText('📚+1 经验', h.g.position.clone().add(new V3(0, 0.65, 0)), '#9fd0ff', 16); if (up) toast('🆙 食人魔升到了 Lv.' + RPG.lvOf(S.xp).lv, '#ffd27a', 3); }
-    const val = Math.max(1, Math.round(v));
+    let val = Math.max(1, Math.round(v));
+    if (window.Loop && Loop.caveGate) { const k = Loop.caveGate(val); if (k < val && (src === 'manual' || src === 'hold')) { floatText('🔒→' + (k ? '+' + k : '下回合加成'), h.g.position.clone().add(new V3(0, 0.6, 0)), '#c8b8ff', 14); } val = k; } // R54i run_loop：洞内收入每回合有上限，超出转为下回合产出加成
     if (tag) floatText(tag, h.g.position.clone().add(new V3(0, 0.45, 0)), '#ffe27a', 24);
-    addCoins(val);
+    if (val > 0) addCoins(val);
     const r = h.rec.c.rar;
     floatText('+' + val, h.g.position.clone().add(new V3(0, 0.25, 0)), RAR[r].c, 18 + r * 4 + Math.min(combo, 10));
     if (Math.random() < 0.6) soulWisp(h.g.position.clone().add(new V3(0, 0.1, 0)), RAR[r].c);

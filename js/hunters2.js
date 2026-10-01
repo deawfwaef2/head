@@ -93,7 +93,7 @@ window.Hunters2 = (() => {
 
   // ================= 入场伏击（R49d）：根据地区恶名 + 仇恨，进入地区时可能触发某位猎手；由 Saga 电影引出 =================
   function rollOmen(k) {
-    if (!on()) return null; const s = SS(), S = G_().S, al = alive(); if (!al.length) return null;
+    if (!on() || (window.Loop && Loop.isBossTrip())) return null; const s = SS(), S = G_().S, al = alive(); if (!al.length) return null;
     const trips = (S.stats && S.stats.trips) || 0; if (trips < 3 || s.hate < 6) return null;
     if (s.lastOmen != null && trips - s.lastOmen < 2) return null;
     const inf = (s.reg && s.reg[k]) || 0, p = Math.min(0.6, 0.06 + inf * 0.035 + s.hate * 0.008); if (Math.random() > p) return null;
@@ -114,7 +114,7 @@ window.Hunters2 = (() => {
     if (k > T.kH && locK) s.reg[locK] = (s.reg[locK] || 0) + (k - T.kH); if (dc > T.dH && locK) s.reg[locK] = (s.reg[locK] || 0) + (dc - T.dH) * 0.5;
     if (k > T.kH) { s.hate += (k - T.kH) * (window.Gear2 ? Gear2.hateMul() : 1); T.m += (k - T.kH) * (calm() ? CALM.kill : 7) * (window.Gear2 ? Gear2.senseMul() : 1); T.kH = k; }
     if (dc > T.dH) { s.hate += (dc - T.dH) * 0.5 * (window.Gear2 ? Gear2.hateMul() : 1); T.m += (dc - T.dH) * (calm() ? CALM.decap : 4) * (window.Gear2 ? Gear2.senseMul() : 1); T.dH = dc; }
-    const node = W.graph.nodes[W.cur], quiet = !node || node.home || node.huntArena || node.eliteArena || (W.boss && !W.boss.dead) || W.busy || W.dead;
+    const node = W.graph.nodes[W.cur], quiet = !node || node.home || node.huntArena || node.eliteArena || (W.boss && !W.boss.dead) || W.busy || W.dead || (window.Loop && Loop.isBossTrip());
     const mins = (now - (T.t0 || (T.t0 = now))) / 60000;
     const gm = window.Gear2 ? Gear2.senseMul() : 1;
     if (calm()) { if (!T.fo && !quiet && now > T.cool && mins * 60 > CALM.grace) T.m += dt * (CALM.base + Math.min(mins, CALM.rampCap) * CALM.ramp) * gm; } // R50：前 2 分钟不涨；之后约 4.5%→8%/分钟

@@ -17,7 +17,8 @@ window.Nemesis = (() => {
     for (const k in v) v[k] = Math.min(0.12, v[k]); hc.v = v; return v;
   }
   const act = () => (onR() && S().act) || {};
-  const dmgK = () => (1 + (act().dmg || 0)) * (1 + heads().dmg), hpK = () => (1 + (act().hp || 0)) * (1 + heads().hp), spdK = () => (1 + (act().spd || 0)) * (1 + heads().spd);
+  const LP = () => (window.Loop && Loop.on() ? Loop : null); // R54i run_loop：世道倍率
+  const dmgK = () => (1 + (act().dmg || 0)) * (1 + heads().dmg) * (LP() ? LP().runDmg() : 1), hpK = () => (1 + (act().hp || 0)) * (1 + heads().hp) * (LP() ? LP().runHp() : 1), spdK = () => (1 + (act().spd || 0)) * (1 + heads().spd) * (LP() ? LP().runSpd() : 1);
   if (window.RPG && RPG.stats && !RPG.stats.__nem) { const s0 = RPG.stats; RPG.stats = function () { const s = s0.apply(this, arguments); try { if (s && s.maxHp && G() && G().S) s.maxHp = Math.round(s.maxHp * hpK()); } catch (e) { } return s; }; RPG.stats.__nem = 1; }
   // ---------- 血祭（选地点面板里）----------
   const RITE = [['dmg', 0.15, '⚔️ 力量血祭', '下一趟伤害 +15%'], ['hp', 0.2, '❤️ 血肉血祭', '下一趟生命上限 +20%'], ['spd', 0.1, '💨 疾风血祭', '下一趟移速 +10%']];
@@ -57,9 +58,28 @@ window.Nemesis = (() => {
     try { G().toast('🌙 月光骤冷——「塞勒涅之影」从雾里走了出来。她只是分身……但足够杀死你。', '#d8d0ff', 4); SFX.roar && SFX.roar(0.7); G().flash && G().flash('#2a2050', 0.5, 600); } catch (e) { }
     return true;
   }
+  // R54i：被你逃掉的老兵以上敌人 → 新宿敌（最多 6 个），每次你去别处她都在变强
+  function addFoe(fo) {
+    if (!onN() || !fo || !fo.h || fo._nemAdded) return; fo._nemAdded = 1; const s = S(); s.extra = s.extra || [];
+    const nm = (fo.h.c && fo.h.c.name) || '无名者'; if (s.extra.some(x => x.n === nm)) return; if (s.extra.length >= 6) s.extra.shift();
+    s.extra.push({ n: nm, h: JSON.parse(JSON.stringify(fo.h)), lv: (fo.lvl || plv()) + 1, t: Math.max(1, fo.tier || 1), at: s.play });
+    try { G().toast(`👁 ${nm} 记住了你的脸——她成了你的新宿敌，会变强并找上门来`, '#ffb0a0', 3.4); } catch (e) { }
+  }
+  async function extraStrike() {
+    const w = W(), s = S(), C = window.Foe && Foe.ctx(); if (!w || !C || !w.B || C.sc !== w.B.sc || !(s.extra && s.extra.length)) return false;
+    const i = Math.floor(Math.random() * s.extra.length), x = s.extra[i], grow = Math.floor((s.play - x.at) / 300);
+    const a = Math.random() * 6.28, pos = new THREE.Vector3(w.pos.x + Math.sin(a) * 11, 0, w.pos.z + Math.cos(a) * 11); if (w.B.lp && w.B.lp.clamp) w.B.lp.clamp(pos, 1.5); else { const r = Math.hypot(pos.x, pos.z), lim = (w.B.R || 20) - 3; if (r > lim) { pos.x *= lim / r; pos.z *= lim / r; } }
+    const out = await Foe.populate(C, [{ h: x.h, pos }], { keep: true }); const fo = out && out[0]; if (!fo) return false;
+    const lv = x.lv + grow, d = lv - plv(); fo.lvl = lv; fo.tier = Math.min(3, x.t + (grow >= 2 ? 1 : 0)); fo.maxHp = fo.hp = Math.round((26 + fo.rar * 16) * 1.8 * Math.max(0.8, Math.min(4, Math.pow(1.1, d)))); fo.dmgMul = Math.max(0.8, Math.min(3, Math.pow(1.07, d))) * 1.15;
+    fo.brave = true; fo.iq = 1.25; fo.nemX = 1; fo.nemIdx = x.n; fo.seen = true; fo.state = 'chase'; fo._liv = 1; if (!w.foes) w.foes = Foe.foes; else if (!w.foes.includes(fo)) w.foes.push(fo);
+    try { G().toast(`🩸 宿敌「${x.n}」追来了 · Lv.${lv}${grow ? `（比上次强了 ${grow} 级）` : ''}`, '#ff9a8a', 3.4); SFX.roar && SFX.roar(0.5); } catch (e) { }
+    return true;
+  }
   async function strike(reason) {
     const w = W(); if (!w || w.busy || !w.B || w.B.corr || w.dead) return false; const H2 = window.Hunters2, C = window.Foe && Foe.ctx(); if (!C || C.sc !== w.B.sc) return false;
+    if (LP() && LP().isBossTrip()) return false; // BOSS 战时宿敌不来
     const al = H2 && H2.on && H2.on() ? H2.alive() : []; if (H2 && H2.T && H2.T.fo && !H2.T.fo.dead) return false;
+    const ex = (S().extra || []).length; if (ex && Math.random() < ex / (ex + al.length + 1)) return extraStrike();
     if (!al.length || Math.random() < 0.3) return clone();
     try { await H2.spawn(al[Math.floor(Math.random() * al.length)].id); const fo = H2.T && H2.T.fo; if (fo) { if (!w.foes) w.foes = Foe.foes; else if (!w.foes.includes(fo)) w.foes.push(fo); fo.seen = true; fo.state = 'chase'; } return true; } catch (e) { console.warn('nemesis', e); return false; }
   }
@@ -71,13 +91,15 @@ window.Nemesis = (() => {
       if (!w && wasW) { s.act = null; plan = null; }
       wasW = w;
     }
-    if (!w) { if (onN() && G().playing && !G().uiOpen) { s.p = Math.min(100, s.p + 100 / 300); chipUI(true); } else chipUI(!!(onN() && G().playing)); inject(); return; }
-    chipUI(false);
-    if (!plan || !onN()) return; const now = performance.now() / 1000;
+    if (!w) { if (onN() && G().playing && !G().uiOpen) { s.p = Math.min(100, s.p + 100 / 300 * (LP() ? LP().nemRate() : 1)); chipUI(true); } else chipUI(!!(onN() && G().playing)); inject(); return; }
+    const boss = LP() && LP().isBossTrip(); chipUI(onN() && !boss);
+    if (!plan || !onN() || boss) return; const now = performance.now() / 1000;
     if (w.busy || !w.B || w.B.corr) { plan.enteredAt = 0; return; } if (!plan.enteredAt) plan.enteredAt = now;
+    if (LP() && G().playing && !w.dead) s.p = Math.min(100, s.p + 100 / 420 * LP().nemRate()); // R54i：出猎时逼近也在涨（满了就来），不只是洞里
     if (plan.first && now - plan.enteredAt > 6) { plan.first = false; strike('first').catch(() => { }); }
-    else if (now > plan.next && now - plan.enteredAt > 10) { plan.next = now + 240 + Math.random() * 180; strike('periodic').catch(() => { }); }
+    else if (LP() && s.p >= 100 && now - plan.enteredAt > 8) { s.p = 0; strike('meter').then(ok => { if (!ok) s.p = 90; }).catch(() => { }); }
+    else if (!LP() && now > plan.next && now - plan.enteredAt > 10) { plan.next = now + 240 + Math.random() * 180; strike('periodic').catch(() => { }); }
   }
   setInterval(() => { try { tick(); } catch (e) { } }, 1000);
-  return { dmgK, hpK, spdK, heads, strike, S };
+  return { dmgK, hpK, spdK, heads, strike, S, addFoe };
 })();
