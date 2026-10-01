@@ -520,7 +520,7 @@ window.Foe = (() => {
         if (strafe === 3 && fo.slotV) { const hd = Math.atan2(fo.slotV.x, fo.slotV.z), rel = ang(hd - face); if (Math.abs(rel) < 2.3) turnTo = face + clampA(rel, 0.95); }
         else if (strafe === 1 || strafe === -1) turnTo = face + strafe * (FAIR() ? 0.35 : 0.9); }
       if (window.Locomo && Locomo.on() && !fo.atk && !(fo.stag > 0)) Locomo.turn(fo, turnTo, dt, spd); /* R47 npc_locomo：角速度弹簧转身 */ else { fo.yawV = 0; if (turnTo != null) fo.yaw += clampA(ang(turnTo - fo.yaw), 6 * dt * (0.6 + fo.iq) * (spd > 4 ? 1.4 : 1)); }
-      if (FAIR() && fo.state === 'chase' && fo.seen && d < 5 && !fo.atk && !fo.sk && !(fo.stag > 0) && !(fo.gestT > 0)) { const e = ang(face - fo.yaw); if (Math.abs(e) > 0.5) { fo.yaw += e - Math.sign(e) * 0.5; fo.yawV = 0; } } // R54n：近身缠斗时始终大致正对你
+      if (FAIR() && fo.seen && fo.state !== 'flee' && fo.state !== 'idle' && d < 8 && !fo.sk && !(fo.stag > 0) && !(fo.gestT > 0) && !(fo.atk && fo.atk.act && fo.atk.hits[fo.atk.hi] && fo.atk.act.time >= fo.atk.hits[fo.atk.hi].t - 0.14)) { const e = ang(face - fo.yaw), lim = fo.atk ? 0.2 : 0.3; if (Math.abs(e) > lim) { fo.yaw += e - Math.sign(e) * lim; fo.yawV = 0; } } // 缠斗时始终正对你（出刀最后 0.14 秒除外，侧闪仍有效）
       { // 第十九轮：速度带加速度（不再瞬间换向）；侧移/后退都以“面向玩家”的方向为基准
         let vx = 0, vz = 0; if (spd > 0) { vx = Math.sin(fo.yaw) * spd; vz = Math.cos(fo.yaw) * spd; }
         if (strafe === 3 && !fo.atk && fo.stag <= 0 && fo.slotV) { vx += fo.slotV.x * 1.6; vz += fo.slotV.z * 1.6; }

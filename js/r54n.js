@@ -182,9 +182,9 @@ body.menuon #wRoot,body.menuon #nemChip,body.menuon #h2Hud,body.menuon #tbBar,bo
     let seed = ((nd.seed || 7) ^ 0x2545f491) >>> 0; const rr = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
     const R = Math.max(8, (B.R || 20) - 2), n = 14 + Math.floor(rr() * 9), cols = B.cols || [];
     for (let i = 0, tries = 0; i < n && tries < n * 6; tries++) {
-      const a = rr() * 6.283, r = 3 + Math.sqrt(rr()) * (R - 3), x = Math.cos(a) * r, z = Math.sin(a) * r;
-      if (B.Rf && Math.hypot(x, z) > B.Rf(Math.atan2(z, x)) - 1.5) continue; if (cols.some(c => Math.hypot(x - c.x, z - c.z) < c.r + 0.7)) continue; if (BKS.some(b => Math.hypot(b.x - x, b.z - z) < 1.6)) continue;
-      const k = BKK[Math.floor(rr() * BKK.length)], g = bkMesh(k); g.position.set(x, B.H(x, z), z); g.rotation.y = rr() * 6.28; B.sc.add(g); BKS.push({ k, g, x, z }); i++;
+      const a = rr() * 6.283, r = 3 + Math.sqrt(rr()) * (R - 3); let x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (B.lp && B.lp.shaped && B.lp.clamp) { const q = new THREE.Vector3(x, 0, z); B.lp.clamp(q, 1.2); x = q.x; z = q.z; } else if (B.Rf && Math.hypot(x, z) > B.Rf(Math.atan2(z, x)) - 1.5) continue; if (cols.some(c => Math.hypot(x - c.x, z - c.z) < c.r + 0.7)) continue; if (BKS.some(b => Math.hypot(b.x - x, b.z - z) < 1.6)) continue;
+      const k = BKK[Math.floor(rr() * BKK.length)], g = bkMesh(k); g.position.set(x, B.H(x, z), z); g.rotation.y = rr() * 6.28; g.scale.setScalar(1.6 + rr() * 0.5); B.sc.add(g); BKS.push({ k, g, x, z }); i++;
     }
   }
   function bkSnd(kind) {
@@ -202,23 +202,48 @@ body.menuon #wRoot,body.menuon #nemChip,body.menuon #h2Hud,body.menuon #tbBar,bo
     b.dead = 1; const g = b.g, p = g.position.clone(); g.parent && g.parent.remove(g); bkSnd(BK[b.k].snd);
     const sc = Worlds._W && Worlds._W.B && Worlds._W.B.sc, mat = g.children[0] && g.children[0].material; if (sc && mat) for (let i = 0; i < 7; i++) { const o = new THREE.Mesh(bkGeo.deb, mat); o.position.set(p.x, p.y + 0.2, p.z); sc.add(o); DEB.push({ o, v: new THREE.Vector3((Math.random() - 0.5) * 3, 1.5 + Math.random() * 2.5, (Math.random() - 0.5) * 3), t: 0, y0: p.y, sc }); }
     const S = G.S; S.shards = S.shards || {}; const got = [];
-    for (const [id, a, z] of BK[b.k].y) { const n = a + Math.floor(Math.random() * (z - a + 1)); if (n <= 0) continue; S.shards[id] = (S.shards[id] || 0) + n; got.push(`${SHD[id][1]}${SHD[id][0]} <b>+${n}</b> <small>(${S.shards[id] % SHD[id][2]}/${SHD[id][2]})</small>`);
-      const k = Math.floor(S.shards[id] / SHD[id][2]); if (k > 0 && window.Sack && Sack.stashAdd && Sack.mk && Sack.IT[id]) { S.shards[id] -= k * SHD[id][2]; try { Sack.stashAdd(Sack.mk(id, k)); setTimeout(() => feedMsg(`📦 攒够了 → ${Sack.IT[id].icon}${Sack.IT[id].n} <b>×${k}</b> 已送进储物箱`), 350); } catch (e) { } } }
+    for (const [id, a, z] of BK[b.k].y) { const n = a + Math.floor(Math.random() * (z - a + 1)); if (n <= 0) continue; S.shards[id] = (S.shards[id] || 0) + n; got.push(`${SHD[id][1]}${SHD[id][0]} <b>+${n}</b> <small>（碎料袋 ${S.shards[id]}）</small>`); }
     if (got.length) feedMsg(`💥 ${BK[b.k].n}：${got.join(' · ')}`);
   }
-  let bkLast = 0;
+  function shardsHome() { // 回洞后把碎料合成材料放进储物箱
+    const S = G.S, sh = S && S.shards; if (!sh || !window.Sack || !Sack.stashAdd || !Sack.mk) return; const out = [];
+    for (const id in sh) { const per = SHD[id] ? SHD[id][2] : 5, k = Math.floor(sh[id] / per); if (k > 0 && Sack.IT[id]) { sh[id] -= k * per; try { Sack.stashAdd(Sack.mk(id, k)); out.push(`${Sack.IT[id].icon}${Sack.IT[id].n} ×${k}`); } catch (e) { } } }
+    if (out.length) setTimeout(() => { try { G.toast(`📦 碎料袋合成：${out.join(' · ')} 已放进储物箱`, '#ffe0a0', 4); } catch (e) { } }, 1500);
+  }
+  let bkLast = 0, bkWas = false;
   function bkFrame() {
     const now = performance.now(), dt = Math.min(0.05, (now - (bkLast || now)) / 1000); bkLast = now;
     for (let i = DEB.length - 1; i >= 0; i--) { const d = DEB[i]; d.t += dt; d.v.y -= 9 * dt; d.o.position.addScaledVector(d.v, dt); d.o.rotation.x += dt * 9; d.o.rotation.z += dt * 7; if (d.o.position.y < d.y0) { d.o.position.y = d.y0; d.v.multiplyScalar(0.3); } if (d.t > 1.4) { d.o.parent && d.o.parent.remove(d.o); DEB.splice(i, 1); } }
     if (DEB.length) requestAnimationFrame(bkFrame); else bkLast = 0;
   }
   function bkTick() {
-    if (!M('breakables') || !window.Worlds || !Worlds.active || !window.THREE || !window.G || !G.S) return; const W = Worlds._W; if (!W || !W.B || W.busy || W.B.corr) return;
+    const act = !!(window.Worlds && Worlds.active); if (bkWas && !act) { const dead = window.G && G.S && G.S.hp <= 0; if (!dead) shardsHome(); else if (G.S) G.S.shards = {}; } bkWas = act;
+    if (!M('breakables') || !act || !window.THREE || !window.G || !G.S) return; const W = Worlds._W; if (!W || !W.B || W.busy || W.B.corr) return;
     if (W.B !== bkB) { bkB = W.B; try { bkSpawn(W); } catch (e) { console.warn('breakables', e); } }
-    for (const b of BKS) if (!b.dead && Math.hypot(W.pos.x - b.x, W.pos.z - b.z) < 1.25) { bkBreak(b); if (DEB.length && !bkLast) requestAnimationFrame(bkFrame); }
+    for (const b of BKS) if (!b.dead && Math.hypot(W.pos.x - b.x, W.pos.z - b.z) < 1.5) { bkBreak(b); if (DEB.length && !bkLast) requestAnimationFrame(bkFrame); }
+  }
+
+  // ================= 食人魔评级（MOD ogre_rank）：清空一个地点后按表现打分 =================
+  const RK = [[34, 'SS', '噬魂魔王', '#ff5a8a', 40], [26, 'S', '魂首窟之主', '#ffd060', 25], [19, 'A', '暴食魔', '#ffb070', 12], [13, 'B', '食人魔', '#e8d0a0', 5], [8, 'C', '食人魔学徒', '#b8c8d8', 0], [-1e9, 'D', '饿肚子的幼魔', '#8a8a9a', 0]];
+  let rkN = null, rkEl = null;
+  function rkTick() {
+    if (!M('ogre_rank') || !window.Worlds || !Worlds.active || !window.Foe) { rkN = null; return; } const W = Worlds._W; if (!W || !W.B || W.busy || W.B.corr) return;
+    const st = W.stats || {}, snap = () => ({ kill: st.kill | 0, decap: st.decap | 0, execute: st.execute | 0, onecut: st.onecut | 0, parry: st.parry | 0, perfectdodge: st.perfectdodge | 0, guardbreak: st.guardbreak | 0 });
+    if (!rkN || rkN.B !== W.B) { rkN = { B: W.B, t0: performance.now(), s0: snap(), hp: G.S.hp, hits: 0, mx: 0, n: 0, done: false }; }
+    const fs = Foe.foes.filter(f => f && !f.hunter2 && !f.nemClone); rkN.n = Math.max(rkN.n, fs.length);
+    if (G.S.hp < rkN.hp - 0.5) rkN.hits++; rkN.hp = G.S.hp; if (window.Momentum && Momentum.M) rkN.mx = Math.max(rkN.mx, Momentum.M.n || 0);
+    if (rkN.done || rkN.n < 2 || fs.some(f => !f.dead)) return; rkN.done = true;
+    const s1 = snap(), d = k => s1[k] - rkN.s0[k], sec = (performance.now() - rkN.t0) / 1000, n = rkN.n;
+    const parts = [[`斩首 ×${d('decap')}`, d('decap') * 8], [`处决 ×${d('execute')}`, d('execute') * 10], [`一刀斩首 ×${d('onecut')}`, d('onecut') * 12], [`完美格挡 ×${d('parry')}`, d('parry') * 6], [`完美闪避 ×${d('perfectdodge')}`, d('perfectdodge') * 6], [`破防 ×${d('guardbreak')}`, d('guardbreak') * 3], [`最高杀意 ×${rkN.mx}`, rkN.mx * 4], [`挨打 ×${rkN.hits}`, -rkN.hits * 6], [`用时 ${Math.round(sec)} 秒`, sec < n * 9 ? 10 : sec > n * 25 ? -6 : 0]];
+    const sc = n * 10 + parts.reduce((a, p) => a + p[1], 0), avg = sc / n, R = RK.find(r => avg >= r[0]);
+    if (R[4] > 0) try { G.addCoins(R[4] * Math.max(1, Math.round(n / 3))); } catch (e) { }
+    if (!rkEl) { const s = document.createElement('style'); s.textContent = '#rkStamp{position:fixed;right:6vw;top:24vh;z-index:61;pointer-events:none;text-align:center;font-family:"Noto Serif SC",serif;opacity:0;transform:scale(1.8) rotate(-8deg);transition:opacity .25s,transform .35s cubic-bezier(.2,1.6,.4,1)}#rkStamp.on{opacity:1;transform:scale(1) rotate(-8deg)}#rkStamp .L{font:900 120px/1 "Noto Serif SC",serif;color:var(--c);text-shadow:0 0 30px var(--c),0 6px 0 #0008;letter-spacing:-.04em}#rkStamp .T{font:800 22px/1.3 "Noto Serif SC",serif;color:#fff;letter-spacing:.3em;text-shadow:0 2px 8px #000}#rkStamp .K{font:600 12px/1 sans-serif;color:#c8b8a0;letter-spacing:.5em;margin-bottom:4px}#rkStamp .P{margin-top:8px;font:500 12.5px/1.6 "Microsoft YaHei UI",sans-serif;color:#e8dcc4;text-shadow:0 1px 3px #000}#rkStamp .P b{color:#ffd27a}body.menuon #rkStamp{visibility:hidden}'; document.head.appendChild(s); rkEl = document.createElement('div'); rkEl.id = 'rkStamp'; document.body.appendChild(rkEl); }
+    rkEl.style.setProperty('--c', R[3]); rkEl.innerHTML = `<div class="K">食 人 魔 评 级</div><div class="L">${R[1]}</div><div class="T">${R[2]}</div><div class="P">${parts.filter(p => p[1]).map(p => `${p[0]} <b>${p[1] > 0 ? '+' : ''}${p[1]}</b>`).join(' · ')}${R[4] ? `<br>🔮 评级奖励 +${R[4] * Math.max(1, Math.round(n / 3))}` : ''}</div>`;
+    rkEl.classList.remove('on'); void rkEl.offsetWidth; rkEl.classList.add('on'); clearTimeout(rkEl._t); rkEl._t = setTimeout(() => rkEl.classList.remove('on'), 4200);
+    try { SFX.play && SFX.play('bell', 0.6, R[1].startsWith('S') ? 0.8 : 1.2); } catch (e) { }
   }
 
   window.R54n = { BKS, vox };
-  setInterval(() => { try { bkTick(); } catch (e) { } }, 100);
+  setInterval(() => { try { bkTick(); } catch (e) { } try { rkTick(); } catch (e) { } }, 100);
   setInterval(() => { try { tidyTick(); } catch (e) { } try { intelTick(); } catch (e) { } try { barkTick(); } catch (e) { } }, 250);
 })();

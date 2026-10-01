@@ -10,8 +10,8 @@ window.Mods = (() => {
   // cat: play 玩法 / look 角色外观 / render 画风(互斥组 render) / perf 性能 / asset 模型与材质
   const LIST = [
     // ---------- 画风（互斥：只能选一个） ----------
-    { id: 'r_classic', cat: 'render', group: 'render', icon: '🎮', n: '原版渲染', d: '不做后处理，最省性能。', def: false },
-    { id: 'r_illust', cat: 'render', group: 'render', icon: '🖌️', n: '插画风（厚涂）', d: '各向异性 Kuwahara 笔触 + 墨线描边 + 纸纹 + 柔光晕染，画面像厚涂插画。R54n 起默认（用户：喜欢厚涂质感）。', def: true },
+    { id: 'r_classic', cat: 'render', group: 'render', icon: '🎮', n: '原版渲染', d: '不做后处理，最省性能。', def: true },
+    { id: 'r_illust', cat: 'render', group: 'render', icon: '🖌️', n: '插画风', d: '各向异性 Kuwahara 笔触 + 墨线描边 + 纸纹 + 柔光晕染，画面像厚涂插画。会让远景变糊。', def: false },
     { id: 'r_anime', cat: 'render', group: 'render', icon: '✨', n: '赛璐璐动画', d: '粗描边 + 色阶化光影 + 高饱和 + 高光溢出，像 TV 动画截图。' },
     { id: 'r_water', cat: 'render', group: 'render', icon: '💧', n: '水彩', d: '颜料晕开、边缘积色、纸张颗粒与轻微手绘抖动。' },
     { id: 'r_oil', cat: 'render', group: 'render', icon: '🎨', n: '油画', d: '强 Kuwahara 厚涂笔触 + 画布纹理 + 暖色调。' },
@@ -52,9 +52,9 @@ window.Mods = (() => {
     { id: 'head_norm', cat: 'look', icon: '📏', n: '头模尺寸归一（第二十四轮）', d: 'MMD 管线的头比 VRoid 头小约两成，挂在身体上显得特别小。载入时按脸宽等比放大到标准尺寸（需重新载入）。', def: true },
     { id: 'head_norm2', cat: 'look', icon: '📐', n: '头身比例修正（R30，取代上一项）', d: '所有非 VRoid 头按脸宽+两眼间距双指标归一到 VRoid 标准，可缩可放：星铁/绝区零/异环/经典 MMD 不再是大头娃娃，测歪的头不再是小头怪。开启时上一项“头模尺寸归一”不生效。需重新载入。', def: true },
     { id: 'char_unify', cat: 'look', icon: '🌗', n: '人物统一光影 · 逆光不恐怖谷（R47）', d: '头和身体用同一套“随环境变化”的二次元明暗：暗面=此处满受光的 60%（不会比环境更亮、不再像自发光纸片人），亮面平涂；逆光时轮廓出一圈太阳色边缘光。开启时自动旁路二次元光影/次表面散射/面部补光下限，避免叠加。', def: true },
-    { id: 'cs_cel', cat: 'look', group: 'cstyle', icon: '🎴', n: '人物风格：赛璐璐（R47）', d: '需开“人物统一光影”。硬明暗交界的二次元：基础色 / 阴影色（偏环境光色、更浓的同色）/ 最暗（下巴下、袖底）/ 阶梯高光 / 逆光轮廓光，全部随环境明暗与色调变化。', def: true },
+    { id: 'cs_cel', cat: 'look', group: 'cstyle', icon: '🎴', n: '人物风格：赛璐璐（R47）', d: '需开“人物统一光影”。硬明暗交界的二次元：基础色 / 阴影色（偏环境光色、更浓的同色）/ 最暗（下巴下、袖底）/ 阶梯高光 / 逆光轮廓光，全部随环境明暗与色调变化。', def: false },
     { id: 'cs_soft', cat: 'look', group: 'cstyle', icon: '🌸', n: '人物风格：柔光动画（R47）', d: '宽而柔的明暗过渡 + 交界处一条暖色晕带 + 更强的逆光边，像动画电影的柔和打光。' },
-    { id: 'cs_paint', cat: 'look', group: 'cstyle', icon: '🖼️', n: '人物风格：厚涂质感（R47）', d: '二次元的阴影色和分阶，保留三成真实光照与部分高光，更有材质厚度。' },
+    { id: 'cs_paint', cat: 'look', group: 'cstyle', icon: '🖼️', n: '人物风格：厚涂质感（R47）', d: '二次元的阴影色和分阶，保留三成真实光照与部分高光，更有材质厚度。R54p 起默认。', def: true },
     { id: 'cs_real', cat: 'look', group: 'cstyle', icon: '📷', n: '人物风格：写实相对光（R47）', d: '上一版：PBR 光照，只把暗面抬到此处满受光的 40%，加逆光边。无勾线。' },
     { id: 'char_outline', cat: 'look', icon: '✒️', n: '人物勾线（R47）', d: '身体和头的外轮廓描一圈细线（反向外壳，远处自动变细）；线色取自贴图并随环境变暗/变色，不是死黑。需开“人物统一光影”。', def: true },
     { id: 'world_cel', cat: 'look', icon: '🏞️', n: '环境二次元阴影（R47）', d: '场景保留 3D 贴图材质感，但阴影边缘收硬、阴影染上天空色、亮面略平——和二次元人物的阴影对齐。', def: true },
@@ -185,8 +185,11 @@ window.Mods = (() => {
     { id: 'foe_skills2', cat: 'play', icon: '🌀', n: '高阶敌人 / BOSS 专属技能（R54l）', d: '敌人阶位越高会的技能越多：老兵〔三向飞刃、半月横扫〕→ 精英〔锁链拉拽、震地三波〕→ 冠军〔月蚀印记、嗜血战吼〕；BOSS 还有〔月光新星〕，每个地区霸主 / 每位章节 BOSS 都有自己的 3~6 个招牌技（出发面板可见）。每个技能都有地面预警 + 头顶念招名 + 第一次见到时的解法提示；战吼可以被打断。', def: true },
     { id: 'soft_glow', cat: 'look', icon: '🔆', n: '人物不再刺眼发光（R54l）', d: '泛光只给真正的高亮（火、魔法、天光），阈值 0.9→1.25、强度 0.9→0.38；人物逆光轮廓光减到 40%。关掉 = 旧的「光芒万丈」。', def: true },
     { id: 'no_freebies', cat: 'play', icon: '🪨', n: '开局不送东西（R54l）', d: '用户：付出→奖励，不要开局送东西。新存档开局 0 魂晶、不送药、不送绷带/布/草药/摆件材料；回合结算去掉「底薪」；每回合的祝福抉择要这一趟杀满 3 人或清空一个地点才给。（', def: true },
+    { id: 'hit_stop', cat: 'play', icon: '💢', n: '命中顿帧（R54p）', d: '砍中敌人的一瞬间她顿住一下 + 镜头震动；击杀、完美格挡、破防、完美闪避、处决的顿帧更长更重。', def: true },
+    { id: 'side_panels', cat: 'ui', icon: '📑', n: '章节 / BOSS / 主线 独立面板（R54p）', d: '打开出发面板时，右侧单独挂出三张卡：第几章与进度、本章 BOSS（等级/擂台/词缀/招牌技）、主线月之魔女的线索进度。不再塞在出发面板的小角落。', def: true },
+    { id: 'ogre_rank', cat: 'play', icon: '🏆', n: '食人魔评级（R54p）', d: '清空一个地点（≥ 2 个敌人）后按表现打分：D 饿肚子的幼魔 → C 学徒 → B 食人魔 → A 暴食魔 → S 魂首窟之主 → SS 噬魂魔王。斩首/处决/一刀/完美格挡/闪避/杀意加分，挨打和拖拉扣分；A 以上有魂晶奖励。', def: true },
     { id: 'fem_vox', cat: 'play', icon: '🎤', n: '合成女声（R54n）', d: '用共振峰合成的女声代替 AI 语音：出手喝声「哈！」、挨刀痛呼、倒下的惨叫、格挡的闷哼、砍中你时的嘲笑；每人音高不同，带方位和距离。战斗中敌人会用气泡互相喊话（包抄/嘲讽/同伴倒下时的反应）。', def: true },
-    { id: 'breakables', cat: 'play', icon: '🏺', n: '可破坏小物件 · 碎料（R54n）', d: '每个地点散落 14~22 个陶罐/小木箱/枯骨堆/魂晶簇/毒蘑菇/骨灰瓮/破布袋，走近就踩碎（有碎片和音效），掉出不占麻袋格子的碎料（铁屑/碎布/草籽/魂屑/骨渣/木屑/碎肉）；攒够 4~6 个自动合成一份材料送进储物箱。', def: true },
+    { id: 'breakables', cat: 'play', icon: '🏺', n: '可破坏小物件 · 碎料（R54n）', d: '每个地点散落 14~22 个陶罐/小木箱/枯骨堆/魂晶簇/毒蘑菇/骨灰瓮/破布袋，走近就踩碎（有碎片和音效），掉出不占麻袋格子的碎料（铁屑/碎布/草籽/魂屑/骨渣/木屑/碎肉）存在碎料袋里；平安回洞后每 4~6 个自动合成一份材料放进储物箱（死在外面全部丢失）。', def: true },
     { id: 'soft_vfx', cat: 'look', icon: '🌫️', n: '柔和技能特效（R54n）', d: '技能的冲击环、新月刃光、光柱改用渐变贴图：边缘柔和发光、光柱向上淡出，不再是硬边的纯色圆环/圆柱。', def: true },
     { id: 'fair_fight', cat: 'play', icon: '⏱️', n: '有反应时间的敌人（R54n）', d: '敌人起手慢约 30%（约 1 秒可以反应）、不再假动作；先转过来正对你才会出刀，没对准就砍不到你；两个敌人出手至少隔 1.1 秒；攻击间隔 +0.7 秒；出招时不再边打边滑过来。', def: true },
     { id: 'foe_barks', cat: 'play', icon: '💬', n: '敌人动作气泡（R54n）', d: '敌人头顶冒出气泡写出她正在干什么：从哪边砍、该往哪边闪、重击/突刺/连斩/冲刺/掷刃预警、举刀格挡、转身逃跑、快撑不住了、刺客绕背。', def: true },
@@ -296,6 +299,7 @@ window.Mods = (() => {
   if (st.__v < 21) { st.corridor = false; st.nat_gates = false; st.__v = 21; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R54m：用户：不要走廊、传送门改回铁门
   if (st.__v < 22) { st.moon_trail = false; st.__v = 22; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R54n：用户更喜欢原来的电影任务线索
   if (st.__v < 23) { for (const m of LIST) if (m.group === 'render') st[m.id] = (m.id === 'r_illust'); st.lowspec = false; st.persona_voice = false; st.__v = 23; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R54n：默认厚涂插画风；AI 语音换成合成女声
+  if (st.__v < 24) { for (const m of LIST) { if (m.group === 'render') st[m.id] = (m.id === 'r_classic'); if (m.group === 'cstyle') st[m.id] = (m.id === 'cs_paint'); } st.__v = 24; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R54p：用户说的厚涂是 R47 人物风格，画面渲染回原版
   for (const m of LIST) if (st[m.id] === undefined) st[m.id] = !!m.def;
   // 修正非法状态（互斥组恰好一个；冲突；依赖）
   function normalize() {

@@ -2033,3 +2033,16 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 画风：默认 r_illust（插画风/厚涂），迁移 v23；persona_voice 默认关。
 - worlds.goto：W.shWait 期间 Worlds.frame 不渲染（否则首帧同步编译卡死主线程），ShaderQ 等待上限 15s。
 - r54n.js 新增：fem_vox（共振峰合成女声：喝声/痛呼/惨叫/闷哼/嘲笑）、敌人战斗聊天气泡（包抄/嘲讽/同伴倒下/受伤）、breakables（每地点 14~22 个可踩碎小物件，碎料存 G.S.shards 不占格子，攒够 4~6 自动 Sack.stashAdd 成材料，右侧 #bkFeed 提示）。skillfx：soft_vfx 渐变贴图（环/月刃/光柱）。
+
+## R54p 反馈感 / 鬼巫流派 / 评级 / 面板
+- 画面：render 组回 r_classic（插画风会让远景糊），R47 人物风格 cstyle 默认 cs_paint（厚涂），迁移 v24。
+- 读图条：资源 0-50%、敌人 62-80%、着色器 80-100%，不再资源读完就满。
+- 斩首：G.S.decapN 持久计数（以前用本趟 W.stats，总显示第 1 颗）；decapcam slashArc 沿 Combat.state.sw 方向的 3D 刀痕 + DOM 刀光同角度。
+- 朝向：fair_fight 下 seen 且非 flee/idle、d<8、非技能/硬直，yaw 偏差钳到 0.3（出招 0.2，命中前 0.14s 放开）。
+- 完美格挡放宽：方向 1.05、按下 0.5s、转向 0.4s/0.7。momentum.js hitStop：hit/kill/parry/guardbreak/perfectdodge/execute → Foe.slowSet 顿帧 + 震屏（MOD hit_stop）。
+- 脚步：玩家加 230Hz 中频踏声、总线 2.0；敌人脚步 ×2.2（笔记本喇叭放不出 95Hz）。
+- skillfx：FX 只挂在 HOOK.frame（野外不跑）→ 野外特效永不消失；加 rAF 循环在野外更新。
+- breakables：放大 1.6~2.1 倍（以前藏在草里）、shaped 地图用 lp.clamp 落点、碎料只在平安回洞后合成（死亡清空）。
+- loop.js side()：出发面板打开时右侧 #lpSide 三张卡（章节/章节 BOSS/主线），MOD side_panels；lpHead 只留回合经济。
+- r54n.js ogre_rank：清空地点（≥2 敌）后 D~SS 评级盖章 + A 以上魂晶。
+- 新天赋流派「鬼巫」hex（talents_data + talents.js S_.x_*）：勾魂索/换魂/提线傀儡/同命咒/血井/百鬼夜行。

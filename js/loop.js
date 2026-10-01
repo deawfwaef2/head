@@ -111,6 +111,12 @@ window.Loop = (() => {
   }
   function css() { if (document.getElementById('lpCss')) return; const s = document.createElement('style'); s.id = 'lpCss'; s.textContent = `
 #lpHead{margin:6px 0 10px;padding:8px 14px;border-left:3px solid #e1c07e;background:linear-gradient(90deg,#1a1410d0,transparent);font-size:13px;color:#e8dcc4;letter-spacing:.04em}#lpHead b{color:#ffd890}#lpHead small{color:#a89880}
+#lpSide{position:fixed;right:16px;top:70px;z-index:120;width:min(330px,28vw);display:flex;flex-direction:column;gap:10px;pointer-events:none;font:13.5px/1.6 "Microsoft YaHei UI",sans-serif;color:#eadcc4;animation:lpIn .35s ease-out}@keyframes lpIn{from{opacity:0;transform:translateX(24px)}}
+#lpSide section{padding:12px 14px;background:linear-gradient(160deg,rgba(30,20,16,.94),rgba(10,7,6,.94));border:1px solid var(--bc,#6a4a2a);border-left:3px solid var(--bc,#e1c07e);box-shadow:0 10px 30px #0009}
+#lpSide h4{margin:0 0 6px;font:700 15px "Noto Serif SC",serif;letter-spacing:.12em;color:#ffd890}#lpSide h4 small{float:right;font:12px sans-serif;color:#a89880;letter-spacing:0}#lpSide p{margin:4px 0}#lpSide .m{font-size:12px;color:#b8a890}#lpSide .hot{color:#ff8a6a}
+#lpSide .bar{height:6px;background:#0008;margin:4px 0 6px}#lpSide .bar i{display:block;height:100%;background:linear-gradient(90deg,#8a5a20,#ffd27a)}
+#lpSide .bn{font:800 20px "Noto Serif SC",serif;color:var(--bc);margin:2px 0}#lpSide .bn small{display:block;font:12px sans-serif;color:#c8b8a8}
+#lpSide .pips{margin:4px 0 6px}#lpSide .pp{display:inline-block;width:14px;height:14px;border-radius:50%;margin-right:5px;vertical-align:middle;box-shadow:inset 0 0 0 2px #8878c8}#lpSide .pp.on{background:radial-gradient(circle,#fff,#b8a8ff);box-shadow:0 0 8px #b8a8ff}#lpSide .pips b{margin-left:6px;color:#fff}#lpSide .cl{font-size:12.5px;color:#d8d0ff}
 #lpBoss{margin:10px 0;padding:16px 18px;border:1px solid var(--bc);background:radial-gradient(120% 140% at 0 0,#2a1414ee,#0a0607f2);border-radius:4px}#lpBoss .t{font-size:12px;letter-spacing:.3em;color:#c8a8a0}#lpBoss .n{font-size:24px;color:var(--bc);margin:4px 0 8px;font-weight:700}#lpBoss .n small{font-size:13px;color:#c8b8a8;font-weight:400}
 #lpBoss .s{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:#e8d8c0}#lpBoss .s i{color:#ff7a6a;font-style:normal}#lpBoss p{font-size:13px;color:#b8a890;line-height:1.7}#lpBoss button{padding:9px 26px;border:1px solid var(--bc);background:linear-gradient(#4a1c14,#220c08);color:#ffe8c8;font-size:15px;letter-spacing:.2em;cursor:pointer;border-radius:3px}
 #lpSettle{position:fixed;right:18px;top:84px;z-index:60;width:min(440px,92vw);max-height:78vh;overflow:auto;padding:14px 16px;background:linear-gradient(160deg,#1c1410f4,#0a0706f6);border:1px solid #c9a35e;border-radius:4px;color:#eadcc4;font:13px/1.6 "Microsoft YaHei UI",sans-serif;box-shadow:0 18px 60px #000a;opacity:0;transform:translateX(30px);transition:opacity .35s,transform .35s;pointer-events:none}
@@ -122,7 +128,7 @@ window.Loop = (() => {
     const host = document.querySelector('.rq-pick') || document.querySelector('.locs'); if (!host || !host.offsetParent || document.getElementById('lpHead')) return; css(); const r = R();
     const h = document.createElement('div'); h.id = 'lpHead'; let hn = 0; try { hn = (G().heads || []).filter(x => x && x.mount).length; } catch (e) { }
     const eco = rOn() ? ` · 在岗首级 <b>${hn}</b> 颗（每次回洞定量结算，上回合 +${r.last || 0}）· 洞内活动已存 ${Math.round(r.stash)}/${capCave()}` : ` · 洞内收入 ${Math.round(r.cave)}/${capCave()}（超出转为下回合产出 +${Math.round(r.bonus * 100)}%）`, bl = nbText(nb());
-    h.innerHTML = `📖 <b>第 ${r.chap} 章</b> · 本章已去 ${Math.min(2, r.n)}/2 个地区${r.n >= 2 ? ' · <b>章节 BOSS 战</b>' : ''} · 回合 ${r.round}${eco}${bl ? `<br>🎐 建筑给这一趟的祝福：<b>${bl}</b>` : ''}<br><small>世道：${r.mods.map(k => { const M = MODS.find(x => x.k === k); return M.n + '（' + M.d + '）'; }).join('；')}</small>`;
+    h.innerHTML = SP() ? `⏳ 回合 ${r.round}${eco}${bl ? `<br>🎐 建筑给这一趟的祝福：<b>${bl}</b>` : ''}` : `📖 <b>第 ${r.chap} 章</b> · 本章已去 ${Math.min(2, r.n)}/2 个地区${r.n >= 2 ? ' · <b>章节 BOSS 战</b>' : ''} · 回合 ${r.round}${eco}${bl ? `<br>🎐 建筑给这一趟的祝福：<b>${bl}</b>` : ''}<br><small>世道：${r.mods.map(k => { const M = MODS.find(x => x.k === k); return M.n + '（' + M.d + '）'; }).join('；')}</small>`;
     host.parentNode.insertBefore(h, host);
     if (r.n >= 2) { host.style.display = 'none'; const b = document.createElement('div'); b.innerHTML = bossCard(); host.parentNode.insertBefore(b, host); b.addEventListener('click', e => { if (!e.target.closest('[data-lp="boss"]')) return; e.stopPropagation(); try { UI._startTrip(CB().base); } catch (er) { bossTrip = false; console.warn(er); } }); }
   }
@@ -233,12 +239,26 @@ ${P.boons ? `<div class="x">🎴 额外祝福抉择 ×${P.boons}</div>` : ''}${n
     if (!on()) return; const w = W(); if (!w) return; clearReward(true);
     try { if (window.Foe && window.Nemesis) for (const fo of Foe.foes) { if (fo.dead || !fo.seen || fo.state !== 'chase' || (fo.tier || 0) < 1 || fo.hunter2 || fo.nemClone || fo.boss) continue; Nemesis.addFoe(fo); } } catch (e) { }
   }
+  // R54p MOD side_panels：章节 / 章节 BOSS / 主线不再塞在出发面板角落，独立挂在右侧
+  const SP = () => !window.Mods || Mods.on('side_panels') !== false;
+  function side() {
+    const host = document.querySelector('.rq-pick') || document.querySelector('.locs'), vis = !!(host && host.offsetParent) && !W(); let el = document.getElementById('lpSide');
+    if (!vis || !SP()) { if (el) el.remove(); return; } if (el && performance.now() - el._t < 1500) return; css();
+    if (!el) { el = document.createElement('div'); el.id = 'lpSide'; document.body.appendChild(el); } el._t = performance.now();
+    const r = R(), B = CB(), lv = bossLv(), d = lv - plv(), n2 = Math.min(2, r.n), S = window.Saga, cn = S && S.clues ? S.clues() : 0, need = S && S.NEED || 7, pips = Array.from({ length: need }, (_, i) => `<i class="pp${i < cn ? ' on' : ''}"></i>`).join('');
+    const cl = S && S.SS ? (S.SS().cl || []).slice(-3).map(c => `<div class="cl">🌙 ${esc(String(c.t || '').replace(/^“|”$/g, ''))}</div>`).join('') : '';
+    el.innerHTML = `<section><h4>📖 第 ${r.chap} 章 <small>回合 ${r.round}</small></h4><div class="bar"><i style="width:${n2 * 50}%"></i></div><p>本章已去 <b>${n2}/2</b> 个地区 → ${r.n >= 2 ? '<b class="hot">章节 BOSS 已开放！</b>' : `再去 ${2 - n2} 个地区解锁章节 BOSS`}</p><p class="m">世道：${r.mods.map(k => { const M = MODS.find(x => x.k === k); return M ? `<b>${M.n}</b>` : ''; }).join(' · ')}</p></section>
+<section style="--bc:${B.col}"><h4>👑 章节 BOSS</h4><div class="bn">${esc(B.n)}<small>${esc(B.title)}</small></div><p>Lv.<b>${lv}</b>（你 Lv.${plv()}${d >= 6 ? ' · <b class="hot">极度危险</b>' : d >= 2 ? ' · 危险' : ''}）· 擂台「${esc(B.place)}」</p><p class="m">词缀 ${B.aff.map(k => AFN[k]).join(' ')} · 招牌技 ${B.sk.map(k => (window.FoeAI2 && FoeAI2.SK2 && FoeAI2.SK2[k] ? FoeAI2.SK2[k].n : k)).join('、')}</p></section>
+${S ? `<section><h4>🌙 主线 · 月之魔女</h4><div class="pips">${pips}<b>${cn}/${need}</b></div>${cl || '<p class="m">在各地区斩下“月之使者”或触发章节闪回拿到线索；集齐后神殿打开。</p>'}</section>` : ''}`;
+  }
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   let wasW = null, node0 = null;
   function tick() {
     if (!on() || !G() || !G().S) return; R(); wrapCoins(); const w = W();
     if (w !== wasW) { if (w && !wasW) { bossKilledThisTrip = false; trip.k = 0; trip.c = 0; if (!bossTrip) R().regs.push(w.graph && w.graph.loc ? w.graph.loc.k : ''); } if (!w && wasW) roundEnd(!!wasW.dead || (G().S.hp <= 0)); wasW = w; node0 = null; }
     if (w) { if (!w.busy && w.B && !w.B.corr && (!node0 || node0.i !== w.cur)) node0 = { i: w.cur }; clearReward(false); if (bossTrip && window.Foe && Foe.foes.some(f => f.boss && f.dead)) bossKilledThisTrip = true; }
     else inject();
+    try { side(); } catch (e) { }
   }
   setInterval(() => { try { tick(); } catch (e) { } }, 500);
   // 本章已去 2 个地区 → 任何出发入口（地点卡 / 委托 / 精英）都改为前往本章 BOSS 的独立擂台

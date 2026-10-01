@@ -9,7 +9,7 @@ window.SkillFX = (() => {
   'use strict';
   const on = () => !window.Mods || !Mods.on || Mods.on('skill_vfx') !== false;
   const G0 = () => window.G, D = () => window.TalData;
-  const SCH = { b: ['blade', '#ffd27a'], w: ['ward', '#9fd0ff'], s: ['shadow', '#b8a0ff'], r: ['rage', '#ff6a6a'], m: ['soul', '#7af0ff'], h: ['hunt', '#ffd060'] };
+  const SCH = { b: ['blade', '#ffd27a'], w: ['ward', '#9fd0ff'], s: ['shadow', '#b8a0ff'], r: ['rage', '#ff6a6a'], m: ['soul', '#7af0ff'], h: ['hunt', '#ffd060'], x: ['soul', '#d07aff'] };
   const info = id => { const k = id === 'dodge' ? 's' : String(id)[0], s = SCH[k] || ['blade', '#ffd27a']; return { school: s[0], col: s[1], ult: /_ult$/.test(id), dodge: id === 'dodge' }; };
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const lang = () => { const l = (window.I18N && I18N.lang) || localStorage.getItem('soulhead_lang') || 'zh'; return ['zh', 'ja', 'en'].includes(l) ? l : 'zh'; };
@@ -134,5 +134,6 @@ body.sfxon #tbCast{display:none!important}
   }
   function cast(id) { if (!on() || !G0() || !D()) return; const inf = info(id); try { domFx(id, inf); } catch (e) { console.warn('SkillFX dom', e); } try { fx3d(id, inf); } catch (e) { console.warn('SkillFX 3d', e); } }
   const wait = setInterval(() => { if (window.G && G.HOOK && G.S) { clearInterval(wait); G.HOOK.frame.push(dt => { if (!on()) document.body.classList.remove('sfxon'); else document.body.classList.add('sfxon'); frame(dt); }); } }, 300);
+  { let lt = 0; const lp = t => { requestAnimationFrame(lp); if (!(window.Worlds && Worlds.active) || !FX.length) { lt = 0; return; } const dt = lt ? Math.min(0.05, (t - lt) / 1000) : 0.016; lt = t; frame(dt); }; requestAnimationFrame(lp); } // 野外 HOOK.frame 不跑：技能特效以前在野外永远不消失
   return { cast, info, on, _FX: FX };
 })();

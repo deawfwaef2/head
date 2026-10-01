@@ -685,8 +685,9 @@ window.Worlds = (() => {
         const tip = CS && CS.lastTip ? CS.lastTip.clone() : W.pos.clone().add(new V3(0, 1.3, 0));
         if (CS && CS.rmb && !h.unblock && guardFacing(fo.pos)) { // R34：h.unblock = 破防技，格挡无效（只能闪身/躲开）
           const gA = CS.gAng, diff = h.thrust ? 0 : Math.abs(Math.atan2(Math.sin(gA - h.ang), Math.cos(gA - h.ang)));
-          const aligned = diff < 0.7, partial = diff < 1.25;
-          const WPb = window.WpnX ? WpnX.pf() : null, pressed = CS.guardT && now - CS.guardT < 0.3 * (WPb ? WPb.par : 1), swung = aligned && !h.thrust && Combat.guardWas(0.25, h.ang) > 1.0; // 刚按下 / 最后一刻转对方向
+          const FFp = !window.Mods || Mods.on('fair_fight') !== false; // R54p：完美格挡放宽——方向偏差 1.05 内、按下 0.5 秒内都算
+          const aligned = diff < (FFp ? 1.05 : 0.7), partial = diff < (FFp ? 1.5 : 1.25);
+          const WPb = window.WpnX ? WpnX.pf() : null, pressed = CS.guardT && now - CS.guardT < (FFp ? 0.5 : 0.3) * (WPb ? WPb.par : 1), swung = aligned && !h.thrust && Combat.guardWas(FFp ? 0.4 : 0.25, h.ang) > (FFp ? 0.7 : 1.0); // 刚按下 / 最后一刻转对方向
           if (aligned && (pressed || swung)) { // 完美格挡（重击也能弹）
             G.toast && G.toast('⚔️ 完美格挡！她露出了破绽——砍脖子或按 E 处决', '#ffe070', 1.8); SFX.play && SFX.play('bell', 0.6, 1.8); SFX.thud && SFX.thud(1); W.shake = Math.max(W.shake || 0, 0.3);
             Foe.spark(tip, 30); G.flash && G.flash('#fff6c0', 0.35, 160); Foe.parried(fo); foeEvent('parry', fo); return; }
@@ -891,7 +892,7 @@ window.Worlds = (() => {
     else { await wait(260); W.dom.load.style.display = 'flex'; W.dom.loadT.textContent = `前往「${node.name}」……`; }
     const tg0 = performance.now(); PROF.length = 0;
     if (fast) { try { kickAhead(node); } catch (e) { console.warn('kickAhead', e); } } // R49：敌人身体/动画/野兽资源与场景资源并行下载解析
-    await need(stylesOf(i), (p) => { W.dom.loadB.style.width = Math.round(p * 100) + '%'; }); tp('need', tg0); if (fd) await fd;
+    await need(stylesOf(i), (p) => { W.dom.loadB.style.width = Math.round(p * 50) + '%'; }); tp('need', tg0); if (fd) await fd;
     // 预热相邻地点的资产（后台、空闲时、一次一个）
     setTimeout(() => { if (!W) return; node.adj.forEach(b => warm(stylesOf(b))); }, 800);
     if (!W) return;
@@ -909,8 +910,8 @@ window.Worlds = (() => {
         const r = mulberry(node.seed ^ 0x5bd1e995), list = [];
         const SL = B.site && B.site.slots; node.prey.forEach((h, k) => { const sl = SL && SL[k]; list.push({ h, pos: sl ? new V3(sl.x, 0, sl.z) : spot(B, r) }); }); // R41：集会里各就各位
         if (wantBoss) { const Bo = BOf(node); node.bossH = node.bossH || mkBossH(node, Bo); list.push({ h: node.bossH, pos: B.bossAt || new V3(0, 0, 0), boss: Bo, bossK: node.chB || node.region }); }
-        W.dom.loadT.textContent = `「${node.name}」里有人……`;
-        const tf0 = performance.now(); W.foes = await popFoes(B, node, list); tp('foes', tf0);
+        W.dom.loadT.textContent = `「${node.name}」里有人……`; W.dom.loadB.style.width = '62%';
+        const tf0 = performance.now(); W.foes = await popFoes(B, node, list); tp('foes', tf0); if (W) W.dom.loadB.style.width = '80%';
         if (W.foes && !W.foes.length && list.length) W.foes = null;
         if (W.foes && B.site && window.WSites) WSites.seat(W.foes, B.site);
       } catch (e) { console.warn('Foe', e); W.foes = null; }
@@ -926,7 +927,7 @@ window.Worlds = (() => {
     G.player.yaw = Math.atan2(-ins.x, -ins.z); G.player.pitch = -0.05;
     B.sc.add(G.camera); G.camera.far = 400; G.camera.updateProjectionMatrix();
     if (window.Combat && Combat.attach) Combat.attach(B.sc);
-    if (window.ShaderQ && ShaderQ.async) { const ts0 = performance.now(); W.dom.loadT.textContent = `「${node.name}」的灯火一盏盏亮起……`; W.shWait = true; try { await ShaderQ.ready(G.renderer, B.sc, G.camera, p => { if (W) W.dom.loadB.style.width = Math.round(p * 100) + '%'; }, 15000); } finally { if (W) W.shWait = false; } tp('shaders', ts0); if (!W) return; }
+    if (window.ShaderQ && ShaderQ.async) { const ts0 = performance.now(); W.dom.loadT.textContent = `「${node.name}」的灯火一盏盏亮起……`; W.shWait = true; try { await ShaderQ.ready(G.renderer, B.sc, G.camera, p => { if (W) W.dom.loadB.style.width = Math.round(80 + p * 20) + '%'; }, 15000); } finally { if (W) W.shWait = false; } tp('shaders', ts0); if (!W) return; }
     try { const tc0 = performance.now(); const cm = G.camera; cm.position.set(W.pos.x, W.pos.y + EYE, W.pos.z); cm.rotation.set(G.player.pitch, G.player.yaw, 0, 'YXZ'); cm.updateMatrixWorld(true); if (G.post && G.post.on) G.post.render(B.sc, cm); else G.renderer.render(B.sc, cm); tp('firstframe', tc0); } catch (e) { console.warn('precompile', e); } // 进场前先渲一帧：着色器编译/贴图上传都藏在加载画面后面
     tp('total', tg0); W.dom.load.style.display = 'none'; hud(); banner(node); if (window.Living) try { Living.enter(node, B); } catch (e) { }
     if (window.Mods && Mods.on && Mods.on('loc_story')) { const enter = await nodeStory(node, true); if (!W) return; if (!enter) { leaveHome(); return; } try { G.lockPointer(); } catch (e) {} } // 第二十一轮：用户不要进场冻结剧情卡 → MOD loc_story 默认关

@@ -42,8 +42,13 @@ window.Momentum = (() => {
     el.style.setProperty('--c', t >= 0 ? T[2] : '#e8d8c0'); el.querySelector('.x').innerHTML = `<small>×</small>${M.n}`; el.querySelector('.nm').textContent = t >= 0 ? T[1].replace(/ /g, '') : '杀 意';
     el.querySelector('.bf').textContent = M.n >= 2 ? `伤害 +${Math.round((dmgK() - 1) * 100)}% · 移速 +${Math.round((spdK() - 1) * 100)}%` : '5 秒内再杀一个'; el.querySelector('.bar i').style.transform = `scaleX(${Math.max(0, M.t / WIN)})`;
   }
+  const HS = { hit: [0.06, 0.07, 0.12], kill: [0.08, 0.16, 0.32], parry: [0.04, 0.42, 0.35], guardbreak: [0.07, 0.22, 0.4], perfectdodge: [0.12, 0.55, 0.2], execute: [0.06, 0.3, 0.5] };
+  function hitStop(t) { // R54p：命中顿帧（只冻敌人那一侧）+ 镜头震动
+    const h = HS[t]; if (!h || (window.Mods && Mods.on('hit_stop') === false) || (window.DecapCam && DecapCam.active)) return;
+    try { if (window.Foe && Foe.slowSet) Foe.slowSet(h[0], h[1]); const w = W(); if (w) w.shake = Math.max(w.shake || 0, h[2]); } catch (e) { }
+  }
   function event(t, fo, d) {
-    if (!on() || !W()) return;
+    if (!W()) return; hitStop(t); if (!on()) return;
     if (t === 'kill') add(1, fo);
     else if (t === 'execute' || t === 'onecut' || t === 'decapAlive') add(1, null); // kill 事件已经先 +1，这里是斩首/处决的额外 +1
     else if (t === 'decap') { if (M.n > 0) M.t = WIN; }

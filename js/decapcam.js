@@ -60,12 +60,23 @@ body.dcam>*:not(canvas):not(#dcRoot):not(script):not(style):not(:has(canvas)){op
 #dcRoot .ld.on{opacity:.85}#dcRoot .ld.off{opacity:0;margin-top:140px;transition:opacity 1.6s 1.4s,margin-top 3.2s cubic-bezier(.5,0,1,.6)}`;
     document.head.appendChild(st);
   }
-  function mkUI(n, name) {
+  function mkUI(n, name, sa) {
     addCss(); if (root) root.remove(); root = document.createElement('div'); root.id = 'dcRoot';
     root.innerHTML = '<div class="vg"></div><div class="sl"></div><div class="fl"></div><div class="bar bt"></div><div class="bar bb"></div><div class="cap"><b>斩 首</b><i></i></div><div class="sub"></div>';
     root.querySelector('.cap i').textContent = '第 ' + n + ' 颗首级' + (name ? ' · ' + name : ''); document.body.appendChild(root); document.body.classList.add('dcam'); void root.offsetWidth; root.classList.add('on');
-    const fl = root.querySelector('.fl'), sl = root.querySelector('.sl');
-    try { fl.animate([{ opacity: 0.75 }, { opacity: 0 }], { duration: 260, easing: 'ease-out' }); sl.animate([{ opacity: 1, transform: 'rotate(-24deg) scaleX(.2)' }, { opacity: 1, transform: 'rotate(-24deg) scaleX(1)', offset: 0.35 }, { opacity: 0, transform: 'rotate(-24deg) scaleX(1.1)' }], { duration: 380, easing: 'ease-out' }); } catch (e) { }
+    const fl = root.querySelector('.fl'), sl = root.querySelector('.sl'), dg = sa == null ? -24 : Math.round(-sa * 180 / Math.PI);
+    try { fl.animate([{ opacity: 0.75 }, { opacity: 0 }], { duration: 260, easing: 'ease-out' }); sl.animate([{ opacity: 1, transform: `rotate(${dg}deg) scaleX(.2)` }, { opacity: 1, transform: `rotate(${dg}deg) scaleX(1)`, offset: 0.35 }, { opacity: 0, transform: `rotate(${dg}deg) scaleX(1.1)` }], { duration: 900, easing: 'ease-out' }); } catch (e) { }
+  }
+  // 刀痕：颈口一道沿挥刀方向的亮痕，慢镜头里慢慢淡出
+  function slashArc(s) {
+    const T = THREE, np = new T.Vector3(); if (!neckPos(s, np)) return;
+    if (!slashArc.tex) { const c = document.createElement('canvas'); c.width = 256; c.height = 16; const g = c.getContext('2d'), h = g.createLinearGradient(0, 0, 256, 0); h.addColorStop(0, 'rgba(255,255,255,0)'); h.addColorStop(0.35, 'rgba(255,240,230,.9)'); h.addColorStop(0.6, 'rgba(255,255,255,1)'); h.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = h; g.fillRect(0, 0, 256, 16); const v = g.createLinearGradient(0, 0, 0, 16); v.addColorStop(0, 'rgba(0,0,0,1)'); v.addColorStop(0.5, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,1)'); g.globalCompositeOperation = 'destination-out'; g.fillStyle = v; g.fillRect(0, 0, 256, 16); slashArc.tex = new T.CanvasTexture(c); }
+    const grp = new T.Group(); for (const [w, h, col, op] of [[1.9, 0.07, '#ffffff', 1], [2.3, 0.2, '#ff3a30', 0.55]]) { const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: slashArc.tex, color: col, transparent: true, opacity: op, blending: T.AdditiveBlending, depthWrite: false, depthTest: false, side: T.DoubleSide })); m.renderOrder = 9; m.userData.op = op; grp.add(m); }
+    grp.position.copy(np); grp.lookAt(G.camera.position); grp.rotateZ(s.sa || 0); grp.scale.set(0.3, 1, 1); s.sc.add(grp); s.arc = grp;
+  }
+  function arcTick(s, real) {
+    const a = s.arc; if (!a) return; s.arcT = (s.arcT || 0) + real; const k = s.arcT; a.scale.x = Math.min(1.15, 0.3 + k * 6); const op = k < 0.15 ? 1 : Math.max(0, 1 - (k - 0.15) / 1.4);
+    a.children.forEach(m => { m.material.opacity = m.userData.op * op; }); if (op <= 0) { a.parent && a.parent.remove(a); a.children.forEach(m => { m.geometry.dispose(); m.material.dispose(); }); s.arc = null; }
   }
   function lensBlood(dist) {
     if (!root || dist > 4.8) return; const n = dist < 2.5 ? 9 : 5;
@@ -111,9 +122,11 @@ body.dcam>*:not(canvas):not(#dcRoot):not(script):not(style):not(:has(canvas)){op
   }
   function onEvent(t, fo) {
     if (t !== 'decap') return; try {
-      if (!gate(fo)) return; const W = Worlds._W, n = (W.stats && W.stats.decap) || 1, P = G.postFx && G.postFx.P, hp = fo.h && fo.h.name;
-      S = { t: 0, fo, hb: fo.f.hb, hp0: G.S.hp, pg: 0, pulse: -1, sc: W.B.sc, H: W.B.H, P0: P ? { sat: P.sat, contrast: P.contrast, vig: P.vig } : null, P, fov0: G.camera.fov, lens: false, skipped: false, tr: 0, ended: false, ex: '' };
-      plan(S); bloodInit(S.sc, S.H); mkUI(n, fo.h && (fo.h.name || fo.h.n)); sfxStart();
+      if (window.G && G.S) G.S.decapN = (G.S.decapN || (G.S.heads ? G.S.heads.length : 0)) + 1;
+      if (!gate(fo)) return; const W = Worlds._W, n = (G.S && G.S.decapN) || 1, P = G.postFx && G.postFx.P, hp = fo.h && fo.h.name;
+      const sw = window.Combat && Combat.state && Combat.state.sw, sa = sw ? Math.atan2(sw.dy || 0, sw.dx || 1) : -0.42;
+      S = { t: 0, fo, hb: fo.f.hb, hp0: G.S.hp, pg: 0, pulse: -1, sc: W.B.sc, H: W.B.H, P0: P ? { sat: P.sat, contrast: P.contrast, vig: P.vig } : null, P, fov0: G.camera.fov, lens: false, skipped: false, tr: 0, ended: false, ex: '', sa };
+      plan(S); bloodInit(S.sc, S.H); mkUI(n, fo.h && (fo.h.name || fo.h.n), sa); sfxStart(); slashArc(S);
       const hv = headPos(S, new THREE.Vector3()), dd = hv ? hv.distanceTo(G.camera.position) : 9; S.dist = dd; setTimeout(() => lensBlood(dd), 60);
     } catch (e) { console.warn('DecapCam', e); finish(); }
   }
@@ -160,7 +173,7 @@ body.dcam>*:not(canvas):not(#dcRoot):not(script):not(style):not(:has(canvas)){op
       // 2) 锁血
       if (G.S) { if (G.S.hp < s.hp0) G.S.hp = s.hp0; else s.hp0 = G.S.hp; }
       // 3) 血
-      const gd = real * k; spray(s, gd); bloodTick(gd);
+      const gd = real * k; spray(s, gd); bloodTick(gd); arcTick(s, real);
       sayLines(s);
       // 4) 头的表情
       try { const ex = exprAt(t), key = Object.keys(ex).map(q => q + ':' + ex[q].toFixed(2)).join(','); if (key !== s.ex && s.hb && s.hb.setExpression) { s.ex = key; s.hb.setExpression(ex); } } catch (e) { }
@@ -185,7 +198,7 @@ body.dcam>*:not(canvas):not(#dcRoot):not(script):not(style):not(:has(canvas)){op
     if (T && T.restore) Promise.resolve().then(() => Promise.resolve().then(restore)); else Promise.resolve().then(restore);
   }
   function finish() {
-    const s = S; S = null; if (!s) return; lastEnd = performance.now() / 1000; kNow = 1;
+    const s = S; S = null; if (!s) return; lastEnd = performance.now() / 1000; kNow = 1; if (s.arc) { s.arcT = 99; arcTick(s, 0); }
     try { if (window.Foe && Foe.slowSet) Foe.slowSet(1, 0); } catch (e) { }
     try { if (s.P && s.P0) { s.P.sat = s.P0.sat; s.P.contrast = s.P0.contrast; s.P.vig = s.P0.vig; } } catch (e) { }
     try { if (G.camera) { G.camera.fov = s.fov0; G.camera.updateProjectionMatrix(); } } catch (e) { }
