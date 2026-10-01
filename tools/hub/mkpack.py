@@ -9,7 +9,11 @@ ST = sys.argv[1] if len(sys.argv) > 1 else '/tmp/vrm_out/state.json'
 ok = json.load(open(ST))['ok']
 BAD_TAG = re.compile('ロリ|水着|スク水|下着|ビキニ|バニー|ネグリジェ|おばけ|赤ちゃん|幼')
 MANUAL_OUT = set(os.environ.get('VH_OUT', '').split(','))
-ok = [m for m in ok if not BAD_TAG.search(' '.join(m['tags'] + [m['name']])) and m['file'] not in MANUAL_OUT]
+import ast
+EXIST = {}
+if os.path.exists('js/vroid_pack.js'):
+    _t = open('js/vroid_pack.js', encoding='utf-8').read(); EXIST = json.loads(_t[_t.index('window.VH_PACK = ') + 17:_t.rindex(';')])  # 追加模式：保留已登记的
+ok = [m for m in ok if m['file'] not in EXIST and not BAD_TAG.search(' '.join(m['tags'] + [m['name']])) and m['file'] not in MANUAL_OUT]
 env = dict(os.environ, PYTHONPATH='/home/user/.cache/pylib', PLAYWRIGHT_BROWSERS_PATH='/home/user/.cache/pw', VW='1200', VH='520')
 stats = {}
 os.makedirs('/tmp/vhsheets', exist_ok=True)
@@ -60,8 +64,10 @@ def pick(m):
     else: add('villager', 'herbalist', 'smithgirl', 'engineer', 'ranger', 'guard', 'merc', 'huntress')
     return ids[:10]
 OVR = {'VH_921690': ['guard', 'general', 'knight', 'paladin', 'merc']}  # 人工看图：军装外套
-pack = {m['file']: {'n': m['name'], 'a': m['author'], 'ids': OVR.get(m['file']) or pick(m)} for m in ok if m['file'] in stats}
+OVR.update(json.loads(os.environ.get('VH_IDS', '{}')))  # 人工指定 {文件:[身份…]}
+new = {m['file']: {'n': m['name'], 'a': m['author'], 'ids': OVR.get(m['file']) or pick(m)} for m in ok if m['file'] in stats}
+pack = dict(EXIST); pack.update(new)
 js = '// R53 VRoid Hub 身体登记（tools/hub/mkpack.py 生成；每条授权在 hub.vroid.com 页面核对：允许暴力表现 / 改造 / 再分发）。\n// VH_PACK[文件名] = {n: 模型名, a: 作者, ids: 适配的身份}；身体本体在 big/body/<文件名>.js（按名字加载），由 js/foe.js vhExt 并入身份候选，MOD vh_bodies 可关。\nwindow.VH_PACK = ' + json.dumps(pack, ensure_ascii=False, indent=0).replace('\n', '') + ';\n'
 open('js/vroid_pack.js', 'w').write(js)
-open('/tmp/vh_credits.md', 'w').write('\n'.join('- `%s` %s — %s (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/%s/models/%s' % (m['file'], m['name'], m['author'], m['cid'], m['mid']) for m in ok if m['file'] in pack) + '\n')
+open('/tmp/vh_credits.md', 'w').write('\n'.join('- `%s` %s — %s (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/%s/models/%s' % (m['file'], m['name'], m['author'], m['cid'], m['mid']) for m in ok if m['file'] in new) + '\n')
 print(len(pack), 'registered')

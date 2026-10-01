@@ -198,3 +198,30 @@ models/CLS_*.js，由 js/headpacks.js 按 MOD pack_voc / pack_touhou / pack_cls 
 - `VH_061299` 赤居浮奈 — 永遠力吹雪@Skeb募集中 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/4405457166853439284/models/4403766635056061299
 - `VH_127512` モブ子ちゃん — マユラ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/5746502360712405535/models/2998677666839127512
 - `VH_216139` お試し2 — yamochan7 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/3293756840432485398/models/8624915900578216139
+
+### R53b（骑士/精灵/冒险者批）
+- `VH_665801` Jinx — Archi (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2904771558218700181/models/9089459980967665801
+- `VH_654907` スウェーデンちゃん — バーネット (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/4095024816131573121/models/6681066214779654907
+- `VH_470048` samplecft0.0 — SunLace✨ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/4625139936223931935/models/4599730645493470048
+- `VH_407402` AI子3 — misaki (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/6372258706445967624/models/2974275768817407402
+- `VH_862934` Boothにて無料配布中 — 安全太郎(旧01_mit) (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2825453020096694533/models/6896701093787862934
+- `VH_329278` Brenda — BrunixxVT (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/7421534503591137114/models/8674465397224329278
+- `VH_172387` 陸上少女 — ひなゆずき (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/3825745923642048810/models/714615516957172387
+- `VH_110696` Dream_Patora — 素材利用時は利用規約を読でね (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/9081248154626929492/models/2086305716430110696
+- `VH_866480` Lea Loxnoct — omgwhocares14 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/8262859030199215254/models/1912025010562866480
+- `VH_348798` 名前不詳１ — レオ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/3872299465362313211/models/2219483509765348798
+- `VH_483515` Lisara Gozen — Lisara Gozen_VT (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/9204064368673026870/models/3664734996884483515
+- `VH_730511` Female dark elf — ᴮᵉʳᵘᵗʰⁱᵉˡ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/4614100189762954631/models/6769475352946730511
+- `VH_436970` Lilia — archekitai (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/7204213222772510185/models/2255237240786436970
+- `VH_579317` skinny elf women — LittleMxStar (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/181278512695377023/models/1170536215708579317
+- `VH_255863` +anatasia+ — Joii (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/4744645135358012250/models/8751785310530255863
+- `VH_846051` Actor2 — つあ a.k.a 開星 ヨキ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/8709531605683402840/models/5063585635226846051
+- `VH_507309` ドラセラ — クロリ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2387423309867367631/models/3002878208344507309
+- `VH_398626` Asula — Heady (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/7171429020801271881/models/4270651959988398626
+- `VH_476605` ander — Eya Rizgi (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/3837322738024036009/models/2370468579952476605
+- `VH_092224` katei_kyousi — 素材利用時は利用規約を読でね (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/154232427885440366/models/8762854870688092224
+- `VH_028455` Phoenix — BeanMChocolate (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/656707744707807167/models/1430813664729028455
+- `VH_996092` Cyber Android 21 armor (full) — VtuberSAIN (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2114068361230241913/models/8800473713369996092
+- `VH_058208` SL14 — 桜田とまこ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/838957408149116567/models/8851210693205058208
+- `VH_477048` Jinny — Andrew M (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/3430760887649883569/models/792233110711477048
+- `VH_914350` アルマ — さとうたくや (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/9149881920343406910/models/2275186222502914350

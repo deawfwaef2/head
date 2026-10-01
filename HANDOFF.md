@@ -1918,3 +1918,9 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - **IMPORTANT FINDING**: `G.HOOK.frame` does NOT run while a hunt world is active (game.js returns after `Worlds.frame`). Talents.frame (mana regen, buffs, projectiles), TalUI.frame (skill bar) and HpCenter.frame were therefore only running in the cave. Fixed with `HOOK.world` bridge + dedupe. Other HOOK.frame modules (skillfx, balance, unlocks, curios, ...) are still cave-only; check them if something "never updates outdoors".
 - cave_cozy default OFF (user request). Compact HP/mana block in hpcenter.js (2px gap, tick chips under the bar).
 - Could not verify in a real world run (headless world crashes/hangs the 2GB sandbox); verified with stub harness.
+
+---
+## R53b — VRoid Hub 追加：骑士 / 精灵 / 冒险者批（agent: sourcing）
+- 用户再次亲手登录（`tools/hub/livelogin.py` 在 8081 端口给用户实时页面；验证码只由用户点，用户过了验证码后我才替他点“登录”按钮）。重新筛选 39 个候选（骑士/精灵/暗精灵/弓手/佣兵等）→ 下载转换 32 个、质检拒 2 个、转换失败 5 个（头部无脸）。人工看图剔除 7 个（现代便服/过矮/暴露）后登记 25 个，`js/vroid_pack.js` 现共 76 个。
+- 身份是看渲染图后手工指定的：骑士类（`VH_507309` `VH_476605` `VH_996092` 等 → knight/paladin/guard/general/dragonknight），精灵类（`VH_579317` `VH_110696` `VH_477048` → elfprincess/ranger/archer/druid），暗色 → courtmage/hexer/fallen，等等。`tools/hub/mkpack.py` 现为追加模式（保留已登记）；`VH_IDS` 环境变量可手工指定。
+- 事实：Hub 上“允许暴力+改造+再分发”的骑士/盔甲女角色极少（多为男性、机甲或比基尼甲），所以骑士类仍然少；要更多请告诉我具体想要什么风格，或让用户在 Hub 上手动收藏条目 URL，我按 URL 下载。
