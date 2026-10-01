@@ -24,8 +24,9 @@ head.position.set(0.1, 1.55, -2.4); scene.add(head); let hv = new THREE.Vector3(
 let K = 1; const exprLog = [];
 window.G = { camera, S: { hp: 50 }, playing: true, uiOpen: false, postFx: { P: { sat: 1.08, contrast: 1.07, vig: 0.42 } } };
 window.Worlds = { active: true, _W: { B: { sc: scene, H: () => 0 }, stats: { decap: 3 } } };
-window.Foe = { foes: [], slowSet(k) { K = k; } };
-const fo = { f: { holder: head, bones: { neck }, hb: { setExpression(e) { curEx = e; exprLog.push(JSON.stringify(e)); drawFace(e); } } }, h: { name: '艾琳' }, pos: new THREE.Vector3(0.1, 0, -2.4), boss: false };
+window.Foe = { foes: [], slowSet(k) { K = k; }, say(o, t) { window.__said = (window.__said || []).concat([(o.h.name) + ':' + t]); } };
+Foe.foes.push({ h: { name: '守卫' }, pos: new THREE.Vector3(3, 0, -5), brave: true }, { h: { name: '村民' }, pos: new THREE.Vector3(-3, 0, -6) });
+Foe.foes.push(null); Foe.foes.pop(); const fo = { f: { holder: head, bones: { neck }, hb: { setExpression(e) { curEx = e; exprLog.push(JSON.stringify(e)); drawFace(e); } } }, h: { name: '艾琳' }, pos: new THREE.Vector3(0.1, 0, -2.4), boss: false };
 let T = 0; const DT = 1 / 30;
 window.begin = () => { DecapCam.onEvent('decap', fo); return Mods.on('decap_cam'); };
 window.stepTo = (t) => { while (T < t) { T += DT; if (headLive) { hv.y -= 9.8 * DT * K; head.position.addScaledVector(hv, DT * K); head.rotation.z += 0.9 * DT * K; if (head.position.y < 0.14) { head.position.y = 0.14; headLive = false; } }

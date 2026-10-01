@@ -1933,3 +1933,7 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - **信息栏展开**：已想起的行点击展开/收起全文（`.fr.open` 换行显示，▸/▾ 标记，刷新后保持）。
 - **头大小**：旧 k = 整颗头包围盒高/0.26 → 同一张脸因发长/帽子 k 从 1.33 跳到 3.0（长发=拿得远=头特别小；高帽=盒中心上移、脸沉到动作栏后）。改为 `faceFit()`：k = 1.4 × hb.group 世界缩放/1.55（ModelHeads 已按脸归一），对准点 = iris 网格中心；打开后 0.6s/1.6s 复测并平滑（刚生成的头网格可能未就绪）。YOFF 0.04→0.09（两眼在画面中部偏下、下巴不压栏）。
 - 测试工具：`/var/work/riw2.py`（备份在 /home/user/bak/tools）——index 真实启动、加头、逐个 F 打开，输出 k/对准点/按钮遮挡/全局样式泄漏/可见 HUD 并截图。注意：全量 models 在 2GB 沙盒会 OOM，只 sparse 检出少量头测试。
+
+## R49h-2 (decap_cam: much slower + witness reactions)
+- User: wants the slow-mo to be *very* slow so the head's whole flight is watchable, and nearby characters to talk. js/decapcam.js: timeline now 5.8s real (k≈0.075→0.115 hold 4.6s, ease out to 1), ~13x slow; expression keyframes, heartbeat, spray pulses (0.16 game-s) and head blood trail retimed for slow-mo; camera push eases over 1.3s.
+- Witnesses: up to 3 nearest live foes within 24m say a line at t=0.8/2.1/3.4s via `Foe.say` (bubble) + large subtitle `.sub` (name + 「line」); first speaker uses shock lines containing the victim's name, brave foes taunt, others panic, bosses menace. Files: js/decapcam.js, js/mods.js, js/mods_i18n.js, tools/test/decapcam.html.
