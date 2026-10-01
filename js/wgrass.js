@@ -27,7 +27,7 @@ window.WGrass = (() => {
   const FLOWERS = [[.95, .93, .85], [.95, .8, .2], [.85, .35, .55], [.55, .4, .85], [.95, .5, .15]];
 
   // ======================= v2（R52 grass_master）=======================
-  const TIER = { ultra: { N: 32, K: 4, far: 36 }, high: { N: 24, K: 3, far: 30 }, mid: { N: 16, K: 2, far: 22 } };
+  const TIER = { ultra: { N: 24, K: 3, far: 30 }, high: { N: 16, K: 3, far: 26 }, mid: { N: 10, K: 2, far: 20 } };
   if (+QS.get('gn')) for (const k in TIER) TIER[k].N = +QS.get('gn');
   if (+QS.get('gk')) for (const k in TIER) TIER[k].K = +QS.get('gk');
   const postFx = () => { const G = window.__game; return (G && (G.postFx || G.post)) || null; };
@@ -38,19 +38,19 @@ window.WGrass = (() => {
     float wgN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
       return mix(mix(wgH1(i), wgH1(i + vec2(1.0, 0.0)), f.x), mix(wgH1(i + vec2(0.0, 1.0)), wgH1(i + vec2(1.0, 1.0)), f.x), f.y); }`;
   const VERT_PRE = `
-    attribute float gm; attribute float aI; attribute vec4 wgF; attribute vec2 wgL;
-    uniform float uN, uStride, uH, uFar, uRad, uT, uWind; uniform vec2 uWD, uSeed;
+    attribute float gm; attribute vec2 aL; attribute vec4 wgF; attribute vec2 wgL;
+    uniform float uN, uH, uFar, uRad, uT, uWind; uniform vec2 uWD, uSeed;
     varying vec3 vGW; varying vec3 vGN; varying float vGH; varying float vGS; varying float vGF; varying float vGM; varying vec4 vGF4; varying vec3 vGB;
     ${HASH}`;
   const VERT_MAIN = `
-    { float lay = uN - 1.0 - aI * uStride; // 实例 0 = 最上层：从上往下画
+    { float lay = aL.x; // 实例 0 = 最上层：从上往下画；aL.y = 本块的抽层步长
       float hn = (lay + 1.0) / uN;
       vec3 wp0 = (modelMatrix * vec4(position, 1.0)).xyz; vec3 wn = normalize(mat3(modelMatrix) * normal);
       float dc = distance(wp0.xz, cameraPosition.xz);
       float fd = (1.0 - smoothstep(uFar * 0.55, uFar, dc)) * (1.0 - smoothstep(uRad - 4.0, uRad, length(wp0.xz)));
       float hk = uH * (0.6 + 0.4 * fd);
       transformed += normal * (hk * hn);
-      vGW = wp0 + wn * (hk * hn); vGN = wn; vGH = hk * hn; vGS = hk / uN * uStride; vGF = fd;
+      vGW = wp0 + wn * (hk * hn); vGN = wn; vGH = hk * hn; vGS = hk / uN * aL.y; vGF = fd;
       vGM = gm * smoothstep(0.74, 0.9, wn.y); vGF4 = wgF;
       float g1 = wgN(wp0.xz * 0.06 - uWD * uT * 0.42 + uSeed), g2 = wgN(wp0.xz * 0.17 - uWD * uT * 1.05 + uSeed + 5.7);
       float gust = smoothstep(0.32, 0.85, g1 * 0.62 + g2 * 0.38); // 沿风向滚动的阵风：看得见的风浪
@@ -152,9 +152,9 @@ window.WGrass = (() => {
     }
     #undef RE_Direct
     #define RE_Direct RE_Direct_WG`;
-  function patchGrass(m, U, su, pre) {
+  function patchGrass(m, U, pre) {
     m.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, U, su);
+      Object.assign(sh.uniforms, U);
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + VERT_PRE).replace('#include <begin_vertex>', '#include <begin_vertex>\n' + VERT_MAIN);
       // 预通道与着色通道顶点着色器逐字相同（EQUAL 深度测试要求位置完全一致）；WG_PRE 只写进片元
       sh.fragmentShader = (pre ? '#define WG_PRE\n' : '') + '#define CHAR_MAT\n' + sh.fragmentShader // CHAR_MAT：不吃 world_cel 的硬阴影
@@ -196,7 +196,9 @@ window.WGrass = (() => {
   }
   let FALLBACK = null; const groundFallback = () => { if (!FALLBACK) { FALLBACK = new THREE.DataTexture(new Uint8Array([140, 120, 90, 255]), 1, 1); FALLBACK.needsUpdate = true; } return FALLBACK; };
   function buildV2(tg, o, lush) {
-    const TI = tierOf(), TC = TIER[TI], N = TC.N, A2C = msaaOn();
+    const TI = tierOf(), TC = TIER[TI], A2C = msaaOn();
+    let rs = 1; try { const v = window.__game.renderer.getDrawingBufferSize(new THREE.Vector2()); rs = Math.min(1, Math.max(0.45, Math.sqrt(1280 * 720 / (v.x * v.y)))); } catch (e) { }
+    const N = QS.get('gn') ? TC.N : Math.max(8, Math.round(TC.N * rs)); // 高分辨率时壳层按像素数缩减（填充率随像素数线性增长，子步会补上层间空隙）
     const pos = tg.attributes.position, nor = tg.attributes.normal, n = pos.count, idx = tg.index.array, Rg = Math.max(8, (o.RM || o.R || 20) + 3), R2 = (Rg + 2) * (Rg + 2);
     // 本地点的“草基因”（种子决定，每个地点都不一样）
     const gr = o.g.grassMul || new THREE.Color(1, 1, 1), rr = seeded(o.g.seed);
@@ -227,7 +229,7 @@ window.WGrass = (() => {
       lA[i * 2] = (nz(X * 0.33 + 17, Z * 0.33 + 17) - 0.5) * lk; lA[i * 2 + 1] = (nz(X * 0.33 + 41, Z * 0.33 + 41) - 0.5) * lk; }
     const gmAttr = new THREE.BufferAttribute(gmA, 1), fAttr = new THREE.BufferAttribute(fA, 4), lAttr = new THREE.BufferAttribute(lA, 2);
     tg.setAttribute('gm', gmAttr); tg.setAttribute('wgF', fAttr);
-    const CH = 9, cmap = new Map(), px = (v) => pos.getX(v), py = (v) => pos.getY(v), pz = (v) => pos.getZ(v);
+    const CH = 12, cmap = new Map(), px = (v) => pos.getX(v), py = (v) => pos.getY(v), pz = (v) => pos.getZ(v);
     for (let t = 0; t < idx.length; t += 3) {
       const a = idx[t], b = idx[t + 1], c = idx[t + 2];
       if (!(inR[a] | inR[b] | inR[c]) || gmA[a] + gmA[b] + gmA[c] < 0.05) continue;
@@ -245,25 +247,26 @@ window.WGrass = (() => {
       uBase: { value: V(pa, 0) }, uTip: { value: V(pa, 1) }, uBase2: { value: V(pb, 0) }, uTip2: { value: V(pb, 1) },
       uFl: { value: new THREE.Vector3(fl[0], fl[1], fl[2]) }, uDryC: { value: new THREE.Vector3(.36 * gr.r, .29 * gr.g, .12 * gr.b) },
       uPush: { value: [0, 1, 2, 3, 4, 5].map(() => new THREE.Vector4(0, 0, 0, 0)) }, uGT: { value: (tm && tm.map) || groundFallback() } };
-    const aI = new THREE.InstancedBufferAttribute(new Float32Array(N).map((_, i) => i), 1);
+    // 抽层变体（步长 1/2/4）做成三份实例属性：所有块共用 2 个材质，切 LOD 只换属性，不切材质（three.js 切材质的 CPU 开销很大）
+    const AL = {}; for (const s of [1, 2, 4]) { const a = []; for (let l = N - 1; l >= 0; l -= s) a.push(l, s); AL[s] = new THREE.InstancedBufferAttribute(new Float32Array(a), 2); }
     const grp = new THREE.Group(), chunks = [], vc = !!tg.attributes.color, mats = [];
-    const mkMat = (su, pre) => {
+    const mkMat = (pre) => {
       const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, metalness: 0, vertexColors: vc, envMapIntensity: 0.4 });
       m.defines = { WG_K: TC.K }; m.extensions = { derivatives: true }; m.alphaToCoverage = A2C;
       if (pre) m.colorWrite = false; else { m.depthWrite = false; m.depthFunc = THREE.EqualDepth; }
-      patchGrass(m, U, su, pre); mats.push(m); return m;
+      patchGrass(m, U, pre); mats.push(m); return m;
     };
+    const mPre = mkMat(true), mMain = mkMat(false);
     for (const ch of cmap.values()) {
       const geo = new THREE.InstancedBufferGeometry();
       geo.setAttribute('position', pos); geo.setAttribute('normal', nor); if (vc) geo.setAttribute('color', tg.attributes.color);
-      geo.setAttribute('gm', gmAttr); geo.setAttribute('wgF', fAttr); geo.setAttribute('wgL', lAttr); geo.setAttribute('aI', aI);
-      geo.setIndex(new THREE.BufferAttribute(n > 65535 ? new Uint32Array(ch.i) : new Uint16Array(ch.i), 1)); geo.instanceCount = N;
+      geo.setAttribute('gm', gmAttr); geo.setAttribute('wgF', fAttr); geo.setAttribute('wgL', lAttr); geo.setAttribute('aL', AL[1]);
+      geo.setIndex(new THREE.BufferAttribute(n > 65535 ? new Uint32Array(ch.i) : new Uint16Array(ch.i), 1)); geo.instanceCount = AL[1].count; geo._maxInstanceCount = N;
       geo.boundingSphere = new THREE.Sphere(new THREE.Vector3((ch.x0 + ch.x1) / 2, (ch.y0 + ch.y1) / 2 + uH / 2, (ch.z0 + ch.z1) / 2), Math.hypot(ch.x1 - ch.x0, ch.y1 - ch.y0 + uH, ch.z1 - ch.z0) / 2 + 0.5);
-      const su = { uStride: { value: 1 } };
-      const pre = new THREE.Mesh(geo, mkMat(su, true)), main = new THREE.Mesh(geo, mkMat(su, false));
+      const pre = new THREE.Mesh(geo, mPre), main = new THREE.Mesh(geo, mMain);
       pre.renderOrder = -2; // 所有草的深度预通道先画，之后的地面/石头也能被草挡住省掉着色
       for (const me of [pre, main]) { me.castShadow = false; me.receiveShadow = !(me === pre); me.userData.wg = 1; me.raycast = () => { }; grp.add(me); }
-      chunks.push({ pre, main, geo, su, s: 1, x0: ch.x0, x1: ch.x1, z0: ch.z0, z1: ch.z1 });
+      chunks.push({ pre, main, geo, s: 1, x0: ch.x0, x1: ch.x1, z0: ch.z0, z1: ch.z1 });
     }
     if (tm) patchGround(tm, U);
     o.sc.add(grp);
@@ -282,7 +285,7 @@ window.WGrass = (() => {
         for (const c of chunks) {
           const dx = Math.max(c.x0 - p.x, 0, p.x - c.x1), dz = Math.max(c.z0 - p.z, 0, p.z - c.z1), d = Math.hypot(dx, dz);
           const vis = d < TC.far + 1; c.pre.visible = c.main.visible = vis; if (!vis) continue;
-          const s = d < 12 ? 1 : d < 22 ? 2 : 4; if (s !== c.s) { c.s = s; c.su.uStride.value = s; c.geo.instanceCount = Math.ceil(N / s); }
+          const s = d < 9 ? 1 : d < 17 ? 2 : 4; if (s !== c.s) { c.s = s; c.geo.setAttribute('aL', AL[s]); c.geo.instanceCount = AL[s].count; }
         }
       } };
     WGrass._last = api;

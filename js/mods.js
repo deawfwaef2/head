@@ -74,17 +74,17 @@ window.Mods = (() => {
     { id: 'ground_props', cat: 'look', icon: '🪨', n: '岩石贴地（第五十轮）', d: '大件摆设（岩石、树桩等）按脚印四角取最低地面并略微下沉，不再悬在坡上。关掉恢复旧摆法。', def: true },
     { id: 'water_fx', cat: 'look', icon: '🌊', n: '水面质感（第五十轮）', d: '水岸渐隐（不再是硬边平板）、浅滩泛亮、岸边泡沫、更细的涟漪，深处更深。关掉恢复旧水面。', def: true },
     { id: 'shell_grass', cat: 'look', icon: '🌱', n: '壳层草地（第五十轮）', d: '地面长出毛茸茸的草：着色器壳层渲染（不放草模型、无贴图），镜头附近一根根逐渐变细、随风摆动，26 米外自动退回地面。路/水边/陡坡不长，干旱地区稀疏。关掉恢复光秃地面。', def: true },
-    { id: 'grass_master', cat: 'look', icon: '🌾', n: '大师级草地（R52）', d: '壳层草地重写：最多 48 层实例化壳 + 扫掠光线步进（低角度看不再是一摞薄片）、扁叶片 / 卷曲 / 簇状散开 / 枯叶 / 野花、看得见的阵风风浪、玩家和敌人走过会把草拨开、逆光透射与根部阴影、4×MSAA 下边缘抗锯齿；长草区的地面自动染成草色，远近无缝。跟随画质档位自动降级。关掉 = 第五十轮原版草地。', def: true, requires: ['shell_grass'] },
-    { id: 'world_atmos', cat: 'look', icon: '🌅', n: '大气与光束（R52）', d: '野外的大气层：朝太阳方向的空气透视光晕（远景被阳光染暖）、顺着地形沉在低处的薄雾、从树叶和建筑缝隙里漏出的太阳光束（体积光）。只作用于野外，洞里不变。', def: true },
+    { id: 'grass_master', cat: 'look', icon: '🌾', n: '大师级草地（R52）', d: '壳层草地重写：最多 48 层实例化壳 + 扫掠光线步进（低角度看不再是一摞薄片）、扁叶片 / 卷曲 / 簇状散开 / 枯叶 / 野花、看得见的阵风风浪、玩家和敌人走过会把草拨开、逆光透射与根部阴影、4×MSAA 下边缘抗锯齿；长草区的地面自动染成草色，远近无缝。跟随画质档位自动降级。关掉 = 第五十轮原版草地。', def: true, requires: ['shell_grass'], rel: { world_cel: '草不吃 world_cel 的硬阴影（保持柔光）', pcss_shadows: '草地也接收 PCSS 软阴影，两者同开最耗 GPU', world_master: 'world_master 高档位还会加密模型草/灌木，叠加', terrain_detail: '长草区地面会被草地染色，细节层保留' } },
+    { id: 'world_atmos', cat: 'look', icon: '🌅', n: '大气与光束（R52）', d: '野外的大气层：朝太阳方向的空气透视光晕（远景被阳光染暖）、顺着地形沉在低处的薄雾、从树叶和建筑缝隙里漏出的太阳光束（体积光）；同时把原来的灰雾减薄、压一点黑位去灰。只作用于野外，洞里不变。', def: true, rel: { world_master: 'world_master 的分地区调色在之后叠加', sky_master: '太阳 HDR 光晕是光束的光源，同开最明显', filmic_agx: '大气光晕在色调映射之前加入' } },
     { id: 'cloud_shadows', cat: 'look', icon: '☁️', n: '云影（R52）', d: '天上的云在地面上投下缓缓飘过的影子，山坡和草地忽明忽暗，电影感。需开「大气与光束」。', def: true, requires: ['world_atmos'] },
-    { id: 'filmic_agx', cat: 'look', icon: '🎬', n: '电影色调 AgX（R52）', d: '用 AgX 替换 ACES 色调映射：高光滚降更自然，亮的草地/天空/火光不再偏色发黄、不过饱和，暗部层次更多。洞里和野外都生效。', def: true },
-    { id: 'terrain_detail', cat: 'look', icon: '🪨', n: '近景地面细节（R52）', d: '地面、岩壁、洞壁在镜头 20 米内叠加同一张真实贴图的高频细节（亮度 + 法线），近看不再糊成一片。洞里和野外都生效。', def: true },
-    { id: 'foliage_glow', cat: 'look', icon: '🍃', n: '树叶透光（R52）', d: '树叶、灌木、草丛迎着太阳时透出黄绿色的光（次表面透射），逆光的林子会发亮。', def: true },
-    { id: 'sky_master', cat: 'look', icon: '🌤️', n: '高清天空（R52）', d: '天空照片改用双三次（Catmull-Rom）采样，放大不再发糊；太阳周围加 HDR 光晕，驱动泛光和太阳光束。', def: true },
-    { id: 'water_master', cat: 'look', icon: '💧', n: '镜面水（R52）', d: '水面菲涅尔反射：斜看像镜子一样映出天空，俯看透出水色；反射更锐利。与「水面质感」叠加。', def: true },
-    { id: 'pcss_shadows', cat: 'look', icon: '🌳', n: '真实软阴影 PCSS（R52）', d: '太阳阴影改为接触硬化软阴影：物体接地处锐利，离地越高边缘越柔（树冠的影子有真实的半影）。只作用于野外太阳。', def: true },
-    { id: 'lens_flare', cat: 'look', icon: '📸', n: '镜头光晕（R52）', d: '太阳、火光等强光在画面对称位置产生淡淡的带色散鬼影和光环，电影镜头感。', def: true },
-    { id: 'sharpen', cat: 'look', icon: '🔍', n: '画面锐化 CAS（R52）', d: '抗锯齿之后加一道对比度自适应锐化（AMD CAS）：贴图、草叶、发丝更清晰，平滑区域不会出白边。几乎不吃性能。', def: true },
+    { id: 'filmic_agx', cat: 'look', icon: '🎬', n: '电影色调 AgX（R52）', d: '用 AgX 替换 ACES 色调映射：高光滚降更自然，亮的草地/天空/火光不再偏色发黄、不过饱和；但整体更柔、对比更低（用户反馈“灰蒙蒙”，默认关）。洞里和野外都生效。', def: false, rel: { world_master: '分地区调色在 AgX 之后叠加', world_atmos: '与大气光晕同开时画面更灰' } },
+    { id: 'terrain_detail', cat: 'look', icon: '🪨', n: '近景地面细节（R52）', d: '地面、岩壁、洞壁在镜头 20 米内叠加同一张真实贴图的高频细节（亮度 + 法线），近看不再糊成一片。洞里和野外都生效。', def: true, rel: { terrain_master: '陡坡岩石贴图同样加细节', cave_detail: '洞壁/洞底同样加细节' } },
+    { id: 'foliage_glow', cat: 'look', icon: '🍃', n: '树叶透光（R52）', d: '树叶、灌木、草丛迎着太阳时透出黄绿色的光（次表面透射），逆光的林子会发亮。', def: true, rel: { world_cel: 'world_cel 会把透光部分也收硬一些' } },
+    { id: 'sky_master', cat: 'look', icon: '🌤️', n: '高清天空（R52）', d: '天空照片改用双三次（Catmull-Rom）采样，放大不再发糊；太阳周围加 HDR 光晕，驱动泛光和太阳光束。', def: true, rel: { water_master: '镜面水反射的就是这张天空', lens_flare: '太阳光晕越亮，镜头鬼影越明显' } },
+    { id: 'water_master', cat: 'look', icon: '💧', n: '镜面水（R52）', d: '水面菲涅尔反射：斜看像镜子一样映出天空，俯看透出水色；反射更锐利。与「水面质感」叠加。', def: true, rel: { water_fx: '在岸线渐隐/泡沫之上叠加反射' } },
+    { id: 'pcss_shadows', cat: 'look', icon: '🌳', n: '真实软阴影 PCSS（R52）', d: '太阳阴影改为接触硬化软阴影：物体接地处锐利，离地越高边缘越柔（树冠的影子有真实的半影）。只作用于野外太阳。卡时优先关它。', def: true, rel: { world_master: 'world_master 把阴影图设为 4096（ultra），PCSS 在其上采样' } },
+    { id: 'lens_flare', cat: 'look', icon: '📸', n: '镜头光晕（R52）', d: '太阳、火光等强光在画面对称位置产生淡淡的带色散鬼影和光环，电影镜头感。', def: true, rel: { lowspec: '低配模式没有后处理，不生效' } },
+    { id: 'sharpen', cat: 'look', icon: '🔍', n: '画面锐化 CAS（R52）', d: '抗锯齿之后加一道对比度自适应锐化（AMD CAS）：贴图、草叶、发丝更清晰，平滑区域不会出白边。几乎不吃性能。', def: true, rel: { lowspec: '低配模式没有后处理，不生效' } },
     { id: 'fast_load', cat: 'look', icon: '⚡', n: '加载提速（第四十九轮）', d: '进图更快：敌人身体/动画/野兽模型与场景资源并行载入，去掉固定等待（淡出 260ms + 60ms），模型解码改同步（更快），地形外圈（玩不到的远景）每 3 格求一次高度其余插值。关掉恢复旧流程。', def: true },
     { id: 'head_natural', cat: 'look', icon: '🧒', n: '头身比更自然（第四十三轮）', d: '头整体缩小 10%：原来头约占身高 1:5.8，像大头娃娃；现在约 1:6.5。关掉恢复旧尺寸。', def: true },
     { id: 'id_look', cat: 'look', icon: '🎭', n: '身份决定发色/头饰/衣服色（第四十三轮）', d: '外观原来只看种族，修女戴兔耳、骑士扎蝴蝶结。现在按身份：发色成套（骑士银/金/棕，女巫紫/黑，修女黑/褐），头饰重配（修女=头纱，女巫=尖帽，公主=小王冠，女王=王冠，工匠/炼金=护目镜，游侠=羽毛），衣服按身份重新着色（修女黑修道服，骑士钢灰，游侠森林绿，女王深红）。霸主不变。', def: true },
@@ -237,6 +237,7 @@ window.Mods = (() => {
   if (st.__v < 10) { st.cc0_only = true; st.head_collage = true; st.head_native = false; st.hair_mix2 = true; st.acc_mix = true; st.__v = 10; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R38：用户要 CC0 模式默认开；不要“头发-头-饰品”原样绑定，要拼图混搭
   if (st.__v < 11) { st.cc0_only = false; st.__v = 11; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R43：用户“不限制 CC0 了”——默认关闭 CC0 模式（旧存档迁移一次；仍可在 O 面板重新打开）
   if (st.__v < 12) { st.cc0_only = true; st.__v = 12; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R43b：用户改口“还是得 CC0”——默认重新打开 CC0 模式（旧存档迁移一次；非 CC0 模型放进“非 CC0 包”，关掉 CC0 才出现）
+  if (st.__v < 13) { st.filmic_agx = false; st.__v = 13; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R52：用户反馈画面灰蒙蒙 → AgX 默认关
   for (const m of LIST) if (st[m.id] === undefined) st[m.id] = !!m.def;
   // 修正非法状态（互斥组恰好一个；冲突；依赖）
   function normalize() {
@@ -278,6 +279,26 @@ window.Mods = (() => {
     const C = window.BuildCat && BuildCat.C;
     if (C) for (const id in BUILDS) if (!on(id)) for (const k of BUILDS[id]) delete C[k];
     if (!on('unlocks') && window.Unlocks) Unlocks.has = () => true;
+  }
+
+  // ---------------- R52 MOD 配置码：只记录「与默认不同」的 MOD（每项 = id 的 FNV 哈希 4 位 + 开/关），加校验哈希与默认集签名；node tools/modcode.js <码> 可解 ----------------
+  const fnv = (s) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h >>> 0; };
+  const h4 = (s) => (fnv(s) % 1679616).toString(36).padStart(4, '0');
+  const defSig = () => h4(LIST.filter(m => m.def).map(m => m.id).sort().join(',')).slice(0, 3);
+  function code(s) { s = s || st; const body = LIST.filter(m => !!s[m.id] !== !!m.def).map(m => h4(m.id) + (s[m.id] ? '+' : '-')).sort().join(''); return 'MOD1-' + h4(body + defSig()) + '-' + defSig() + '-' + (body || '0'); }
+  function decode(c) {
+    const m = /^mod1-([0-9a-z]{4})-([0-9a-z]{3})-([0-9a-z+\-]+)$/.exec(String(c || '').trim().toLowerCase()); if (!m) return null;
+    const body = m[3] === '0' ? '' : m[3], map = {}; for (const x of LIST) map[h4(x.id)] = x;
+    const out = { ok: h4(body + m[2]) === m[1], sameDefaults: m[2] === defSig(), set: [], unknown: [] };
+    for (let i = 0; i + 5 <= body.length; i += 5) { const x = map[body.slice(i, i + 4)]; if (x) out.set.push([x.id, body[i + 4] === '+']); else out.unknown.push(body.slice(i, i + 4)); }
+    return out;
+  }
+  // 关系：依赖 / 被依赖 / 冲突（双向）/ 互斥组 / 相互影响（rel，双向显示）
+  function rels(m) {
+    const o = { req: m.requires || [], by: LIST.filter(x => (x.requires || []).includes(m.id)).map(x => x.id), cf: [...new Set((m.conflicts || []).concat(LIST.filter(x => (x.conflicts || []).includes(m.id)).map(x => x.id)))], grp: m.group ? LIST.filter(x => x.group === m.group && x.id !== m.id).map(x => x.id) : [], soft: [] };
+    for (const k in (m.rel || {})) o.soft.push([k, m.rel[k]]);
+    for (const x of LIST) if (x.rel && x.rel[m.id] && !(m.rel && m.rel[x.id])) o.soft.push([x.id, x.rel[m.id]]);
+    o.n = o.req.length + o.by.length + o.cf.length + o.soft.length; return o;
   }
 
   // ---------------- 管理器界面（R39 重做：左侧分类 + 搜索 + 筛选 + 行内开关 + 点行展开详情；原地刷新不丢滚动位置） ----------------
@@ -327,6 +348,8 @@ window.Mods = (() => {
 #modbox .dt{display:none;padding:2px 14px 12px 54px;font-size:13px;line-height:1.65;color:#d8c6a6}
 #modbox .row.ex .dt{display:block}#modbox .dt .m{margin-top:6px;font-size:12px;color:#8f7b60}#modbox .dt .m b{color:#c9a768;font-weight:600}
 #modbox .em{padding:40px 10px;text-align:center;color:#8f7b60}
+#modbox .code{font:12px ui-monospace,Consolas,monospace;color:#9fd4ff;border:1px dashed #3f6f94;border-radius:8px;padding:4px 8px;cursor:pointer;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}#modbox .code:hover{border-color:#9fd4ff;color:#d8f0ff}
+#modbox .tag.rl{color:#b7e39a;border-color:#4f7a3a}#modbox .dt .rel{margin-top:6px;padding:6px 10px;border-radius:8px;background:rgba(0,0,0,.25);font-size:12px;color:#c9b896;line-height:1.7}#modbox .dt .rel b{color:#b7e39a;font-weight:600}
 #modbox .ft{display:flex;align-items:center;gap:10px;padding:10px 20px;border-top:1px solid #3c2a1a;background:rgba(0,0,0,.25)}
 #modbox .nt{flex:1;min-width:0;font-size:12.5px;color:#ffd27a;line-height:1.45;max-height:38px;overflow:hidden}#modbox .nt.pd{color:#9fd4ff}
 #modbox .bt{border:1px solid #5a3e28;background:#2a1b10;color:#d9c39f;border-radius:10px;padding:8px 16px;font-size:14px;cursor:pointer}#modbox .bt:hover{border-color:#e0b75d}
@@ -346,8 +369,10 @@ window.Mods = (() => {
   function rowHTML(m) {
     const pd = !!st[m.id] !== !!bootSt[m.id], ex = view.open === m.id;
     const req = (m.requires || []).map(i => BY[i] && nm(BY[i])).filter(Boolean), cf = (m.conflicts || []).map(i => BY[i] && nm(BY[i])).filter(Boolean);
-    return `<div class="row ${st[m.id] ? 'on' : ''} ${pd ? 'pend' : ''} ${ex ? 'ex' : ''}" data-id="${m.id}"><div class="rh" data-a="ex"><div class="ic">${m.icon}</div><div class="tx"><b>${esc(nm(m))}</b>${pd ? '<span class="tag pd">待应用</span>' : ''}${!!st[m.id] !== !!m.def && !pd ? '<span class="tag df">已改动</span>' : ''}${m.reload ? '<span class="tag nd">需重载</span>' : ''}<small>${esc(brief(dm(m)))}</small></div><div class="sw ${m.group ? 'rd' : ''}" data-a="tg" title="${m.group ? '选用这个画风' : '开 / 关'}"></div></div>`
-      + `<div class="dt">${esc(dm(m))}<div class="m"><b>默认</b> ${m.def ? '开' : '关'}　<b>ID</b> ${m.id}${req.length ? `<br><b>依赖</b> ${esc(req.join('、'))}（开启时自动打开）` : ''}${cf.length ? `<br><b>冲突</b> ${esc(cf.join('、'))}（开启时自动关闭）` : ''}</div></div></div>`;
+    const R = rels(m), N = i => BY[i] ? esc(nm(BY[i]).replace(/（.*?）|\(.*?\)/g, '')) + (st[i] ? '' : '<i style="opacity:.55">（关）</i>') : esc(i);
+    const relH = R.n || R.grp.length ? `<div class="rel">${R.req.length ? `<b>依赖</b> ${R.req.map(N).join('、')}<br>` : ''}${R.by.length ? `<b>被依赖</b> ${R.by.map(N).join('、')}（关掉本项会连带关掉）<br>` : ''}${R.cf.length ? `<b>冲突</b> ${R.cf.map(N).join('、')}<br>` : ''}${R.grp.length ? `<b>同组单选</b> ${R.grp.map(N).join('、')}<br>` : ''}${R.soft.map(([k, t]) => `<b>相互影响</b> ${N(k)}：${esc(t)}`).join('<br>')}</div>` : '';
+    return `<div class="row ${st[m.id] ? 'on' : ''} ${pd ? 'pend' : ''} ${ex ? 'ex' : ''}" data-id="${m.id}"><div class="rh" data-a="ex"><div class="ic">${m.icon}</div><div class="tx"><b>${esc(nm(m))}</b>${pd ? '<span class="tag pd">待应用</span>' : ''}${!!st[m.id] !== !!m.def && !pd ? '<span class="tag df">已改动</span>' : ''}${m.reload ? '<span class="tag nd">需重载</span>' : ''}${R.n ? `<span class="tag rl" title="与其它 MOD 有关系，展开查看">🔗${R.n}</span>` : ''}<small>${esc(brief(dm(m)))}</small></div><div class="sw ${m.group ? 'rd' : ''}" data-a="tg" title="${m.group ? '选用这个画风' : '开 / 关'}"></div></div>`
+      + `<div class="dt">${esc(dm(m))}<div class="m"><b>默认</b> ${m.def ? '开' : '关'}　<b>ID</b> ${m.id}${req.length ? `<br><b>依赖</b> ${esc(req.join('、'))}（开启时自动打开）` : ''}${cf.length ? `<br><b>冲突</b> ${esc(cf.join('、'))}（开启时自动关闭）` : ''}</div>${relH}</div></div>`;
   }
   function listHTML() {
     const out = []; const cats = view.cat === 'all' ? CATS : [view.cat];
@@ -363,12 +388,13 @@ window.Mods = (() => {
   }
   function footHTML() {
     const pd = pending(); return `<div class="nt ${pd.length && !view.note ? 'pd' : ''}">${esc(view.note) || (pd.length ? `待应用 ${pd.length} 项：` + esc(pd.slice(0, 5).map(m => (st[m.id] ? '＋' : '－') + nm(m).replace(/（.*?）|\(.*?\)/g, '')).join('、') + (pd.length > 5 ? '…' : '')) : '点开关即可切换；点击条目展开详情。修改后需要“应用并重新载入”（会先自动存档）。')}</div>`
-      + `<button class="bt" data-a="def">恢复默认</button><button class="bt" data-a="close">${pd.length ? '暂不应用' : '关闭'}</button><button class="bt pri" data-a="apply" ${pd.length ? '' : 'disabled'}>应用并重新载入${pd.length ? ' (' + pd.length + ')' : ''}</button>`;
+      + `<button class="bt" data-a="imp" title="粘贴别人发来的配置码，一键套用">📥 导入配置码</button><button class="bt" data-a="def">恢复默认</button><button class="bt" data-a="close">${pd.length ? '暂不应用' : '关闭'}</button><button class="bt pri" data-a="apply" ${pd.length ? '' : 'disabled'}>应用并重新载入${pd.length ? ' (' + pd.length + ')' : ''}</button>`;
   }
   function refresh(keepScroll = true) {
     if (!box) return; const ls = box.querySelector('.ls'), y = ls ? ls.scrollTop : 0;
     box.querySelector('.sd').innerHTML = sideHTML(); box.querySelector('.ls').innerHTML = listHTML(); box.querySelector('.ft').innerHTML = footHTML();
     box.querySelector('.cnt').textContent = `${LIST.filter(m => st[m.id]).length} / ${LIST.length} 已开启`;
+    const cd = box.querySelector('.code'); if (cd) { const c = code(); cd.textContent = '配置码 ' + c; cd.title = c + '\n点击复制：发给 agent 即可算出你改了哪些 MOD（只记录与默认不同的项）'; }
     if (keepScroll) box.querySelector('.ls').scrollTop = y;
   }
   if (window.I18N && I18N.onChange) I18N.onChange(() => { try { if (box && box.isConnected && box.style.display !== 'none') refresh(); } catch (e) { } }); // R40：切换语言时面板重绘
@@ -378,9 +404,11 @@ window.Mods = (() => {
     if (window.G && G.setUIOpen) G.setUIOpen(true);
     view.note = '';
     box = document.createElement('div'); box.id = 'modbox';
-    box.innerHTML = `<div class="mb"><div class="hd"><h2>🧩 MOD 管理</h2><span class="cnt"></span><div class="sr"><input id="modq" placeholder="搜索名称 / 说明（按 / 聚焦）" value="${esc(view.q)}" autocomplete="off"></div><button class="x" data-a="close">✕ 关闭 Esc</button></div><div class="bd"><div class="sd"></div><div class="ls"></div></div><div class="ft"></div></div>`;
+    box.innerHTML = `<div class="mb"><div class="hd"><h2>🧩 MOD 管理</h2><span class="cnt"></span><span class="code" data-a="code"></span><div class="sr"><input id="modq" placeholder="搜索名称 / 说明（按 / 聚焦）" value="${esc(view.q)}" autocomplete="off"></div><button class="x" data-a="close">✕ 关闭 Esc</button></div><div class="bd"><div class="sd"></div><div class="ls"></div></div><div class="ft"></div></div>`;
     box.addEventListener('click', e => {
       if (e.target === box) { close(); return; }
+      if (e.target.closest('[data-a="code"]')) { const c = code(), done = () => { view.note = '已复制配置码 ' + c + '（发给 agent 就能算出你开/关了哪些 MOD）'; refresh(); };
+        try { navigator.clipboard.writeText(c).then(done, () => { prompt('复制这个配置码：', c); done(); }); } catch (er) { prompt('复制这个配置码：', c); done(); } return; }
       const ct = e.target.closest('[data-cat]'); if (ct) { view.cat = ct.dataset.cat; refresh(false); box.querySelector('.ls').scrollTop = 0; return; }
       const ch = e.target.closest('[data-f]'); if (ch) { view.f = ch.dataset.f; refresh(false); return; }
       const row = e.target.closest('.row');
@@ -390,6 +418,9 @@ window.Mods = (() => {
       const a = e.target.closest('button'); if (!a) return;
       if (a.dataset.a === 'close') close();
       else if (a.dataset.a === 'def') { for (const m of LIST) st[m.id] = !!m.def; normalize(); save(); view.note = '已恢复默认设置（仍需应用并重新载入）'; refresh(); }
+      else if (a.dataset.a === 'imp') { const d = decode(prompt('粘贴配置码（MOD1-…）：') || ''); if (!d) { view.note = '配置码格式不对'; refresh(); return; }
+        for (const m of LIST) st[m.id] = !!m.def; for (const [id, v] of d.set) st[id] = v; normalize(); save();
+        view.note = `已套用 ${d.set.length} 项${d.ok ? '' : '（校验不符，可能抄错）'}${d.sameDefaults ? '' : '（与当前版本默认值不同）'}${d.unknown.length ? '，' + d.unknown.length + ' 项未知' : ''}，点「应用并重新载入」生效`; refresh(); }
       else if (a.dataset.a === 'apply') { save(); try { if (window.G) G.save(); } catch (er) {} location.reload(); }
     });
     box.addEventListener('keydown', e => { if (e.target.id === 'modq' && e.code !== 'Escape') e.stopPropagation(); });
@@ -402,5 +433,5 @@ window.Mods = (() => {
     else if (box && e.code === 'Escape') { e.preventDefault(); const q = document.getElementById('modq'); if (q && q.value) { q.value = ''; view.q = ''; refresh(false); } else close(); }
     else if (box && e.key === '/' && document.activeElement && document.activeElement.id !== 'modq') { e.preventDefault(); const q = document.getElementById('modq'); if (q) q.focus(); }
   });
-  return { LIST, on, set, apply, open, close, get isOpen() { return !!box; }, get state() { return st; }, get boot() { return bootSt; } };
+  return { LIST, on, set, apply, open, close, code, decode, rels, get isOpen() { return !!box; }, get state() { return st; }, get boot() { return bootSt; } };
 })();

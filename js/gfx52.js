@@ -10,12 +10,12 @@ window.Gfx52 = (() => {
     const PC = `float pcss52( sampler2D sm, vec2 smSize, float lk, vec3 c ) {
       float rot = fract( 52.9829189 * fract( dot( gl_FragCoord.xy, vec2( 0.06711056, 0.00583715 ) ) ) ) * 6.2831853;
       float tx = 1.0 / smSize.x, sr = max( lk * 0.00025, 3.0 * tx ), bs = 0.0, bn = 0.0;
-      for ( int i = 0; i < 12; i ++ ) { float fi = float( i ), a = fi * 2.3999632 + rot; vec2 o = vec2( cos( a ), sin( a ) ) * sqrt( ( fi + 0.5 ) / 12.0 ) * sr;
+      for ( int i = 0; i < 6; i ++ ) { float fi = float( i ), a = fi * 2.3999632 + rot; vec2 o = vec2( cos( a ), sin( a ) ) * sqrt( ( fi + 0.5 ) / 6.0 ) * sr;
         float d = unpackRGBAToDepth( texture2D( sm, c.xy + o ) ); if ( d < c.z ) { bs += d; bn += 1.0; } }
       if ( bn < 0.5 ) return 1.0;
       float pen = clamp( ( c.z - bs / bn ) * lk * 0.001, 1.2 * tx, sr * 2.0 ), s = 0.0;
-      for ( int i = 0; i < 16; i ++ ) { float fi = float( i ), a = fi * 2.3999632 + rot + 1.3; vec2 o = vec2( cos( a ), sin( a ) ) * sqrt( ( fi + 0.5 ) / 16.0 ) * pen; s += texture2DCompare( sm, c.xy + o, c.z ); }
-      return s / 16.0;
+      for ( int i = 0; i < 10; i ++ ) { float fi = float( i ), a = fi * 2.3999632 + rot + 1.3; vec2 o = vec2( cos( a ), sin( a ) ) * sqrt( ( fi + 0.5 ) / 10.0 ) * pen; s += texture2DCompare( sm, c.xy + o, c.z ); }
+      return s / 10.0;
     }
     `;
     let C = THREE.ShaderChunk.shadowmap_pars_fragment;
@@ -80,6 +80,7 @@ void RE_Direct_Fol( const in IncidentLight directLight, const in GeometricContex
     const W = window.Worlds && Worlds._W, B = (W && W.B) || window.__B; if (!B || !B.sc) return;
     if (B.sun && B.sun.shadow && M('pcss_shadows')) { const R = 2070 / Math.max(4, B.sun.shadow.camera.right || 26); if (Math.abs(B.sun.shadow.radius - R) > 0.5) B.sun.shadow.radius = R; } // 太阳角径约 1.5° 的半影
     if (B === cur) return; cur = B;
+    if (B.sc.fog && B.sc.fog.isFogExp2 && M('world_atmos') && !B.sc.userData.fog52) { B.sc.userData.fog52 = 1; B.sc.fog.density *= 0.72; } // 去灰：大气透视交给 world_atmos，内置雾减薄
     try { if (M('sky_master')) sky(B.sc, B); } catch (e) { console.warn('Gfx52 sky', e); }
     try { if (M('water_master')) water(B.sc); } catch (e) { console.warn('Gfx52 water', e); }
   }
