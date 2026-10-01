@@ -390,14 +390,14 @@ window.Foe = (() => {
   // ---- 每帧 ----
   const tv = new V3(), tv2 = new V3(), up = new V3(0, 1, 0);
   function update(dt, now) {
-    if (window.FaceFill) FaceFill.world(); // 第二十四轮：野外用更高的面部补光下限
+    if (window.FaceFill) try { FaceFill.world(); } catch (e) { foeErr(e); } // 第二十四轮：野外用更高的面部补光下限
     if (!CTX) return; const ctx = CTX, P = ctx.player;
-    CLK += dt; if (window.FoeRoles) FoeRoles.update(dt, ctx); if (window.FoeAI2) FoeAI2.update(dt, ctx); /* R34：敌人强化（词缀/技能/区域强度） */
-    if (window.Steps) Steps.foes(FOES, dt); // 第二十四轮：敌人脚步（用上一帧到这一帧的位移）
+    CLK += dt; try { if (window.FoeRoles) FoeRoles.update(dt, ctx); if (window.FoeAI2) FoeAI2.update(dt, ctx); } catch (e) { foeErr(e); } /* R34：敌人强化（词缀/技能/区域强度） */
+    if (window.Steps) try { Steps.foes(FOES, dt); } catch (e) { foeErr(e); } // 第二十四轮：敌人脚步（用上一帧到这一帧的位移）
     if (slowT > 0) { slowT -= dt; dt *= slowK; if (slowT <= 0) slowK = 1; } // 击杀慢动作：只作用于敌人/尸体/头/血，玩家照常
     const SMART = !window.Mods || Mods.on('foe_smart'), DOORESC = !window.Mods || Mods.on('foe_door_escape');
     for (const fo of FOES) {
-      const f = fo.f;
+      const f = fo.f; try {
       if (fo.dead) { if (fo.rag) ragStep(fo, dt); if (fo.warn) fo.warn.visible = false; if (fo.gs) fo.gs.visible = false;
         if (fo.spurt > 0 && !fo.headOnPiece) { fo.spurt -= dt; const nb = f.bones.neck; if (nb && Math.random() < 0.8) { nb.getWorldPosition(tv2); const up = tv.set(0, 1, 0).applyQuaternion(nb.getWorldQuaternion(_q)); blood(tv2.addScaledVector(up, 0.05), 1, up, 0.9 + fo.spurt * 0.3); } }
         continue; }
@@ -535,6 +535,7 @@ window.Foe = (() => {
       fo.blinkT -= dt; if (fo.blinkT < 0) { const b = fo.blinkT > -0.07 ? -fo.blinkT / 0.07 : fo.blinkT > -0.16 ? 1 - (-fo.blinkT - 0.07) / 0.09 : 0; try { f.hb.setExpression({ blink: Math.max(0, b) }); } catch (e) {} if (fo.blinkT < -0.16) fo.blinkT = 2 + Math.random() * 4; }
       if (fo.warn) { const A = fo.atk, hh = A && A.act && A.hits && A.hits[A.hi]; fo.warn.visible = !!(hh && hh.t - A.act.time > 0.04); if (fo.warn.visible) { fo.warn.material.color.set(hh.heavy ? '#ffa030' : '#ffffff'); fo.warn.position.copy(fo.anchor.pos); fo.warn.position.y += 0.6; const k = 0.16 + 0.1 * (A.tot > 0 ? Math.max(0, 1 - atkLeft(A) / A.tot) : 0); fo.warn.scale.set(k, k, 1); } } // 第十九轮：不再 30rad/s 脉动闪烁，随蓄力平稳变大
       if (fo.broken > 0) fo.broken -= dt;
+      } catch (e) { foeErr(e); try { f.mixer.update(dt); } catch (e2) { } } // R54：一个敌人出错不再让全场定格
     }
     for (const h of HEADS) bodyPhys(h, dt, 0.11);
     for (const p of PIECES) bodyPhys(p, dt, p.rad);
@@ -543,6 +544,7 @@ window.Foe = (() => {
       if (x.t <= 0) { x.o.parent && x.o.parent.remove(x.o); FX[i] = FX[FX.length - 1]; FX.pop(); if (POOL.length < 300) POOL.push(x); } }
   }
   let slowT = 0, slowK = 1; function slowmo(t, k) { slowT = Math.max(slowT, t); slowK = Math.min(k, slowT > 0 ? slowK : 1); } function slowSet(k, t) { slowT = t; slowK = k; } /* R49h：外部（decap_cam）逐帧给出平滑的慢放系数 */
+  let errN = 0; function foeErr(e) { if (errN++ < 8) console.warn('Foe.update', e); }
   const ang = a => Math.atan2(Math.sin(a), Math.cos(a)), clampA = (a, m) => Math.max(-m, Math.min(m, a));
   function collideList(p, r, cols) { for (const c of cols) { const ex = p.x - c.x, ez = p.z - c.z, m = c.r + r, e2 = ex * ex + ez * ez; if (e2 >= m * m) continue; const e = Math.sqrt(e2); if (e > 1e-5) { p.x += ex / e * (m - e); p.z += ez / e * (m - e); } } const pr = Math.hypot(p.x, p.z), pl = CTX.R - 1; if (pr > pl) { p.x *= pl / pr; p.z *= pl / pr; } }
   function collide(p, r) { const ctx = CTX; for (const c of ctx.cols) { const ex = p.x - c.x, ez = p.z - c.z, m = c.r + r, e2 = ex * ex + ez * ez; if (e2 >= m * m) continue; const e = Math.sqrt(e2); if (e > 1e-5) { p.x += ex / e * (m - e); p.z += ez / e * (m - e); } } const pr = Math.hypot(p.x, p.z), pl = ctx.R - 1; if (pr > pl) { p.x *= pl / pr; p.z *= pl / pr; } }

@@ -1216,7 +1216,7 @@ window.startGame = function () {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, clock.getDelta()); const now = clock.elapsedTime;
     if ((window.Seance && Seance.active) || (window.Recall && Recall.active) || window.__pauseMain) return; // 通灵 MV / 头棋等全屏小游戏期间暂停主场景渲染
-    if (window.Worlds && Worlds.active) { Worlds.frame(dt, now); return; } // 第十四轮：出猎世界（地点图）接管主循环
+    if (window.Worlds && Worlds.active) { try { Worlds.frame(dt, now); } catch (e) { if ((frame.wErr = (frame.wErr || 0) + 1) < 6) console.warn('Worlds.frame', e); try { const W = Worlds._W; if (W && W.B) { if (post && post.on) post.render(W.B.sc, camera); else renderer.render(W.B.sc, camera); } } catch (e2) { } } return; } // 第十四轮：出猎世界（地点图）接管主循环；R54：出错也照常出画面，不整屏定格
     for (const f of HOOK.frame) { try { f(dt, now); } catch (e) { console.warn(e); } }
     if (eDown && !eLong && performance.now() - eDown > 350) { eLong = true; if (playing && !uiOpen && !cine && !bagCarrying) { const tgt = held || targetHead(lookHit()); if (tgt) startHP(tgt); else eLong = false; } }
     if (hplace) updateHP();

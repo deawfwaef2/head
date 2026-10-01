@@ -928,14 +928,14 @@ window.Worlds = (() => {
     // 门：靠近提示
     W.doorNear = null; for (const d of B.doors) { const dd = Math.hypot(W.pos.x - d.x, W.pos.z - d.z); if (dd < 2.6) W.doorNear = d; d.label.visible = Math.hypot(cam.position.x - d.x, cam.position.z - d.z) < 34; }
     W.interNear = null; { let bd = 9; for (const it of B.inter) { const dd = Math.hypot(W.pos.x - it.x, W.pos.z - it.z); if (!it.done && dd < (it.corpse ? 2.3 : 1.9) && dd < bd) { bd = dd; W.interNear = it; } } }
-    if (window.Sack) Sack.frame(dt);
+    if (window.Sack) try { Sack.frame(dt); } catch (e) { console.warn(e); }
     // 猎物 / 霸主
-    if (W.foes) { Foe.update(dt, now); if (W.boss) W.boss.sayT -= dt; } else { updatePrey(dt, now); if (W.boss) updateBoss(dt, now); }
-    if (window.Beasts && Beasts.list.length) Beasts.update(dt, now);
+    try { if (W.foes) { Foe.update(dt, now); if (W.boss) W.boss.sayT -= dt; } else { updatePrey(dt, now); if (W.boss) updateBoss(dt, now); } } catch (e) { console.warn('foes', e); }
+    if (window.Beasts && Beasts.list.length) try { Beasts.update(dt, now); } catch (e) { console.warn('beasts', e); }
     W.headNear = W.foes ? Foe.nearHead(W.pos, G.player.yaw) : null;
-    updateSay();
+    try { updateSay(); } catch (e) { console.warn(e); }
     if (window.Combat) { try { Combat.update(dt, now); Combat.prerender(); } catch (e) { console.warn(e); } }
-    W.hintT -= dt; if (W.hintT <= 0) { W.hintT = 0.12; hud(); skillHud(); }
+    W.hintT -= dt; if (W.hintT <= 0) { W.hintT = 0.12; try { hud(); skillHud(); } catch (e) { console.warn(e); } }
     if (G.S.hp <= 0) dieNow();
     if (window.CFX3D) try { CFX3D.frame(dt, now); } catch (e) { console.warn(e); } if (window.FPV) try { FPV.frame(dt, now); FPV.pre(dt, now); } catch (e) { console.warn(e); } if (window.DecapCam) { try { DecapCam.pre(dt, now); } catch (e) { } } /* R49h */ { const hw = G.HOOK && G.HOOK.world; if (hw) for (const f of hw) { try { f(dt, now); } catch (e) { console.warn(e); } } } /* R49h：出猎世界里补跑 Talents / 技能栏 / 血魂条 的每帧（HOOK.frame 在这里不跑） */ /* R41：3D 战斗特效 / 第一人称兽人手 / 第三人称（HOOK 在出猎世界里不跑，这里直接调） */
     const post = G.post; if (post && post.setRayLight) post.setRayLight(tmp.set(0, -100, 0), 0);
