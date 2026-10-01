@@ -46,6 +46,14 @@ body.hubon #hpC,body.sgcine #hpC{display:none!important}
 #hpC .mq.fail .mf{filter:hue-rotate(160deg) saturate(1.5)}
 #hpC .mq .fl{position:absolute;right:14px;top:-8px;font-size:23px;font-weight:900;color:#9fe8ff;text-shadow:0 2px 4px #000,0 0 10px #5ab8ff;pointer-events:none;animation:mqFl 1s forwards}
 #hpC .mq .fl.neg{color:#ff9a8a;text-shadow:0 2px 4px #000,0 0 10px #ff5a4a}
+/* R49h 紧凑：血条与魂能条贴在一起（2px 间隙、同宽），刻度数字挂在魂能条下沿 */
+#hpC .hp{height:30px}#hpC .hp b{line-height:30px;font-size:22px}#hpC .hp em{line-height:30px}
+#hpC.mqon .mq{margin:2px 0 0}
+#hpC .mqb{height:27px;border-radius:8px}#hpC .mqb .mt{font-size:18px;gap:8px}#hpC .mqb .mt em{font-size:17px}#hpC .mqb .mt small{font-size:15px}
+#hpC.mqon .xp{margin:2px 6px 0;height:4px}
+#hpC .mqr.has{height:19px}
+#hpC .mqr .tk{top:0;bottom:auto;border-radius:0 0 6px 6px;border:1px solid #5ab8ff;border-top:0;height:19px}
+#hpC .mq .fl{top:-2px}
 @keyframes mqFl{from{transform:translateY(0);opacity:1}to{transform:translateY(-38px);opacity:0}}
 #hpC .lv{position:absolute;left:-18px;top:-9px;min-width:46px;height:46px;border-radius:50%;box-sizing:border-box;background:radial-gradient(#6a4438,#1a0f12);border:3px solid #ffd27a;color:#fff;font-weight:900;font-size:21px;display:flex;align-items:center;justify-content:center;text-shadow:0 2px 3px #000;z-index:2;box-shadow:0 3px 10px #000a}
 #hpC .lv small{position:absolute;bottom:-9px;font-size:12px;background:#ffd27a;color:#2a1800;border-radius:7px;padding:0 5px;line-height:15px}
@@ -55,7 +63,7 @@ body.hubon #hpC,body.sgcine #hpC{display:none!important}
 `;
   function build() {
     if (el) return; const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
-    el = document.createElement('div'); el.id = 'hpC'; el.innerHTML = '<div class="hp"><i class="g"></i><i class="f"></i><i class="sh"></i><em>❤</em><b></b></div><div class="lv">1<small>Lv</small></div><div class="mp"><i></i><b></b></div><div class="mq"><div class="mqr"></div><div class="mqb"><i class="mf"></i><div class="mt"><em>🔮</em><span class="mn"></span><small class="rg"></small></div></div></div><div class="xp"><i></i></div>'; document.body.appendChild(el);
+    el = document.createElement('div'); el.id = 'hpC'; el.innerHTML = '<div class="hp"><i class="g"></i><i class="f"></i><i class="sh"></i><em>❤</em><b></b></div><div class="lv">1<small>Lv</small></div><div class="mp"><i></i><b></b></div><div class="mq"><div class="mqb"><i class="mf"></i><div class="mt"><em>🔮</em><span class="mn"></span><small class="rg"></small></div></div><div class="xp"><i></i></div><div class="mqr"></div></div>'; document.body.appendChild(el);
     lowV = document.createElement('div'); lowV.id = 'hpV'; document.body.appendChild(lowV);
   }
   let mPrev = -1, mSig = '', mFailT = 0, mFailUntil = 0;
