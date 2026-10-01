@@ -1841,3 +1841,23 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 
 ### R50-gfx (c) VRoid Hub 候选扫描（无需登录）
 `tools/hub/hubscan.py`：用 VRoid Hub 公开 API（`/api/search/character_models`，头 `X-Api-Version: 11`）按关键词列出「可下载+VRM meta 暴力/改造/再分发全允许+非R18」的模型，只读元数据；`tools/hub/picks.md` 是我人工看缩略图筛过的 40 个。**下载接口需登录，已确认匿名 404；我不绕过登录/验证码，由用户本人下载后交我转换（vrm2body/vrm2head）。**
+
+## R52（画质 Agent · 2026-10-01）— 用户：画质太低级 / 壳层草地“非常不好但有潜力”→ 大师级重写 / 画质拉到最高、惊艳
+**用户原话要点（长期有效）**：
+- “目前游戏画质太低级了。就是看起来就是普通游戏。”
+- “那个壳形草地的效果其实我看来非常不好，但是感觉这种效果有潜力，你能不能大师级写下。”→ **保留 shell texturing 方向**，重写到大师级（不要换回草模型方案）。
+- “你能不能大师级让画质变到最高级，让人惊艳的程度。”
+
+**用户长期约束汇总（新模型开工前必读；全部来自前面各轮，仍有效）**：
+1. 每次编程前先读 HANDOFF.md；**只追加，不覆盖、不删除**。
+2. **小步频繁 commit + push**（用户用模型的网站可能出 BUG 回退）；push 前 `git pull --rebase`；禁止 force-push；有协作者，远端随时会更新。
+3. **任何时刻根目录 `index.html` 双击（file://）就能玩**，有可点击的「开始游戏」；classic script + base64 `.js` 资产，不用 CDN / fetch 本地文件 / ES module。
+4. token 只放会话环境变量，**不写进任何仓库文件**；不改仓库可见性。
+5. 不自制/程序化**模型、身体、贴图**（着色器效果、布局、地形生成可以）；新素材优先 CC0（Poly Haven）。
+6. 所有改动做成**可开关 MOD**（`js/mods.js` + `js/mods_i18n.js` 英/日译文），处理好冲突。
+7. 用户显卡是**高端独显**：ultra 档放手做，掉帧时 game.js 会自动降到 high/mid。
+8. 美术方向：二次元人物（cel 光影 + 勾线）+ 风格化 3D 环境（`world_cel`）；目标是“惊艳”，不是“普通游戏”。
+
+**本机环境（Windows，`E:\farhead`）**：系统没有 git → 便携 MinGit `E:\tools\MinGit\cmd\git.exe`；仓库是 partial clone（`--filter=blob:none`）+ 非 cone 稀疏检出（本地不含 models/ big/ promo/ music/ voice/ beasts/ 的文件，提交不受影响）。本地测试服务器 `node E:\tools\serve.js`（本地缺的文件从 raw.githubusercontent.com 拉一次缓存到 `E:\tools\rawcache`），测试页 `http://127.0.0.1:8765/tools/test/world.html?reg=meadow&seed=5`。
+
+**本轮计划（每完成一项就推送并在下面追加记录）**：① 壳层草地 v2（重写 `js/wgrass.js`）② 天空高清化 ③ 大气层（太阳光束 / 空气透视 / 低地薄雾，后处理）④ 调色与曝光。
