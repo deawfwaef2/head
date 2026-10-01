@@ -604,6 +604,7 @@ window.Worlds = (() => {
       playerSwinging: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.sw || Combat.state.thrust > 0)),
       playerAiming: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.tipSpeed > 3)),
       handAng: (fo) => { const CS = window.Combat && Combat.drawn && Combat.state; if (!CS) return null; // 第十八轮：刀尖锁准星 → 刀来自“准星相对这个敌人”的方向；挥动中用挥动来向
+        if (CS.aim) return Math.atan2(-CS.aim.dy, -CS.aim.dx); // R54 hold_strike：蓄势方向会被敌人读到
         if (CS.sw && CS.sw.v) return Math.atan2(-CS.sw.v.y, -CS.sw.v.x); // R26：出刀中用刀路来向
         if (CS.lmb && CS.mv && CS.mv.lengthSq() > 4e4) return Math.atan2(-CS.mv.y, -CS.mv.x);
         if (fo && fo.pos) { const p = _hv.set(fo.pos.x, fo.pos.y + 1.2, fo.pos.z).project(G.camera); if (p.z < 1 && Math.hypot(p.x, p.y) > 0.08) return Math.atan2(-p.y, -p.x); }
@@ -913,7 +914,7 @@ window.Worlds = (() => {
         sp = ex ? ex : (wantRun ? 6.2 : 3.6) * (1 - 0.55 * P.crouch); }
       runBar();
       fw.set(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)); rt.set(Math.cos(P.yaw), 0, -Math.sin(P.yaw));
-      want.copy(fw).multiplyScalar(f).addScaledVector(rt, s); if (want.lengthSq() > 0) want.normalize().multiplyScalar(sp * (window.Talents ? Talents.moveMul() : 1) * (window.FoeRoles3 ? FoeRoles3.moveK() : 1)); // R37 被网/夹住=定身；R36 移速天赋/增益
+      want.copy(fw).multiplyScalar(f).addScaledVector(rt, s); if (want.lengthSq() > 0) want.normalize().multiplyScalar(sp * (window.Talents ? Talents.moveMul() : 1) * (window.FoeRoles3 ? FoeRoles3.moveK() : 1) * (window.Combat && Combat.aimMove ? Combat.aimMove() : 1)); // R37 被网/夹住=定身；R36 移速天赋/增益；R54 hold_strike 蓄势时变慢
       if (f < 0 && want.lengthSq() > 0 && (!window.Mods || Mods.on('back_slow'))) { let fight = false; for (const fo of Foe.foes) { if (fo.dead || !fo.seen || fo.state === 'flee' || fo.state === 'idle') continue; if (Math.hypot(fo.pos.x - W.pos.x, fo.pos.z - W.pos.z) < 14) { fight = true; break; } } const bk = -want.dot(fw); if (fight && bk > 0) { want.addScaledVector(fw, bk * 0.45); if (!W._bkHint) { W._bkHint = 1; G.toast && G.toast('🐢 战斗中后退很慢——想逃就转身跑', '#ffd9a0', 2.2); } } } // R43 MOD back_slow：有敌人盯着你时倒着走只有 55% 速度（不能无限后撤；转身跑才快）
       if (W.dashT > 0) { W.dashT -= dt; W.vel.x = W.dashV.x; W.vel.z = W.dashV.z; } else { W.vel.x += (want.x - W.vel.x) * Math.min(1, dt * 10); W.vel.z += (want.z - W.vel.z) * Math.min(1, dt * 10); }
       if (K.Space && W.onGround && P.crouch < 0.3 && (!window.Stamina || Stamina.canJump())) { W.vel.y = 4.4; W.onGround = false; }

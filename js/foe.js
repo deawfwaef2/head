@@ -352,6 +352,7 @@ window.Foe = (() => {
       fo.armed = !!fo.wpn || !!it.boss;
       f.root.position.copy(it.pos); f.root.position.y = ctx.H(it.pos.x, it.pos.z); f.root.rotation.y = fo.yaw;
       ctx.sc.add(f.root); f.play(fo.idleClip, { fade: 0 }); f.mixer.setTime(r() * 3);
+      if (window.FoeDuel) FoeDuel.assign(fo, r, it); // R54 foe_duel：程序化方向斩击的新敌人（在职业之前；被选中的不再分职业）
       if (window.FoeRoles) FoeRoles.assign(fo, r, it); // 第二十二轮（续 9）：敌人职业
       if (window.FoeAI2) FoeAI2.init(fo, r, it, ctx); // R34：区域强度缩放 + 词缀
       if (window.Persona) Persona.apply(fo, r); // 第二十四轮：人设（在职业之后：标题里带职业名）
@@ -407,7 +408,7 @@ window.Foe = (() => {
     const SMART = !window.Mods || Mods.on('foe_smart'), DOORESC = !window.Mods || Mods.on('foe_door_escape');
     for (const fo of FOES) {
       const f = fo.f; try {
-      if (fo.dead) { if (fo.rag) ragStep(fo, dt); if (fo.warn) fo.warn.visible = false; if (fo.gs) fo.gs.visible = false;
+      if (fo.dead) { if (fo.rag) ragStep(fo, dt); if (fo.warn) fo.warn.visible = false; if (fo.gs) fo.gs.visible = false; if (fo.duel && fo.duel.rib) fo.duel.rib.visible = false;
         if (fo.spurt > 0 && !fo.headOnPiece) { fo.spurt -= dt; const nb = f.bones.neck; if (nb && Math.random() < 0.8) { nb.getWorldPosition(tv2); const up = tv.set(0, 1, 0).applyQuaternion(nb.getWorldQuaternion(_q)); blood(tv2.addScaledVector(up, 0.05), 1, up, 0.9 + fo.spurt * 0.3); } }
         continue; }
       fo.t += dt; fo.cd -= dt; fo.sayT -= dt; if (fo.stag > 0) fo.stag -= dt; if (fo.block > 0) fo.block -= dt;
@@ -532,6 +533,7 @@ window.Foe = (() => {
       if (window.Locomo) Locomo.tick(fo, dt); // R47 npc_locomo
       f.mixer.update(dt);
       if (window.Stance) Stance.post(fo, dt); // R51 npc_strafe / npc_stance：下肢朝移动方向+上身扭回、架势体态
+      if (fo.duel && window.FoeDuel) FoeDuel.post(fo, dt);
       fo.f.bones.head.getWorldPosition(fo.anchor.pos); fo.anchor.pos.y -= 0.3;
       { // 受击闪红 + 第十九轮：蓄力时身体渐亮（红=普通，橙=重击），出手瞬间最亮 —— 只改 uniform，不新建材质
         if (fo.flash > 0) fo.flash -= dt; let er = 0, eg = 0, eb = 0;
@@ -621,6 +623,7 @@ window.Foe = (() => {
   function tokenOK(fo) { if (fo.boss) return true; if (CLK - lastAtkAt < 0.6) return false;
     let n = 0, boss = false; for (const o of FOES) { if (o.dead) continue; if (o.boss) boss = true; if (o !== fo && (o.atk || o.sk)) n++; } return n < (boss ? 2 : 1); }
   function attack(fo, d, force) {
+    if (fo.duel && window.FoeDuel && FoeDuel.attack(fo, d, force)) { lastAtkAt = CLK; return; } // R54 foe_duel：不播攻击动画，程序化举刀到来刀一侧
     const f = fo.f, s = CTX.st(), r = Math.random();
     let clip;
     if (force) clip = force;
@@ -1059,5 +1062,5 @@ window.Foe = (() => {
   }
   function has(name) { return !!(window.BODY_LIST && BODY_LIST.includes(name)); }
   try { setTimeout(() => { if (fastOn()) (window.requestIdleCallback || setTimeout)(() => { loadAnim().catch(() => { }); }); }, 5000); } catch (e) { } // R49：菜单空闲时先把动画包（1.4MB）载好，首次进图不用再等
-  return { slowSet, preload, bodyFor, say: (fo, t, col) => talk(fo, t, col), hasHead: (h) => HEADS.includes(h), warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, dot: dotDmg, attack, ATK, tokenOK, ctx: () => CTX, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
+  return { slowSet, attachWeapon, preload, bodyFor, say: (fo, t, col) => talk(fo, t, col), hasHead: (h) => HEADS.includes(h), warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, dot: dotDmg, attack, ATK, tokenOK, ctx: () => CTX, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
 })();
