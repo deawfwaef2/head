@@ -14,7 +14,9 @@ window.Master = (() => {
   const P = { // 调色（黑暗奇幻：暖高光、冷暗部、偏低饱和的中间调、电影感对比）
     exposure: 1.25, bloomStr: 0.9, bloomThresh: 0.9, bloomKnee: 0.6, aoStr: 1.0, aoRadius: 0.55,
     rayStr: 0.55, rayDecay: 0.965, rayDensity: 0.9,
-    sat: 1.08, contrast: 1.07, shadowTint: [0.93, 0.98, 1.08], highTint: [1.06, 1.0, 0.9], vig: 0.42, grain: 0.028, ca: 0.0007
+    sat: 1.08, contrast: 1.07, shadowTint: [0.93, 0.98, 1.08], highTint: [1.06, 1.0, 0.9], vig: 0.42, grain: 0.028, ca: 0.0007,
+    // R52 world_atmos：空气透视（朝太阳的 Mie 散射）/ 低地薄雾 / 太阳光束
+    mie: 0.9, mieG: 0.76, mieDist: 0.012, mist: 0.55, mistH: 2.2, mistDist: 0.03, sunRay: 0.85, sunRayDecay: 0.972
   };
   const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
   const quad = new THREE.PlaneGeometry(2, 2), cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -109,8 +111,39 @@ window.Master = (() => {
       gl_FragColor = vec4(s / 40.0, 1.0);
     }`;
   // ---------- 合成 ----------
+  // ---------- R52 world_atmos：空气透视 + 低地薄雾（HDR → HDR） ----------
+  const ATMOS = `${COMMON}
+    uniform sampler2D tScene; uniform sampler2D tDepth; uniform mat4 uProjInv; uniform mat4 uViewInv; uniform vec3 uCam; uniform vec3 uSunDir; uniform vec3 uSunCol; uniform vec3 uFogCol;
+    uniform float uMie; uniform float uG; uniform float uMieDist; uniform float uMist; uniform float uMistH; uniform float uMistDist; uniform float uGround; uniform float uT; varying vec2 vUv;
+    void main(){
+      vec3 col = texture2D(tScene, vUv).rgb; float d = texture2D(tDepth, vUv).x;
+      vec4 v = uProjInv * vec4(vUv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0); vec3 vp = v.xyz / v.w;
+      bool sky = d >= 0.99999; float dist = sky ? 400.0 : length(vp);
+      vec3 dir = normalize((uViewInv * vec4(vp, 0.0)).xyz); vec3 wp = uCam + dir * dist;
+      float cs = dot(dir, uSunDir), g2 = uG * uG;
+      float ph = (1.0 - g2) / pow(max(1.0 + g2 - 2.0 * uG * cs, 1e-4), 1.5) * 0.0796; // Henyey-Greenstein
+      float ext = 1.0 - exp(-dist * uMieDist);
+      col += uSunCol * ph * ext * uMie * (sky ? 0.35 : 1.0);
+      if (!sky) { // 低地薄雾：沿视线对高度指数衰减的雾密度积分（解析式）
+        float b = 1.0 / uMistH, h0 = uCam.y - uGround, dy = wp.y - uCam.y;
+        float od = uMistDist * exp(-b * h0) * dist * (abs(dy) > 0.01 ? (1.0 - exp(-b * dy)) / (b * dy) : 1.0);
+        float f = (1.0 - exp(-od)) * uMist;
+        vec3 mc = uFogCol * (1.0 + 0.6 * ph * 6.0) + uSunCol * ph * 0.25;
+        col = mix(col, mc, clamp(f, 0.0, 0.85));
+      }
+      gl_FragColor = vec4(col, 1.0);
+    }`;
+  // 太阳光束的源：只取天空像素（深度=远平面）× 太阳附近的径向衰减 → 树叶/建筑的缝隙里漏出光柱
+  const SUNSRC = `${COMMON}
+    uniform sampler2D tScene; uniform sampler2D tDepth; uniform vec2 uSun; uniform float uAsp; uniform vec2 uTex; varying vec2 vUv;
+    void main(){
+      vec3 s = vec3(0.0);
+      for (int i = 0; i < 4; i++) { vec2 o = vec2(i == 1 || i == 3 ? 1.0 : -1.0, i >= 2 ? 1.0 : -1.0) * uTex; float d = texture2D(tDepth, vUv + o).x; if (d >= 0.99999) s += min(texture2D(tScene, vUv + o).rgb, vec3(6.0)); }
+      vec2 q = (vUv - uSun) * vec2(uAsp, 1.0); float r = length(q);
+      gl_FragColor = vec4(s * 0.25 * (exp(-r * 4.5) + 0.25 * exp(-r * 1.4)), 1.0);
+    }`;
   const COMP = `${COMMON}
-    uniform sampler2D tScene; uniform sampler2D tAO; uniform sampler2D tBloom; uniform sampler2D tRays;
+    uniform sampler2D tScene; uniform sampler2D tAO; uniform sampler2D tBloom; uniform sampler2D tRays; uniform sampler2D tSunRays; uniform float uSunRay; uniform vec3 uSunRayCol;
     uniform float uAO; uniform float uBloom; uniform float uRay; uniform float uExp; uniform float uSat; uniform float uCon;
     uniform vec3 uShT; uniform vec3 uHiT; uniform float uVig; uniform float uGrain; uniform float uCA; uniform float uT; uniform vec2 uRes; uniform vec3 uRayCol;
     varying vec2 vUv;
@@ -129,6 +162,7 @@ window.Master = (() => {
       if (uAO > 0.0) { float ao = texture2D(tAO, uv).r; ao = mix(ao, 1.0, smoothstep(0.8, 3.0, L0)); col *= mix(1.0, ao, uAO); }
       col += texture2D(tBloom, uv).rgb * uBloom;
       if (uRay > 0.0) col += texture2D(tRays, uv).rgb * uRay * uRayCol;
+      if (uSunRay > 0.0) col += texture2D(tSunRays, uv).rgb * uSunRay * uSunRayCol;
       col = aces(col * uExp);
       // 分离色调：暗部偏冷、亮部偏暖
       float l = luma(col);
@@ -181,9 +215,13 @@ window.Master = (() => {
     const down = mk(DOWN, { tSrc: { value: null }, uTex: { value: new THREE.Vector2() } });
     const up = mk(UP, { tSrc: { value: null }, tPrev: { value: null }, uTex: { value: new THREE.Vector2() }, uR: { value: 1.0 } });
     const rays = mk(RAYS, { tSrc: { value: null }, uLight: { value: new THREE.Vector2(0.5, 0.5) }, uDecay: { value: P.rayDecay }, uDensity: { value: P.rayDensity }, uT: { value: 0 } });
-    const CU = { tScene: { value: null }, tAO: { value: null }, tBloom: { value: null }, tRays: { value: null }, uAO: { value: 0 }, uBloom: { value: P.bloomStr }, uRay: { value: 0 }, uExp: { value: P.exposure }, uSat: { value: P.sat }, uCon: { value: P.contrast },
+    const CU = { tScene: { value: null }, tAO: { value: null }, tBloom: { value: null }, tRays: { value: null }, tSunRays: { value: null }, uSunRay: { value: 0 }, uSunRayCol: { value: new THREE.Vector3(1, 0.9, 0.75) }, uAO: { value: 0 }, uBloom: { value: P.bloomStr }, uRay: { value: 0 }, uExp: { value: P.exposure }, uSat: { value: P.sat }, uCon: { value: P.contrast },
       uShT: { value: new THREE.Vector3(...P.shadowTint) }, uHiT: { value: new THREE.Vector3(...P.highTint) }, uVig: { value: P.vig }, uGrain: { value: P.grain }, uCA: { value: P.ca }, uT: { value: 0 }, uRes: { value: new THREE.Vector2() }, uRayCol: { value: new THREE.Vector3(1, 0.85, 0.65) } };
     const comp = mk(COMP, CU);
+    const atm = mk(ATMOS, { tScene: { value: null }, tDepth: { value: null }, uProjInv: { value: new THREE.Matrix4() }, uViewInv: { value: new THREE.Matrix4() }, uCam: { value: new THREE.Vector3() }, uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Vector3(1, 1, 1) }, uFogCol: { value: new THREE.Vector3(0.5, 0.6, 0.7) },
+      uMie: { value: P.mie }, uG: { value: P.mieG }, uMieDist: { value: P.mieDist }, uMist: { value: P.mist }, uMistH: { value: P.mistH }, uMistDist: { value: P.mistDist }, uGround: { value: 0 }, uT: { value: 0 } });
+    const sunSrc = mk(SUNSRC, { tScene: { value: null }, tDepth: { value: null }, uSun: { value: new THREE.Vector2() }, uAsp: { value: 1 }, uTex: { value: new THREE.Vector2() } });
+    const sunRays = mk(RAYS, { tSrc: { value: null }, uLight: { value: new THREE.Vector2(0.5, 0.5) }, uDecay: { value: P.sunRayDecay }, uDensity: { value: 1.0 }, uT: { value: 0 } });
     const fxaa = mk(FXAA, { tSrc: { value: null }, uTex: { value: new THREE.Vector2() } });
     const white = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1); white.needsUpdate = true;
     const black = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1); black.needsUpdate = true;
@@ -196,7 +234,7 @@ window.Master = (() => {
       const ldr = new THREE.WebGLRenderTarget(w, h, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false });
       const mips = [], ups = []; let mw = w >> 1, mh = h >> 1;
       for (let i = 0; i < MIPS; i++) { mw = Math.max(2, mw); mh = Math.max(2, mh); mips.push(RT(mw, mh)); ups.push(RT(mw, mh)); mw >>= 1; mh >>= 1; }
-      T = { scene, ao: RT(aw, ah, { type: THREE.UnsignedByteType }), ao2: RT(aw, ah, { type: THREE.UnsignedByteType }), ldr, mips, ups, rays: RT(Math.max(2, w >> 2), Math.max(2, h >> 2)), aw, ah };
+      T = { scene, ao: RT(aw, ah, { type: THREE.UnsignedByteType }), ao2: RT(aw, ah, { type: THREE.UnsignedByteType }), ldr, mips, ups, rays: RT(Math.max(2, w >> 2), Math.max(2, h >> 2)), atm: RT(w, h), sun: RT(Math.max(2, w >> 2), Math.max(2, h >> 2)), sunRays: RT(Math.max(2, w >> 2), Math.max(2, h >> 2)), aw, ah };
       CU.uRes.value.set(w, h); fxaa.u.uTex.value.set(1 / w, 1 / h);
     }
     function setSize(w, h) { if (w === W && h === H && T) return; W = w; H = h; alloc(w, h); }
@@ -205,6 +243,10 @@ window.Master = (() => {
     function pass(p, target) { renderer.setRenderTarget(target); renderer.render(p.sc, cam); }
     let rayWorld = null, rayStr = 0; // 体积光光源（世界坐标）
     function setRayLight(v3, strength, col) { rayWorld = v3; rayStr = strength == null ? 1 : strength; if (col) CU.uRayCol.value.set(col.r, col.g, col.b); }
+    // R52 world_atmos：只在野外场景（worlds.js 的天空球 sc.userData.skyM）生效；太阳 = 场景里最亮的投影平行光
+    const sunCache = new WeakMap(), _sd = new THREE.Vector3(), _sp = new THREE.Vector3();
+    const atmosOn = (scene) => !!(scene && scene.userData && scene.userData.skyM) && !(window.Mods && Mods.on && Mods.on('world_atmos') === false) && !/[?&]atm=0/.test(location.search);
+    function sunOf(scene) { let s = sunCache.get(scene); if (s && s.parent) return s; s = null; scene.traverse(o => { if (o.isDirectionalLight && (!s || o.intensity > s.intensity)) s = o; }); if (s) sunCache.set(scene, s); return s; }
 
     function render(scene, camera) {
       renderer.getDrawingBufferSize(_v); setSize(_v.x, _v.y);
@@ -213,6 +255,28 @@ window.Master = (() => {
       renderer.toneMapping = THREE.NoToneMapping; // 场景保持线性 HDR，统一在合成里做 ACES
       renderer.setRenderTarget(T.scene); renderer.clear(); renderer.render(scene, camera);
       renderer.toneMapping = tm;
+      let src = T.scene; CU.uSunRay.value = 0; CU.tSunRays.value = black;
+      const sun = atmosOn(scene) ? sunOf(scene) : null;
+      if (sun) {
+        _sd.setFromMatrixPosition(sun.matrixWorld).sub(_sp.setFromMatrixPosition(sun.target.matrixWorld)).normalize();
+        const sc = sun.color, si = sun.intensity, fg = scene.fog ? scene.fog.color : null, A = atm.u;
+        A.tScene.value = T.scene.texture; A.tDepth.value = T.scene.depthTexture; A.uProjInv.value.copy(camera.projectionMatrixInverse); A.uViewInv.value.copy(camera.matrixWorld);
+        A.uCam.value.setFromMatrixPosition(camera.matrixWorld); A.uSunDir.value.copy(_sd); A.uSunCol.value.set(sc.r * si, sc.g * si, sc.b * si); if (fg) A.uFogCol.value.set(fg.r, fg.g, fg.b);
+        A.uMie.value = P.mie; A.uG.value = P.mieG; A.uMieDist.value = P.mieDist; A.uMist.value = P.mist; A.uMistH.value = P.mistH; A.uMistDist.value = P.mistDist; A.uGround.value = sun.target.position.y; A.uT.value = t;
+        pass(atm, T.atm); src = T.atm;
+        // 太阳光束：太阳在镜头前方（可以略在画外）时沿屏幕径向散射天空像素
+        if (q.rays && P.sunRay > 0) {
+          _l.copy(A.uCam.value).addScaledVector(_sd, 1000).project(camera);
+          const inFront = _l.z < 1 && _l.z > -1, edge = Math.max(Math.abs(_l.x), Math.abs(_l.y)), fade = inFront ? Math.max(0, 1 - Math.max(0, edge - 1.0) / 0.8) : 0;
+          if (fade > 0.01) {
+            const S = sunSrc.u; S.tScene.value = T.scene.texture; S.tDepth.value = T.scene.depthTexture; S.uSun.value.set(_l.x * 0.5 + 0.5, _l.y * 0.5 + 0.5); S.uAsp.value = W / H; S.uTex.value.set(1.5 / W, 1.5 / H);
+            pass(sunSrc, T.sun);
+            sunRays.u.tSrc.value = T.sun.texture; sunRays.u.uLight.value.copy(S.uSun.value); sunRays.u.uDecay.value = P.sunRayDecay; sunRays.u.uT.value = (t * 60 | 0) % 64;
+            pass(sunRays, T.sunRays); CU.tSunRays.value = T.sunRays.texture; CU.uSunRay.value = P.sunRay * fade * Math.min(1.5, 0.35 + Math.max(0, _sd.y) * 0.9);
+            CU.uSunRayCol.value.set(Math.min(2, sc.r * 1.1), Math.min(2, sc.g), Math.min(2, sc.b * 0.85));
+          }
+        }
+      }
       // AO
       if (q.ao) {
         const ap = mkAO(q.aoSamples);
@@ -226,7 +290,7 @@ window.Master = (() => {
       } else { CU.tAO.value = white; CU.uAO.value = 0; }
       // 泛光
       if (q.bloom) {
-        bright.u.tSrc.value = T.scene.texture; bright.u.uTex.value.set(1 / W, 1 / H); bright.u.uThresh.value = P.bloomThresh; pass(bright, T.mips[0]);
+        bright.u.tSrc.value = src.texture; bright.u.uTex.value.set(1 / W, 1 / H); bright.u.uThresh.value = P.bloomThresh; pass(bright, T.mips[0]);
         for (let i = 1; i < MIPS; i++) { down.u.tSrc.value = T.mips[i - 1].texture; down.u.uTex.value.set(1 / T.mips[i - 1].width, 1 / T.mips[i - 1].height); pass(down, T.mips[i]); }
         let prev = T.mips[MIPS - 1];
         for (let i = MIPS - 2; i >= 0; i--) { up.u.tSrc.value = prev.texture; up.u.tPrev.value = T.mips[i].texture; up.u.uTex.value.set(1 / prev.width, 1 / prev.height); pass(up, T.ups[i]); prev = T.ups[i]; }
@@ -243,12 +307,12 @@ window.Master = (() => {
           pass(rays, T.rays); CU.tRays.value = T.rays.texture; CU.uRay.value = P.rayStr * rayStr * fade;
         }
       }
-      CU.tScene.value = T.scene.texture; CU.uT.value = t; CU.uExp.value = P.exposure;
+      CU.tScene.value = src.texture; CU.uT.value = t; CU.uExp.value = P.exposure;
       CU.uSat.value = P.sat; CU.uCon.value = P.contrast; CU.uShT.value.set(P.shadowTint[0], P.shadowTint[1], P.shadowTint[2]); CU.uHiT.value.set(P.highTint[0], P.highTint[1], P.highTint[2]); CU.uVig.value = P.vig; CU.uGrain.value = P.grain; // R46：调色可被 WorldMaster 按地区实时调整
       if (q.fxaa) { pass(comp, T.ldr); fxaa.u.tSrc.value = T.ldr.texture; pass(fxaa, null); } else pass(comp, null);
       renderer.autoClear = ac;
     }
-    function warm() { try { for (const p of [mkAO(q.aoSamples), aoBlur, bright, down, up, rays, comp, fxaa]) renderer.compile(p.sc, cam); for (const k in Q) renderer.compile(mkAO(Q[k].aoSamples).sc, cam); } catch (e) { } } // 第二十一轮：三档 AO 变体一起预编，切档不再现编
+    function warm() { try { for (const p of [mkAO(q.aoSamples), aoBlur, bright, down, up, rays, comp, fxaa, atm, sunSrc, sunRays]) renderer.compile(p.sc, cam); for (const k in Q) renderer.compile(mkAO(Q[k].aoSamples).sc, cam); } catch (e) { } } // 第二十一轮：三档 AO 变体一起预编，切档不再现编
     return { on: true, style: 'master', setSize, render, setTier, get tier() { return tier; }, setRayLight, warm, P };
   }
   return { create, P, Q };
