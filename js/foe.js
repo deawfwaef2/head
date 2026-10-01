@@ -370,6 +370,7 @@ window.Foe = (() => {
   // 第十九轮（卡顿根因）：Master 后处理把场景渲到离屏 RT 且关掉色调映射 → 着色器变体（线性输出/无 ACES）与直接渲到屏幕不同。
   // 以前的预热直接 render 到屏幕，编的是用不上的变体，斩首/倒袋时照样现编。这里完全模拟 Master 的状态再 compile+render。
   function warmRender(R, sc, cam) {
+    if (window.ShaderQ && ShaderQ.async) { ShaderQ.compile(R, sc, cam); return; } // 异步编译：不再用 render 强制同步等待
     const GG = window.G || window.__game, post = GG && GG.post, viaRT = !!(post && post.on), tm = R.toneMapping, rt0 = R.getRenderTarget();
     try {
       if (viaRT) { const rt = warmRender.rt || (warmRender.rt = new THREE.WebGLRenderTarget(16, 16, { depthBuffer: true })); R.toneMapping = THREE.NoToneMapping; R.setRenderTarget(rt); }
@@ -623,7 +624,8 @@ window.Foe = (() => {
   };
   // 第十九轮：攻击令牌 —— 同一时间最多 1 人出手（有霸主时 2 人），两次出手之间至少隔 0.6s；霸主总能出手
   let lastAtkAt = -9, CLK = 0;
-  function tokenOK(fo) { if (fo.boss) return true; if (CLK - lastAtkAt < 0.6) return false;
+  const FAIR = () => !window.Mods || Mods.on('fair_fight') !== false;
+  function tokenOK(fo) { if (fo.boss) return true; if (CLK - lastAtkAt < (FAIR() ? 1.1 : 0.6)) return false;
     let n = 0, boss = false; for (const o of FOES) { if (o.dead) continue; if (o.boss) boss = true; if (o !== fo && (o.atk || o.sk)) n++; } return n < (boss ? 2 : 1); }
   function attack(fo, d, force) {
     if (fo.duel && window.FoeDuel && FoeDuel.attack(fo, d, force)) { lastAtkAt = CLK; return; } // R54 foe_duel：不播攻击动画，程序化举刀到来刀一侧
@@ -646,6 +648,8 @@ window.Foe = (() => {
       reach: fo.armed ? 1.8 : 1.35, tot: 0, dmg: Math.max(1, Math.round(s.maxHp * base * (0.85 + Math.random() * 0.3))) };
     if (fo.role && window.FoeRoles) FoeRoles.tune(fo, fo.atk, d);
     if (window.FoeAI2) FoeAI2.tune(fo, fo.atk, d); // R34：强度缩放 / 节奏扰乱
+    if (FAIR()) { const A = fo.atk; A.ws *= 0.72; A.ws2 = Math.min(0.8, A.ws * 1.4); A.hold = Math.max(0, A.hold) + 0.18; A.feint = false; } // R54n：给玩家约 1 秒反应
+    if (window.Barks) try { Barks.windup(fo, clip, fo.atk); } catch (e) { }
     if (fo.sayT <= 0 && Math.random() < 0.25) { if (fo.boss) talk(fo, '', '#ffb0a0'); else sayP(fo, 'fight', SAY.fight, '#ffb0a0'); } else if (!fo.boss && window.Persona && Math.random() < 0.5) Persona.line(fo, 'atk', true); // 第二十四轮：出手喝声
   }
   // 当前这一刀还要多久（真实秒）
@@ -654,21 +658,22 @@ window.Foe = (() => {
   const PRESS = () => !window.Mods || Mods.on('foe_press') !== false;
   function atkStep(fo, dt, d, face) {
     const A = fo.atk, act = A.act, ct = act.time, h = A.hits[A.hi]; let sc = 0.9, turnTo = null, spd = 0;
+    if (FAIR() && !A.hi && ct < 0.08 && !A.faced) { if (Math.abs(ang(face - fo.yaw)) > 0.45 && (A.faceT = (A.faceT || 0) + dt) < 0.8) { act.timeScale = 0; return { turnTo: face, spd: 0 }; } A.faced = 1; } // 先转过来对着你再起手
     if (h) {
       if (A.hold > 0 && ct >= A.holdAt) { sc = 0; A.hold -= dt; if (A.hold <= 0 && A.feint) { fo.atk = null; fo.cd = 0.35; fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.15 }); if (Math.random() < 0.5) talk(fo, pickR(Math.random, ['骗你的～', '嘿……', '别紧张嘛'])); return { turnTo: face, spd: 0 }; } }
       else sc = ct < h.t - 0.06 ? (A.hi ? A.ws2 : A.ws) : 1;
       if (ct < h.t - 0.14) turnTo = face; // 出手前最后一瞬不再转身：侧闪有效
       if (A.lunge && ct < h.t && d > 1.1 && sc > 0) spd = A.lunge;
-      if (PRESS() && !A.ranged && ct < h.t && sc > 0 && d > A.reach * 0.75) spd = Math.max(spd, (h.heavy ? 3.0 : 1.9) * (fo.boss ? 1.15 : 1)); // R43 foe_press：出招时边打边逼近（重击迈得更多）——不能靠无限后撤躲开
+      if (PRESS() && !A.ranged && ct < h.t && sc > 0 && d > A.reach * 0.75) spd = Math.max(spd, (h.heavy ? 3.0 : 1.9) * (fo.boss ? 1.15 : 1) * (FAIR() ? 0.55 : 1)); // R43 foe_press：出招时边打边逼近（重击迈得更多）——不能靠无限后撤躲开
       const left = atkLeft(A); if (left > A.tot) A.tot = left;
       if (ct >= h.t) { A.hi++; A.tot = 0;
         if (window.CombatFX) CombatFX.enemySwing(fo, h);
         if (A.ranged) FoeRoles.fire(fo, h, d);
-        else if (d < A.reach + (PRESS() ? (h.heavy ? 0.55 : 0.3) : 0) && Math.abs(ang(face - fo.yaw)) < 0.9) { A.landed = 1; CTX.hitPlayer(fo, Math.round(A.dmg * (h.heavy ? 1.6 : 1)), h); if (window.Persona && fo.sayT <= 0 && Math.random() < 0.35) { sayP(fo, 'hit'); if (Math.random() < 0.5) Persona.gesture(fo); } }
+        else if (d < A.reach + (PRESS() ? (h.heavy ? 0.55 : 0.3) : 0) && Math.abs(ang(face - fo.yaw)) < (FAIR() ? 0.7 : 0.9)) { A.landed = 1; CTX.hitPlayer(fo, Math.round(A.dmg * (h.heavy ? 1.6 : 1)), h); if (window.Persona && fo.sayT <= 0 && Math.random() < 0.35) { sayP(fo, 'hit'); if (Math.random() < 0.5) Persona.gesture(fo); } }
         else if (fo.sayT <= 0 && Math.random() < 0.3) talk(fo, '……躲开了？'); }
     }
     act.timeScale = sc;
-    if (!A.hits[A.hi] && (ct >= A.end - 1e-3 || ct >= act.getClip().duration - 1e-3)) { fo.atk = null; fo.cd = (fo.boss ? (fo.rage ? 1.0 : 1.5) : 1.15) + Math.random() * (fo.boss ? Math.max(0.6, 2.4 - fo.iq) : Math.max(0.5, 1.6 - fo.iq)); if (PRESS() && !A.ranged && !A.landed && d < 3.2 && fo.iq > 0.45 && (fo.chain | 0) < 2) { fo.cd = 0.3 + Math.random() * 0.3; fo.chain = (fo.chain | 0) + 1; } else fo.chain = 0; /* R43：落空后你还在附近就立刻补一刀（最多连 2 次） */ fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); if (fo.role && window.FoeRoles) FoeRoles.after(fo); if (window.FoeAI2) FoeAI2.after(fo); }
+    if (!A.hits[A.hi] && (ct >= A.end - 1e-3 || ct >= act.getClip().duration - 1e-3)) { fo.atk = null; fo.cd = (fo.boss ? (fo.rage ? 1.0 : 1.5) : 1.15) + Math.random() * (fo.boss ? Math.max(0.6, 2.4 - fo.iq) : Math.max(0.5, 1.6 - fo.iq)) + (FAIR() ? 0.7 : 0); if (PRESS() && !A.ranged && !A.landed && d < 3.2 && fo.iq > 0.45 && (fo.chain | 0) < (FAIR() ? 1 : 2)) { fo.cd = (FAIR() ? 0.9 : 0.3) + Math.random() * 0.3; fo.chain = (fo.chain | 0) + 1; } else fo.chain = 0; /* R43：落空后你还在附近就立刻补一刀（最多连 2 次） */ fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); if (fo.role && window.FoeRoles) FoeRoles.after(fo); if (window.FoeAI2) FoeAI2.after(fo); }
     return { turnTo, spd };
   }
   // 给 HUD：正在蓄力/出手的敌人 → 来刀方向 + 进度（1 = 命中那一刻）
@@ -693,7 +698,7 @@ window.Foe = (() => {
     const aim = CTX.handAng ? CTX.handAng(fo) : null; if (aim == null) return;
     const err = (Math.random() - 0.5) * 2 * Math.max(0.1, (1.1 - fo.iq)) * 0.7;
     if (fo.block > 0) { fo.gAng = aim + err; return; } // 跟着玩家的手移动格挡
-    if (CTX.playerAiming && CTX.playerAiming() && Math.random() < fo.iq * 0.45) { fo.block = 1.2 + Math.random() * 0.9; fo.gAng = aim + err; fo.f.play('Sword_Block', { once: true, fade: 0.1, restart: true }); }
+    if (CTX.playerAiming && CTX.playerAiming() && Math.random() < fo.iq * 0.45) { fo.block = 1.2 + Math.random() * 0.9; fo.gAng = aim + err; fo.f.play('Sword_Block', { once: true, fade: 0.1, restart: true }); if (window.Barks) Barks.act(fo, 'block'); }
   }
   function guardShow(fo) {
     if (!fo.gs) { fo.gs = new THREE.Sprite(guardMat()); fo.gs.scale.set(0.6, 0.6, 1); fo.gs.renderOrder = 6; CTX.sc.add(fo.gs); }

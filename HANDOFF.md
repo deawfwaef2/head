@@ -2015,3 +2015,10 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - fast_ttk：普通敌人≤4 刀；combat chainK 体力更便宜。
 - corridor 默认关（不走走廊）、nat_gates 默认关（回到铁门），迁移 v21。野兽与敌人并行生成加快换图（实测约 1s）。
 - arrival2 抵达大窗口恢复（等 Saga 电影结束后弹）。
+
+## R54n 加载提速 + 战斗可读性 + 界面整理
+- 加载：实测大头是 Windows(D3D11) 着色器编译（每个变体 0.3~0.9s，进图要编几十个）。lib/three.min.js 打补丁：getProgram 不再立刻 getUniforms（uniformsList 改为 setProgram 时惰性计算，同 r151+），配合 KHR_parallel_shader_compile 并行编译。新 js/shaderq.js（MOD async_shaders）：ShaderQ.compile/wait/ready；开机时 __pauseMain 暂停首帧→异步编译→再出画面；Foe.warm 异步时只 compile；worlds.goto 建好场景立刻发起编译、首帧前等待。实测：开机着色器阶段 15s→6s，首次出猎 3.6s→2.0s，换地点 20.9s→9.2s（本机）。
+- decapcam：body.dcam 隐藏规则漏了 :not(:has(canvas))，把 #game 一起隐藏 → 斩首瞬间黑屏（用户说的黑屏/没慢动作）。已修；周围 ≥4 人才不触发。
+- fair_fight（foe.js）：起手速度 ×0.72、hold +0.18s、无假动作、先转身对准再出手、命中角 0.7、出手间隔 1.1s、冷却 +0.7s、出招前压 ×0.55、落空补刀最多 1 次且 0.9s 后。实测起手到命中约 1.1s。
+- 新 js/r54n.js：Feel54n（move_sfx 跳/落地/闪身音效，脚步调响）、Barks（foe_barks 头顶气泡：来刀方向+往哪闪、重击/突刺/连斩/冲刺/掷刃、格挡、逃跑、残血、刺客绕背）、敌情研判卡（region_intel，#icCard：模糊等级、你的等级/战力、胜率、按职业推荐战术）、HudTidy（hud_tidy：rqTrack/arTrack/mtTrack/sgTrack 左侧一列统一卡片；猎手感应并入 #nemChip；菜单打开时 body.menuon 隐藏 HUD）。arrival2.track 在 hud_tidy 开时不再自己定位。
+- 精英光环/法球光晕不再刺眼（soft_glow 开时透明度约 1/3）。moon_trail 默认关（迁移 v22），恢复原来的电影任务线索。

@@ -46,7 +46,9 @@ window.Nemesis = (() => {
   }
   // ---------- 宿敌 ----------
   let wasW = null, plan = null, chip = null;
-  function chipUI(show) { if (!chip) { css(); chip = document.createElement('div'); chip.id = 'nemChip'; document.body.appendChild(chip); } chip.style.display = show ? 'block' : 'none'; if (!show) return; const p = S().p; chip.classList.toggle('full', p >= 100); chip.innerHTML = `🩸 宿敌逼近 ${Math.round(p)}%<i><b style="width:${Math.min(100, p)}%"></b></i>`; }
+  function chipUI(show) { if (!chip) { css(); chip = document.createElement('div'); chip.id = 'nemChip'; document.body.appendChild(chip); } chip.style.display = show ? 'block' : 'none'; if (!show) return; const p = S().p; chip.classList.toggle('full', p >= 100);
+    const H = window.HudTidy && HudTidy.on() && window.Hunters2 && Hunters2.on() && Hunters2.T && Hunters2.alive().length ? Hunters2.T : null, hm = H ? Math.floor(H.m || 0) : -1; // R54n：猎手感应并入宿敌条
+    chip.innerHTML = `🩸 宿敌逼近 ${Math.round(p)}%<i><b style="width:${Math.min(100, p)}%"></b></i>${hm >= 0 ? `<span style="margin-left:14px;color:${hm >= 100 ? '#ff7a6a' : '#e7c27a'}">🏹 猎手 ${hm}%${hm >= 100 ? ' · 随时会来' : ''}</span><i><b style="width:${Math.min(100, hm)}%;background:linear-gradient(90deg,#7a5a20,#e7c27a)"></b></i>` : ''}`; }
   async function clone() {
     const w = W(), C = window.Foe && Foe.ctx(); if (!w || !C || !w.B || C.sc !== w.B.sc) return false;
     const loc = (window.Lore && Lore.LOCS.find(l => l.k === 'peak')) || w.graph.loc; let h; try { h = RPG.foe(G().S, loc, (Math.random() * 4294967296) >>> 0, G().usedNames, G().usedSig); } catch (e) { return false; } if (!h) return false;

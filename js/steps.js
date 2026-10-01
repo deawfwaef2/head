@@ -31,7 +31,7 @@ window.Steps = (() => {
   // 你的脚步（worlds.js / game.js 调用；返回 true = 已替代原来的 step 采样）
   function player(ground) {
     if (!on()) return false; const c = ac(); if (!c) return false; const t = c.currentTime + 0.005; lr = -lr;
-    const o = bus(c, 0.75, lr * 0.12), surf = ground === 'cave' ? 'stone' : SURF(ground);
+    const o = bus(c, window.Mods && Mods.on('move_sfx') === false ? 0.75 : 1.05, lr * 0.12), surf = ground === 'cave' ? 'stone' : SURF(ground);
     tn(c, o, t, 'sine', 95 * (0.92 + Math.random() * 0.16), 38, 0.22, 0.55, 0.006); // 食人魔的体重
     nz(c, o, t, 0.12, 0.2, 'lowpass', 500, 150, 1, 0.005);
     layer(c, o, t + 0.01, surf, 1.2);

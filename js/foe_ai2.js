@@ -107,7 +107,7 @@ window.FoeAI2 = (() => {
   function kill(e) { if (!e || e.dead) return; e.dead = true; e.m.parent && e.m.parent.remove(e.m); e.m.material.dispose(); }
   function aura(fo, ctx) { // 精英脚下的词缀光环
     const t = T(); if (!t || !ctx || !ctx.sc || fo.auraM) return; const g = aura.g || (aura.g = new t.RingGeometry(0.62, 0.78, 32).rotateX(-Math.PI / 2));
-    fo.auraM = new t.Mesh(g, new t.MeshBasicMaterial({ color: fo.affCol || '#ffffff', transparent: true, opacity: 0.75, depthWrite: false, blending: t.AdditiveBlending, side: t.DoubleSide, fog: false })); fo.auraM.renderOrder = 4; ctx.sc.add(fo.auraM);
+    fo.auraM = new t.Mesh(g, new t.MeshBasicMaterial({ color: fo.affCol || '#ffffff', transparent: true, opacity: window.Mods && Mods.on('soft_glow') === false ? 0.75 : 0.26, depthWrite: false, blending: t.AdditiveBlending, side: t.DoubleSide, fog: false })); fo.auraM.renderOrder = 4; ctx.sc.add(fo.auraM);
   }
 
   // ================= 攻击参数调整（attack → tune）=================
@@ -161,7 +161,7 @@ window.FoeAI2 = (() => {
     const foes = (F_() && Foe.foes) || [], P = ctx && ctx.player;
     for (const fo of foes) {
       if (fo.dead || fo.escaped) { if (fo.auraM) { fo.auraM.parent && fo.auraM.parent.remove(fo.auraM); fo.auraM = null; } continue; }
-      if (fo.elite) { aura(fo, ctx); if (fo.auraM) { fo.auraM.position.set(fo.pos.x, (ctx.H ? ctx.H(fo.pos.x, fo.pos.z) : 0) + 0.06, fo.pos.z); fo.auraM.material.opacity = 0.5 + 0.25 * Math.sin(CLKA * 4 + fo.id); }
+      if (fo.elite) { aura(fo, ctx); if (fo.auraM) { fo.auraM.position.set(fo.pos.x, (ctx.H ? ctx.H(fo.pos.x, fo.pos.z) : 0) + 0.06, fo.pos.z); fo.auraM.material.opacity = (window.Mods && Mods.on('soft_glow') === false ? 1 : 0.35) * (0.5 + 0.25 * Math.sin(CLKA * 4 + fo.id)); }
         if (fo.seen && !fo.affShown) { fo.affShown = true; say(fo, `【精英】${fo.affName}`, fo.affCol); const ks = Object.keys(fo.aff); for (const k of ks) if (!LBL[k] && ctx.toast) { LBL[k] = 1; ctx.toast(`${AFF[k].ic} 精英·${AFF[k].n}：${AFF[k].tip}`, AFF[k].col, 3.2); break; } } }
       if (fo.sk && fo.stag > 0 && fo.sk.k !== 'roll') { const k = fo.sk; if (k.fx) for (const e of k.fx) kill(e); fo.sk = null; fo.yOff = 0; fo.skCd = 3; } // 被打断：取消技能
       if (fo.aff && fo.aff.regen && fo.hp < fo.maxHp) { fo.rgT = (fo.rgT || 0) + dt; if (fo.rgT > 2.2) fo.hp = Math.min(fo.maxHp, fo.hp + fo.maxHp * 0.035 * dt); }

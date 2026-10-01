@@ -255,7 +255,7 @@ window.Talents = (() => {
   const need1 = (r, msg) => { if (!r) { castFail(msg || '附近没有目标'); return false; } return true; };
 
   // ---- 通用：闪身（Q）----
-  S_.dodge = () => { const W = WW(), t = nowS(), v = moveDir().multiplyScalar(11); W.vel.x = v.x; W.vel.z = v.z; W.dashT = 0.2; W.dashV = v; W.dodgeAt = t; W.dodgeT = t + 0.38; sfx('draw', 0.5, 0.6); };
+  S_.dodge = () => { const W = WW(), t = nowS(), v = moveDir().multiplyScalar(11); W.vel.x = v.x; W.vel.z = v.z; W.dashT = 0.2; W.dashV = v; W.dodgeAt = t; W.dodgeT = t + 0.38; sfx('draw', 0.5, 0.6); if (window.Feel54n) Feel54n.dash(); };
 
   // ---- 刃舞 ----
   S_.b_whirl = () => { const P = P3(); const n = aoeHits(P, 3.2, 1.3, { zone: 'neck', decapAt: 0.35 }); /* R42b 旋风斩扫颈：敌人血量≤35% 时斩首 */ ring(P, '#ffe0a0', 0.8, 3.4, 0.35, P.y); slashFx(new V3(P.x, P.y + 1.1, P.z), 0, '#ffe8b0', 2.4, 0.3); W_spin(); Pshake(0.35); sfx('draw', 0.8, 0.9); void n; };

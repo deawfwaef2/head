@@ -762,7 +762,7 @@ window.Worlds = (() => {
     W.cds[k] = now + sk.cd; const P = G.player;
     if (k === 'KeyQ') { const K = G.keys || {}, f = (K.KeyW ? 1 : 0) - (K.KeyS ? 1 : 0), sd = (K.KeyD ? 1 : 0) - (K.KeyA ? 1 : 0);
       fw.set(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)); rt.set(Math.cos(P.yaw), 0, -Math.sin(P.yaw)); const v = new V3().addScaledVector(fw, f || (sd ? 0 : -1)).addScaledVector(rt, sd).normalize().multiplyScalar(11);
-      W.vel.x = v.x; W.vel.z = v.z; W.dashT = 0.2; W.dashV = v; W.dodgeAt = now; W.dodgeT = now + 0.38; SFX.play && SFX.play('draw', 0.5, 0.6); }
+      W.vel.x = v.x; W.vel.z = v.z; W.dashT = 0.2; W.dashV = v; W.dodgeAt = now; W.dodgeT = now + 0.38; SFX.play && SFX.play('draw', 0.5, 0.6); if (window.Feel54n) Feel54n.dash(); }
     if (k === 'KeyR') { const n = Foe.roar(W.pos, 7); SFX.roar && SFX.roar(1); W.shake = 0.6; G.flash && G.flash('#ffd0a0', 0.25, 300); G.toast && G.toast(`📣 战吼！震慑了 ${n} 人`, '#ffd0a0', 1.4); }
     if (k === 'KeyG') { const n = Foe.aoe(W.pos, 2.7, 1.3); SFX.play && SFX.play('draw', 0.8, 0.9); W.shake = 0.35; W.spinT = 0.35; ring(); G.toast && G.toast(n ? `🌀 旋风斩 ×${n}` : '🌀 旋风斩', '#ffd27a', 1); }
   }
@@ -899,6 +899,7 @@ window.Worlds = (() => {
     W.cur = i; node.visited = true; node.known = true; node.adj.forEach(b => W.graph.nodes[b].known = true); remember(node);
     if (!node.prey) populate(node);
     const tb0 = performance.now(); const B = W.B = buildNode(node); tp('build', tb0);
+    if (window.ShaderQ && ShaderQ.async) ShaderQ.compile(G.renderer, B.sc, G.camera); // 场景着色器在 GPU 进程编译，同时主线程载入敌人/野兽
     W.foes = null; W.prey = []; W.boss = null;
     const wantBoss = node.boss && (!(G.S.bosses || {})[node.region] || BT()) && BOf(node);
     let beastP = null; { const d0 = B.doors.find(d => d.to === from) || B.doors.find(d => d.home) || B.doors[0], ins = d0 ? new V3(-Math.cos(d0.a), 0, -Math.sin(d0.a)) : new V3(0, 0, 1); W.pos.set((d0 ? d0.x : 0) + ins.x * 2.4, 0, (d0 ? d0.z : 0) + ins.z * 2.4); W.pos.y = B.H(W.pos.x, W.pos.z); } // R54m：野兽和敌人并行载入
@@ -925,6 +926,7 @@ window.Worlds = (() => {
     G.player.yaw = Math.atan2(-ins.x, -ins.z); G.player.pitch = -0.05;
     B.sc.add(G.camera); G.camera.far = 400; G.camera.updateProjectionMatrix();
     if (window.Combat && Combat.attach) Combat.attach(B.sc);
+    if (window.ShaderQ && ShaderQ.async) { const ts0 = performance.now(); W.dom.loadT.textContent = `「${node.name}」的灯火一盏盏亮起……`; await ShaderQ.ready(G.renderer, B.sc, G.camera, p => { if (W) W.dom.loadB.style.width = Math.round(p * 100) + '%'; }); tp('shaders', ts0); if (!W) return; }
     try { const tc0 = performance.now(); const cm = G.camera; cm.position.set(W.pos.x, W.pos.y + EYE, W.pos.z); cm.rotation.set(G.player.pitch, G.player.yaw, 0, 'YXZ'); cm.updateMatrixWorld(true); if (G.post && G.post.on) G.post.render(B.sc, cm); else G.renderer.render(B.sc, cm); tp('firstframe', tc0); } catch (e) { console.warn('precompile', e); } // 进场前先渲一帧：着色器编译/贴图上传都藏在加载画面后面
     tp('total', tg0); W.dom.load.style.display = 'none'; hud(); banner(node); if (window.Living) try { Living.enter(node, B); } catch (e) { }
     if (window.Mods && Mods.on && Mods.on('loc_story')) { const enter = await nodeStory(node, true); if (!W) return; if (!enter) { leaveHome(); return; } try { G.lockPointer(); } catch (e) {} } // 第二十一轮：用户不要进场冻结剧情卡 → MOD loc_story 默认关
@@ -1066,13 +1068,13 @@ window.Worlds = (() => {
       want.copy(fw).multiplyScalar(f).addScaledVector(rt, s); if (want.lengthSq() > 0) want.normalize().multiplyScalar(sp * (window.Talents ? Talents.moveMul() : 1) * (window.Sack && Sack.spdMul ? Sack.spdMul() : 1) * (window.FoeRoles3 ? FoeRoles3.moveK() : 1) * (window.Combat && Combat.aimMove ? Combat.aimMove() : 1) * (window.Nemesis ? Nemesis.spdK() : 1)); // R37 被网/夹住=定身；R36 移速天赋/增益；R54 hold_strike 蓄势时变慢
       if (f < 0 && want.lengthSq() > 0 && (!window.Mods || Mods.on('back_slow'))) { let fight = false; for (const fo of Foe.foes) { if (fo.dead || !fo.seen || fo.state === 'flee' || fo.state === 'idle') continue; if (Math.hypot(fo.pos.x - W.pos.x, fo.pos.z - W.pos.z) < 14) { fight = true; break; } } const bk = -want.dot(fw); if (fight && bk > 0) { want.addScaledVector(fw, bk * 0.45); if (!W._bkHint) { W._bkHint = 1; G.toast && G.toast('🐢 战斗中后退很慢——想逃就转身跑', '#ffd9a0', 2.2); } } } // R43 MOD back_slow：有敌人盯着你时倒着走只有 55% 速度（不能无限后撤；转身跑才快）
       if (W.dashT > 0) { W.dashT -= dt; W.vel.x = W.dashV.x; W.vel.z = W.dashV.z; } else { W.vel.x += (want.x - W.vel.x) * Math.min(1, dt * 10); W.vel.z += (want.z - W.vel.z) * Math.min(1, dt * 10); }
-      if (K.Space && W.onGround && P.crouch < 0.3 && (!window.Stamina || Stamina.canJump())) { W.vel.y = 4.4; W.onGround = false; }
+      if (K.Space && W.onGround && P.crouch < 0.3 && (!window.Stamina || Stamina.canJump())) { W.vel.y = 4.4; W.onGround = false; if (window.Feel54n) Feel54n.jump(); }
     } else { W.vel.x *= 0.8; W.vel.z *= 0.8; }
     W.vel.y -= 14 * dt; W.pos.addScaledVector(W.vel, dt);
     // 碰撞：边界圆 + 物体圆
     const rr = Math.hypot(W.pos.x, W.pos.z), lim = (B.Rf ? B.Rf(Math.atan2(W.pos.z, W.pos.x)) : B.R) - 0.4; if (B.lp && B.lp.shaped && B.lp.clamp) B.lp.clamp(W.pos, 0.4); else if (rr > lim) { W.pos.x *= lim / rr; W.pos.z *= lim / rr; } // R46：特殊形状沿法线推回（径向会把人沿长廊拖回中心）
     for (const c of B.cols) { const dx = W.pos.x - c.x, dz = W.pos.z - c.z, m = c.r + 0.35, d2 = dx * dx + dz * dz; if (d2 >= m * m) continue; const d = Math.sqrt(d2); if (d > 1e-5) { W.pos.x += dx / d * (m - d); W.pos.z += dz / d * (m - d); } }
-    const gy = B.H(W.pos.x, W.pos.z); if (W.pos.y <= gy) { W.pos.y = gy; W.vel.y = 0; W.onGround = true; } else if (W.pos.y > gy + 0.05) W.onGround = false;
+    const gy = B.H(W.pos.x, W.pos.z); if (W.pos.y <= gy) { if (!W.onGround && W.vel.y < -3 && window.Feel54n) Feel54n.land(-W.vel.y); W.pos.y = gy; W.vel.y = 0; W.onGround = true; } else if (W.pos.y > gy + 0.05) W.onGround = false;
     const moving = Math.hypot(W.vel.x, W.vel.z);
     if (W.onGround && moving > 1) { W.stepT -= dt * moving; if (W.stepT <= 0) { W.stepT = 1.7; const nd = W.graph && W.graph.nodes[W.cur], gs = nd && STYLES[nd.style]; if (window.Steps) Steps.ground = gs ? gs.ground : ''; if (!(window.Steps && Steps.player(Steps.ground))) SFX.step && SFX.step(); } } // 第二十四轮：按地面材质的沉重脚步
     const bob = W.onGround ? Math.sin(now * 9) * Math.min(1, moving / 3) * 0.03 : 0;

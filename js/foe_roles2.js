@@ -29,7 +29,7 @@ window.FoeRoles2 = (() => {
   function orbMesh(col) {
     const t = T(); const g = new t.Group(); const c = new t.Color(col);
     const core = new t.Mesh(new t.SphereGeometry(0.16, 12, 10), new t.MeshBasicMaterial({ color: 0xffffff, fog: false }));
-    const halo = new t.Mesh(new t.SphereGeometry(0.34, 12, 10), new t.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.45, depthWrite: false, blending: t.AdditiveBlending, fog: false }));
+    const halo = new t.Mesh(new t.SphereGeometry(0.34, 12, 10), new t.MeshBasicMaterial({ color: c, transparent: true, opacity: window.Mods && Mods.on('soft_glow') === false ? 0.45 : 0.18, depthWrite: false, blending: t.AdditiveBlending, fog: false }));
     g.add(core); g.add(halo); return g;
   }
 

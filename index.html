@@ -292,6 +292,7 @@
 <script src="lib/GLTFLoader.js"></script>
 <script src="js/mods_i18n.js"></script>
 <script src="js/mods.js"></script>
+<script src="js/shaderq.js"></script>
 <script src="js/eco.js"></script>
 <script src="js/render.js"></script>
 <script src="js/master.js"></script>
@@ -489,6 +490,7 @@
 <script src="js/fix54l.js"></script>
 <script src="js/grandui.js"></script>
 <script src="js/momentum.js"></script>
+<script src="js/r54n.js"></script>
 <script src="js/feel54.js"></script>
 <script src="js/ui54.js"></script>
 <script src="js/guard54.js"></script>
@@ -515,7 +517,10 @@
     await ModelHeads.init(prog(window.Assets ? 1 : 0, '加载首级模型'));
     if (!ModelHeads.ready) throw new Error('模型解析失败');
     txt.textContent = veil ? '洞门缓缓开启……' : '构建洞窟…'; await new Promise(r => setTimeout(r, 30));
+    const aq = !!(window.ShaderQ && ShaderQ.on()); if (aq) window.__pauseMain = true; // 首帧前先异步编译着色器，加载条不再卡死
     startGame();
+    if (aq && ShaderQ.async) { try { if (G.post && G.post.warm) G.post.warm(); await ShaderQ.ready(G.renderer, G.scene, G.camera, (f) => { bar.style.width = (f * 100) + '%'; txt.textContent = veil ? '供灯一盏接一盏亮起……　' + Math.round(f * 100) + '%' : '编译着色器 ' + Math.round(f * 100) + '%'; }); } catch (e) { console.warn('ShaderQ boot', e); } }
+    window.__pauseMain = false;
   } catch (e) { fail(e); return; }
   document.getElementById('loading').remove();
   document.getElementById('menu').classList.remove('hidden');

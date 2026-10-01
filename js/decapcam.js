@@ -41,7 +41,7 @@ window.DecapCam = (() => {
   // ---------------- 界面 ----------------
   function addCss() {
     if (css) return; css = true; const st = document.createElement('style'); st.textContent = `
-body.dcam>*:not(canvas):not(#dcRoot):not(script):not(style){opacity:0!important;transition:opacity .2s}
+body.dcam>*:not(canvas):not(#dcRoot):not(script):not(style):not(:has(canvas)){opacity:0!important;transition:opacity .2s}
 #dcRoot{position:fixed;inset:0;z-index:90;pointer-events:none;overflow:hidden}
 #dcRoot .bar{position:absolute;left:0;right:0;height:13vh;background:#000;transition:transform .32s cubic-bezier(.2,.8,.2,1)}
 #dcRoot .bt{top:0;transform:translateY(-101%)}#dcRoot .bb{bottom:0;transform:translateY(101%)}
@@ -106,7 +106,7 @@ body.dcam>*:not(canvas):not(#dcRoot):not(script):not(style){opacity:0!important;
     if (performance.now() / 1000 - lastEnd < 6) return false; if (G.uiOpen || G.cine || !G.playing || (G.S && G.S.hp <= 0)) return false;
     const cl = document.body.classList; if (cl.contains('sgcine') || cl.contains('hubon') || cl.contains('dcam')) return false;
     if (!fo || !fo.f || !fo.f.holder) return false;
-    if (!fo.boss && window.Foe && Foe.foes) { let n = 0; for (const o of Foe.foes) if (o !== fo && !o.dead && o.seen && o.pos && fo.pos && o.pos.distanceTo(fo.pos) < 10) n++; if (n >= 2) return false; }
+    if (!fo.boss && window.Foe && Foe.foes) { let n = 0; for (const o of Foe.foes) if (o !== fo && !o.dead && o.seen && o.pos && fo.pos && o.pos.distanceTo(fo.pos) < 10) n++; if (n >= 4) return false; }
     return true;
   }
   function onEvent(t, fo) {
