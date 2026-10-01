@@ -366,9 +366,9 @@ window.Worlds = (() => {
   }
   // 第十四轮 14c（用户改回）：每次出门选地区，这一趟随机生成这个地区的地点图（入口=回洞门，最深处=霸主）
   function genTrip(loc, seed) {
-    const r = mulberry(seed), di = Math.max(0, Lore.LOCS.findIndex(l => l.k === loc.k));
-    const N = 8 + Math.min(8, di) + Math.floor(r() * 4), P = [];
-    for (let t = 0; P.length < N && t < 6000; t++) { const p = { x: r() * 150, y: r() * 90 }; if (P.every(q => Math.hypot(q.x - p.x, q.y - p.y) > 17)) P.push(p); }
+    const r = mulberry(seed), di = Math.max(0, Lore.LOCS.findIndex(l => l.k === loc.k)), BIG = !(window.Mods && Mods.on && Mods.on('region_big') === false);
+    const N = BIG ? 20 + di * 2 + Math.floor(r() * 7) : 8 + Math.min(8, di) + Math.floor(r() * 4), P = [], AW = BIG ? 260 : 150, AH = BIG ? 160 : 90; // R54f region_big：地区 20~44 个地点
+    for (let t = 0; P.length < N && t < 9000; t++) { const p = { x: r() * AW, y: r() * AH }; if (P.every(q => Math.hypot(q.x - p.x, q.y - p.y) > 17)) P.push(p); }
     const n = P.length, adj = P.map(() => []), deg = new Array(n).fill(0), dist = (a, b) => Math.hypot(P[a].x - P[b].x, P[a].y - P[b].y);
     const addE = (a, b) => { if (a === b || adj[a].includes(b)) return; adj[a].push(b); adj[b].push(a); deg[a]++; deg[b]++; };
     const inT = new Set([0]); while (inT.size < n) { let best = null; for (const a of inT) for (let b = 0; b < n; b++) if (!inT.has(b)) { const d = dist(a, b); if (!best || d < best[2]) best = [a, b, d]; } addE(best[0], best[1]); inT.add(best[1]); }
@@ -381,7 +381,7 @@ window.Worlds = (() => {
       const style = Worlds._forceStyle || (i === far ? pool[0] : pick(r, pool));
       const sz = i === home ? 's' : i === far ? 'l' : (() => { const x = r(); return x < 0.55 ? 's' : x < 0.88 ? 'm' : 'l'; })();
       let nm; for (let t = 0; t < 30; t++) { const NM = NAMES[style]; nm = (t > 8 || r() < 0.15 ? pick(r, ['北', '南', '东', '西', '上', '下', '旧', '深', '远']) : '') + pick(r, NM[0]) + pick(r, NM[1]); if (!usedN.has(nm)) break; } usedN.add(nm);
-      const Rr = SIZES[sz].R[0] + r() * (SIZES[sz].R[1] - SIZES[sz].R[0]);
+      const Rr = (SIZES[sz].R[0] + r() * (SIZES[sz].R[1] - SIZES[sz].R[0])) * (BIG && sz !== 's' ? 1.25 : 1);
       return { i, x: p.x, y: p.y, region: loc.k, loc, style, size: sz, R: Rr, name: nm, seed: (seed ^ Math.imul(i + 1, 2654435761)) >>> 0, adj: adj[i], depth: depth[i],
         visited: false, known: false, home: i === home, stone: false, boss: i === far && hasBoss, prey: null, chests: null };
     });
@@ -601,8 +601,7 @@ window.Worlds = (() => {
       const gate = !nat && window.Assets && Assets.fit(home ? 'large_castle_door' : 'large_iron_gate', { h: home ? 3.4 : 3.2 }); if (gate) { g.add(gate); }
       // 门两侧灯笼 + 火光
       if (!nat) for (const sx of [-1, 1]) { const ln = window.Assets && Assets.fit('Lantern_01', { h: 0.45, x: sx * 1.7, y: 2.2, z: 0.2 }); if (ln) g.add(ln); }
-      else veil(g, home);
-      const pl = new THREE.PointLight(home ? '#ffb070' : '#9ab8ff', nat ? 1.0 : 1.4, 7, 2); pl.position.set(0, nat ? 1.6 : 2.4, 1.0); g.add(pl);
+      if (!nat) { const pl = new THREE.PointLight(home ? '#ffb070' : '#9ab8ff', 1.4, 7, 2); pl.position.set(0, 2.4, 1.0); g.add(pl); } // R54e：山口不要传送门感（无雾幕、无光晕）
       const label = makeLabel('', home ? '#ffd9a0' : '#cfe0ff'); label.position.set(0, nat ? 3.9 : 4.4, 0); g.add(label);
       if (!nat) cols.push({ x: d.x + Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z + Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 }, { x: d.x - Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z - Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 });
       return Object.assign(d, { g, label, home, nat });
@@ -807,6 +806,9 @@ window.Worlds = (() => {
       for (const i of S.world.vis || []) if (graph.nodes[i]) graph.nodes[i].visited = graph.nodes[i].known = true;
       for (const i of S.world.known || []) if (graph.nodes[i]) graph.nodes[i].known = true;
       for (const k of Object.keys(S.bosses || {})) { const R = graph.regions.find(x => x.k === k); if (R) graph.nodes[R.boss].boss = false; }
+    } else if (!(window.Mods && Mods.on && Mods.on('region_persist') === false)) { // R54f：每个地区只生成一次（种子存档），重进还是那张图，去过的地点记得
+      const RS = S.rmap = S.rmap || {}, k = trip.loc.k; if (!RS[k]) RS[k] = { seed: (Math.random() * 4294967296) >>> 0, vis: [] };
+      graph = genTrip(trip.loc, RS[k].seed); for (const i of RS[k].vis) if (graph.nodes[i]) { graph.nodes[i].visited = graph.nodes[i].known = true; graph.nodes[i].adj.forEach(b => graph.nodes[b].known = true); }
     } else graph = genTrip(trip.loc, (Math.random() * 4294967296) >>> 0);
     const pool = (trip.res.heads || []).slice(); trip.res.heads = []; // 猎物要亲手砍
     W = { trip, api, graph, pool, cur: -1, B: null, pos: new V3(), vel: new V3(), onGround: true, prey: [], boss: null, dead: false, fade: 0, busy: true, t: 0, stepT: 0, hintT: 0, say: [], camFar: G.camera.far, doorNear: null, mapOpen: false, storySeen: new Set() };
@@ -827,6 +829,7 @@ window.Worlds = (() => {
     return t;
   }
   function remember(node) {
+    try { const RS = G.S.rmap && W.graph.trip && G.S.rmap[node.region]; if (RS && !RS.vis.includes(node.i)) RS.vis.push(node.i); } catch (e) { }
     const w = G.S.world; if (!w || W.graph.trip) return; w.vis = w.vis || []; w.known = w.known || [];
     if (!w.vis.includes(node.i)) w.vis.push(node.i);
     node.adj.forEach(b => { if (!w.known.includes(b) && !w.vis.includes(b)) w.known.push(b); });
@@ -863,6 +866,7 @@ window.Worlds = (() => {
   function prefetchNode(i) { if (!W || !IL()) return; const nd = W.graph.nodes[i]; if (!nd || nd._pf) return; nd._pf = 1; try { warm(stylesOf(i)); kickAhead(nd); } catch (e) { console.warn('prefetch', e); } }
   function prefetchAdj(node) { if (!IL()) return; let k = 0; for (const b of node.adj) setTimeout(() => idle(() => { if (W && !W.busy && W.cur === node.i) prefetchNode(b); }), 1500 + 1200 * k++); }
   async function goto(i, from) {
+    if (W.B && W.B.corr) { const k = W.B; W.B = null; try { k.dispose(); } catch (e) { } } // 走廊里出错时的回退路径
     W.busy = true; const node = W.graph.nodes[i];
     const fast = FL(); fadeTo(1, true); let fd = null;
     if (fast) { fd = wait(260).then(() => { if (W) { W.dom.load.style.display = 'flex'; W.dom.loadT.textContent = `前往「${node.name}」……`; } }); } // R49：淡出与加载并行（不再先干等 260ms）
@@ -910,8 +914,74 @@ window.Worlds = (() => {
     if (window.Overhear) try { Overhear.enter(node, { log: t => W && W.trip && W.trip.log.push({ t, cls: 'note' }) }); } catch (e) { console.warn(e); } // 第二十七轮：进场偷听对话框
     if (W.boss) setTimeout(() => { if (W && W.boss) bossSay(W.boss.B.say, 5); }, 1500);
   }
+  // ================= R54 MOD corridor：穿门走进即时生成的弯曲走廊，后台准备下一个地点，走到雾门出口就到（不再有加载画面）=================
+  const CORR = () => !!window.Corridor && !(window.Mods && Mods.on && Mods.on('corridor') === false) && !/[?&]nocorr=1/.test(location.search);
+  function travel(i, from) { if (CORR() && W && W.B && !W.B.corr) return gotoCorr(i, from).catch(e => { console.warn('corridor', e); if (W) goto(i, from); }); return goto(i, from); }
+  const KIT = { templates: (n) => templates(n), veil: (g, home) => veil(g, home) };
+  function corrSize(n) { const t = templates(n)[0]; return t ? { x: t.size.x, z: t.size.z, big: t.size.y > 1.5 || Math.max(t.size.x, t.size.z) > 2.5 } : { x: 1, z: 1, big: false }; }
+  async function gotoCorr(i, from) {
+    W.busy = true; const node = W.graph.nodes[i], src = W.graph.nodes[W.cur];
+    fadeTo(1, true); await wait(160); if (!W) return;
+    const base = STYLES[src.style] || STYLES.meadow, sg = styleOf(src), loaded = n => templates(n).length > 0;
+    const walls = [...new Set([].concat(base.edge ? base.edge[0] : [], ...base.props.filter(p => p[4] === 'tree' || p[4] === 'rock' || p[4] === 'wall').map(p => p[0])))].filter(loaded);
+    const plants = [...new Set([].concat(...base.props.filter(p => p[4] === 'plant' || p[4] === 'grass').map(p => p[0])))].filter(loaded).slice(0, 4);
+    const gset = TEX[sg.ground] || TEX[base.ground]; let mat;
+    if (gset && window.Assets && Assets.triplanar) { mat = Assets.triplanar(gset, { scale: sg.gs || base.gs, normal: 1.1, env: 0.35, ao: 0.9 }); mat.envMap = SKY[sg.sky] ? SKY[sg.sky].env : null; if (base.tint) mat.color = new THREE.Color(base.tint); }
+    else mat = new THREE.MeshStandardMaterial({ color: '#5a5a48', roughness: 1 });
+    disposeNode();
+    const C = Corridor.create(KIT, { st: base, sky: SKY[sg.sky] || SKY[base.sky], mat, walls, plants, size: corrSize, seed: ((src.seed || 1) ^ (node.seed || 7) ^ 0x9e3779b9) >>> 0 });
+    W.B = C; W.foes = null; W.prey = []; W.boss = null; W.corrTo = i;
+    W.pos.set(C.start.x, C.start.y, C.start.z); W.vel.set(0, 0, 0); G.player.yaw = C.start.yaw; G.player.pitch = -0.03;
+    C.sc.add(G.camera); G.camera.far = 400; G.camera.updateProjectionMatrix(); if (window.Combat && Combat.attach) Combat.attach(C.sc);
+    fadeTo(0); W.busy = false; G.toast && G.toast(`🌫️ 通往「${node.name}」的小径……一直往前走`, '#cfe0ff', 2.6);
+    let P = null; try { P = await prepNode(i, from); } catch (e) { console.warn('prepNode', e); }
+    if (!W || W.B !== C) return;
+    if (!P) { goto(i, from); return; }
+    C.ready(() => enterPrepared(P, C));
+  }
+  async function prepNode(i, from) {
+    const node = W.graph.nodes[i], tg0 = performance.now(); PROF.length = 0;
+    try { kickAhead(node); } catch (e) { }
+    await need(stylesOf(i)); tp('need', tg0); if (!W) return null;
+    if (!node.prey) populate(node);
+    await wait(30); if (!W) return null;
+    const tb0 = performance.now(); const B = buildNode(node); tp('build', tb0);
+    let foes = null; const wantBoss = node.boss && !(G.S.bosses || {})[node.region] && window.Explore && Explore.BOSSES[node.region];
+    if (window.Foe && !/[?&]nofoe=1/.test(location.search) && !(window.Mods && !Mods.on('foe_bodies'))) {
+      try {
+        const r = mulberry(node.seed ^ 0x5bd1e995), list = [], SL = B.site && B.site.slots;
+        node.prey.forEach((h, k) => { const sl = SL && SL[k]; list.push({ h, pos: sl ? new V3(sl.x, 0, sl.z) : spot(B, r) }); });
+        if (wantBoss) { const Bo = Explore.BOSSES[node.region]; node.bossH = node.bossH || RPG.bossHead(G.S, G.st(), node.loc, Bo, G.usedNames, G.usedSig); list.push({ h: node.bossH, pos: B.bossAt || new V3(0, 0, 0), boss: Bo, bossK: node.region }); }
+        const tf0 = performance.now(); foes = await Foe.populate(foeCtx(B, node), list); tp('foes', tf0);
+        if (foes && !foes.length && list.length) foes = null;
+        if (foes && B.site && window.WSites) WSites.seat(foes, B.site);
+      } catch (e) { console.warn('Foe', e); foes = null; }
+    }
+    B.doors.forEach(d => { d.label.userData.set(doorName(node, d)); });
+    try { if (window.Foe && Foe.warm) Foe.warm(G.renderer, B.sc, G.camera); } catch (e) { } // 着色器在走廊里就编好
+    tp('total', tg0); return { node, B, foes, wantBoss, from };
+  }
+  function enterPrepared(P, C) {
+    const { node, B, foes, wantBoss, from } = P; W.busy = true; fadeTo(1, true);
+    setTimeout(async () => {
+      if (!W || W.B !== C) return;
+      try { C.dispose(); } catch (e) { } W.B = B; W.corrTo = null;
+      W.cur = node.i; node.visited = true; node.known = true; node.adj.forEach(b => W.graph.nodes[b].known = true); remember(node);
+      W.foes = foes; W.prey = []; W.boss = null; if (!W.foes) { W.prey = spawnPrey(B, node); W.boss = wantBoss ? spawnBoss(B, node) : null; }
+      const d0 = B.doors.find(d => d.to === from) || B.doors.find(d => d.home) || B.doors[0], ins = d0 ? new V3(-Math.cos(d0.a), 0, -Math.sin(d0.a)) : new V3(0, 0, 1);
+      W.pos.set((d0 ? d0.x : 0) + ins.x * 2.4, 0, (d0 ? d0.z : 0) + ins.z * 2.4); W.pos.y = B.H(W.pos.x, W.pos.z); W.vel.set(0, 0, 0);
+      if (window.Beasts && !/[?&]nobeast=1/.test(location.search) && !(window.Mods && Mods.on('beasts') === false)) { try { await Beasts.spawn(beastCtx(B, node, r0 => r0), node); } catch (e) { console.warn('Beasts', e); } }
+      if (!W) return;
+      G.player.yaw = Math.atan2(-ins.x, -ins.z); G.player.pitch = -0.05;
+      B.sc.add(G.camera); G.camera.far = 400; G.camera.updateProjectionMatrix(); if (window.Combat && Combat.attach) Combat.attach(B.sc);
+      hud(); banner(node); fadeTo(0); W.busy = false; prefetchAdj(node);
+      if (window.Overhear) try { Overhear.enter(node, { log: t => W && W.trip && W.trip.log.push({ t, cls: 'note' }) }); } catch (e) { console.warn(e); }
+      if (W.boss) setTimeout(() => { if (W && W.boss) bossSay(W.boss.B.say, 5); }, 1500);
+    }, 230);
+  }
   function disposeNode() {
     const B = W.B; if (!B) return;
+    if (B.corr) { try { B.dispose(); } catch (e) { console.warn(e); } W.say.forEach(s => s.el.remove()); W.say = []; W.B = null; return; } // R54 corridor
     if (window.Foe) Foe.clear(); if (window.Beasts) Beasts.clear();
     B.sc.traverse(o => { if (o.isInstancedMesh) o.dispose && o.dispose(); if (o.userData.sky) { o.geometry.dispose(); o.material.dispose(); } if (o.userData.wg) { o.geometry.dispose(); o.material.dispose(); } if (o.isSprite && o.material.map && o.material.map.isCanvasTexture && o.material.map !== glowTex) { o.material.map.dispose(); o.material.dispose(); } });
     B.terr.geometry.dispose(); B.terr.material.dispose && B.terr.material.dispose();
@@ -993,7 +1063,8 @@ window.Worlds = (() => {
     if (B.wx) try { B.wx(dt, cam.position, now); } catch (e) { B.wx = null; console.warn(e); }
     if (B.sc.userData.fire) B.sc.userData.fire.intensity = 2.2 * (0.85 + Math.sin(now * 13) * 0.08 + Math.sin(now * 29) * 0.05);
     // 门：靠近提示
-    W.doorNear = null; for (const d of B.doors) { const dd = Math.hypot(W.pos.x - d.x, W.pos.z - d.z); if (dd < 2.6) W.doorNear = d; if (dd < 12 && d.to >= 0) prefetchNode(d.to); d.label.visible = Math.hypot(cam.position.x - d.x, cam.position.z - d.z) < 34; }
+    W.doorNear = null; for (const d of B.doors) { const dd = Math.hypot(W.pos.x - d.x, W.pos.z - d.z); if (dd < 2.6) W.doorNear = d; if (dd < 12 && d.to >= 0) prefetchNode(d.to); d.label.visible = Math.hypot(cam.position.x - d.x, cam.position.z - d.z) < 34;
+      if (d.nat && !d.home && dd < 1.6 && !W.busy && CORR() && (W.vel.x * Math.cos(d.a) + W.vel.z * Math.sin(d.a)) > 1.2 && !(W.foes && W.foes.some(f => !f.dead && f.seen && f.atk))) { travel(d.to, W.cur); break; } } // R54e：顺着山口走出去就上路（不用按 E）
     W.interNear = null; { let bd = 9; for (const it of B.inter) { const dd = Math.hypot(W.pos.x - it.x, W.pos.z - it.z); if (!it.done && dd < (it.corpse ? 2.3 : 1.9) && dd < bd) { bd = dd; W.interNear = it; } } }
     if (window.Sack) try { Sack.frame(dt); } catch (e) { console.warn(e); }
     // 猎物 / 霸主
@@ -1137,13 +1208,13 @@ window.Worlds = (() => {
     if (!e.repeat && (e.code === 'KeyQ' || e.code === 'KeyR' || e.code === 'KeyG')) { skill(e.code); return true; }
     if (e.code === 'KeyE' && !e.repeat) {
       // 第二十一轮：被追杀时站在门口按 E 优先逃走（不会被旁边的尸体/战利品抢走 E）
-      if (W.doorNear && W.foes && W.foes.some(f => !f.dead && f.seen && (f.state === 'chase' || f.atk))) { const d = W.doorNear; G.toast && G.toast('🏃 你甩开了追兵，逃出了门！', '#b0ffb0', 2); if (d.home) leaveHome(); else { SFX.open && SFX.open(); goto(d.to, W.cur); } return true; }
+      if (W.doorNear && W.foes && W.foes.some(f => !f.dead && f.seen && (f.state === 'chase' || f.atk))) { const d = W.doorNear; G.toast && G.toast('🏃 你甩开了追兵，逃出了门！', '#b0ffb0', 2); if (d.home) leaveHome(); else { SFX.open && SFX.open(); travel(d.to, W.cur); } return true; }
       if (W.foes) { const bf = Foe.brokenNear(W.pos, G.player.yaw); if (bf) { Foe.execute(bf, new V3(Math.cos(G.player.yaw), 0, -Math.sin(G.player.yaw))); return true; } }
       if (W.headNear) { const hd = W.headNear;
         if ((window.Sack && Sack.on()) && !hd.fo.boss) { Sack.queueHead(hd, () => Foe.hasHead(hd), () => { if (takeHead(hd)) Foe.pickup(hd); }); return true; }
         if (takeHead(hd)) Foe.pickup(hd); return true; }
       if (W.interNear) { const it = W.interNear; if (it.kind === 'loot') Sack.openWild(it.L); else openChest(it); return true; }
-      if (W.doorNear) { const d = W.doorNear; if (d.home) leaveHome(); else { SFX.open && SFX.open(); goto(d.to, W.cur); } return true; }
+      if (W.doorNear) { const d = W.doorNear; if (d.home) leaveHome(); else { SFX.open && SFX.open(); travel(d.to, W.cur); } return true; }
     }
     if (e.code === 'KeyF' && window.Combat && Combat.enabled) { Combat.toggle(); return true; }
     if (e.code === 'KeyH' && (window.Sack && Sack.on())) { Sack.quickUse(); return true; }
