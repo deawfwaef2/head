@@ -8,18 +8,20 @@ window.FoeDuel = (() => {
   const TYPES = {
     duelist: { n: '剑斗士', ic: '⚔️', w: 0.5, wu: [0.6, 0.85], strike: 0.15, chain: [1, 3], feint: 0.22, dmg: 1.0, heavyP: 0.12, hp: 1.1, spd: 1.05, col: '#ff7a6a', tip: '出刀前会把刀举到来刀一侧——看清方向，右键格挡并把鼠标转到那一侧；她连斩会换方向，还会在最后一刻变向' },
     brute: { n: '重剑卫', ic: '🗡️', w: 0.25, wu: [1.0, 1.3], strike: 0.22, chain: [1, 1], feint: 0.04, dmg: 1.5, heavyP: 0.65, hp: 1.45, spd: 0.85, col: '#ffa04a', tip: '前摇很长、多为橙色重击：普通格挡挡不住——在刀落下那一瞬完美格挡，或按 Q 闪开再反击' },
-    twin: { n: '疾刃手', ic: '🌪️', w: 0.25, wu: [0.38, 0.5], strike: 0.11, chain: [2, 3], feint: 0.1, dmg: 0.7, heavyP: 0, hp: 0.85, spd: 1.2, col: '#ff6a9a', tip: '出手快、连斩多但每刀很轻：别贪刀，挡住整串再还手' }
+    twin: { n: '疾刃手', ic: '🌪️', w: 0.25, wu: [0.38, 0.5], strike: 0.11, chain: [2, 3], feint: 0.1, dmg: 0.7, heavyP: 0, hp: 0.85, spd: 1.2, col: '#ff6a9a', tip: '出手快、连斩多但每刀很轻：别贪刀，挡住整串再还手' },
+    warlord: { n: '霸主', ic: '👑', w: 0, wu: [0.5, 0.75], strike: 0.16, chain: [2, 4], feint: 0.25, dmg: 1.0, heavyP: 0.35, hp: 1, spd: 1, col: '#ffd060', tip: '' }
   };
+  const ALL = () => !window.Mods || Mods.on('duel_all') !== false;
   const DIRS = [90, 135, 45, 180, 0, -135, -45, 160, 20];
   const ease = x => x < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x);
   const easeIn = x => x < 0 ? 0 : x > 1 ? 1 : x * x * x;
 
   function assign(fo, r, it) {
-    if (!on() || it.boss || r() > 0.42) return false;
+    const all = ALL(); if (!on() || (!all && (it.boss || r() > 0.42))) return false;
     if (!fo.wpn) { try { fo.wpn = Foe.attachWeapon(fo.f, ['antique_katana_01', 'antique_estoc', 'machete'][Math.floor(r() * 3)]); } catch (e) { fo.wpn = null; } if (!fo.wpn) return false; fo.armed = true; }
-    let x = r(), k = 'duelist'; for (const kk in TYPES) { if ((x -= TYPES[kk].w) <= 0) { k = kk; break; } }
-    const T = TYPES[k]; fo.duel = { k, T, w: 0, set: null, orig: null, axL: null, rib: null, shown: false, lastDir: null };
-    fo.spdMul = T.spd; fo.maxHp = fo.hp = Math.max(8, Math.round(fo.maxHp * T.hp)); fo.iq = Math.min(1.1, fo.iq + 0.15);
+    let x = r(), k = 'duelist'; for (const kk in TYPES) { if ((x -= TYPES[kk].w) <= 0) { k = kk; break; } } if (it.boss) k = 'warlord';
+    const T = TYPES[k]; fo.duel = { k, T, w: 0, set: null, orig: null, axL: null, rib: null, shown: !!it.boss, lastDir: null };
+    if (!all) { fo.spdMul = T.spd; fo.maxHp = fo.hp = Math.max(8, Math.round(fo.maxHp * T.hp)); } fo.iq = Math.min(1.1, fo.iq + 0.15); // duel_all：体型/血量交给职业，这里只管出刀方式
     return true;
   }
   function label(fo) {
@@ -31,6 +33,7 @@ window.FoeDuel = (() => {
 
   function attack(fo, d, force) {
     if (!on() || !fo.duel || (force && /Throw/.test(force))) return false;
+    if (fo.role === 'ranged' && d >= 3.2) return false; // 投掷手远距离仍然扔刀
     const C = Foe.ctx(); if (!C) return false; const T = fo.duel.T, s = C.st();
     const n = T.chain[0] + Math.floor(Math.random() * (T.chain[1] - T.chain[0] + 1)), wu = T.wu[0] + Math.random() * (T.wu[1] - T.wu[0]);
     const hits = []; let t = wu, prev = fo.duel.lastDir;
@@ -38,7 +41,7 @@ window.FoeDuel = (() => {
       hits.push({ t, a: a * D2R, ang: a * D2R, heavy, thrust: false, deg: a, st: i ? t - (T.strike + 0.32) : 0 }); t += T.strike + 0.36 + Math.random() * 0.14 + (heavy ? 0.2 : 0); }
     fo.duel.lastDir = prev;
     const end = hits[n - 1].t + 0.55, act = { time: 0, timeScale: 1, getClip: () => ({ duration: end }) };
-    const base = 0.03 + fo.rar * 0.014 + 0.02;
+    const base = fo.boss ? (fo.rage ? 0.08 : 0.07) : 0.03 + fo.rar * 0.014 + 0.02;
     fo.atk = { clip: 'duel', act, hits, hi: 0, ws: 1, ws2: 1, end, lunge: 0, holdAt: 0, hold: 0, feint: false, reach: 1.95, tot: 0, duel: true,
       dfeint: Math.random() < T.feint ? 0.55 + Math.random() * 0.2 : 0, dmg: Math.max(1, Math.round(s.maxHp * base * T.dmg * (0.85 + Math.random() * 0.3))) };
     if (window.FoeAI2) try { FoeAI2.tune(fo, fo.atk, d); } catch (e) { }

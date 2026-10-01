@@ -20,7 +20,7 @@ window.FoeRoles = (() => {
   const PROJ = []; // 飞行中的掷刃
 
   function assign(fo, r, it) {
-    if (!on() || it.boss || fo.duel) return;
+    if (!on() || it.boss || (fo.duel && !(window.Mods && Mods.on('duel_all') === false) ? false : fo.duel)) return;
     const armed = fo.armed, w = armed ? [['brute', 0.14], ['skirm', 0.2], ['guard', 0.18], ['assassin', 0.15], ['berserk', 0.14], ['ranged', 0.12], [null, 0.07]] : [['brute', 0.22], ['skirm', 0.34], ['berserk', 0.26], [null, 0.18]];
     let x = r() * w.reduce((a, b) => a + b[1], 0), role = null; for (const [k, p] of w) { if ((x -= p) <= 0) { role = k; break; } }
     if (window.FoeRoles2) { const r2 = FoeRoles2.pick(fo, r, role); if (r2) role = r2; } // R26：新职业
