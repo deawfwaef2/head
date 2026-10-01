@@ -85,17 +85,22 @@ body.sfxon #tbCast{display:none!important}
     m.scale.setScalar(size); const v = vel.clone();
     return addM(m, life, (f, k, dt) => { v.y -= (grav || 0) * dt; f.m.position.addScaledVector(v, dt); f.m.material.opacity = 1 - k * k; f.m.scale.setScalar(size * (1 - 0.6 * k)); }, pos);
   }
+  const SOFT = () => !window.Mods || Mods.on('soft_vfx') !== false;
+  const TX2 = {};
+  function radTex(k, a0, a1, a2) { if (TX2[k]) return TX2[k]; const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), r = g.createRadialGradient(64, 64, 0, 64, 64, 64); r.addColorStop(0, 'rgba(255,255,255,0)'); r.addColorStop(a0, 'rgba(255,255,255,0)'); r.addColorStop(a1, 'rgba(255,255,255,1)'); r.addColorStop(a2, 'rgba(255,255,255,.35)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 128, 128); return TX2[k] = new THREE.CanvasTexture(c); }
+  function beamTex() { if (TX2.beam) return TX2.beam; const c = document.createElement('canvas'); c.width = 64; c.height = 128; const g = c.getContext('2d'), v = g.createLinearGradient(0, 0, 0, 128); v.addColorStop(0, 'rgba(255,255,255,0)'); v.addColorStop(0.55, 'rgba(255,255,255,.45)'); v.addColorStop(1, 'rgba(255,255,255,1)'); g.fillStyle = v; g.fillRect(0, 0, 64, 128); const h = g.createLinearGradient(0, 0, 64, 0); h.addColorStop(0, 'rgba(0,0,0,.65)'); h.addColorStop(0.5, 'rgba(0,0,0,0)'); h.addColorStop(1, 'rgba(0,0,0,.65)'); g.globalCompositeOperation = 'destination-out'; g.fillStyle = h; g.fillRect(0, 0, 64, 128); return TX2.beam = new THREE.CanvasTexture(c); }
   function ringFx(pos, col, r0, r1, life, delay) {
-    const m = new THREE.Mesh(geo('ring', () => new THREE.RingGeometry(0.82, 1, 56)), amat(col, 0.9)); m.rotation.x = -Math.PI / 2; m.visible = !delay; m.scale.setScalar(r0);
+    const m = new THREE.Mesh(geo('ring', () => new THREE.RingGeometry(0.82, 1, 56)), amat(col, 0.9, SOFT() ? radTex('ring', 0.8, 0.91, 0.97) : null)); m.rotation.x = -Math.PI / 2; m.visible = !delay; m.scale.setScalar(r0);
     const f = addM(m, life + (delay || 0), (f, k) => { const tt = f.t - (delay || 0); if (tt < 0) return; f.m.visible = true; const q = Math.min(1, tt / life); f.m.scale.setScalar(r0 + (r1 - r0) * (1 - Math.pow(1 - q, 3))); f.m.material.opacity = 0.9 * (1 - q); }, pos); return f;
   }
   function pillar(pos, col, h, life) {
-    const m = new THREE.Mesh(geo('pil', () => new THREE.CylinderGeometry(1, 1, 1, 24, 1, true)), amat(col, 0.4)); m.scale.set(0.7, h, 0.7); m.position.set(pos.x, pos.y + h / 2, pos.z);
+    const m = new THREE.Mesh(geo('pil', () => new THREE.CylinderGeometry(1, 1, 1, 24, 1, true)), amat(col, 0.4, SOFT() ? beamTex() : null)); m.scale.set(0.7, h, 0.7); m.position.set(pos.x, pos.y + h / 2, pos.z);
     return addM(m, life, (f, k) => { f.m.scale.set(0.7 * (1 - k * 0.8), h * (1 + k * 0.3), 0.7 * (1 - k * 0.8)); f.m.material.opacity = 0.4 * (1 - k); });
   }
   function crescent(pos, yaw, col, size, life, roll) {
-    const m = new THREE.Mesh(geo('cres', () => new THREE.RingGeometry(0.7, 1, 32, 1, 0, Math.PI)), amat(col, 1)); m.rotation.set(0, yaw, roll || 0); m.scale.setScalar(size * 0.6);
-    const a = new THREE.Mesh(geo('cres', () => new THREE.RingGeometry(0.7, 1, 32, 1, 0, Math.PI)), amat('#ffffff', 0.9)); a.scale.setScalar(0.86); m.add(a);
+    const ct = SOFT() ? radTex('cres', 0.68, 0.86, 0.95) : null;
+    const m = new THREE.Mesh(geo('cres', () => new THREE.RingGeometry(0.7, 1, 32, 1, 0, Math.PI)), amat(col, 1, ct)); m.rotation.set(0, yaw, roll || 0); m.scale.setScalar(size * 0.6);
+    const a = new THREE.Mesh(geo('cres', () => new THREE.RingGeometry(0.7, 1, 32, 1, 0, Math.PI)), amat('#ffffff', SOFT() ? 0.55 : 0.9, ct)); a.scale.setScalar(0.86); m.add(a);
     return addM(m, life, (f, k) => { const q = 1 - Math.pow(1 - k, 3); f.m.scale.setScalar(size * (0.6 + q * 0.7)); f.m.material.opacity = 1 - k; a.material.opacity = 0.9 * (1 - k); }, pos);
   }
   function shell(pos, col, r, life) {

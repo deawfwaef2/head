@@ -41,6 +41,7 @@ window.Eco = (() => {
       if (t - lastRun < n * refMs - refMs * 0.5) { if (Q.size) pend = raf0(pump); return; }
     }
     lastRun = t;
+    if (prNext != null && prSet) { prSet(prNext); prNext = null; } // 在本帧渲染前改分辨率：渲染后再改会清空画布 = 黑屏闪一下
     const cbs = Q; Q = new Map();
     gpuBegin();
     for (const cb of cbs.values()) { try { cb(t); } catch (e) { console.error(e); } }
@@ -51,7 +52,7 @@ window.Eco = (() => {
 
   // ---------- 分辨率上限 + GPU 计时动态分辨率 ----------
   let R = null, prSet = null, gl = null, ext = null, active = null; const qFree = [], qBusy = [], GPU = [];
-  let prWant = 1, prCur = 1, decideT = 0;
+  let prWant = 1, prCur = 1, decideT = 0, prNext = null;
   const prCap = () => on() ? Math.min(devicePixelRatio || 1, 1) : Math.min(devicePixelRatio || 1, 1.5);
   function attach(renderer) {
     if (R) return; R = renderer; prSet = renderer.setPixelRatio.bind(renderer);
@@ -83,8 +84,8 @@ window.Eco = (() => {
     const d = prevRun ? t - prevRun : 0; prevRun = t; if (!R || !on() || tg !== 60 || busyUI() || loading() || !d || d > 250) { PT.length = 0; okSince = t; return; }
     PT.push(d); if (PT.length > 120) PT.shift(); if (PT.length < 90 || t < decideT) return; decideT = t + 1000;
     const a = PT.slice().sort((x, y) => x - y), med = a[a.length >> 1], iv = Math.max(1000 / 60, Math.round(1000 / 60 / refMs) * refMs), cap = prCap();
-    if (med > iv * 1.22 && prCur > cap * 0.75 + 0.01) { prCur = Math.max(cap * 0.75, prCur - 0.08); prSet(prCur); PT.length = 0; okSince = t; }
-    else if (med <= iv * 1.06) { if (prCur < cap - 0.01 && t - okSince > 6000) { prCur = Math.min(cap, prCur + 0.05); prSet(prCur); PT.length = 0; okSince = t; } }
+    if (med > iv * 1.22 && prCur > cap * 0.75 + 0.01) { prCur = Math.max(cap * 0.75, prCur - 0.08); prNext = prCur; PT.length = 0; okSince = t; }
+    else if (med <= iv * 1.06) { if (prCur < cap - 0.01 && t - okSince > 6000) { prCur = Math.min(cap, prCur + 0.05); prNext = prCur; PT.length = 0; okSince = t; } }
     else okSince = t;
   }
   function stats() { const a = GPU.slice().sort((x, y) => x - y); return { on: on(), target: target(), refMs: +refMs.toFixed(2), gpuMs: a.length ? +a[a.length >> 1].toFixed(2) : null, pr: prCur, cap: prCap(), timer: !!ext }; }

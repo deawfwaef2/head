@@ -21,6 +21,6 @@ window.ShaderQ = (() => {
     return new Promise(res => { const f = () => { const n = pending(r); n0 = Math.max(n0, n); if (onProg) try { onProg(n0 ? 1 - n / n0 : 1, n); } catch (e) { }
       calm = n ? 0 : calm + 1; if (calm >= 2 || performance.now() - t0 > lim) return res(); setTimeout(f, 40); }; setTimeout(f, 0); });
   }
-  async function ready(r, sc, cam, onProg) { r = r || R(); if (!on() || !r) return; compile(r, sc, cam); await wait(r, onProg); }
+  async function ready(r, sc, cam, onProg, maxMs) { r = r || R(); if (!on() || !r) return; compile(r, sc, cam); await wait(r, onProg, maxMs); }
   return { on, compile, wait, ready, pending, get async() { const r = R(); return on() && !!r && hasExt(r); } };
 })();

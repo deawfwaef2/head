@@ -105,9 +105,11 @@ window.Beasts = (() => {
     P.y = C.H(P.x, P.z);
   }
   function face(b, x, z, dt, turn = 10) { b.yaw += clamp(ang(Math.atan2(x - b.pos.x, z - b.pos.z) - b.yaw), -turn * dt, turn * dt); b.g.rotation.y = b.yaw; }
+  const FF = () => !window.Mods || Mods.on('fair_fight') !== false;
 
   // ---- 伤害玩家 ----
   function bite(b, frac, o = {}) {
+    if (FF()) { const ch = window.Loop && Loop.R ? (Loop.R().chap || 1) : 1; frac *= ch <= 1 ? 0.55 : ch === 2 ? 0.75 : 1; } // R54n：前期野兽太狠
     const s = C.st(), n = Math.max(1, Math.round(s.maxHp * frac * rnd(0.85, 1.15) * (o.heavy ? 1.5 : 1)));
     b.stub.broken = 0; b.stub.stag = 0; C.hitPlayer(b.stub, n, { ang: o.ang != null ? o.ang : [-2.2, -0.7, 0.7, 2.2, 1.57][Math.floor(Math.random() * 5)], heavy: !!o.heavy, thrust: false });
     if (b.stub.stag > 0.3 || b.stub.broken > 0) { b.stun = Math.max(b.stun, b.stub.stag || 0.8); b.broken = Math.max(b.broken, b.stub.broken || 0.9); b.state = 'stun'; b.t = 0; play(b, 'Idle_HitReact1', { once: true, restart: true, fade: 0.05 }); }
@@ -166,7 +168,7 @@ window.Beasts = (() => {
     if (b.state === 'idle') { play(b, b.t % 5 < 2 ? 'Walk' : 'Idle'); if (b.t % 5 < 2) steer(b, b.pos.x + Math.sin(b.t) * 3, b.pos.z + Math.cos(b.t * 1.3) * 3, T.walk, dt, 3);
       if (b.provoked || (d < T.aggro && seesP(b, T.aggro))) { notice(b, P); b.state = 'chase'; b.t = 0; } return; }
     if (b.state === 'chase') { play(b, 'Gallop'); steer(b, P.x, P.z, T.run, dt); if (d < T.reach + 0.5) { b.state = 'bite'; b.t = 0; b.hitDone = false; play(b, 'Attack', { once: true, restart: true, fade: 0.05, speed: 1.4 }); } return; }
-    if (b.state === 'bite') { face(b, P.x, P.z, dt, 14); if (b.t > 0.28 && !b.hitDone) { b.hitDone = true; if (d < T.reach + 0.6) bite(b, T.dmg); } if (b.t > 0.7) { b.state = 'flee'; b.t = 0; b.fleeA = Math.atan2(b.pos.x - P.x, b.pos.z - P.z) + rnd(-0.8, 0.8); } return; }
+    if (b.state === 'bite') { face(b, P.x, P.z, dt, 14); if (b.t > (FF() ? 0.5 : 0.28) && !b.hitDone) { b.hitDone = true; if (d < T.reach + 0.6) bite(b, T.dmg); } if (b.t > (FF() ? 0.9 : 0.7)) { b.state = 'flee'; b.t = 0; b.fleeA = Math.atan2(b.pos.x - P.x, b.pos.z - P.z) + rnd(-0.8, 0.8); } return; }
     if (b.state === 'flee') { play(b, 'Gallop'); steer(b, b.pos.x + Math.sin(b.fleeA) * 6, b.pos.z + Math.cos(b.fleeA) * 6, T.run, dt); if (b.t > 1.6 + rnd(0, 0.01)) { b.state = 'chase'; b.t = 0; } }
   }
   function aiCharger(b, dt, P, d) { // 野牛：不惹不动；靠近或挨打后刨地、直线冲撞，撞完喘息（破绽 = 双倍伤害）
@@ -208,7 +210,7 @@ window.Beasts = (() => {
     if (b.hp <= 0) { die(b, info); return true; }
     if (b.state === 'idle' || b.state === 'flee' && b.T.ai !== 'skittish') { b.state = ({ pack: 'stalk', charger: 'paw', skittish: 'fight' })[b.T.ai] || 'chase'; b.t = 0; b.cd = 0.5; b.noticed = true; b.ring = Math.atan2(b.pos.x - C.pos().x, b.pos.z - C.pos().z); b.dir = b.side; }
     else if (b.T.ai === 'skittish' && b.state === 'flee') { b.state = 'fight'; b.t = 0; }
-    if (b.state !== 'charge' && !(b.T.ai === 'charger' && b.state === 'paw' && !info.charged)) { b.stun = b.T.ai === 'charger' ? 0.2 : 0.4; b.state = 'stun'; b.t = 0; play(b, 'Idle_HitReact1', { once: true, restart: true, fade: 0.05 }); }
+    if (b.state !== 'charge' && !(b.T.ai === 'charger' && b.state === 'paw' && !info.charged)) { b.stun = b.T.ai === 'charger' ? (FF() ? 0.35 : 0.2) : (FF() ? 0.75 : 0.4); b.state = 'stun'; b.t = 0; play(b, 'Idle_HitReact1', { once: true, restart: true, fade: 0.05 }); }
     return true;
   }
   function die(b, info) {

@@ -10,8 +10,8 @@ window.Mods = (() => {
   // cat: play 玩法 / look 角色外观 / render 画风(互斥组 render) / perf 性能 / asset 模型与材质
   const LIST = [
     // ---------- 画风（互斥：只能选一个） ----------
-    { id: 'r_classic', cat: 'render', group: 'render', icon: '🎮', n: '原版渲染', d: '不做后处理，最省性能。', def: true },
-    { id: 'r_illust', cat: 'render', group: 'render', icon: '🖌️', n: '插画风', d: '各向异性 Kuwahara 笔触 + 墨线描边 + 纸纹 + 柔光晕染，画面像厚涂插画。', def: false },
+    { id: 'r_classic', cat: 'render', group: 'render', icon: '🎮', n: '原版渲染', d: '不做后处理，最省性能。', def: false },
+    { id: 'r_illust', cat: 'render', group: 'render', icon: '🖌️', n: '插画风（厚涂）', d: '各向异性 Kuwahara 笔触 + 墨线描边 + 纸纹 + 柔光晕染，画面像厚涂插画。R54n 起默认（用户：喜欢厚涂质感）。', def: true },
     { id: 'r_anime', cat: 'render', group: 'render', icon: '✨', n: '赛璐璐动画', d: '粗描边 + 色阶化光影 + 高饱和 + 高光溢出，像 TV 动画截图。' },
     { id: 'r_water', cat: 'render', group: 'render', icon: '💧', n: '水彩', d: '颜料晕开、边缘积色、纸张颗粒与轻微手绘抖动。' },
     { id: 'r_oil', cat: 'render', group: 'render', icon: '🎨', n: '油画', d: '强 Kuwahara 厚涂笔触 + 画布纹理 + 暖色调。' },
@@ -185,6 +185,9 @@ window.Mods = (() => {
     { id: 'foe_skills2', cat: 'play', icon: '🌀', n: '高阶敌人 / BOSS 专属技能（R54l）', d: '敌人阶位越高会的技能越多：老兵〔三向飞刃、半月横扫〕→ 精英〔锁链拉拽、震地三波〕→ 冠军〔月蚀印记、嗜血战吼〕；BOSS 还有〔月光新星〕，每个地区霸主 / 每位章节 BOSS 都有自己的 3~6 个招牌技（出发面板可见）。每个技能都有地面预警 + 头顶念招名 + 第一次见到时的解法提示；战吼可以被打断。', def: true },
     { id: 'soft_glow', cat: 'look', icon: '🔆', n: '人物不再刺眼发光（R54l）', d: '泛光只给真正的高亮（火、魔法、天光），阈值 0.9→1.25、强度 0.9→0.38；人物逆光轮廓光减到 40%。关掉 = 旧的「光芒万丈」。', def: true },
     { id: 'no_freebies', cat: 'play', icon: '🪨', n: '开局不送东西（R54l）', d: '用户：付出→奖励，不要开局送东西。新存档开局 0 魂晶、不送药、不送绷带/布/草药/摆件材料；回合结算去掉「底薪」；每回合的祝福抉择要这一趟杀满 3 人或清空一个地点才给。（', def: true },
+    { id: 'fem_vox', cat: 'play', icon: '🎤', n: '合成女声（R54n）', d: '用共振峰合成的女声代替 AI 语音：出手喝声「哈！」、挨刀痛呼、倒下的惨叫、格挡的闷哼、砍中你时的嘲笑；每人音高不同，带方位和距离。战斗中敌人会用气泡互相喊话（包抄/嘲讽/同伴倒下时的反应）。', def: true },
+    { id: 'breakables', cat: 'play', icon: '🏺', n: '可破坏小物件 · 碎料（R54n）', d: '每个地点散落 14~22 个陶罐/小木箱/枯骨堆/魂晶簇/毒蘑菇/骨灰瓮/破布袋，走近就踩碎（有碎片和音效），掉出不占麻袋格子的碎料（铁屑/碎布/草籽/魂屑/骨渣/木屑/碎肉）；攒够 4~6 个自动合成一份材料送进储物箱。', def: true },
+    { id: 'soft_vfx', cat: 'look', icon: '🌫️', n: '柔和技能特效（R54n）', d: '技能的冲击环、新月刃光、光柱改用渐变贴图：边缘柔和发光、光柱向上淡出，不再是硬边的纯色圆环/圆柱。', def: true },
     { id: 'fair_fight', cat: 'play', icon: '⏱️', n: '有反应时间的敌人（R54n）', d: '敌人起手慢约 30%（约 1 秒可以反应）、不再假动作；先转过来正对你才会出刀，没对准就砍不到你；两个敌人出手至少隔 1.1 秒；攻击间隔 +0.7 秒；出招时不再边打边滑过来。', def: true },
     { id: 'foe_barks', cat: 'play', icon: '💬', n: '敌人动作气泡（R54n）', d: '敌人头顶冒出气泡写出她正在干什么：从哪边砍、该往哪边闪、重击/突刺/连斩/冲刺/掷刃预警、举刀格挡、转身逃跑、快撑不住了、刺客绕背。', def: true },
     { id: 'move_sfx', cat: 'play', icon: '🦘', n: '移动音效（R54n）', d: '跳跃破风、落地闷响（越高越重）、Q 闪身的破风声；你的脚步声也调响了。', def: true },
@@ -240,7 +243,7 @@ window.Mods = (() => {
     { id: 'stamina_all', cat: 'play', icon: '💢', n: '统一体力系统（第二十五轮）', d: '攻击、格挡、奔跑、跳跃、闪身共用一条体力；耗尽后力竭——什么都做不了，只能慢走，刀垂下、屏幕发红，歇一会儿才恢复。', def: true },
     { id: 'sprint_stamina', cat: 'play', icon: '😮‍💨', n: '疾跑耗体力（第二十一轮）', d: 'Shift 疾跑每秒消耗体力，耗尽后要缓一缓才能再跑——敌人追得上你了。', def: true },
     { id: 'persona', cat: 'play', icon: '🎭', n: '人设（第二十四轮）', d: '每个敌人按性格（高傲/冷静/温柔/胆小/好战/毒舌/狡黠/开朗）说不同的话、见人是打还是逃、会不会撤退、对峙时点头/摇头/抱臂；没发现你时各干各的（干活、巡逻、蹲守、两人凑一起聊天）；初见弹出【性格·职业】名字。', def: true },
-    { id: 'persona_voice', cat: 'play', icon: '🗣️', n: '人设语音（第二十四轮）', d: '敌人真人语音：台词、出手喝声、痛呼、倒下的最后一句；每人音高略有不同，带方位与距离。需开启“人设”。', def: true, requires: ['persona'] },
+    { id: 'persona_voice', cat: 'play', icon: '🗣️', n: '人设语音（第二十四轮）', d: '敌人真人语音：台词、出手喝声、痛呼、倒下的最后一句；每人音高略有不同，带方位与距离。需开启“人设”。R54n 起默认关（用户：AI 语音太难听），改用 fem_vox 合成女声。', def: false, requires: ['persona'] },
     { id: 'footsteps', cat: 'play', icon: '👣', n: '脚步声（第二十四轮）', d: '你的脚步沉重、随地面变化（草地/落叶/碎石/石板/泥浆/雪地/洞穴）；敌人有轻快的脚步声，能听出方位远近，跑起来更密更响；盾卫和蛮兵带甲片叮当，刺客一旦盯上你就悄无声息。', def: true },
     { id: 'face_light', cat: 'look', icon: '💡', n: '面部补光（第二十四轮）', d: '像游戏里的角色补光一样，从你视线方向给脸（和身体、头发少量）打一层柔光：背光/阴天/夜里脸也不会黑成一团。', def: true },
     { id: 'hit_hud', cat: 'play', icon: '🩸', n: '命中 HUD：合并伤害数字 + 敌人血条（第二十六轮）', d: '同一个目标连续挨打只显示一个累计数字（带 ×N 连击数、每下弹跳），不再一刀一个数字堆满屏；被打中的敌人和野兽头顶出现血条（白色是刚掉的血），看得见还差几刀。', def: true },
@@ -292,6 +295,7 @@ window.Mods = (() => {
   if (st.__v < 20) { st.small_maps = false; st.__v = 20; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R54k：用户：地区不缩小更好
   if (st.__v < 21) { st.corridor = false; st.nat_gates = false; st.__v = 21; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R54m：用户：不要走廊、传送门改回铁门
   if (st.__v < 22) { st.moon_trail = false; st.__v = 22; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R54n：用户更喜欢原来的电影任务线索
+  if (st.__v < 23) { for (const m of LIST) if (m.group === 'render') st[m.id] = (m.id === 'r_illust'); st.lowspec = false; st.persona_voice = false; st.__v = 23; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R54n：默认厚涂插画风；AI 语音换成合成女声
   for (const m of LIST) if (st[m.id] === undefined) st[m.id] = !!m.def;
   // 修正非法状态（互斥组恰好一个；冲突；依赖）
   function normalize() {

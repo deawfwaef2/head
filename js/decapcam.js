@@ -75,7 +75,7 @@ body.dcam>*:not(canvas):not(#dcRoot):not(script):not(style):not(:has(canvas)){op
   const CAP = 340, NSPLAT = 70, NMIST = 22;
   function bloodInit(sc, H) {
     if (bl && bl.sc === sc) { bl.H = H; return bl; } if (bl) bloodKill();
-    const geo = new THREE.CapsuleGeometry(0.007, 0.5, 2, 6), mat = new THREE.MeshStandardMaterial({ color: 0x8a0710, emissive: 0x3a0006, roughness: 0.22, metalness: 0.0 });
+    const geo = new THREE.IcosahedronGeometry(0.014, 1), mat = new THREE.MeshStandardMaterial({ color: 0x8a0710, emissive: 0x3a0006, roughness: 0.22, metalness: 0.0 }); // R54n：滴状血珠，不再是拉长的圆柱
     const im = new THREE.InstancedMesh(geo, mat, CAP); im.frustumCulled = false; im.count = 0; im.renderOrder = 4; const c0 = new THREE.Color(), cs = ['#7a0610', '#a50d16', '#c4141c', '#8a0710']; for (let i = 0; i < CAP; i++) { c0.set(cs[i & 3]); im.setColorAt(i, c0); } sc.add(im);
     const sg = new THREE.CircleGeometry(1, 10).rotateX(-Math.PI / 2), sm = new THREE.MeshBasicMaterial({ color: 0x5a0309, transparent: true, opacity: 0.88, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
     const splats = []; for (let i = 0; i < NSPLAT; i++) { const m = new THREE.Mesh(sg, sm); m.visible = false; m.renderOrder = 2; sc.add(m); splats.push(m); }
@@ -94,7 +94,7 @@ body.dcam>*:not(canvas):not(#dcRoot):not(script):not(style):not(:has(canvas)){op
       const gy = B.H(d.x, d.z) + 0.01; if (d.y <= gy || d.t <= 0) { if (d.y <= gy && d.big > 0.7 && Math.random() < 0.55) splat(d.x, d.z, 0.05 + Math.random() * 0.1 * d.big); P[i] = P[P.length - 1]; P.pop(); }
     }
     for (let i = 0; i < P.length; i++) {
-      const d = P[i], sp = Math.hypot(d.vx, d.vy, d.vz) || 1, len = clamp(sp * 0.06, 0.05, 0.5) / 0.514, r = d.big;
+      const d = P[i], sp = Math.hypot(d.vx, d.vy, d.vz) || 1, len = clamp(1 + sp * 0.16, 1, 2.4), r = d.big;
       B.d.set(d.vx / sp, d.vy / sp, d.vz / sp); B.q.setFromUnitVectors(B.Y, B.d); B.s.set(r, len, r); B.p.set(d.x, d.y, d.z); B.tmpM.compose(B.p, B.q, B.s); B.im.setMatrixAt(n++, B.tmpM);
     }
     B.im.count = n; B.im.instanceMatrix.needsUpdate = true;

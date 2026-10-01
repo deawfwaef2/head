@@ -518,8 +518,9 @@ window.Foe = (() => {
         fo.stuckT = (fo.stuckT || 0) + dt; if (fo.stuckT > 0.5) { const lp = fo.lastP || (fo.lastP = fo.pos.clone()), mv = Math.hypot(fo.pos.x - lp.x, fo.pos.z - lp.z); if (mv < spd * 0.5 * 0.3 && !fo.detour) { fo.detour = 0.9 + Math.random() * 0.6; fo.detourYaw = unstick(fo, turnTo); } lp.copy(fo.pos); fo.stuckT = 0; } }
       if (!fo.atk && !(fo.stag > 0) && !(fo.block > 0) && fo.state === 'chase' && spd < 0.5 && !(fo.gestT > 0)) { // 绕圈/走位时身体转向前进方向（以前正面朝你、脚朝前走着横向滑 = 螃蟹步）
         if (strafe === 3 && fo.slotV) { const hd = Math.atan2(fo.slotV.x, fo.slotV.z), rel = ang(hd - face); if (Math.abs(rel) < 2.3) turnTo = face + clampA(rel, 0.95); }
-        else if (strafe === 1 || strafe === -1) turnTo = face + strafe * 0.9; }
+        else if (strafe === 1 || strafe === -1) turnTo = face + strafe * (FAIR() ? 0.35 : 0.9); }
       if (window.Locomo && Locomo.on() && !fo.atk && !(fo.stag > 0)) Locomo.turn(fo, turnTo, dt, spd); /* R47 npc_locomo：角速度弹簧转身 */ else { fo.yawV = 0; if (turnTo != null) fo.yaw += clampA(ang(turnTo - fo.yaw), 6 * dt * (0.6 + fo.iq) * (spd > 4 ? 1.4 : 1)); }
+      if (FAIR() && fo.state === 'chase' && fo.seen && d < 5 && !fo.atk && !fo.sk && !(fo.stag > 0) && !(fo.gestT > 0)) { const e = ang(face - fo.yaw); if (Math.abs(e) > 0.5) { fo.yaw += e - Math.sign(e) * 0.5; fo.yawV = 0; } } // R54n：近身缠斗时始终大致正对你
       { // 第十九轮：速度带加速度（不再瞬间换向）；侧移/后退都以“面向玩家”的方向为基准
         let vx = 0, vz = 0; if (spd > 0) { vx = Math.sin(fo.yaw) * spd; vz = Math.cos(fo.yaw) * spd; }
         if (strafe === 3 && !fo.atk && fo.stag <= 0 && fo.slotV) { vx += fo.slotV.x * 1.6; vz += fo.slotV.z * 1.6; }
@@ -669,7 +670,7 @@ window.Foe = (() => {
       if (ct >= h.t) { A.hi++; A.tot = 0;
         if (window.CombatFX) CombatFX.enemySwing(fo, h);
         if (A.ranged) FoeRoles.fire(fo, h, d);
-        else if (d < A.reach + (PRESS() ? (h.heavy ? 0.55 : 0.3) : 0) && Math.abs(ang(face - fo.yaw)) < (FAIR() ? 0.7 : 0.9)) { A.landed = 1; CTX.hitPlayer(fo, Math.round(A.dmg * (h.heavy ? 1.6 : 1)), h); if (window.Persona && fo.sayT <= 0 && Math.random() < 0.35) { sayP(fo, 'hit'); if (Math.random() < 0.5) Persona.gesture(fo); } }
+        else if (d < A.reach + (PRESS() ? (h.heavy ? 0.55 : 0.3) : 0) && Math.abs(ang(face - fo.yaw)) < (FAIR() ? 0.7 : 0.9)) { A.landed = 1; CTX.hitPlayer(fo, Math.round(A.dmg * (h.heavy ? 1.6 : 1)), h); if (window.Barks && Barks.landed) Barks.landed(fo); if (window.Persona && fo.sayT <= 0 && Math.random() < 0.35) { sayP(fo, 'hit'); if (Math.random() < 0.5) Persona.gesture(fo); } }
         else if (fo.sayT <= 0 && Math.random() < 0.3) talk(fo, '……躲开了？'); }
     }
     act.timeScale = sc;
@@ -827,7 +828,8 @@ window.Foe = (() => {
     if (poiseBrk) fo.poise = 0;
     if ((!fo.boss || poiseBrk) && !(fo.role && window.FoeRoles && FoeRoles.hurt(fo, dealt, info, zone))) { fo.atk = null;
       if (fo.stag > 0 && (fo.f.cur === 'Hit_Knockback' || fo.f.cur === 'LayToIdle')) { /* 躺着/起身时再挨一刀：不要重播受击动作（会把人从地上瞬间拽起来） */ }
-      else { fo.stag = fo.boss ? 0.35 : 0.45; fo.f.play(zone === 'head' || zone === 'neck' ? 'Hit_Head' : 'Hit_Chest', { once: true, fade: 0.06, restart: true }); } } // 普通受击只用短的 Hit_Chest/Hit_Head（Hit_Knockback 是整个倒地动作，0.55s 就被切掉 = 瞬间弹起）
+      else { fo.stag = fo.boss ? (FAIR() ? 0.4 : 0.35) : (FAIR() ? 0.62 : 0.45); fo.f.play(zone === 'head' || zone === 'neck' ? 'Hit_Head' : 'Hit_Chest', { once: true, fade: 0.06, restart: true });
+        if (FAIR() && !fo.boss && CTX && CTX.player && !fo.kb) { const P = CTX.player.pos, kx = fo.pos.x - P.x, kz = fo.pos.z - P.z, kl = Math.hypot(kx, kz) || 1; fo.kb = { x: kx / kl * 2.6, z: kz / kl * 2.6, t: 0.16 }; } } } // 普通受击只用短的 Hit_Chest/Hit_Head（Hit_Knockback 是整个倒地动作，0.55s 就被切掉 = 瞬间弹起）
     if (fo.sayT <= 0 && Math.random() < 0.5) { if (fo.boss) talk(fo, '', '#ffb0a0'); else sayP(fo, 'hurt', SAY.hit, '#ffb0a0'); } else if (!fo.boss && window.Persona) Persona.line(fo, 'pain', true); // 第二十四轮：没说话时也会痛呼
     if (!fo.boss && !fo.dead && window.Persona && fo.state === 'chase' && Persona.fleeHp(fo) && fo.hp < fo.maxHp * Persona.fleeHp(fo) && !fo.fledOnce) { fo.fledOnce = true; fo.state = 'flee'; fo.brave = false; sayP(fo, 'flee', SAY.flee); } // 胆小：挨几刀就跑向门
     if (!(window.CombatFX && CombatFX.on)) { sfx().chop && sfx().chop(); sfx().squish && sfx().squish(0.5); } // 有 combat_fx 时由 CombatFX 合成更丰富的受击音

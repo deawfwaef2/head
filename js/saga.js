@@ -339,7 +339,7 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
   function next() { if (!CN || CN.wait) { if (CN && CN.wait) end(); return; } const b = CN.beats[CN.bi]; if (!b) return; const t = (performance.now() - CN.t0) / 1000; if (t < 0.8) return; if (CN.bi >= CN.beats.length - 1) { if (t > b.dur - 0.2 || t > 3.2) finishBeats(); return; } beginBeat(CN.bi + 1); }
   function finishBeats() { if (!CN || CN.wait) return; CN.wait = true; el.go.classList.add('on'); el.txt.classList.remove('on'); el.who.classList.remove('on'); const b = CN.beats[CN.beats.length - 1]; el.ttl.classList.add('on'); }
   function end() {
-    if (!CN) return; const c = CN; CN = null; cancelAnimationFrame(c.raf);
+    if (!CN) return; const c = CN; CN = null; cancelAnimationFrame(c.raf); window.__skipMenuUntil = performance.now() + 1500; // Esc 跳过会触发浏览器解锁鼠标，不要因此弹主菜单
     try { G().camera.fov = c.fov0; G().camera.updateProjectionMatrix(); } catch (e) { }
     root.classList.remove('on'); el.fade.style.opacity = '1';
     document.body.classList.remove('sgcine'); try { for (const [o, v] of c.saved) o.visible = v; } catch (e) { }

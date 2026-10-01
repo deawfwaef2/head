@@ -2022,3 +2022,14 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - fair_fight（foe.js）：起手速度 ×0.72、hold +0.18s、无假动作、先转身对准再出手、命中角 0.7、出手间隔 1.1s、冷却 +0.7s、出招前压 ×0.55、落空补刀最多 1 次且 0.9s 后。实测起手到命中约 1.1s。
 - 新 js/r54n.js：Feel54n（move_sfx 跳/落地/闪身音效，脚步调响）、Barks（foe_barks 头顶气泡：来刀方向+往哪闪、重击/突刺/连斩/冲刺/掷刃、格挡、逃跑、残血、刺客绕背）、敌情研判卡（region_intel，#icCard：模糊等级、你的等级/战力、胜率、按职业推荐战术）、HudTidy（hud_tidy：rqTrack/arTrack/mtTrack/sgTrack 左侧一列统一卡片；猎手感应并入 #nemChip；菜单打开时 body.menuon 隐藏 HUD）。arrival2.track 在 hud_tidy 开时不再自己定位。
 - 精英光环/法球光晕不再刺眼（soft_glow 开时透明度约 1/3）。moon_trail 默认关（迁移 v22），恢复原来的电影任务线索。
+
+## R54o 战斗违和感 / 黑屏 / 碎料
+- 黑屏闪烁根因：eco.js pace() 在本帧渲染之后调 setPixelRatio（动态分辨率）→ 画布被清空 = 黑一帧；改为 prNext 延到下一帧渲染前应用。decapcam 黑屏已在 R54n 修。
+- 跳过电影弹主菜单：Esc 跳过会让浏览器解锁鼠标 → pointerlockchange 显示 #menu。saga.end() 设 window.__skipMenuUntil，game.js 在 Saga.cine/宽限期内走 lockFailed（点画面重锁）而不弹菜单。
+- 朝向：fair_fight 下近身缠斗（chase、d<5、非出招/技能/硬直）yaw 与面向玩家的偏差钳制在 0.5rad；绕圈走位偏转 0.9→0.35。受击硬直 0.45→0.62（BOSS 0.4）+ 小击退。
+- 追踪：foe_ai2 mark（追踪圈）只追 0.9s、跟随率 6→2.2、判定半径 1.7→1.4。
+- 野兽：fair_fight 下第 1 章伤害 ×0.55、第 2 章 ×0.75；扑咬命中 0.28→0.5s；受击硬直 0.4→0.75。
+- 血：decapcam 血滴从拉长胶囊改成短血珠（Icosahedron，拉伸 1~2.4）。
+- 画风：默认 r_illust（插画风/厚涂），迁移 v23；persona_voice 默认关。
+- worlds.goto：W.shWait 期间 Worlds.frame 不渲染（否则首帧同步编译卡死主线程），ShaderQ 等待上限 15s。
+- r54n.js 新增：fem_vox（共振峰合成女声：喝声/痛呼/惨叫/闷哼/嘲笑）、敌人战斗聊天气泡（包抄/嘲讽/同伴倒下/受伤）、breakables（每地点 14~22 个可踩碎小物件，碎料存 G.S.shards 不占格子，攒够 4~6 自动 Sack.stashAdd 成材料，右侧 #bkFeed 提示）。skillfx：soft_vfx 渐变贴图（环/月刃/光柱）。

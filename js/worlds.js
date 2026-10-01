@@ -899,7 +899,7 @@ window.Worlds = (() => {
     W.cur = i; node.visited = true; node.known = true; node.adj.forEach(b => W.graph.nodes[b].known = true); remember(node);
     if (!node.prey) populate(node);
     const tb0 = performance.now(); const B = W.B = buildNode(node); tp('build', tb0);
-    if (window.ShaderQ && ShaderQ.async) ShaderQ.compile(G.renderer, B.sc, G.camera); // 场景着色器在 GPU 进程编译，同时主线程载入敌人/野兽
+    if (window.ShaderQ && ShaderQ.async) { W.shWait = true; ShaderQ.compile(G.renderer, B.sc, G.camera); } // 场景着色器在 GPU 进程编译，同时主线程载入敌人/野兽
     W.foes = null; W.prey = []; W.boss = null;
     const wantBoss = node.boss && (!(G.S.bosses || {})[node.region] || BT()) && BOf(node);
     let beastP = null; { const d0 = B.doors.find(d => d.to === from) || B.doors.find(d => d.home) || B.doors[0], ins = d0 ? new V3(-Math.cos(d0.a), 0, -Math.sin(d0.a)) : new V3(0, 0, 1); W.pos.set((d0 ? d0.x : 0) + ins.x * 2.4, 0, (d0 ? d0.z : 0) + ins.z * 2.4); W.pos.y = B.H(W.pos.x, W.pos.z); } // R54m：野兽和敌人并行载入
@@ -926,7 +926,7 @@ window.Worlds = (() => {
     G.player.yaw = Math.atan2(-ins.x, -ins.z); G.player.pitch = -0.05;
     B.sc.add(G.camera); G.camera.far = 400; G.camera.updateProjectionMatrix();
     if (window.Combat && Combat.attach) Combat.attach(B.sc);
-    if (window.ShaderQ && ShaderQ.async) { const ts0 = performance.now(); W.dom.loadT.textContent = `「${node.name}」的灯火一盏盏亮起……`; await ShaderQ.ready(G.renderer, B.sc, G.camera, p => { if (W) W.dom.loadB.style.width = Math.round(p * 100) + '%'; }); tp('shaders', ts0); if (!W) return; }
+    if (window.ShaderQ && ShaderQ.async) { const ts0 = performance.now(); W.dom.loadT.textContent = `「${node.name}」的灯火一盏盏亮起……`; W.shWait = true; try { await ShaderQ.ready(G.renderer, B.sc, G.camera, p => { if (W) W.dom.loadB.style.width = Math.round(p * 100) + '%'; }, 15000); } finally { if (W) W.shWait = false; } tp('shaders', ts0); if (!W) return; }
     try { const tc0 = performance.now(); const cm = G.camera; cm.position.set(W.pos.x, W.pos.y + EYE, W.pos.z); cm.rotation.set(G.player.pitch, G.player.yaw, 0, 'YXZ'); cm.updateMatrixWorld(true); if (G.post && G.post.on) G.post.render(B.sc, cm); else G.renderer.render(B.sc, cm); tp('firstframe', tc0); } catch (e) { console.warn('precompile', e); } // 进场前先渲一帧：着色器编译/贴图上传都藏在加载画面后面
     tp('total', tg0); W.dom.load.style.display = 'none'; hud(); banner(node); if (window.Living) try { Living.enter(node, B); } catch (e) { }
     if (window.Mods && Mods.on && Mods.on('loc_story')) { const enter = await nodeStory(node, true); if (!W) return; if (!enter) { leaveHome(); return; } try { G.lockPointer(); } catch (e) {} } // 第二十一轮：用户不要进场冻结剧情卡 → MOD loc_story 默认关
@@ -1050,6 +1050,7 @@ window.Worlds = (() => {
   const fw = new V3(), rt = new V3(), want = new V3(), tmp = new V3();
   function frame(dt, now) {
     if (!W || !W.B) { if (W && G.post && G.post.on && W.B) G.post.render(W.B.sc, G.camera); return; }
+    if (W.shWait) return; // 着色器异步编译期间不渲染（加载画面盖着），否则主线程会被同步编译卡死
     const B = W.B, P = G.player, K = G.keys || {}; W.t += dt; WIND.value = now;
     const active = G.playing && !G.uiOpen && !W.busy && !W.mapOpen && !W.dead;
     if (active) {
