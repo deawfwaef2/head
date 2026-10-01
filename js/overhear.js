@@ -181,13 +181,13 @@
     };
     cs.forEach((c, i) => { if (!PORT.has(c)) timers.push(setTimeout(() => { try { pics[i] = portraitOf(c); } catch (e) { } if (curI === i) setWho(i); }, 500 + i * 350)); });
     setWho(cs[conv.lines[0] ? conv.lines[0].i : 0] ? (conv.lines[0] ? conv.lines[0].i : 0) : 0); q('.oh-t').textContent = ''; q('.oh-f').className = 'oh-f'; q('.oh-f').textContent = '';
-    requestAnimationFrame(() => el.classList.add('on'));
+    timers.push(setTimeout(() => el.classList.add('on'), 30));
     let t = 900; conv.lines.forEach((ln, n) => {
       timers.push(setTimeout(() => { const tt = q('.oh-t'); tt.style.opacity = 0; setTimeout(() => { setWho(ln.i); tt.textContent = '「' + ln.t + '」'; tt.style.opacity = 1; }, 120); if (window.SFX && SFX.play) try { SFX.play('click', 0.12, 1.4 + ln.i * 0.25); } catch (e) { } }, t));
       t += 1500 + ln.t.length * 70;
     });
     if (conv.facts.length) timers.push(setTimeout(() => { const f = q('.oh-f'); f.textContent = '📝 你从她们的话里听出了：' + conv.facts.join('、'); f.classList.add('on'); }, t));
-    t += 3800; timers.push(setTimeout(() => clear(), t));
+    t += 3800; timers.push(setTimeout(() => clear(), t)); until = Math.max(until, Date.now() + t + 1500);
     if (ctx && ctx.log) ctx.log(`🎧 你在「${node.name}」偷听到：` + conv.lines.map(l => sh(cs[l.i]) + '：「' + l.t + '」').join(' ') + (conv.facts.length ? `（听出了${conv.facts.join('、')}）` : ''));
     hist.push({ node: node.name, who: cs.map(c => c.name), lines: conv.lines.map(l => [sh(cs[l.i]), l.t]), facts: conv.facts }); if (hist.length > 30) hist.shift();
   }
@@ -199,7 +199,9 @@
     + '#ohold .oh-who{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}#ohold .oh-w{flex:1 1 180px;padding:7px 12px;border-left:5px solid var(--c);background:#00000070;border-radius:6px;font-size:14px;line-height:1.55;animation:ohpop .5s cubic-bezier(.2,1.4,.3,1) backwards}#ohold .oh-w:nth-child(2){animation-delay:.12s}#ohold .oh-w:nth-child(3){animation-delay:.24s}#ohold .oh-w b{color:var(--c);font-size:18px;text-shadow:0 0 10px var(--c)}#ohold .oh-w i{font-style:normal;opacity:.8;display:block;font-size:13px}@keyframes ohpop{from{transform:scale(.6) translateY(10px);opacity:0}}'
     + '#ohold .oh-l{max-height:min(34vh,300px);overflow:hidden;display:flex;flex-direction:column;gap:9px}#ohold .oh-ln{font-size:clamp(17px,1.5vw,21px);line-height:1.6;opacity:0;animation:ohin .4s forwards;padding:2px 0}#ohold .oh-ln b{color:var(--c);margin-right:10px;font-size:.92em;text-shadow:0 0 8px var(--c)}@keyframes ohin{from{transform:translateY(8px)}to{opacity:1;transform:none}}'
     + '#ohold .oh-f{margin-top:10px;font-size:14px;color:#ffd27a;opacity:0;transition:opacity .5s}#ohold .oh-f.on{opacity:1}';
-  let elO = null, timersO = [];
+  let elO = null, timersO = [], until = 0;
+  // 看门狗：超过预计时长、离开野外、进入电影/面板 → 无论如何都收起（修“偷听框有时不消失”）
+  setInterval(() => { try { const any = (elO && elO.classList.contains('on')) || (el && el.classList.contains('on')); if (!any) return; const Wa = window.Worlds && Worlds.active; if (Date.now() > until || !Wa || document.body.classList.contains('sgcine') || document.body.classList.contains('hubon')) { clear(); until = 0; } } catch (e) { } }, 500);
   function buildOld() {
     if (elO) return; const s = document.createElement('style'); s.textContent = CSS0; document.head.appendChild(s);
     elO = document.createElement('div'); elO.id = 'ohold'; elO.innerHTML = '<div class="oh-box"><div class="oh-h"><span>🎧 偷听</span><small></small></div><div class="oh-who"></div><div class="oh-l"></div><div class="oh-f"></div></div>'; document.body.appendChild(elO);
@@ -210,20 +212,20 @@
     q('.oh-h small').textContent = `「${node.name}」 · ${conv.rel}`;
     q('.oh-who').innerHTML = cs.map(c => { const r = window.Ranks ? Ranks.of(c) : null, b = bio(c); return `<div class="oh-w" style="--c:${RCOL[c.rar]}"><b>${esc(c.name)}</b> <small>【${RN[c.rar]}】</small><i>${r ? esc(r.S.ic + ' ' + r.S.n + '·' + r.B.n + ' ' + r.tn + '「' + r.name + '」') : ''}</i><i>口头禅：「${esc(b.catch)}」</i></div>`; }).join('');
     q('.oh-l').innerHTML = ''; q('.oh-f').className = 'oh-f'; q('.oh-f').textContent = '';
-    requestAnimationFrame(() => elO.classList.add('on'));
+    timersO.push(setTimeout(() => elO.classList.add('on'), 30)); // R49f：不用 requestAnimationFrame（切出标签页时 rAF 暂停，关闭定时器先跑完、之后才补上 on → 弹框永远不消失）
     let t = 900; conv.lines.forEach((ln, n) => {
       timersO.push(setTimeout(() => { const c = cs[ln.i], d = document.createElement('div'); d.className = 'oh-ln'; d.style.setProperty('--c', RCOL[c.rar]); d.innerHTML = `<b>${esc(sh(c))}</b>「${esc(ln.t)}」`; q('.oh-l').appendChild(d); if (window.SFX && SFX.play) try { SFX.play('click', 0.12, 1.4 + ln.i * 0.25); } catch (e) { } }, t));
       t += 1500 + ln.t.length * 70;
     });
     if (conv.facts.length) timersO.push(setTimeout(() => { const f = q('.oh-f'); f.textContent = '📝 你从她们的话里听出了：' + conv.facts.join('、'); f.classList.add('on'); }, t));
-    t += 3800; timersO.push(setTimeout(() => clearOld(), t));
+    t += 3800; timersO.push(setTimeout(() => clearOld(), t)); until = Math.max(until, Date.now() + t + 1500);
     if (ctx && ctx.log) ctx.log(`🎧 你在「${node.name}」偷听到：` + conv.lines.map(l => sh(cs[l.i]) + '：「' + l.t + '」').join(' ') + (conv.facts.length ? `（听出了${conv.facts.join('、')}）` : ''));
     hist.push({ node: node.name, who: cs.map(c => c.name), lines: conv.lines.map(l => [sh(cs[l.i]), l.t]), facts: conv.facts }); if (hist.length > 30) hist.shift();
   }
   // 进入地点（worlds.js goto 结束时调用）
   function enter(node, ctx) {
     if (!on() || !node || node._heard) return; const cs = (node.prey || []).map(h => h && h.c).filter(Boolean); if (!cs.length) return; node._heard = 1;
-    setTimeout(() => { try { (window.Mods && Mods.on('overhear_old') === false ? show : showOld)(compose(cs, node), node, ctx); } catch (e) { console.warn('Overhear', e); } }, 1600);
+    setTimeout(() => { try { if (!(window.Worlds && Worlds.active)) return; (window.Mods && Mods.on('overhear_old') === false ? show : showOld)(compose(cs, node), node, ctx); } catch (e) { console.warn('Overhear', e); } }, 1600);
   }
   window.Overhear = { portraitOf, enter, compose, bio, bioHTML, hist: () => hist, clear, AN, arche, T, MONO };
 })();

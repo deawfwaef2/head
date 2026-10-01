@@ -50,12 +50,14 @@ window.Talents = (() => {
     if ((u.sch[nd.school] || 0) < D.TIER_REQ[nd.tier]) return 'tier';
     for (const q of nd.need) if (!rank(q)) return 'need'; return '';
   }
+  const gated = () => { try { return !!(window.Memory && Memory.gate && Memory.gate()); } catch (e) { return false; } }; // R49f：技能只能通过升级时的「回忆」三选一获得（MOD skill_pick），天赋树不能再直接加点
   function alloc(id) {
+    if (gated()) { toast('🧠 技能只能在升级时的「回忆」里三选一获得', '#c8b8ff', 1.8); return false; }
     if (canRank(id)) return false; const t = tal(); t.n[id] = rank(id) + 1; t.hist.push(id); if (t.hist.length > 60) t.hist.shift(); bump();
     const nd = D.ALL[id]; if (nd.type === 'a' && D.SK[id]) { const had = tal().bar.includes(id); autoPlace(id); const si = tal().bar.indexOf(id); if (!had && si >= 0) { const k = si < 10 ? (si + 1) % 10 : '⇧' + ((si - 9) % 10); toast(`✨ 学会「${D.SK[id].n}」——已放进快捷栏，按 ${k} 释放（野外）`, '#ffe29a', 3.2); } } save(); return true;
   }
   function undo() { // 撤销最近一次加点（本次打开面板内可无限撤销，关闭面板即“确认”）
-    const t = tal(); while (t.hist.length) { const id = t.hist.pop(); if (id[0] === '@') { const k = id.slice(1); if (t.at[k] > 0) { t.at[k]--; bump(); save(); return true; } continue; } if (!rank(id)) continue; const nd = D.ALL[id];
+    const t = tal(); while (t.hist.length) { const id = t.hist.pop(); if (id[0] === '@') { const k = id.slice(1); if (t.at[k] > 0) { t.at[k]--; bump(); save(); return true; } continue; } if (gated() || !rank(id)) continue; const nd = D.ALL[id];
       // 撤销后若有别的节点依赖它（前置 / 层门槛），不允许
       t.n[id]--; if (!t.n[id]) delete t.n[id]; let bad = false; const u = spent();
       for (const k in t.n) { const n2 = D.ALL[k]; if (n2.need.includes(id) && !rank(id)) bad = true; if ((u.sch[n2.school] || 0) < D.TIER_REQ[n2.tier]) bad = true; }
@@ -66,7 +68,7 @@ window.Talents = (() => {
   function allocAttr(k, n) { n = n || 1; const L = left().attr; n = Math.min(n, L); if (n <= 0) return 0; const t = tal(); t.at[k] = (t.at[k] || 0) + n; t.hist.push('@' + k); bump(); save(); return n; }
   function resetCost() { const l = lv(); return tal().free ? Math.round(40 * l + 60) : 0; }
   function reset(kind) { // kind: 'attr' | 'skill' | 'all'
-    const c = resetCost(), g = G0(); if (c > 0 && (g.S.coins || 0) < c) { toast(`🔮 魂晶不足（洗点需要 ${c}）`, '#ff9a7a', 1.6); return false; }
+    if (gated() && kind !== 'attr') kind = 'attr'; const c = resetCost(), g = G0(); if (c > 0 && (g.S.coins || 0) < c) { toast(`🔮 魂晶不足（洗点需要 ${c}）`, '#ff9a7a', 1.6); return false; }
     if (c > 0) { g.addCoins ? g.addCoins(-c) : (g.S.coins -= c); } const t = tal(); t.free = 1;
     if (kind === 'attr' || kind === 'all') t.at = {}; if (kind === 'skill' || kind === 'all') { t.n = {}; t.bar = new Array(20).fill(null); } t.hist = []; bump(); save(); toast(c ? `已洗点（-${c} 魂晶）` : '已洗点（第一次免费）', '#9fe8b0'); return true;
   }
@@ -80,7 +82,7 @@ window.Talents = (() => {
   }
 
   // ---- 快捷栏 ----
-  function autoPlace(id) { const t = tal(); if (t.bar.includes(id)) return; const i = t.bar.indexOf(null); if (i >= 0) t.bar[i] = id; }
+  function autoPlace(id) { const t = tal(); if (t.bar.includes(id)) return; const lite = !window.Mods || Mods.on('skill_lite') !== false; const i = lite ? t.bar.slice(0, 10).indexOf(null) : t.bar.indexOf(null); if (i >= 0) t.bar[i] = id; }
   function setSlot(i, id) { const t = tal(); if (id && !known(id)) return; if (id) for (let j = 0; j < t.bar.length; j++) if (t.bar[j] === id) t.bar[j] = t.bar[i]; t.bar[i] = id || null; save(); }
   function save() { try { G0().save && G0().save(); } catch (e) { } }
 
@@ -407,7 +409,7 @@ window.Talents = (() => {
   }
   addEventListener('keydown', e => { try { if (onKey(e)) { e.preventDefault(); e.stopImmediatePropagation(); } } catch (er) { console.warn('Talents key', er); } }, true);
 
-  function onLevel(up) { if (!on()) return; const p = pts(); toast(`⬆️ Lv.${up.to}：属性点 +${3 * (up.to - up.from)} · 技能点 +${up.to - up.from}（按 T 分配）`, '#ffd27a', 4); if (window.TalUI && TalUI.pulse) TalUI.pulse(); void p; }
+  function onLevel(up) { if (!on()) return; const p = pts(); toast(`⬆️ Lv.${up.to}：属性点 +${3 * (up.to - up.from)} · 技能 +${up.to - up.from}（属性点按 T 自己分，技能来自「回忆」三选一）`, '#ffd27a', 4); if (window.TalUI && TalUI.pulse) TalUI.pulse(); try { if (window.Memory && Memory.queue) Memory.queue(up); } catch (e) { } void p; }
   function view() { return { M, buffs: M.buffs, mana: M.mana, maxMana: maxMana(), cds: M.cds, target: M.target, shield: M.shield }; }
   function cdLeft(id) { return Math.max(0, (M.cds[id] || 0) - nowS()); }
   function slotInfo(id) { const sk = D.SK[id]; if (!sk) return null; const l = cdLeft(id), tot = sk.cd * (1 - cdr()); return { sk, left: l, tot, frac: tot > 0 ? clamp(l / tot, 0, 1) : 0, ok: sk.cost <= M.mana + 0.01, cost: sk.cost }; }

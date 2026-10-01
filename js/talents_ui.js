@@ -6,6 +6,7 @@
   const G0 = () => window.G, WW = () => (window.Worlds && Worlds.active ? Worlds._W : null);
   const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
   const ui = { open: false, tab: 'attr', sch: 'blade', built: false };
+  const lite = () => !window.Mods || Mods.on('skill_lite') !== false; // R49f：简化技能栏（单排 + 只显示已学技能）；技能只来自升级「回忆」三选一
   let elBar, elCol, elPn, elTip, elCast;
 
   // ================= 样式 =================
@@ -119,12 +120,32 @@ body.tbon #wHint{bottom:calc(var(--u)*2.2 + 92px)!important}
 body.tbon #wRun{bottom:calc(var(--u)*2.2 + 80px)!important}
 body.tbon #wStat .hp{display:none}
 body.tbon .wskills{display:none!important}
+/* ===== R49f 简化版（MOD skill_lite）===== */
+body.skl{--u:clamp(52px,4.3vw,70px)}
+body.skl #tbBar .tbxp,body.skl #tbBar .tbhint,body.skl #tbBar.cave::after,body.skl #tbBar .r2{display:none!important}
+body.skl #tbBar .tbgrp{padding:5px 7px;gap:6px;border-radius:16px;border-color:#7a5c34}
+body.skl #tbBar .tbs.em{opacity:.5;--s:calc(var(--u)*.74)}
+body.skl #tbBar .tbs.util{--s:calc(var(--u)*.8);background:linear-gradient(#2c2418,#14100a)}
+body.skl #tbBar .tbs.util+.tbs:not(.util){margin-left:8px}
+body.skl #tbBar .tbs b{font-size:max(14px,calc(var(--s)*.3))}
+body.skl #tbBar .tbs i{font-size:calc(var(--s)*.6)}
+body.skl .tbsep{width:3px;align-self:stretch;margin:4px 4px;border-radius:2px;background:linear-gradient(#0000,#b88a40aa,#0000)}
+body.skl #tbCol .pfc .pff,body.skl #tbCol .pfc .bar,body.skl #tbCol .pfc .pfpt{display:none!important}
+body.skl #tbCol .pfc{padding:0;border:0;background:none;box-shadow:none;min-height:0}
+body.skl #tbCol .pfc:not(:has(.bf)){display:none}
+body.skl .tbt.mem{width:auto;min-width:calc(var(--u)*1.1);padding:0 12px;border-color:#b8a0ff;background:linear-gradient(#2a1a4a,#140a28);color:#fff;animation:tbp 1s infinite alternate}
+body.skl .tbt.mem small{font-size:max(13px,calc(var(--s)*.22));opacity:1;color:#ffe28a}
+body.skl .skn{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+body.skl .skn span{display:inline-flex;align-items:center;gap:8px;padding:6px 14px 6px 8px;border-radius:24px;border:2px solid var(--c);background:#0008;font-size:17px;font-weight:800;color:#fff}
+body.skl .skn span i{font-style:normal;font-size:26px}body.skl .skn span b{color:var(--c);font-size:18px}
+body.skl .bkc{border-width:2px}
+.bkemp{padding:40px;text-align:center;font-size:22px;color:#c8b8ff;font-weight:800;line-height:1.8}.bkemp i{display:block;font-style:normal;font-size:64px}
 `;
   function addCss() { if (document.getElementById('tbCss')) return; const st = document.createElement('style'); st.id = 'tbCss'; st.textContent = CSS; document.head.appendChild(st); }
 
   // ================= 构建 DOM =================
   function build() {
-    if (ui.built) return; ui.built = true; addCss();
+    if (ui.built) return; ui.built = true; addCss(); compact();
     elBar = document.createElement('div'); elBar.id = 'tbBar'; document.body.appendChild(elBar);
     elCol = document.createElement('div'); elCol.id = 'tbCol'; document.body.appendChild(elCol);
     elCol.innerHTML = `<div class="pfc"><div class="pff">👹<div class="pfl">1</div></div><div class="pfb"><div class="bar hp"><i></i><i class="sh"></i><span></span></div><div class="bar mp"><i></i><span></span></div><div class="bar sm st"><i></i></div><div class="bar sm xp"><i></i></div><div class="pfpt"></div></div></div><div class="pfbf"></div><div class="tfc"><div class="tfn"></div><div class="bar hp"><i></i><span></span></div><div class="tfic"></div></div>`;
@@ -139,7 +160,17 @@ body.tbon .wskills{display:none!important}
     const id = T().tal().bar[i], sk = id && D.SK[id], key = i < 10 ? KEYS[i] : '⇧' + KEYS[i - 10];
     return `<div class="tbs${sk ? '' : ' em'}" data-slot="${i}"${sk ? ` draggable="true" data-drag="s:${i}:${id}" data-tip="s:${id}"` : ''}>${sk ? `<i>${sk.ic}</i>` : ''}<b>${key}</b>${sk && sk.cost ? `<u>${sk.cost}</u>` : ''}<s></s><em></em></div>`;
   }
+  function compact() { // 旧存档：第二排（Shift+1~0）的技能挪到第一排空格里
+    try { if (!lite()) return; const b = T().tal().bar; for (let i = 10; i < 20; i++) if (b[i]) { const j = b.slice(0, 10).indexOf(null); if (j < 0) break; b[j] = b[i]; b[i] = null; } } catch (e) { }
+  }
+  function barLite(withUtil) {
+    const b = T().tal().bar; let last = -1; for (let i = 0; i < 10; i++) if (b[i]) last = i;
+    const n = Math.min(10, Math.max(5, last + 2)); const L = T().left();
+    const mem = withUtil && L.skill > 0 ? `<div class="tbt mem">🧠<small>按 \`</small><span class="dot">${L.skill}</span></div>` : '';
+    return `<div class="tbrow r1"><div class="tbgrp">${withUtil ? utilL() + '<div class="tbsep"></div>' : ''}${Array.from({ length: n }, (_, k) => slotHTML(k)).join('')}${mem}</div></div>`;
+  }
   function barInner(withUtil) {
+    if (lite()) return barLite(withUtil);
     const row = (a, cls) => `<div class="tbrow ${cls}"><div class="tbgrp">${withUtil && cls === 'r1' ? utilL() : ''}${Array.from({ length: 10 }, (_, k) => slotHTML(a + k)).join('')}${withUtil && cls === 'r1' ? utilR() : ''}</div></div>`;
     return row(10, 'r2') + row(0, 'r1');
   }
@@ -149,8 +180,8 @@ body.tbon .wskills{display:none!important}
   function hintHTML() { if (!hintOn()) return ''; const n = T().tal().bar.filter(Boolean).length; return `<div class="tbhint">${n ? '按 <kbd>1</kbd>–<kbd>0</kbd>（主键盘 / 小键盘都行）释放技能 · <kbd>T</kbd> 技能书' : '还没有技能 — 按 <kbd>T</kbd> 打开天赋，学一个技能'}</div>`; }
   let barSig = '';
   function renderBar() {
-    if (!elBar) return; const t = T().tal(), sig = t.bar.join(',') + '|' + t.ver + '|' + hintOn(); if (sig === barSig) return; barSig = sig;
-    elBar.innerHTML = `<div class="tbxp"><i></i></div>` + barInner(true) + hintHTML(); if (ui.open) renderPanelBar();
+    if (!elBar) return; const t = T().tal(), sig = t.bar.join(',') + '|' + t.ver + '|' + hintOn() + '|' + (lite() ? 'L' + T().left().skill : ''); if (sig === barSig) return; barSig = sig;
+    elBar.innerHTML = (lite() ? '' : `<div class="tbxp"><i></i></div>`) + barInner(true) + (lite() ? '' : hintHTML()); if (ui.open) renderPanelBar();
   }
   function renderPanelBar() { const b = elPn && elPn.querySelector('.pnbar'); if (b) b.innerHTML = barInner(false); }
 
@@ -160,7 +191,7 @@ body.tbon .wskills{display:none!important}
   const setW = (el, v) => { if (!el) return; v = v.toFixed(1) + '%'; if (el._w !== v) { el._w = v; el.style.width = v; } };
   function frame(dt) {
     if (!uiOn() || !T() || !T().on() || !G0() || !G0().S) { hideAll(); return; }
-    build(); const W = WW(); const show = !!W && !W.busy && !W.dead; const g0 = G0(), cave = !W && !!g0.playing && !g0.uiOpen; document.body.classList.toggle('tbon', show); document.body.classList.toggle('tbcave', cave);
+    build(); const W = WW(); const show = !!W && !W.busy && !W.dead; const g0 = G0(), cave = !W && !!g0.playing && !g0.uiOpen; document.body.classList.toggle('skl', lite()); document.body.classList.toggle('tbon', show); document.body.classList.toggle('tbcave', cave);
     elBar.classList.toggle('on', show || cave); elBar.classList.toggle('cave', cave); elCol.classList.toggle('on', show); elBar.classList.toggle('ptr', !!g0.uiOpen);
     if (cave) { acc += dt; if (acc >= 0.1) { acc = 0; renderBar(); } return; } // R45：洞里也显示技能栏（变灰，提示出洞可用）
     if (!show) { return; }
@@ -224,19 +255,19 @@ body.tbon .wskills{display:none!important}
   }
 
   // ================= 面板 =================
-  function open(tab) { if (!T() || !T().on()) return; build(); const g = G0(); if (ui.open) { if (tab) { ui.tab = tab; render(); } return; } ui.open = true; if (tab) ui.tab = tab; g.setUI && g.setUI(true); elPn.classList.add('on'); render(); }
+  function open(tab) { if (!T() || !T().on()) return; if (lite() && (tab === 'tree' || tab === 'build')) tab = 'book'; build(); const g = G0(); if (ui.open) { if (tab) { ui.tab = tab; render(); } return; } ui.open = true; if (tab) ui.tab = tab; g.setUI && g.setUI(true); elPn.classList.add('on'); render(); }
   function close() { if (!ui.open) return; ui.open = false; elPn.classList.remove('on'); elTip.style.display = 'none'; const t = T().tal(); t.hist = []; const g = G0(); g.setUI && g.setUI(false); g.lockPointer && g.lockPointer(); g.save && g.save(); }
   const toggle = () => ui.open ? close() : open();
   function hdr() {
     const g = G0(), lv = RPG.lvOf(g.S.xp), L = T().left(), ch = (nm, n) => `<div class="pt${n > 0 ? ' has' : ''}">${nm}<b>${n}</b></div>`;
-    return `<div class="tbh"><h2>🌳 角色 · 天赋</h2><div class="lvb">食人魔 <b>Lv.${lv.lv}</b></div><div class="xpb"><div class="bar"><i style="width:${lv.need ? lv.cur / lv.need * 100 : 100}%"></i><span>经验 ${lv.cur} / ${lv.need || 'MAX'}</span></div></div><div class="pts">${ch('属性点', L.attr)}${ch('技能点', L.skill)}</div><button class="tbx" data-act="close">✕</button></div>`;
+    return `<div class="tbh"><h2>${lite() ? '🧑 角色 · 技能' : '🌳 角色 · 天赋'}</h2><div class="lvb">食人魔 <b>Lv.${lv.lv}</b></div><div class="xpb"><div class="bar"><i style="width:${lv.need ? lv.cur / lv.need * 100 : 100}%"></i><span>经验 ${lv.cur} / ${lv.need || 'MAX'}</span></div></div><div class="pts">${ch('属性点', L.attr)}${lite() ? ch('待选技能', L.skill) : ch('技能点', L.skill)}</div><button class="tbx" data-act="close">✕</button></div>`;
   }
   function attrTab() {
     const g = G0(), s = g.st(), L = T().left(), a = T().agg(), tl = T().tal();
     const rows = D.ATTR.map(x => { const at = tl.at[x.k] || 0; return `<div class="ar" style="--c:${x.col};--c2:${x.col}22" data-tip="a:${x.k}"><div class="ic">${x.ic}</div><div style="flex:1;min-width:0"><div class="nm">${x.n}</div><div class="ds">${esc(x.d)}</div><div class="ds" style="color:#9fe8b0">已投入 ${at} 点 → ${esc(x.f(at))}</div></div><div class="vl">${s[x.k]}<small>含装备等加成</small></div><div class="ad"><button class="pb${L.attr < 1 ? ' dis' : ''}" data-act="attr:${x.k}:1">+1</button><button class="pb${L.attr < 5 ? ' dis' : ''}" data-act="attr:${x.k}:5">+5</button></div></div>`; }).join('');
     const pc = (v, u) => `${(+v).toFixed(1).replace(/\.0$/, '')}${u || ''}`; const R = (n, v, good) => `<div class="rw"><span>${n}</span><b${good ? ' class="g"' : ''}>${v}</b></div>`;
     const sd = `<div class="dv"><h3>📊 战斗属性</h3>${R('战力', s.power)}${R('最大生命', s.maxHp)}${R('攻击 / 防御', `${s.atk} / ${s.def}`)}${R('魂能上限', s.manaMax)}${R('魂能回复', pc(s.manaReg, ' /秒'))}${R('暴击率', pc(s.crit, '%'), s.crit > 10)}${R('暴击伤害', pc(s.critD, '%'), s.critD > 160)}${R('冷却缩减', pc(s.cdr, '%'), s.cdr > 0)}${R('减伤', pc(s.dr, '%'), s.dr > 0)}${R('躲开率', pc(s.avoid, '%'), s.avoid > 0)}${R('移动速度', '+' + pc(a.move || 0, '%'), a.move > 0)}${R('生命回复', pc(s.regenP, '% /秒'))}${R('魂晶收益', '+' + pc(a.coin || 0, '%'), a.coin > 0)}${R('经验收益', '+' + pc(a.xp || 0, '%'), a.xp > 0)}</div>`;
-    return `<div class="atw"><div>${rows}<div style="font-size:13px;color:#a99;padding:4px 6px;line-height:1.6">每升 1 级 +3 属性点、+1 技能点（每 10 级多 +1；首杀霸主 / 精英 BOSS 各 +1 技能点）。装备、训练、建筑的加成照常叠加。</div></div>${sd}</div>`;
+    return `<div class="atw"><div>${rows}<div style="font-size:13px;color:#a99;padding:4px 6px;line-height:1.6">${lite() ? '每升 1 级：+3 属性点（你自己分配）＋ 一次「技能三选一」。技能只能这样得到——没有天赋树。' : '每升 1 级 +3 属性点、+1 技能点（每 10 级多 +1；首杀霸主 / 精英 BOSS 各 +1 技能点）。装备、训练、建筑的加成照常叠加。'}</div></div>${sd}</div>`;
   }
   function treeTab() {
     const T_ = T(), sch = D.SCHOOLS.find(s => s.id === ui.sch) || D.SCHOOLS[0], u = T_.spent();
@@ -249,7 +280,16 @@ body.tbon .wskills{display:none!important}
     let tiers = ''; for (let t = 1; t <= 5; t++) { const req = D.TIER_REQ[t], ok = (u.sch[sch.id] || 0) >= req; tiers += `<div class="tt${ok ? ' ok' : ''}" style="top:${(t - 1) * 88 + 18}px"><b>第 ${t} 层</b>${req ? '本系 ' + req + ' 点' : '无门槛'}</div>`; }
     return `<div class="sct">${tabs}</div><div class="scd"><b style="color:${sch.col}">${sch.ic} ${sch.n}</b> · ${esc(sch.d)}</div><div class="trw">${tiers}<svg class="trl" viewBox="0 0 3 5" preserveAspectRatio="none">${lines}</svg><div class="trg">${cells}</div></div>`;
   }
+  function bookLite() {
+    const T_ = T(), have = ['dodge']; const pas = []; for (const s of D.SCHOOLS) for (const n of s.nodes) { if (T_.rank(n.id)) { if (n.type === 'a') have.push(n.id); else pas.push([n, s]); } }
+    const card = id => { const sk = D.SK[id], nd = D.ALL[id], sc = nd && D.SCHOOLS.find(s => s.id === nd.school), col = sc ? sc.col : '#ffe9b0', slot = T_.tal().bar.indexOf(id);
+      return `<div class="bkc" style="--c:${col};--c2:${col}22"><div class="tbs" draggable="true" data-drag="b:-1:${id}" data-act="place:${id}" data-tip="s:${id}"><i>${sk.ic}</i></div><div class="tx"><div class="nm">${esc(sk.n)}<small>${sc ? sc.ic + ' ' + sc.n : '基础'}</small></div><div class="ms">⏱ ${sk.cd}s${sk.cost ? ' · 💧 ' + sk.cost : ''}</div><div class="ds">${slot >= 0 && slot < 10 ? '已装备 · 按 <b style="color:#ffe28a">' + KEYS[slot] + '</b>' : '点一下装进空格 / 拖到下面的格子'}</div></div></div>`; };
+    const act = have.filter(id => id !== 'dodge');
+    const chips = pas.map(([n, s]) => `<span style="--c:${s.col}" data-tip="n:${n.id}"><i>${n.ic}</i><b>${esc(n.n)}</b> ${T_.rank(n.id)}/${n.max}</span>`).join('');
+    return `<div class="bkw">${act.length ? `<h3>⚔️ 已学会的技能（${act.length}）</h3><div class="bkg">${act.map(card).join('')}</div>` : `<div class="bkemp"><i>🧠</i>还没有技能<br>升级后会弹出「回忆」——三选一，选中的技能自动放进技能栏</div>`}${chips ? `<h3 style="margin-top:22px">✨ 被动（自动生效）</h3><div class="skn">${chips}</div>` : ''}</div>`;
+  }
   function bookTab() {
+    if (lite()) return bookLite();
     const T_ = T(), have = [], not = []; have.push('dodge'); for (const s of D.SCHOOLS) for (const n of s.nodes) if (n.type === 'a') (T_.rank(n.id) ? have : not).push(n.id);
     const card = (id, un) => { const sk = D.SK[id], nd = D.ALL[id], sc = nd && D.SCHOOLS.find(s => s.id === nd.school), col = sc ? sc.col : '#ffe9b0';
       return `<div class="bkc${un ? ' un' : ''}" style="--c:${col};--c2:${col}22"><div class="tbs" ${un ? '' : `draggable="true" data-drag="b:-1:${id}" data-act="place:${id}"`} data-tip="s:${id}"><i>${sk.ic}</i></div><div class="tx"><div class="nm">${esc(sk.n)}<small>${esc(sk.kind)}${sc ? ' · ' + sc.n : ' · 基础'}</small></div><div class="ms">冷却 ${sk.cd}s${sk.cost ? ' · 魂能 ' + sk.cost : ''}${sk.hp ? ' · 生命 -' + sk.hp + '%' : ''}${sk.st ? ' · 体力 ' + sk.st : ''}${un ? ' · 🔒 到天赋树里学习' : ''}</div><div class="ds">${esc(sk.d)}</div></div></div>`; };
@@ -261,9 +301,9 @@ body.tbon .wskills{display:none!important}
   }
   function render() {
     if (!ui.open) return; const body = elPn.querySelector('.tbb'), sc = body ? body.scrollTop : 0;
-    const tabs = [['attr', '👤 角色 · 属性'], ['tree', '🌳 天赋树'], ['book', '📖 技能书'], ['build', '⚡ 推荐流派']].map(([k, n]) => `<div class="tbtab${ui.tab === k ? ' on' : ''}" data-act="tab:${k}">${n}</div>`).join('');
-    const cnt = ui.tab === 'attr' ? attrTab() : ui.tab === 'tree' ? treeTab() : ui.tab === 'book' ? bookTab() : buildTab(); const c = T().resetCost();
-    elPn.innerHTML = `<div class="tbw">${hdr()}<div class="tbtabs">${tabs}</div><div class="tbb">${cnt}</div><div class="tbf"><div class="pnbar" style="display:flex;flex-direction:column">${''}</div><div class="hint">T / Esc 关闭 · 拖技能到格子 · 右键格子清空<br>游戏不会暂停——别在敌人面前发呆。</div><button class="tbbtn" data-act="undo">↶ 撤销</button><button class="tbbtn red" data-act="reset:all">♻ 洗点${c ? '（' + c + ' 魂晶）' : '（首次免费）'}</button></div></div>`;
+    const tabs = (lite() ? [['attr', '👤 属性'], ['book', '📖 技能']] : [['attr', '👤 角色 · 属性'], ['tree', '🌳 天赋树'], ['book', '📖 技能书'], ['build', '⚡ 推荐流派']]).map(([k, n]) => `<div class="tbtab${ui.tab === k ? ' on' : ''}" data-act="tab:${k}">${n}</div>`).join('');
+    if (lite() && (ui.tab === 'tree' || ui.tab === 'build')) ui.tab = 'book'; const cnt = ui.tab === 'attr' ? attrTab() : ui.tab === 'tree' ? treeTab() : ui.tab === 'book' ? bookTab() : buildTab(); const c = T().resetCost();
+    elPn.innerHTML = `<div class="tbw">${hdr()}<div class="tbtabs">${tabs}</div><div class="tbb">${cnt}</div><div class="tbf"><div class="pnbar" style="display:flex;flex-direction:column">${''}</div>${lite() ? '<div class="hint" style="font-size:15px">拖技能进格子 · 右键清空 · T 关闭</div><button class="tbbtn" data-act="undo">↶ 撤销</button><button class="tbbtn red" data-act="reset:attr">♻ 重置属性</button>' : `<div class="hint">T / Esc 关闭 · 拖技能到格子 · 右键格子清空<br>游戏不会暂停——别在敌人面前发呆。</div><button class="tbbtn" data-act="undo">↶ 撤销</button><button class="tbbtn red" data-act="reset:all">♻ 洗点${c ? '（' + c + ' 魂晶）' : '（首次免费）'}</button>`}</div></div>`;
     renderPanelBar(); const nb = elPn.querySelector('.tbb'); if (nb) nb.scrollTop = sc; barSig = ''; renderBar();
   }
   const pulse = () => { const b = elBar && elBar.querySelector('.tbt'); if (b) b.classList.add('pulse'); };
@@ -281,6 +321,7 @@ body.tbon .wskills{display:none!important}
     else if (k === 'attr') { T_.allocAttr(p, +q); render(); sfxOk(); }
     else if (k === 'undo') { T_.undo(); render(); } else if (k === 'reset') { if (confirm('确定洗点？技能栏也会清空。')) { T_.reset(p); render(); } }
     else if (k === 'build') { const n = T_.applyBuild(p); G0().toast && G0().toast(n ? `⚡ 已按「${D.BUILDS.find(b => b.id === p).n}」加点` : '没有可用的点数了——先洗点', '#ffd27a', 2); render(); }
+    else if (k === 'mem') { close(); setTimeout(() => { try { Memory.open({}); } catch (e) { } }, 80); }
     else if (k === 'place') { T_.autoPlace(p); barSig = ''; renderBar(); render(); }
   }
   const sfxOk = () => { try { SFX.play && SFX.play('bell', 0.25, 1.8); } catch (e) { } };

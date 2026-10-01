@@ -44,7 +44,8 @@ window.Memory = (() => {
   }
 
   // ================= UI =================
-  let root = null, st = null;
+  let root = null, st = null, _allow = false, pend = 0;
+  const gate = () => on() && !(window.Mods && Mods.on('skill_pick') === false) && !_allow; // 天赋树加点被锁（技能只能靠回忆三选一）
   function css() {
     if (css.done) return; css.done = 1; const s = document.createElement('style'); s.textContent = `
 #mmRoot{position:fixed;inset:0;z-index:64;display:none;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 45%,rgba(40,24,64,.55),rgba(0,0,0,.92));backdrop-filter:blur(5px);font-family:var(--u-serif,'Noto Serif SC',serif);color:#eee;overflow-y:auto;padding:16px 0}
@@ -75,7 +76,7 @@ window.Memory = (() => {
 #mmRoot .ft small{font-size:15px;color:#bdb2d6}
 #mmRoot .empty{font-size:22px;color:#d8d0f0;padding:30px}
 #mmFlash{position:fixed;inset:0;z-index:65;pointer-events:none;background:radial-gradient(circle,var(--c) 0,transparent 60%);opacity:0}
-#mmFlash.on{animation:mmFl 1s ease-out}@keyframes mmFl{0%{opacity:.85}100%{opacity:0}}`;
+@keyframes mmChip{to{border-right-color:#ffe28a;transform:translateX(-4px)}}#mmFlash.on{animation:mmFl 1s ease-out}@keyframes mmFl{0%{opacity:.85}100%{opacity:0}}`;
     document.head.appendChild(s);
   }
   function ensure() {
@@ -88,7 +89,7 @@ window.Memory = (() => {
   const rrCost = () => (tok() > 0 ? 0 : hasAltar() && !st.rr ? 0 : 40 * lvl() * (st.rr + (hasAltar() ? 0 : 1)));
   function render() {
     const D = TD(), L = left(); st.left = L;
-    if (!st.cards.length) { root.innerHTML = `<div class="hd"><div class="a">MEMORY</div><div class="b">回 忆</div></div><div class="empty">${L > 0 ? '没有可以唤醒的记忆了——天赋树已经点满。' : '没有多余的技能点。升级、击败霸主和精英可以获得更多。'}</div><div class="ft"><button data-x>返回 ▶</button></div>`; return; }
+    if (!st.cards.length) { root.innerHTML = `<div class="hd"><div class="a">MEMORY</div><div class="b">回 忆</div></div><div class="empty">${L > 0 ? '没有可以唤醒的记忆了——能学的技能都学会了。' : '没有待选的技能。升级、击败霸主和精英可以获得更多选择。'}</div><div class="ft"><button data-x>返回 ▶</button></div>`; return; }
     const cards = st.cards.map((id, i) => {
       const nd = D.ALL[id], sc = D.SCHOOLS.find(s => s.id === nd.school), r = TL().rank(id), act = nd.type === 'a', sk = D.SK[id], fl = st.fl[id] || (st.fl[id] = pk(FLAVOR[nd.school] || FLAVOR.blade));
       const ef = act ? `习得主动技能「${nd.n}」` : fmt(nd, r);
@@ -97,7 +98,7 @@ window.Memory = (() => {
 <div class="ty"><span style="color:${act ? '#ffb070' : '#9fe0b0'}">${act ? '主动技能' : r ? `被动 · ${r}→${r + 1} 级` : '被动 · 新习得'}</span><span style="color:${sc.col}">${esc(sc.tag.split(' · ')[0])}</span>${nd.cost > 1 ? `<span style="color:#ffe28a">消耗 ${nd.cost} 点</span>` : ''}</div><div class="ef">${esc(ef)}</div>${skl}<div class="fl">「${esc(fl)}」</div></div>`;
     }).join('');
     const c = rrCost();
-    root.innerHTML = `<div class="hd"><div class="a">${hasAltar() ? '回 忆 之 镜' : 'M E M O R Y'}</div><div class="b">回 忆</div><div class="c">唤醒一段记忆　·　可用技能点 <b>${L}</b></div></div><div class="cards">${cards}</div>
+    root.innerHTML = `<div class="hd"><div class="a">${hasAltar() ? '回 忆 之 镜' : 'M E M O R Y'}</div><div class="b">回 忆</div><div class="c">升级奖励 · 从三段记忆里选一个技能　·　还可选 <b>${L}</b> 次</div></div><div class="cards">${cards}</div>
 <div class="ft"><button data-rr ${c > G().S.coins ? 'disabled' : ''}>🔄 重抽 ${c ? '🔮' + c : (tok() > 0 ? '（重抽券 ×' + tok() + '）' : '（免费）')}</button><button data-x>稍后再想</button><small>按 1 / 2 / 3${st.cards.length > 3 ? ' / 4' : ''} 选择 · Esc 关闭</small></div>`;
   }
   function open(opts) {
@@ -112,7 +113,8 @@ window.Memory = (() => {
   function flash(col) { let f = document.getElementById('mmFlash'); if (!f) { f = document.createElement('div'); f.id = 'mmFlash'; document.body.appendChild(f); } f.style.setProperty('--c', col); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); }
   function pick(i) {
     const id = st && st.cards[i]; if (!id) return; const D = TD(), nd = D.ALL[id], sc = D.SCHOOLS.find(s => s.id === nd.school);
-    if (!TL().alloc(id)) { try { G().toast('这段记忆还唤不醒', '#ff9a8a', 1.4); } catch (e) { } return; }
+    _allow = true; let okA = false; try { okA = TL().alloc(id); } finally { _allow = false; }
+    if (!okA) { try { G().toast('这段记忆还唤不醒', '#ff9a8a', 1.4); } catch (e) { } return; }
     flash(sc.col); try { SFX.fanfare && SFX.fanfare(2); } catch (e) { }
     try { G().toast(`${sc.ic} 回忆 · ${nd.n}${nd.type === 'a' ? '（主动技能，已放进技能栏）' : ''}`, sc.col, 2.6); G().save(); } catch (e) { }
     if (left() > 0) { st.cards = draw(hasAltar() ? 4 : 3); st.rr = 0; st.fl = {}; setTimeout(() => root.classList.contains('on') && render(), 650); } else setTimeout(close, 700);
@@ -163,16 +165,26 @@ window.Memory = (() => {
   initHooks();
   // 洞里提示：有空余技能点时，屏幕右上角一个小徽标，反引号键（`）唤醒
   let chip = null;
-  addEventListener('keydown', e => { if (e.code === 'Backquote' && !e.repeat && on() && G() && G().playing && !G().uiOpen && !(window.Worlds && Worlds.active)) { e.preventDefault(); open({}); } });
+  addEventListener('keydown', e => { if (e.code === 'Backquote' && !e.repeat && on() && G() && G().playing && !G().uiOpen) { const W = window.Worlds && Worlds.active && Worlds._W; if (W && (W.busy || W.dead)) return; e.preventDefault(); open({}); } });
   setInterval(() => {
     try {
-      if (!on() || !window.Talents || !G() || !G().S) return; const n = left(), show = n > 0 && G().playing && !G().uiOpen && !(window.Worlds && Worlds.active) && !(root && root.classList.contains('on'));
-      if (!chip) { css(); chip = document.createElement('div'); chip.style.cssText = 'position:fixed;right:18px;top:96px;z-index:33;pointer-events:none;font:800 17px var(--u-serif,serif);letter-spacing:.12em;color:#fff;padding:8px 16px;background:linear-gradient(270deg,#2a1a4ae0,#2a1a4a00);border-right:3px solid #b8a0ff;text-shadow:0 1px 6px #000;display:none'; document.body.appendChild(chip); }
-      chip.style.display = show ? 'block' : 'none'; if (show) chip.innerHTML = `🧠 ${n} 段回忆待唤醒 · 按 <b style="color:#ffe28a">\`</b>`;
+      if (!on() || !window.Talents || !G() || !G().S) return; const Wc = window.Worlds && Worlds.active && Worlds._W, n = left(), show = n > 0 && G().playing && !G().uiOpen && !(Wc && (Wc.busy || Wc.dead)) && !(root && root.classList.contains('on'));
+      if (!chip) { css(); chip = document.createElement('div'); chip.style.cssText = 'position:fixed;right:18px;top:96px;animation:mmChip 1.2s infinite alternate;z-index:33;pointer-events:none;font:800 17px var(--u-serif,serif);letter-spacing:.12em;color:#fff;padding:8px 16px;background:linear-gradient(270deg,#2a1a4ae0,#2a1a4a00);border-right:3px solid #b8a0ff;text-shadow:0 1px 6px #000;display:none'; document.body.appendChild(chip); }
+      chip.style.display = show ? 'block' : 'none'; if (show) chip.innerHTML = `🧠 升级奖励：${n} 次技能三选一 · 按 <b style="color:#ffe28a">\`</b>`;
     } catch (e) { }
   }, 800);
   // 结算卡关闭后若还有技能点，自动弹出回忆
+  const safeNow = () => {
+    const g = G(); if (!g || !g.playing || g.uiOpen) return false; const W = window.Worlds && Worlds.active && Worlds._W;
+    if (!W) return !document.body.classList.contains('sgcine') && !(window.Saga && Saga.cine);
+    if (W.busy || W.dead || W.mapOpen || (window.Saga && Saga.cine)) return false;
+    try { const P = W.pos; for (const f of (window.Foe && Foe.foes) || []) if (f && !f.dead && !f.escaped && f.seen && f.pos && Math.hypot(f.pos.x - P.x, f.pos.z - P.z) < 42) return false; } catch (e) { }
+    return true;
+  };
+  // 升级后：待选「回忆」自动弹出——野外要等周围没有警觉的敌人（不会在战斗中打断你），否则排队，等安全了/回洞了再弹
+  function queue(up) { pend = Date.now() + 1800; }
+  setInterval(() => { try { if (pend && on() && Date.now() > pend && left() > 0 && !(root && root.classList.contains('on')) && safeNow()) { pend = 0; open({ auto: 1, lv: 1 }); } else if (pend && left() <= 0) pend = 0; } catch (e) { } }, 700);
   function afterSettle() { setTimeout(() => { if (on() && left() > 0 && !(window.Worlds && Worlds.active)) open({ auto: 1 }); }, 500); }
   function grantReroll(n) { const S = G().S; S.saga = S.saga || {}; S.saga.rr = (S.saga.rr || 0) + (n || 1); }
-  return { grantReroll, on, open, close, draw, eligible, left, afterSettle, hasAltar, FLAVOR, get st() { return st; } };
+  return { gate, queue, grantReroll, on, open, close, draw, eligible, left, afterSettle, hasAltar, FLAVOR, get st() { return st; } };
 })();
