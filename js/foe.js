@@ -33,6 +33,7 @@ window.Foe = (() => {
         t.userData.skin = m.userData.skin; o.material = t; m.dispose();
       }
     });
+    if (/^VH_/.test(name)) { let anySkin = false; root.traverse(o => { if (o.isMesh && o.material && o.material.userData && o.material.userData.skin) anySkin = true; }); if (anySkin) TINT[name] = 1; } // R53 VRoid Hub 身体：有独立皮肤材质才可跟头同色
     try { sampleSkin({ E, root }); } catch (e) { console.warn('skin sample', name, e); }
     // 第十八轮：身体比头暗时提亮整个身体（而不是把头压暗去迁就身体）→ 角色和头都不再发暗
     const gain = bodyGain(name); root.traverse(o => { if (o.isMesh && o.material && !o.userData.cut && o.material.color) o.material.color.multiplyScalar(gain); });
@@ -241,8 +242,10 @@ window.Foe = (() => {
     V_KF: ['assassin', 'shadow', 'crossbow', 'engineer', 'merc', 'catthief', 'guard', 'smithgirl', 'huntress'] };
   const VR_IDX = {}; for (const b in VR_ID) for (const id of VR_ID[b]) (VR_IDX[id] = VR_IDX[id] || []).push(b);
   const VR_BOSS = { village: 'HairSample_Female', forest: 'Vita', wilds: 'V_KF', abbey: 'Victoria_Rubin', swamp: 'Darkness_Shibu', fortress: 'Vita', capital: 'Victoria_Rubin', abyss: 'Darkness_Shibu', peak: 'Victoria_Rubin' };
+  // R53 MOD vh_bodies：js/vroid_pack.js 的 VRoid Hub 身体（VH_PACK[file] = {ref: 借用哪具基础身体的身份表}）并入对应身份的候选
+  function vhExt(L, id) { if (!window.VH_PACK || (window.Mods && Mods.on && Mods.on('vh_bodies') === false)) return L; const out = L.slice(); for (const k in VH_PACK) if (VH_PACK[k].ids.includes(id)) out.push(k); return out; }
   function bodyFor(h, r, bossK, used) {
-    if (window.CC0 && CC0.vroidOnly && CC0.vroidOnly()) { if (bossK) return VR_BOSS[bossK] || 'Vita'; const L = VR_IDX[h && h.c && h.c.id] || CC0.VRF; const sd = (h && h.look && h.look.seed) || Math.floor(r() * 1e9); return L[CC0.hash(String(sd)) % L.length]; }
+    if (window.CC0 && CC0.vroidOnly && CC0.vroidOnly()) { if (bossK) return VR_BOSS[bossK] || 'Vita'; const L = vhExt(VR_IDX[h && h.c && h.c.id] || CC0.VRF, h && h.c && h.c.id); const sd = (h && h.look && h.look.seed) || Math.floor(r() * 1e9); return L[CC0.hash(String(sd)) % L.length]; }
     if (window.CC0 && CC0.on() && window.Mods && Mods.on('id_outfit')) { const o = bossK ? OUTFIT_BOSS[bossK] : OUTFIT_ID[h && h.c && h.c.id]; if (o && (!window.BODY_LIST || BODY_LIST.includes(o))) return o; }
     const b = bodyFor0(h, r, bossK, used); return window.CC0 ? CC0.body(b, (h && h.look && h.look.seed) || 0) : b; } /* R38 CC0 模式：只用 CC0 身体 */
   function bodyFor0(h, r, bossK, used) {

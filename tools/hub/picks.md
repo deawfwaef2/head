@@ -1,3 +1,5 @@
+> ⚠ R53：本表的授权栏只看了许可名，不少项其实 `redistribution=disallow`（写在 Hub 条件页 URL 里）。以 `tools/hub/hubscan.py`（已修）+ `hubpipe.py lic_ok()` 的结果为准，别直接照抄这里。
+
 # VRoid Hub 候选清单（公开 API 扫描，授权已核：可下载 + 暴力表现允许 + 允许改造 + 允许再分发 + 非R18）
 
 由 `tools/hub/hubscan.py` 生成，我已看过缩略图筛掉：幼态/校服/暴露/非人形/男性。**下载需要登录 pixiv，请你本人点「下载」，把 .vrm 发给我。**

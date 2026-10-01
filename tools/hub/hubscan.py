@@ -11,13 +11,15 @@ def get(u):
 def ok(v):
     m = v.get('vrm_meta') or {}
     if 'allowExcessivelyViolentUsage' in m:  # VRM1
-        return m.get('allowExcessivelyViolentUsage') and m.get('allowRedistribution') and m.get('modification') in ('allowModification', 'allowModificationRedistribution'), m
-    # VRM0
-    return m.get('violentUssageName') == 'Allow' and m.get('allowedUserName') in ('Everyone', None) and (m.get('licenseName') or '') != 'Redistribution_Prohibited', m
+        return bool(m.get('allowExcessivelyViolentUsage') and m.get('allowRedistribution') and m.get('modification') in ('allowModification', 'allowModificationRedistribution')), m
+    # VRM0：条件写在 otherPermissionUrl / otherLicenseUrl 的查询串里（与 tools/vrm2head.py 的授权检查一致）
+    u = m.get('otherPermissionUrl') or m.get('otherLicenseUrl') or ''; lic = m.get('licenseName') or ''
+    g = m.get('violentUssageName') == 'Allow' and (lic.startswith('CC0') or lic.startswith('CC_BY') or ('redistribution=allow' in u and 'modification=allow' in u)) and 'allowed_to_use_user=everyone' in (u or 'allowed_to_use_user=everyone')
+    return bool(g), m
 out = {}
 for kw in sys.argv[2:]:
     nxt = '/api/search/character_models?' + urllib.parse.urlencode({'keyword': kw, 'is_downloadable': 'true', 'count': 50})
-    for page in range(4):
+    for page in range(8):
         d = get('https://hub.vroid.com' + nxt)
         if not d or not d.get('data'): break
         nxt = (d.get('_links') or {}).get('next', {}).get('href')

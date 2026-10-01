@@ -143,3 +143,58 @@ models/CLS_*.js，由 js/headpacks.js 按 MOD pack_voc / pack_touhou / pack_cls 
 ### R51 身体
 - `big/body/V_KF.js`（AvatarSample K·F）：pixiv VRoid Project 官方样本，VRM 内嵌 meta = VRM Public License 1.0、avatarPermission everyone、allowExcessivelyViolentUsage true、allowRedistribution true、modification allowModificationRedistribution、creditNotation unnecessary。文件取自 github.com/temuulen1221/Bodify（assets/models/AvatarSample_K_F.vrm），tools/vrm2body.py 转换。
 - 已删除 `big/body/Q_*.js`（Quaternius Ultimate Modular Women，R43b 引入）——用户要求只用 VRoid 女性身体。
+
+## VRoid Hub 模型（R53，头 `models/VH_*.js` + 身体 `big/body/VH_*.js`）
+每个模型在 hub.vroid.com 条件页核对为：允许暴力表现 / 允许改造 / 允许再分发（或 CC0 / CC-BY）。若作者要求署名，署名即下列作者名。
+
+- `VH_963851` 錬金術師のワンピース — マユラ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/1880767666855927745/models/3171992335144963851
+- `VH_263529` 歴代サンプルモデル — Coatie（Koh-Tee） (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/4593660874193246717/models/5008365454243263529
+- `VH_921690` 月城ムーン超ハッカソン用 — tsukisiromoon (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/6235639059178780043/models/2968652229362921690
+- `VH_763989` 光莉 — あわ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/7574619046991064867/models/4411539083619763989
+- `VH_711679` Preset Nekomimi Girls — 七百屋 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/6562992088211538595/models/7611892932977711679
+- `VH_170825` 錬金術師の少女 — マユラ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/7326706638307722032/models/9111574850521170825
+- `VH_592508` Geminiちゃん — マユラ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/7622872635463746057/models/950422655037592508
+- `VH_922318` エルフさん — ひなゆずき (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/7295574207011729136/models/6503303582901922318
+- `VH_375224` 【VRoidファイル販売中】メイド服カチューシャ着用サンプル — 白い白米 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/1209921514676884727/models/3546853004395375224
+- `VH_698890` 白夜 — あわ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/876445510960098637/models/5102542936430698890
+- `VH_067202` エース式なこむすめ — エース隊長 / Taichoo (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/8882447825618674321/models/5945210569136067202
+- `VH_478458` ダイドー - アビス・ホライズン — lumis (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/5813324930958434099/models/6434903048487478458
+- `VH_683418` メイド鹿島 — すえ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/4184222219477833273/models/8912494846381683418
+- `VH_208264` ブラッディルビー — 餅丸よう (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/8532109173656919610/models/6158488866753208264
+- `VH_626787` スウェーデンちゃん — バーネット (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/4095024816131573121/models/6042927270325626787
+- `VH_338003` リヴィ — めるぞぺる (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2067013302225845212/models/8723309735329338003
+- `VH_007907` 【版権フリー】エルフ — misaki (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/222360161605488523/models/7058931113539007907
+- `VH_350271` グノーム — ネセネセ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/1714810747070456300/models/5082804560147350271
+- `VH_384719` 菜ツ音りとせ — ＮＲ／ＭＬ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2168018732710122760/models/438605804164384719
+- `VH_925229` DROCK!! — kana~ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/3667883437290326857/models/5149510615692925229
+- `VH_388471` カザハ — キリナレイル (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/7402007000090150733/models/3313146848163388471
+- `VH_720884` nekomimi maid — owo (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/8620852199811893721/models/1972866515957720884
+- `VH_757356` アリス — 永遠力吹雪@Skeb募集中 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/4696869983204914625/models/2442704882327757356
+- `VH_151706` Model 2 — 鷲羽あずさ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/3005936562042173277/models/2162808127113151706
+- `VH_407264` 重音テトSV　麻十a十式v1.5 — 摩十a十 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/1618767370597549811/models/8264070903309407264
+- `VH_611845` サイドテールな少女 — ひなゆずき (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/4476699882452975148/models/7519114352520611845
+- `VH_662171` お試し4 — yamochan7 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/5085958830310947461/models/289113830910662171
+- `VH_104806` レイカ — Tovie (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/4220132588234183943/models/6361244108665104806
+- `VH_796605` AI（アイ）ちゃん — マユラ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/9117432442733715615/models/8249199474611796605
+- `VH_775012` ver12aka — ぶーたきちゃん (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/9078856536562664185/models/7804687272331775012
+- `VH_057183` ペパーミントドレス — 餅丸よう (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/5210687575611148088/models/5165957922947057183
+- `VH_173040` ピンクのチロルめいど — 餅丸よう (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/6216046191932128492/models/5911351483580173040
+- `VH_786947` カクテルベリー — 餅丸よう (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/5956157495788537521/models/2194566611037786947
+- `VH_390116` 安岡　真奈 — うさ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/6057953589277922507/models/3730592115841390116
+- `VH_960801` 白黒ぐるぐる目ちゃん — 紫乃桜甘味料 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/1313219482666259333/models/4422403184066960801
+- `VH_997601` 9 — GoKi御器 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/1633414261567720896/models/7828776083448997601
+- `VH_048015` レイチェルちゃん — マユラ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/827815393298964854/models/6275124255425048015
+- `VH_382000` ニャルラトホテプ — マユラ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2380309382611423311/models/5292605843110382000
+- `VH_400132` AvatarSample — yomox9 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2175138617022572467/models/1646378957069400132
+- `VH_035130` ジトメちゃん — ヽ｜∵｜ゝ(Fantom) (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2089525207077426323/models/3806710271773035130
+- `VH_487209` おさげ？ちゃん — ひなゆずき (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/767334058303576906/models/9073030574770487209
+- `VH_999667` 風音リム — 夢喰ねるよ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/7573892730382934303/models/1380206967745999667
+- `VH_273237` maid — owo (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/7563662045241140659/models/255350776653273237
+- `VH_855223` スカイブルードレス — 餅丸よう (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/286113380493805153/models/2248616446848855223
+- `VH_334274` 配布キャラ＿12 — 今6　エクモン (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2735220209351543392/models/506768837298334274
+- `VH_248595` Celeste — JustAPal (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/6685370406885124983/models/5295951488219248595
+- `VH_933940` 気だるげシスターメイドさん — かんなっ！（別名:これ） (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/5784282389576220298/models/2529419180646933940
+- `VH_793513` ｔｔ — アミ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/8438484546938384856/models/5992844497770793513
+- `VH_061299` 赤居浮奈 — 永遠力吹雪@Skeb募集中 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/4405457166853439284/models/4403766635056061299
+- `VH_127512` モブ子ちゃん — マユラ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/5746502360712405535/models/2998677666839127512
+- `VH_216139` お試し2 — yamochan7 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/3293756840432485398/models/8624915900578216139

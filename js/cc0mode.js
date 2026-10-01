@@ -24,7 +24,7 @@ window.CC0 = (() => {
   const VRS = new Set(VRF);
   const vroidOnly = () => { try { return !window.Mods || !Mods.on || Mods.on('vroid_only') !== false; } catch (e) { return true; } };
   function body(name, seed) {
-    if (vroidOnly()) return VRS.has(name) ? name : VRF[hash(name + '|' + (seed || 0)) % VRF.length];
+    if (vroidOnly()) return (VRS.has(name) || (window.VH_PACK && VH_PACK[name] && (!window.Mods || !Mods.on || Mods.on('vh_bodies') !== false))) ? name : VRF[hash(name + '|' + (seed || 0)) % VRF.length];
     if (QBAD[name] && qc50()) name = QBAD[name];
     if (okBody(name)) return name;
     const have = BODIES.filter(b => !window.BODY_LIST || BODY_LIST.includes(b)); const L = have.length ? have : BODIES;

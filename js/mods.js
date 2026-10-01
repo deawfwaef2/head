@@ -55,6 +55,7 @@ window.Mods = (() => {
     { id: 'char_outline', cat: 'look', icon: '✒️', n: '人物勾线（R47）', d: '身体和头的外轮廓描一圈细线（反向外壳，远处自动变细）；线色取自贴图并随环境变暗/变色，不是死黑。需开“人物统一光影”。', def: true },
     { id: 'world_cel', cat: 'look', icon: '🏞️', n: '环境二次元阴影（R47）', d: '场景保留 3D 贴图材质感，但阴影边缘收硬、阴影染上天空色、亮面略平——和二次元人物的阴影对齐。', def: true },
     { id: 'vroid_only', cat: 'look', icon: '🧍', n: '身体只用 VRoid 女性模型（R51）', d: '所有人物身体只从 8 具 VRoid 女性身体里按身份挑（Vita / Victoria Rubin / Darkness Shibu / HairSample Female / AvatarSample A / AvatarSample B / 浴衣 Osage / 新增 AvatarSample K·F），不管 CC0 模式开没开。Quaternius 低模身体已删除；原神 MMD 身体和身高幼态的光莉不再出现。', def: true },
+    { id: 'vh_bodies', cat: 'look', icon: '👗', n: 'VRoid Hub 新增身体（R53）', d: '来自 VRoid Hub、授权为“允许暴力/改造/再分发”的成年比例女性身体（js/vroid_pack.js 登记），按身份并入候选：更多不同的女角色、不同衣服。关掉恢复只用 8 具基础身体。', def: true },
     { id: 'hunter_calm', cat: 'play', icon: '🏹', n: '猎手感应放慢（R50）', d: '击倒 +2.5（原 7）、斩首 +1.5（原 4）；出猎前 2 分钟不随时间增长，之后约 4.5→8%/分钟（原 15%+）；满后每 12 秒判定一次、概率 6%→50%（原每 5 秒 15%→90%）；遭遇结束后冷却 150 秒（原 40 秒）。', def: true },
     { id: 'hunter_hud2', cat: 'look', icon: '🎯', n: '猎手 HUD 重做 · 紧凑统一（R50）', d: '猎手感应改为顶部小型黑曜石面板（分段细条 + 仇恨/U 提示一行），不再是屏幕中间的大字和糊状阴影；猎手血条、横幅同风格（血金、切角、30% 逃跑刻度）。', def: true },
     { id: 'npc_strafe', cat: 'look', icon: '↔️', n: '方向性移动 · 横移不再“向前走着滑”（R51）', d: '敌人包抄/游走/后撤时，下半身转向实际移动方向迈步，脊柱到脖子反向扭回，胸口和脸仍正对你；移动方向在身后时改为后退步。需要“人物移动自然化”开启。', def: true },
