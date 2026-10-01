@@ -185,11 +185,11 @@ window.WGrass = (() => {
             #ifdef USE_COLOR
               gc *= mix(vec3(1.0), vColor.rgb, 0.35);
             #endif
-            float fr = smoothstep(uFar * 0.45, uFar * 1.05, distance(vTP.xz, cameraPosition.xz));
+            float fr = smoothstep(uFar * 0.45, uFar * 1.05, distance(vTP.xz, cameraPosition.xz)), ck = smoothstep(0.04, 0.55, cv);
             float lg = max(dot(gc, vec3(0.3, 0.59, 0.11)), 1e-3), ld = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
-            vec3 gt = gc * clamp(mix(1.0, ld / lg, 0.7), 0.4, 1.8); // 保留地面贴图自身的明暗纹理，只换成草的色相
-            diffuseColor.rgb = mix(diffuseColor.rgb, gt * 1.1, cv * mix(0.45, 0.65, fr));
-            diffuseColor.rgb *= mix(1.0, mix(0.55, 1.0, fr), cv); }`);
+            vec3 gt = gc * clamp(mix(1.0, ld / lg, mix(0.7, 0.3, fr)), 0.55, mix(1.8, 1.25, fr)); // 近处保留地面贴图明暗纹理；远处（草带外）以草冠色为主，避免发白发灰
+            diffuseColor.rgb = mix(diffuseColor.rgb, gt * 1.1, mix(cv * 0.45, ck * 0.85, fr));
+            diffuseColor.rgb *= mix(mix(1.0, 0.55, cv), mix(1.0, 0.8, ck), fr); }`);
     };
     mat.customProgramCacheKey = () => (key ? key.call(mat) : '') + '|wg2';
     mat.needsUpdate = true;
