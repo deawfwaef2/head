@@ -55,15 +55,15 @@ window.Eco = (() => {
   const prCap = () => on() ? Math.min(devicePixelRatio || 1, 1) : Math.min(devicePixelRatio || 1, 1.5);
   function attach(renderer) {
     if (R) return; R = renderer; prSet = renderer.setPixelRatio.bind(renderer);
-    renderer.setPixelRatio = function (v) { prWant = v; prCur = Math.min(v, prCap(), dyn); return prSet(prCur); };
+    renderer.setPixelRatio = function (v) { prWant = v; if (on()) return; prCur = Math.min(v, prCap()); return prSet(prCur); }; // 节能模式下分辨率只由 GPU 计时决定（旧的按 FPS 调档会被加载卡顿误导，进图后一直停在 0.7）
     try { gl = renderer.getContext(); ext = gl.getExtension('EXT_disjoint_timer_query_webgl2'); } catch (e) { ext = null; }
-    prWant = renderer.getPixelRatio(); prCur = Math.min(prWant, prCap()); prSet(prCur);
+    prWant = renderer.getPixelRatio(); prCur = on() ? prCap() : Math.min(prWant, prCap()); prSet(prCur);
   }
   let dyn = 9, lastTg = 0;
   function gpuBegin() { if (!ext || active || !on() || QF === 0) return; try { const q = qFree.pop() || gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, q); active = q; } catch (e) { ext = null; } }
   function gpuEnd() { if (!active) return; try { gl.endQuery(ext.TIME_ELAPSED_EXT); qBusy.push(active); } catch (e) { } active = null; }
   function gpuPoll(fps) {
-    if (!ext || !qBusy.length) return;
+    if (!ext || !qBusy.length || !on()) return;
     let dis = false; try { dis = gl.getParameter(ext.GPU_DISJOINT_EXT); } catch (e) { }
     while (qBusy.length) {
       const q = qBusy[0]; if (!gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) break; qBusy.shift();
@@ -74,10 +74,10 @@ window.Eco = (() => {
     if (fps !== lastTg) { lastTg = fps; GPU.length = 0; }
     const now = performance.now(); if (now < decideT || GPU.length < 30 || !R || busyUI()) return; decideT = now + 1500;
     const a = GPU.slice().sort((x, y) => x - y), med = a[a.length >> 1], budget = 1000 / Math.max(30, Math.min(fps, 60)) * 0.6;
-    const cap = Math.min(prWant, prCap()); let next = Math.min(prCur, cap);
+    const cap = prCap(); let next = Math.min(prCur, cap);
     if (med > budget * 1.15) next = Math.max(cap * 0.75, prCur * Math.max(0.85, Math.sqrt(budget / med)));
     else if (med < budget * 0.6) next = Math.min(cap, prCur + 0.05);
-    if (Math.abs(next - prCur) >= 0.02) { dyn = next >= cap - 0.01 ? 9 : next; prCur = next; prSet(next); GPU.length = 0; }
+    if (Math.abs(next - prCur) >= 0.02) { prCur = next; prSet(next); GPU.length = 0; }
   }
   function stats() { const a = GPU.slice().sort((x, y) => x - y); return { on: on(), target: target(), refMs: +refMs.toFixed(2), gpuMs: a.length ? +a[a.length >> 1].toFixed(2) : null, pr: prCur, cap: prCap(), timer: !!ext }; }
   return { on, attach, stats, target, shadowMax: () => (on() ? 2048 : 4096) };
