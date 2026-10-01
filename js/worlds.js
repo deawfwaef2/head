@@ -935,6 +935,7 @@ window.Worlds = (() => {
   // ================= R54 MOD corridor：穿门走进即时生成的弯曲走廊，后台准备下一个地点，走到雾门出口就到（不再有加载画面）=================
   const CORR = () => !!window.Corridor && !(window.Mods && Mods.on && Mods.on('corridor') === false) && !/[?&]nocorr=1/.test(location.search);
   const BT = () => !!(window.Loop && Loop.isBossTrip());
+  const SEAL = () => !!(window.Nemesis && Nemesis.sealed && Nemesis.sealed());
   const inFight = () => !!(W && window.Foe && Foe.foes && Foe.foes.some(f => f && !f.dead && f.pos && (f.atk || (f.seen && f.state === 'chase')) && Math.hypot(f.pos.x - W.pos.x, f.pos.z - W.pos.z) < 20));
   async function popFoes(B, node, list) { // R54l：载入失败先重试，不要动不动退回「光球小精灵」
     for (let a = 0; a < 3; a++) { try { const f = await Foe.populate(foeCtx(B, node), list); if (f && (f.length || !list.length)) return f; } catch (e) { console.warn('Foe.populate', a, e); } if (!W) return null; await wait(500 + a * 700); }
@@ -1089,7 +1090,7 @@ window.Worlds = (() => {
     if (B.sc.userData.fire) B.sc.userData.fire.intensity = 2.2 * (0.85 + Math.sin(now * 13) * 0.08 + Math.sin(now * 29) * 0.05);
     // 门：靠近提示
     W.doorNear = null; for (const d of B.doors) { const dd = Math.hypot(W.pos.x - d.x, W.pos.z - d.z); if (dd < 2.6) W.doorNear = d; if (dd < 12 && d.to >= 0) prefetchNode(d.to); d.label.visible = Math.hypot(cam.position.x - d.x, cam.position.z - d.z) < 34;
-      if (d.nat && !d.home && dd < 1.6 && !W.busy && CORR() && (W.vel.x * Math.cos(d.a) + W.vel.z * Math.sin(d.a)) > 1.2 && !inFight()) { travel(d.to, W.cur); break; } } // R54e：顺着山口走出去就上路（不用按 E）；R54l：战斗中（含宿敌）不会自动穿门
+      if (d.nat && !d.home && dd < 1.6 && !W.busy && CORR() && (W.vel.x * Math.cos(d.a) + W.vel.z * Math.sin(d.a)) > 1.2 && !inFight() && !SEAL()) { travel(d.to, W.cur); break; } } // R54e：顺着山口走出去就上路（不用按 E）；R54l：战斗中（含宿敌）不会自动穿门
     W.interNear = null; { let bd = 9; for (const it of B.inter) { const dd = Math.hypot(W.pos.x - it.x, W.pos.z - it.z); if (!it.done && dd < (it.corpse ? 2.3 : 1.9) && dd < bd) { bd = dd; W.interNear = it; } } }
     if (window.Sack) try { Sack.frame(dt); } catch (e) { console.warn(e); }
     // 猎物 / 霸主
@@ -1232,6 +1233,7 @@ window.Worlds = (() => {
     if (W.mapOpen) return true;
     if (!e.repeat && (e.code === 'KeyQ' || e.code === 'KeyR' || e.code === 'KeyG')) { skill(e.code); return true; }
     if (e.code === 'KeyE' && !e.repeat) {
+      if (W.doorNear && SEAL()) { G.toast && G.toast('🔒 宿敌在场，门被封死了——打倒她、打到她残血撤退，或者撑到封锁时间结束', '#ff9070', 2.2); return true; }
       // 第二十一轮：被追杀时站在门口按 E 优先逃走（不会被旁边的尸体/战利品抢走 E）
       if (W.doorNear && W.foes && W.foes.some(f => !f.dead && f.seen && (f.state === 'chase' || f.atk))) { const d = W.doorNear; G.toast && G.toast('🏃 你甩开了追兵，逃出了门！', '#b0ffb0', 2); if (d.home) leaveHome(); else { SFX.open && SFX.open(); travel(d.to, W.cur); } return true; }
       if (W.foes) { const bf = Foe.brokenNear(W.pos, G.player.yaw); if (bf) { Foe.execute(bf, new V3(Math.cos(G.player.yaw), 0, -Math.sin(G.player.yaw))); return true; } }

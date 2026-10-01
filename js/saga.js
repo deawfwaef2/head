@@ -413,6 +413,7 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
     if (window.Foe && !Foe.__sg) {
       const p0 = Foe.populate; let inj = null;
       Foe.populate = async function (ctx, list) {
+        if (arguments[2] && arguments[2].keep) return p0.apply(this, arguments); // R54l：中途追加（宿敌/精英）不清场、不重复注入
         inj = null;
         try {
           const W = window.Worlds && Worlds._W, node = W && W.graph && W.graph.nodes[W.cur], sg = on() && T && node && node.sagaT;

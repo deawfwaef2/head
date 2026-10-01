@@ -103,6 +103,7 @@ window.RegionQuest = (() => {
     if (window.Foe && !Foe.__rq) {
       const p0 = Foe.populate; let injH = null;
       Foe.populate = async function (ctx, list) {
+        if (arguments[2] && arguments[2].keep) return p0.apply(this, arguments); // R54l：中途追加（宿敌/精英）不清场、不重复注入
         injH = null;
         try {
           const W = window.Worlds && Worlds._W, node = W && W.graph && W.graph.nodes[W.cur], m = on() && T && node && node.rqMini;

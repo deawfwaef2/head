@@ -1999,6 +1999,8 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - `soft_glow`（js/fix54l.js）：Master 泛光 0.9/0.9→0.38/1.25，CharLight 逆光轮廓 ×0.4。
 - 下蹲走路：persona sly 走路、刺客绕背改为正常走/小跑，persona 闲置去掉 Crouch_Idle。宿敌战穿门：自然山口自动穿越加 `inFight()`（20m 内有追击/出招的敌人就不穿）。光球小精灵：`popFoes` 载入失败重试 3 次再退回。
 - `no_freebies`：新档 0 魂晶、无药、无材料；结算无底薪；祝福抉择需要这一趟杀满 3 人或清空 1 个地点。
+- 宿敌封门（nemesis.js `sealed()/sealFoes()/sealLeft()`，SEAL_T=90s）：宿敌（hunter2 / nemClone / nemX）在场时所有门（E、自然山口自动穿越、回洞魂门）都封死；解除条件 = 宿敌死 / 残血撤退（猎手 30% 逃跑；分身/新宿敌 25% 撤退，8 秒后带伤消失、下次 +1 级）/ 90 秒到点你可以撤退。屏幕上方显示倒计时。
+- 刷宿敌清场 BUG：regionquest.js 和 saga.js 包装 `Foe.populate` 时丢了第 3 个参数 `{keep:true}` → 中途追加宿敌时把整个地点的敌人清掉。现在 keep 调用直接透传（也不再重复注入小 BOSS/异变目标）。
 ## R54 workshop_plus（工坊扩充，MOD 默认开）
 - 用户：合成内容太少、工坊文字有问题；想要更多断肢/器官（肠、胸、心脏、上臂、下臂、大腿、小腿）。
 - **新 js/workshop.js**：配方 12 → 47（药品 / 料理 / 战斗增益 / 护具·饰品 / 材料转化 / 拆解·肢体）；新物品 tonic、salve、soulwine、manadraught(魂能)、bonebroth、jerky、huntstew、ironskin(受伤-25%)、swiftdust(移速+18%)、bloodoil(伤害+40%)、regenbalm(每秒2%) 与肢体材料 ua/la/th/ca/torso。**不做武器配方**（武器只来自搜刮 + 铁匠台强化，用户旧约束）。

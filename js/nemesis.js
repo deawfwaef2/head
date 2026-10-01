@@ -101,5 +101,27 @@ window.Nemesis = (() => {
     else if (!LP() && now > plan.next && now - plan.enteredAt > 10) { plan.next = now + 240 + Math.random() * 180; strike('periodic').catch(() => { }); }
   }
   setInterval(() => { try { tick(); } catch (e) { } }, 1000);
-  return { dmgK, hpK, spdK, heads, strike, S, addFoe };
+  // R54l：遇到宿敌就封门——只有三种情况能离开：宿敌倒下、宿敌残血撤退、封锁时间到（SEAL_T 秒后你可以撤退）
+  const SEAL_T = 90, isNem = f => f && (f.hunter2 || f.nemClone || f.nemX);
+  function sealFoes() {
+    const w = W(); if (!w || !window.Foe || !Foe.foes || !onN()) return []; const now = performance.now(), H2 = window.Hunters2, out = [];
+    for (const f of Foe.foes) { if (!isNem(f) || f.dead || f.escaped) continue; if (!f._sealAt) f._sealAt = now;
+      const fled = f._fled || (f.hunter2 && H2 && H2.T && H2.T.fo === f && H2.T.fleeAt); if (!fled && now - f._sealAt < SEAL_T * 1000) out.push(f); }
+    return out;
+  }
+  const sealed = () => sealFoes().length > 0;
+  const sealLeft = f => Math.max(0, Math.ceil(SEAL_T - (performance.now() - ((f && f._sealAt) || performance.now())) / 1000));
+  function vanishFoe(fo) { fo.dead = true; fo.escaped = true; fo.rag = null; if (fo.warn) fo.warn.visible = false; try { if (fo.f && fo.f.root && fo.f.root.parent) fo.f.root.parent.remove(fo.f.root); Foe.say(fo, ''); } catch (e) { } const w = W(); if (w && w.foes) { const i = w.foes.indexOf(fo); if (i >= 0) w.foes.splice(i, 1); } const j = Foe.foes.indexOf(fo); if (j >= 0) Foe.foes.splice(j, 1); }
+  let sealEl = null;
+  function sealTick() {
+    const w = W(), list = w && !w.busy ? sealFoes() : [], now = performance.now();
+    if (w && window.Foe && Foe.foes) for (const f of Foe.foes.slice()) { if (!(f.nemClone || f.nemX) || f.dead) continue;
+      if (!f._fled && f.hp <= f.maxHp * 0.25) { f._fled = now; f.state = 'flee'; f.brave = false; f.atk = null; f.spdMul = (f.spdMul || 1) * 1.3; try { G().toast(`💨 ${(f.h && f.h.c && f.h.c.name) || '宿敌'} 残血撤退了——门的封锁解除。8 秒内追上她还能斩下首级`, '#ffd070', 3); } catch (e) { } }
+      if (f._fled) { f.state = 'flee'; if (now - f._fled > 8000) { if (f.nemX) { const x = (S().extra || []).find(e => e.n === f.nemIdx); if (x) x.lv++; } vanishFoe(f); try { G().toast('她带着伤逃走了——下次会更强。', '#c8c8c8', 2.4); } catch (e) { } } } }
+    if (!sealEl) { sealEl = document.createElement('div'); sealEl.style.cssText = 'position:fixed;left:50%;top:132px;transform:translateX(-50%);z-index:34;pointer-events:none;padding:4px 14px;font:700 14px "Microsoft YaHei UI",sans-serif;color:#ffd8c8;text-shadow:0 1px 4px #000;background:linear-gradient(90deg,transparent,#2a0808d0 20%,#2a0808d0 80%,transparent);display:none'; document.body.appendChild(sealEl); }
+    if (!list.length) { sealEl.style.display = 'none'; return; }
+    const left = Math.max(...list.map(sealLeft)); sealEl.style.display = 'block'; sealEl.textContent = `🔒 宿敌在场，门被封死 · 打倒她 / 打到她残血撤退 / ${left} 秒后你可以撤退`;
+  }
+  setInterval(() => { try { sealTick(); } catch (e) { } }, 250);
+  return { dmgK, hpK, spdK, heads, strike, S, addFoe, sealed, sealFoes, sealLeft, SEAL_T };
 })();

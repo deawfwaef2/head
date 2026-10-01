@@ -149,7 +149,7 @@ window.Hunters2 = (() => {
     if (window.Worlds && !Worlds.__h2) {
       const k0 = Worlds.onKey; Worlds.onKey = function (e) {
         const W = Worlds._W;
-        if (on() && T && T.fo && !T.fo.dead && W && e.code === 'KeyE' && !e.repeat && W.doorNear) { try { G.toast(`🔒 ${BY[T.id].n} 在这里——门被封死了，打倒她或者撑到她撤退！`, '#ff9070', 2); } catch (x) { } return true; }
+        if (on() && T && T.fo && !T.fo.dead && (window.Nemesis && Nemesis.sealed ? Nemesis.sealed() : !T.fleeAt) && W && e.code === 'KeyE' && !e.repeat && W.doorNear) { try { G.toast(`🔒 ${BY[T.id].n} 在这里——门被封死了，打倒她或者撑到她撤退！`, '#ff9070', 2); } catch (x) { } return true; }
         return k0.apply(this, arguments);
       };
       const s0 = Worlds.start; Worlds.start = function () { const r = s0.apply(this, arguments); try { newTrip(); } catch (e) { } return r; };
@@ -214,7 +214,7 @@ window.Hunters2 = (() => {
       const d = BY[T.id], L = lvOf(T.id), o = odds(T.id), fl = T.fleeAt ? Math.max(0, FLEE_T - (now - T.fleeAt) / 1000) : 0;
       h.bar.style.display = 'block';
       h.bar.innerHTML = `<div class="n" style="color:${d.col}">${d.ic} ${esc(d.n)} <span style="font-size:12px">Lv.${L}</span></div><div class="t">${esc(d.t)} · 战力 ${o.rec} vs 你 ${myPow()} · 胜率约 ${Math.round(o.p * 100)}%</div>
-<div class="hp"><i style="width:${Math.max(0, fo.hp / fo.maxHp * 100)}%"></i></div>${fl ? `<div class="fl">她在逃跑！${fl.toFixed(1)} 秒</div>` : `<div class="g">血量 30% 时她会逃跑 · 🔒 门已封锁 · ${Math.max(0, Math.ceil(STAY_T - (now - T.spawnAt) / 1000))} 秒后撤退</div>`}`;
+<div class="hp"><i style="width:${Math.max(0, fo.hp / fo.maxHp * 100)}%"></i></div>${fl ? `<div class="fl">她在逃跑！${fl.toFixed(1)} 秒</div>` : `<div class="g">血量 30% 时她会逃跑 · ${window.Nemesis && Nemesis.sealLeft ? (Nemesis.sealLeft(fo) > 0 ? `🔒 门已封锁 · ${Nemesis.sealLeft(fo)} 秒后你可以撤退` : '🔓 封锁已解除，可以撤退') : `🔒 门已封锁 · ${Math.max(0, Math.ceil(STAY_T - (now - T.spawnAt) / 1000))} 秒后撤退`}</div>`}`;
     } else h.bar.style.display = 'none';
   }
 
