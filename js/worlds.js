@@ -570,7 +570,25 @@ window.Worlds = (() => {
       return true; } catch (e) { console.warn('nat_gates', e); return false; } }) : null;
     // 实例化
     if (g && g.wd) for (const M of [inst, instNS]) for (const [tm, ms] of M) { const k = ms.filter(m => m.keep || g.wd(m.elements[12], m.elements[14]).d >= 0); if (k.length !== ms.length) M.set(tm, k); } // 水里不长树/石头
+    const CULL = !(window.Mods && Mods.on && Mods.on('inst_cull') === false), small = [], gUse = new Map();
     for (const [M, ns] of [[inst, false], [instNS, true]]) for (const [tm, ms] of M) for (const p of tm.parts) {
+      if (CULL && ms.length) { // R54 inst_cull：实例按 14m 网格分块，每块有真实包围球 → 视锥/阴影相机能剔除（以前整片实例永远全画，一帧 300 万三角形）
+        if (!p.geo.boundingSphere) p.geo.computeBoundingSphere(); const bs = p.geo.boundingSphere, cells = new Map(), mm = new THREE.Matrix4(), cv = new V3();
+        ms.forEach(m => { const key = Math.floor(m.elements[12] / 14) + ',' + Math.floor(m.elements[14] / 14); if (!cells.has(key)) cells.set(key, []); cells.get(key).push(m); });
+        const pool = p.__g2 || (p.__g2 = []); let gi = gUse.get(p) || 0;
+        for (const list of cells.values()) {
+          const g2 = pool[gi] || (pool[gi] = (() => { const q = new THREE.BufferGeometry(); q.index = p.geo.index; for (const k in p.geo.attributes) q.setAttribute(k, p.geo.attributes[k]); q.groups = p.geo.groups; q.boundingBox = p.geo.boundingBox; return q; })()); gi++;
+          const im = new THREE.InstancedMesh(g2, p.mat, list.length), cs = []; let cx = 0, cy = 0, cz = 0;
+          list.forEach((m, i) => { mm.multiplyMatrices(m, p.m); im.setMatrixAt(i, mm); cv.copy(bs.center).applyMatrix4(mm); const r = bs.radius * mm.getMaxScaleOnAxis(); cs.push([cv.x, cv.y, cv.z, r]); cx += cv.x; cy += cv.y; cz += cv.z; });
+          cx /= cs.length; cy /= cs.length; cz /= cs.length; let rad = 0; for (const c of cs) rad = Math.max(rad, Math.hypot(c[0] - cx, c[1] - cy, c[2] - cz) + c[3]);
+          g2.boundingSphere = new THREE.Sphere(new V3(cx, cy, cz), rad);
+          if (g) { const leaf = p.mat.alphaTest > 0; list.forEach((m, i) => { const u = m.uc; im.setColorAt(i, u ? (leaf ? u.L : u.B) : WHITE); }); }
+          im.instanceMatrix.needsUpdate = true; im.frustumCulled = true; im.castShadow = !ns && !(p.mat.alphaTest > 0 && tm.size.y < 1.2); im.receiveShadow = !ns; sc.add(im);
+          if (tm.size.y < 1.2 && !ns) small.push({ im, x: cx, z: cz, r: rad });
+        }
+        gUse.set(p, gi);
+        continue;
+      }
       const im = new THREE.InstancedMesh(p.geo, p.mat, ms.length);
       ms.forEach((m, i) => im.setMatrixAt(i, new THREE.Matrix4().multiplyMatrices(m, p.m)));
       if (g) { const leaf = p.mat.alphaTest > 0; ms.forEach((m, i) => { const u = m.uc; im.setColorAt(i, u ? (leaf ? u.L : u.B) : WHITE); }); }
@@ -589,7 +607,7 @@ window.Worlds = (() => {
       if (!nat) cols.push({ x: d.x + Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z + Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 }, { x: d.x - Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z - Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 });
       return Object.assign(d, { g, label, home, nat });
     });
-    return { grass: GR, site: LY.slots ? LY : null, sc, H, R, Rf: LP ? Rf : null, RM, edge: LP && LP.edge ? LP.edge : null, wx: (LPX && LPX.wx) || GD ? (dt, p, now) => { if (LPX && LPX.wx) LPX.wx(dt, p, now); if (GD) GD.update(dt, p, now); } : null, tag: [LP ? LP.tag : '', g ? g.tag.join(' · ') : ''].filter(Boolean).join(' · '), lp: LP, cols, doors, inter, sun, sunDir, terr, style: st, spots, lay: LY.k, bossAt: LY.boss ? new V3(LY.boss.x, 0, LY.boss.z) : null };
+    return { small, grass: GR, site: LY.slots ? LY : null, sc, H, R, Rf: LP ? Rf : null, RM, edge: LP && LP.edge ? LP.edge : null, wx: (LPX && LPX.wx) || GD ? (dt, p, now) => { if (LPX && LPX.wx) LPX.wx(dt, p, now); if (GD) GD.update(dt, p, now); } : null, tag: [LP ? LP.tag : '', g ? g.tag.join(' · ') : ''].filter(Boolean).join(' · '), lp: LP, cols, doors, inter, sun, sunDir, terr, style: st, spots, lay: LY.k, bossAt: LY.boss ? new V3(LY.boss.x, 0, LY.boss.z) : null };
   }
   // R54 nat_gates：山口里的雾幕（纯着色器，共用一个材质/几何）+ 地面微光
   let VEIL = null;
@@ -971,6 +989,7 @@ window.Worlds = (() => {
     B.sun.target.position.set(W.pos.x, W.pos.y, W.pos.z); B.sun.position.copy(B.sun.target.position).addScaledVector(B.sunDir, 70);
     if (B.sc.userData.skyM) B.sc.userData.skyM.position.copy(cam.position);
     if (B.grass) B.grass.update(cam.position, now);
+    if (B.small && B.small.length && (W.smallT = (W.smallT || 0) - dt) <= 0) { W.smallT = 0.25; const cx = cam.position.x, cz = cam.position.z; for (const s of B.small) s.im.visible = Math.hypot(s.x - cx, s.z - cz) - s.r < 46; } // R54 inst_cull：小花小草 46m 外不画（雾里本来就看不见）
     if (B.wx) try { B.wx(dt, cam.position, now); } catch (e) { B.wx = null; console.warn(e); }
     if (B.sc.userData.fire) B.sc.userData.fire.intensity = 2.2 * (0.85 + Math.sin(now * 13) * 0.08 + Math.sin(now * 29) * 0.05);
     // 门：靠近提示

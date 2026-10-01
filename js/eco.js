@@ -2,7 +2,7 @@
 // ① 全局 requestAnimationFrame 限帧：按显示器刷新率整数分频到约 60fps（144Hz→72，165Hz→55，240Hz→60），帧间隔均匀
 //    菜单/面板/暂停 30fps · 窗口失焦 15fps · 2 分钟没有任何输入 30fps
 // ② 渲染分辨率上限 1.0（高 DPI 屏不再 1.5× 超采样）
-// ③ GPU 计时（EXT_disjoint_timer_query_webgl2）：GPU 帧时间长期超过预算（帧间隔的 60%）就逐步降分辨率（最低 0.75），宽裕时升回
+// ③ 帧率稳不住（持续低于目标约 20%）才逐步降分辨率（最低 0.75），稳住 6 秒再升回；GPU 计时（EXT_disjoint_timer_query_webgl2）只用于 Eco.stats()
 // URL：?fps=0 不限帧（测试用），?fps=N 指定上限
 window.Eco = (() => {
   const on = () => { try { return !window.Mods || Mods.on('eco_gpu') !== false; } catch (e) { return true; } };
@@ -44,7 +44,7 @@ window.Eco = (() => {
     const cbs = Q; Q = new Map();
     gpuBegin();
     for (const cb of cbs.values()) { try { cb(t); } catch (e) { console.error(e); } }
-    gpuEnd(); gpuPoll(tg || 60);
+    gpuEnd(); gpuPoll(tg || 60); pace(t, tg);
   }
   window.requestAnimationFrame = function (cb) { const id = ++seq; Q.set(id, cb); if (!pend) pend = raf0(pump); return id; };
   window.cancelAnimationFrame = function (id) { Q.delete(id); };
@@ -63,7 +63,7 @@ window.Eco = (() => {
     try { gl = renderer.getContext(); ext = gl.getExtension('EXT_disjoint_timer_query_webgl2'); } catch (e) { ext = null; }
     prWant = renderer.getPixelRatio(); prCur = on() ? prCap() : Math.min(prWant, prCap()); prSet(prCur);
   }
-  let dyn = 9, lastTg = 0;
+  let lastTg = 0;
   function gpuBegin() { if (!ext || active || !on() || QF === 0) return; try { const q = qFree.pop() || gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, q); active = q; } catch (e) { ext = null; } }
   function gpuEnd() { if (!active) return; try { gl.endQuery(ext.TIME_ELAPSED_EXT); qBusy.push(active); } catch (e) { } active = null; }
   function gpuPoll(fps) {
@@ -75,13 +75,17 @@ window.Eco = (() => {
       qFree.push(q);
     }
     if (qBusy.length > 8) { qFree.push(...qBusy.splice(0, qBusy.length - 4)); }
-    if (fps !== lastTg) { lastTg = fps; GPU.length = 0; }
-    const now = performance.now(); if (now < decideT || GPU.length < 30 || !R || busyUI()) return; decideT = now + 1500;
-    const a = GPU.slice().sort((x, y) => x - y), med = a[a.length >> 1], budget = 1000 / Math.max(30, Math.min(fps, 60)) * 0.6;
-    const cap = prCap(); let next = Math.min(prCur, cap);
-    if (med > budget * 1.15) next = Math.max(cap * 0.75, prCur * Math.max(0.85, Math.sqrt(budget / med)));
-    else if (med < budget * 0.6) next = Math.min(cap, prCur + 0.05);
-    if (Math.abs(next - prCur) >= 0.02) { prCur = next; prSet(next); GPU.length = 0; }
+  }
+  // 分辨率按“能不能稳住目标帧率”决定：GPU 计时在显卡省电降频时会变大（不代表吃紧），只用来显示
+  const PT = []; let prevRun = 0, okSince = 0;
+  function loading() { try { const W = window.Worlds && Worlds._W; return !!(W && (W.busy || !W.B)); } catch (e) { return false; } }
+  function pace(t, tg) {
+    const d = prevRun ? t - prevRun : 0; prevRun = t; if (!R || !on() || tg !== 60 || busyUI() || loading() || !d || d > 250) { PT.length = 0; okSince = t; return; }
+    PT.push(d); if (PT.length > 120) PT.shift(); if (PT.length < 90 || t < decideT) return; decideT = t + 1000;
+    const a = PT.slice().sort((x, y) => x - y), med = a[a.length >> 1], iv = Math.max(1000 / 60, Math.round(1000 / 60 / refMs) * refMs), cap = prCap();
+    if (med > iv * 1.22 && prCur > cap * 0.75 + 0.01) { prCur = Math.max(cap * 0.75, prCur - 0.08); prSet(prCur); PT.length = 0; okSince = t; }
+    else if (med <= iv * 1.06) { if (prCur < cap - 0.01 && t - okSince > 6000) { prCur = Math.min(cap, prCur + 0.05); prSet(prCur); PT.length = 0; okSince = t; } }
+    else okSince = t;
   }
   function stats() { const a = GPU.slice().sort((x, y) => x - y); return { on: on(), target: target(), refMs: +refMs.toFixed(2), gpuMs: a.length ? +a[a.length >> 1].toFixed(2) : null, pr: prCur, cap: prCap(), timer: !!ext }; }
   return { on, attach, stats, target, shadowMax: () => (on() ? 2048 : 4096) };
