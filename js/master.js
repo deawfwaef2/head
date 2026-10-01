@@ -17,7 +17,7 @@ window.Master = (() => {
     sat: 1.08, contrast: 1.07, shadowTint: [0.93, 0.98, 1.08], highTint: [1.06, 1.0, 0.9], vig: 0.42, grain: 0.028, ca: 0.0007,
     // R52 world_atmos：空气透视（朝太阳的 Mie 散射）/ 低地薄雾 / 太阳光束
     mie: 0.9, mieG: 0.76, mieDist: 0.012, mist: 0.35, mistH: 2.2, mistDist: 0.03, sunRay: 0.85, sunRayDecay: 0.972,
-    cloud: 0.3, cas: 0.55, agxExp: 1.4, agxSat: 1.18
+    cloud: 0.3, cas: 0.55, agxExp: 1.5, agxSat: 1.24, flare: 0.05
   };
   const MOD = (id) => !(window.Mods && Mods.on && Mods.on(id) === false);
   const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
@@ -152,7 +152,7 @@ window.Master = (() => {
       gl_FragColor = vec4(s * 0.25 * (exp(-r * 4.5) + 0.25 * exp(-r * 1.4)), 1.0);
     }`;
   const COMP = `${COMMON}
-    uniform sampler2D tScene; uniform sampler2D tAO; uniform sampler2D tBloom; uniform sampler2D tRays; uniform sampler2D tSunRays; uniform float uSunRay; uniform vec3 uSunRayCol;
+    uniform sampler2D tScene; uniform sampler2D tAO; uniform sampler2D tBloom; uniform sampler2D tRays; uniform sampler2D tSunRays; uniform float uSunRay; uniform vec3 uSunRayCol; uniform sampler2D tFlare; uniform float uFlare;
     uniform float uAO; uniform float uBloom; uniform float uRay; uniform float uExp; uniform float uSat; uniform float uCon;
     uniform vec3 uShT; uniform vec3 uHiT; uniform float uVig; uniform float uGrain; uniform float uCA; uniform float uT; uniform vec2 uRes; uniform vec3 uRayCol; uniform float uTM; uniform float uAgxSat;
     varying vec2 vUv;
@@ -161,6 +161,7 @@ window.Master = (() => {
       const mat3 mi = mat3(1.19687900512017, -0.0528968517574562, -0.0529716355144438, -0.0980208811401368, 1.15190312990417, -0.0980434501171241, -0.0990297440797205, -0.0989611768448433, 1.15107367264116);
       v = m * max(v, vec3(1e-10)); v = clamp(log2(v), -12.47393, 4.026069); v = (v + 12.47393) / 16.499999;
       vec3 v2 = v * v, v4 = v2 * v2; v = 15.5 * v4 * v2 - 40.14 * v4 * v + 31.96 * v4 - 6.868 * v2 * v + 0.4298 * v2 + 0.1191 * v - 0.00232;
+      v = pow(max(v, vec3(0.0)), vec3(1.12)); // punchy：稍加对比
       float l = dot(v, vec3(0.2126, 0.7152, 0.0722)); v = l + uAgxSat * (v - l);
       return clamp(pow(max(mi * v, vec3(0.0)), vec3(2.2)), 0.0, 1.0);
     }
@@ -180,6 +181,7 @@ window.Master = (() => {
       col += texture2D(tBloom, uv).rgb * uBloom;
       if (uRay > 0.0) col += texture2D(tRays, uv).rgb * uRay * uRayCol;
       if (uSunRay > 0.0) col += texture2D(tSunRays, uv).rgb * uSunRay * uSunRayCol;
+      if (uFlare > 0.0) col += texture2D(tFlare, uv).rgb * uFlare * vec3(1.0, 0.86, 0.72);
       col = uTM > 0.5 ? agx(col * uExp) : aces(col * uExp);
       // 分离色调：暗部偏冷、亮部偏暖
       float l = luma(col);
@@ -193,6 +195,15 @@ window.Master = (() => {
       gl_FragColor = vec4(col, luma(col));
     }`;
   // ---------- FXAA 3.11（精简 PC 质量档） ----------
+  // R52 lens_flare：屏幕空间镜头光晕（Chapman）——亮处在中心对称位置生成带色散的鬼影 + 光环
+  const FLARE = `uniform sampler2D tSrc; uniform float uHalo; varying vec2 vUv;
+    vec3 tapC(vec2 uv, vec2 dir){ return vec3(texture2D(tSrc, uv + dir * 0.008).r, texture2D(tSrc, uv).g, texture2D(tSrc, uv - dir * 0.008).b); }
+    void main(){
+      vec2 uv = vec2(1.0) - vUv, gv = (vec2(0.5) - uv) * 0.34, dn = normalize(gv + 1e-5); vec3 r = vec3(0.0);
+      for (int i = 1; i < 6; i++) { vec2 o = uv + gv * float(i); if (o.x < 0.0 || o.y < 0.0 || o.x > 1.0 || o.y > 1.0) continue; float w = pow(max(1.0 - length(vec2(0.5) - o) / 0.7071, 0.0), 6.0); r += tapC(o, dn) * w; }
+      vec2 ho = uv + dn * 0.45; if (ho.x > 0.0 && ho.y > 0.0 && ho.x < 1.0 && ho.y < 1.0) r += tapC(ho, dn) * pow(max(1.0 - length(vec2(0.5) - ho) / 0.7071, 0.0), 4.0) * uHalo;
+      gl_FragColor = vec4(r, 1.0);
+    }`;
   // R52 sharpen：AMD CAS 对比度自适应锐化（FXAA 之后），贴图/草叶/发丝更清晰，平滑区不出白边
   const CAS = `uniform sampler2D tSrc; uniform vec2 uTex; uniform float uAmt; varying vec2 vUv;
     void main(){
@@ -241,9 +252,10 @@ window.Master = (() => {
     const down = mk(DOWN, { tSrc: { value: null }, uTex: { value: new THREE.Vector2() } });
     const up = mk(UP, { tSrc: { value: null }, tPrev: { value: null }, uTex: { value: new THREE.Vector2() }, uR: { value: 1.0 } });
     const rays = mk(RAYS, { tSrc: { value: null }, uLight: { value: new THREE.Vector2(0.5, 0.5) }, uDecay: { value: P.rayDecay }, uDensity: { value: P.rayDensity }, uT: { value: 0 } });
-    const CU = { tScene: { value: null }, tAO: { value: null }, tBloom: { value: null }, tRays: { value: null }, tSunRays: { value: null }, uSunRay: { value: 0 }, uSunRayCol: { value: new THREE.Vector3(1, 0.9, 0.75) }, uAO: { value: 0 }, uBloom: { value: P.bloomStr }, uRay: { value: 0 }, uExp: { value: P.exposure }, uSat: { value: P.sat }, uCon: { value: P.contrast },
+    const CU = { tScene: { value: null }, tAO: { value: null }, tBloom: { value: null }, tRays: { value: null }, tSunRays: { value: null }, uSunRay: { value: 0 }, tFlare: { value: null }, uFlare: { value: 0 }, uSunRayCol: { value: new THREE.Vector3(1, 0.9, 0.75) }, uAO: { value: 0 }, uBloom: { value: P.bloomStr }, uRay: { value: 0 }, uExp: { value: P.exposure }, uSat: { value: P.sat }, uCon: { value: P.contrast },
       uShT: { value: new THREE.Vector3(...P.shadowTint) }, uHiT: { value: new THREE.Vector3(...P.highTint) }, uVig: { value: P.vig }, uGrain: { value: P.grain }, uCA: { value: P.ca }, uT: { value: 0 }, uRes: { value: new THREE.Vector2() }, uRayCol: { value: new THREE.Vector3(1, 0.85, 0.65) }, uTM: { value: 0 }, uAgxSat: { value: P.agxSat } };
     const cas = mk(CAS, { tSrc: { value: null }, uTex: { value: new THREE.Vector2() }, uAmt: { value: P.cas } });
+    const flare = mk(FLARE, { tSrc: { value: null }, uHalo: { value: 0.6 } });
     const comp = mk(COMP, CU);
     const atm = mk(ATMOS, { tScene: { value: null }, tDepth: { value: null }, uProjInv: { value: new THREE.Matrix4() }, uViewInv: { value: new THREE.Matrix4() }, uCam: { value: new THREE.Vector3() }, uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Vector3(1, 1, 1) }, uFogCol: { value: new THREE.Vector3(0.5, 0.6, 0.7) }, uCloud: { value: 0 }, uCW: { value: new THREE.Vector2(0.016, 0.007) },
       uMie: { value: P.mie }, uG: { value: P.mieG }, uMieDist: { value: P.mieDist }, uMist: { value: P.mist }, uMistH: { value: P.mistH }, uMistDist: { value: P.mistDist }, uGround: { value: 0 }, uT: { value: 0 } });
@@ -262,7 +274,7 @@ window.Master = (() => {
       const ldr2 = new THREE.WebGLRenderTarget(w, h, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false });
       const mips = [], ups = []; let mw = w >> 1, mh = h >> 1;
       for (let i = 0; i < MIPS; i++) { mw = Math.max(2, mw); mh = Math.max(2, mh); mips.push(RT(mw, mh)); ups.push(RT(mw, mh)); mw >>= 1; mh >>= 1; }
-      T = { scene, ao: RT(aw, ah, { type: THREE.UnsignedByteType }), ao2: RT(aw, ah, { type: THREE.UnsignedByteType }), ldr, ldr2, mips, ups, rays: RT(Math.max(2, w >> 2), Math.max(2, h >> 2)), atm: RT(w, h), sun: RT(Math.max(2, w >> 2), Math.max(2, h >> 2)), sunRays: RT(Math.max(2, w >> 2), Math.max(2, h >> 2)), aw, ah };
+      T = { scene, ao: RT(aw, ah, { type: THREE.UnsignedByteType }), ao2: RT(aw, ah, { type: THREE.UnsignedByteType }), ldr, ldr2, mips, ups, rays: RT(Math.max(2, w >> 2), Math.max(2, h >> 2)), atm: RT(w, h), sun: RT(Math.max(2, w >> 2), Math.max(2, h >> 2)), sunRays: RT(Math.max(2, w >> 2), Math.max(2, h >> 2)), flare: RT(Math.max(2, w >> 2), Math.max(2, h >> 2)), aw, ah };
       CU.uRes.value.set(w, h); fxaa.u.uTex.value.set(1 / w, 1 / h);
     }
     function setSize(w, h) { if (w === W && h === H && T) return; W = w; H = h; alloc(w, h); }
@@ -323,7 +335,8 @@ window.Master = (() => {
         let prev = T.mips[MIPS - 1];
         for (let i = MIPS - 2; i >= 0; i--) { up.u.tSrc.value = prev.texture; up.u.tPrev.value = T.mips[i].texture; up.u.uTex.value.set(1 / prev.width, 1 / prev.height); pass(up, T.ups[i]); prev = T.ups[i]; }
         CU.tBloom.value = T.ups[0].texture; CU.uBloom.value = P.bloomStr / MIPS * 2.2;
-      } else { CU.tBloom.value = black; CU.uBloom.value = 0; }
+        if (MOD('lens_flare') && P.flare > 0) { flare.u.tSrc.value = T.ups[1].texture; pass(flare, T.flare); CU.tFlare.value = T.flare.texture; CU.uFlare.value = P.flare; } else { CU.tFlare.value = black; CU.uFlare.value = 0; }
+      } else { CU.tBloom.value = black; CU.uBloom.value = 0; CU.tFlare.value = black; CU.uFlare.value = 0; }
       // 体积光：光源在画面前方时才做
       CU.uRay.value = 0; CU.tRays.value = black;
       if (q.rays && q.bloom && rayWorld && rayStr > 0) {
@@ -343,7 +356,7 @@ window.Master = (() => {
       else if (sharp) { pass(comp, T.ldr); cas.u.tSrc.value = T.ldr.texture; pass(cas, null); } else pass(comp, null);
       renderer.autoClear = ac;
     }
-    function warm() { try { for (const p of [mkAO(q.aoSamples), aoBlur, bright, down, up, rays, comp, fxaa, atm, sunSrc, sunRays, cas]) renderer.compile(p.sc, cam); for (const k in Q) renderer.compile(mkAO(Q[k].aoSamples).sc, cam); } catch (e) { } } // 第二十一轮：三档 AO 变体一起预编，切档不再现编
+    function warm() { try { for (const p of [mkAO(q.aoSamples), aoBlur, bright, down, up, rays, comp, fxaa, atm, sunSrc, sunRays, cas, flare]) renderer.compile(p.sc, cam); for (const k in Q) renderer.compile(mkAO(Q[k].aoSamples).sc, cam); } catch (e) { } } // 第二十一轮：三档 AO 变体一起预编，切档不再现编
     return { on: true, style: 'master', setSize, render, setTier, get tier() { return tier; }, setRayLight, warm, P };
   }
   return { create, P, Q };

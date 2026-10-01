@@ -239,7 +239,7 @@ window.WGrass = (() => {
     if (!cmap.size) return null;
     const U = {
       uT: { value: 0 }, uH: { value: uH }, uDens: { value: 30 + rr() * 10 }, uWid: { value: 0.15 + rr() * 0.05 },
-      uFlD: { value: lush > 0.3 && rr() < 0.65 ? 0.004 + rr() * 0.01 : 0 }, uDry: { value: (dry ? 0.2 : 0.04) + rr() * 0.06 }, uA2C: { value: A2C ? 1 : 0 }, uGS: { value: gs },
+      uFlD: { value: lush > 0.3 && rr() < 0.4 ? 0.002 + rr() * 0.004 : 0 }, uDry: { value: (dry ? 0.2 : 0.04) + rr() * 0.06 }, uA2C: { value: A2C ? 1 : 0 }, uGS: { value: gs },
       uWind: { value: 0.8 + rr() * 0.7 }, uFar: { value: TC.far }, uRad: { value: Rg }, uN: { value: N },
       uWD: { value: new THREE.Vector2(Math.cos(wa), Math.sin(wa)) }, uSeed: { value: new THREE.Vector2(rr() * 400, rr() * 400) }, uCell: { value: new THREE.Vector2(Math.floor(rr() * 900), Math.floor(rr() * 900)) },
       uBase: { value: V(pa, 0) }, uTip: { value: V(pa, 1) }, uBase2: { value: V(pb, 0) }, uTip2: { value: V(pb, 1) },

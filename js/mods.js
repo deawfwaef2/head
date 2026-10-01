@@ -82,6 +82,8 @@ window.Mods = (() => {
     { id: 'foliage_glow', cat: 'look', icon: '🍃', n: '树叶透光（R52）', d: '树叶、灌木、草丛迎着太阳时透出黄绿色的光（次表面透射），逆光的林子会发亮。', def: true },
     { id: 'sky_master', cat: 'look', icon: '🌤️', n: '高清天空（R52）', d: '天空照片改用双三次（Catmull-Rom）采样，放大不再发糊；太阳周围加 HDR 光晕，驱动泛光和太阳光束。', def: true },
     { id: 'water_master', cat: 'look', icon: '💧', n: '镜面水（R52）', d: '水面菲涅尔反射：斜看像镜子一样映出天空，俯看透出水色；反射更锐利。与「水面质感」叠加。', def: true },
+    { id: 'pcss_shadows', cat: 'look', icon: '🌳', n: '真实软阴影 PCSS（R52）', d: '太阳阴影改为接触硬化软阴影：物体接地处锐利，离地越高边缘越柔（树冠的影子有真实的半影）。只作用于野外太阳。', def: true },
+    { id: 'lens_flare', cat: 'look', icon: '📸', n: '镜头光晕（R52）', d: '太阳、火光等强光在画面对称位置产生淡淡的带色散鬼影和光环，电影镜头感。', def: true },
     { id: 'sharpen', cat: 'look', icon: '🔍', n: '画面锐化 CAS（R52）', d: '抗锯齿之后加一道对比度自适应锐化（AMD CAS）：贴图、草叶、发丝更清晰，平滑区域不会出白边。几乎不吃性能。', def: true },
     { id: 'fast_load', cat: 'look', icon: '⚡', n: '加载提速（第四十九轮）', d: '进图更快：敌人身体/动画/野兽模型与场景资源并行载入，去掉固定等待（淡出 260ms + 60ms），模型解码改同步（更快），地形外圈（玩不到的远景）每 3 格求一次高度其余插值。关掉恢复旧流程。', def: true },
     { id: 'head_natural', cat: 'look', icon: '🧒', n: '头身比更自然（第四十三轮）', d: '头整体缩小 10%：原来头约占身高 1:5.8，像大头娃娃；现在约 1:6.5。关掉恢复旧尺寸。', def: true },

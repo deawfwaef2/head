@@ -2,9 +2,29 @@
 //  · MOD foliage_glow：所有 alpha 裁剪的非角色 PBR 材质（树叶 / 灌木 / 草卡片）加逆光透射 —— 迎着太阳的树冠发出黄绿色透光。
 //  · MOD sky_master：天空球改用 Catmull-Rom 双三次采样（2K 天空照片放大不再糊）+ 太阳周围的 HDR 光晕（驱动泛光与光束）。
 //  · MOD water_master：水面菲涅尔反射增强（掠射角像镜子、俯视透出水色）+ 更锐利的天空反射。
+//  · MOD pcss_shadows：太阳阴影改为 PCSS（接触处锐利、离遮挡物越远越柔，树影有真实的半影）。只对 shadow.radius>8 的光生效（由这里给野外太阳设置）。
 window.Gfx52 = (() => {
   'use strict';
   const M = (id) => !(window.Mods && Mods.on && Mods.on(id) === false);
+  if (M('pcss_shadows') && THREE.ShaderChunk.shadowmap_pars_fragment.indexOf('pcss52') < 0) {
+    const PC = `float pcss52( sampler2D sm, vec2 smSize, float lk, vec3 c ) {
+      float rot = fract( 52.9829189 * fract( dot( gl_FragCoord.xy, vec2( 0.06711056, 0.00583715 ) ) ) ) * 6.2831853;
+      float tx = 1.0 / smSize.x, sr = max( lk * 0.00025, 3.0 * tx ), bs = 0.0, bn = 0.0;
+      for ( int i = 0; i < 12; i ++ ) { float fi = float( i ), a = fi * 2.3999632 + rot; vec2 o = vec2( cos( a ), sin( a ) ) * sqrt( ( fi + 0.5 ) / 12.0 ) * sr;
+        float d = unpackRGBAToDepth( texture2D( sm, c.xy + o ) ); if ( d < c.z ) { bs += d; bn += 1.0; } }
+      if ( bn < 0.5 ) return 1.0;
+      float pen = clamp( ( c.z - bs / bn ) * lk * 0.001, 1.2 * tx, sr * 2.0 ), s = 0.0;
+      for ( int i = 0; i < 16; i ++ ) { float fi = float( i ), a = fi * 2.3999632 + rot + 1.3; vec2 o = vec2( cos( a ), sin( a ) ) * sqrt( ( fi + 0.5 ) / 16.0 ) * pen; s += texture2DCompare( sm, c.xy + o, c.z ); }
+      return s / 16.0;
+    }
+    `;
+    let C = THREE.ShaderChunk.shadowmap_pars_fragment;
+    const sig = 'float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowBias, float shadowRadius, vec4 shadowCoord ) {';
+    if (C.indexOf(sig) >= 0 && /if \( frustumTest \) \{\s*#if defined\( SHADOWMAP_TYPE_PCF \)/.test(C)) {
+      C = C.replace(sig, PC + sig).replace(/if \( frustumTest \) \{(\s*)#if defined\( SHADOWMAP_TYPE_PCF \)/, 'if ( frustumTest ) {$1if ( shadowRadius > 8.0 ) return pcss52( shadowMap, shadowMapSize, shadowRadius, shadowCoord.xyz );$1#if defined( SHADOWMAP_TYPE_PCF )');
+      THREE.ShaderChunk.shadowmap_pars_fragment = C;
+    }
+  }
   if (M('foliage_glow') && THREE.ShaderChunk.lights_physical_pars_fragment.indexOf('RE_Direct_Fol') < 0) {
     THREE.ShaderChunk.lights_physical_pars_fragment += `
 #if defined( USE_ALPHATEST ) && !defined( CHAR_MAT )
@@ -57,7 +77,9 @@ void RE_Direct_Fol( const in IncidentLight directLight, const in GeometricContex
   let cur = null;
   function tick() {
     requestAnimationFrame(tick);
-    const W = window.Worlds && Worlds._W, B = (W && W.B) || window.__B; if (!B || !B.sc || B === cur) return; cur = B;
+    const W = window.Worlds && Worlds._W, B = (W && W.B) || window.__B; if (!B || !B.sc) return;
+    if (B.sun && B.sun.shadow && M('pcss_shadows')) { const R = 2070 / Math.max(4, B.sun.shadow.camera.right || 26); if (Math.abs(B.sun.shadow.radius - R) > 0.5) B.sun.shadow.radius = R; } // 太阳角径约 1.5° 的半影
+    if (B === cur) return; cur = B;
     try { if (M('sky_master')) sky(B.sc, B); } catch (e) { console.warn('Gfx52 sky', e); }
     try { if (M('water_master')) water(B.sc); } catch (e) { console.warn('Gfx52 water', e); }
   }
