@@ -534,6 +534,7 @@ window.Foe = (() => {
       f.mixer.update(dt);
       if (window.Stance) Stance.post(fo, dt); // R51 npc_strafe / npc_stance：下肢朝移动方向+上身扭回、架势体态
       if (fo.duel && window.FoeDuel) FoeDuel.post(fo, dt);
+      if (fo.hr && window.Feel54) Feel54.post(fo, dt); // R54 hit_react：程序化受击后仰/侧歪
       fo.f.bones.head.getWorldPosition(fo.anchor.pos); fo.anchor.pos.y -= 0.3;
       { // 受击闪红 + 第十九轮：蓄力时身体渐亮（红=普通，橙=重击），出手瞬间最亮 —— 只改 uniform，不新建材质
         if (fo.flash > 0) fo.flash -= dt; let er = 0, eg = 0, eb = 0;
