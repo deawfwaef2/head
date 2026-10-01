@@ -353,6 +353,7 @@ window.Worlds = (() => {
     if (node.home) return;
     let x = r(), n = W && W.graph && W.graph.trip ? (node.boss ? 0 : x < 0.15 ? 0 : x < 0.55 ? 1 : x < 0.88 ? 2 : 3) : (x < 0.3 ? 0 : x < 0.72 ? 1 : x < 0.93 ? 2 : 3);
     if (n > 0 && !node.boss && window.FoeAI2 && FoeAI2.packBonus) n += FoeAI2.packBonus(ri, r); // R34 MOD foe_pack：越深的地区，敌人成群出现
+    if (window.Living) try { n = Living.count(node, n, r); } catch (e) { console.warn('Living.count', e); } // R54g：活地区人口 / 局面
     const site = window.WSites && (layOf(node), node.site) ? node.site : null; if (site) n = WSites.count(node, n, r); // R41：集会 = 5–8 人
     for (let k = 0; k < n; k++) {
       let h = null;
@@ -720,7 +721,7 @@ window.Worlds = (() => {
   //   现在：声明单独成行；整个事件处理包 try/catch——音效/日志/成就里的任何 bug 都不能再打断伤害结算。
   function foeEvent(t, fo, d) { try { foeEvent0(t, fo, d); } catch (e) { console.warn('foeEvent', t, e); } }
   function foeEvent0(t, fo, d) {
-    if (!W) return; if (t === 'decap' && window.DecapCam) { try { DecapCam.onEvent(t, fo, d); } catch (e) { } } /* R49h */ if (window.WpnX) { try { WpnX.onEvent(t, fo, d); } catch (e) { } } /* R41主管：单武器熟练度经验 */ if (window.Talents) { try { Talents.onEvent(t, fo, d); } catch (e) { console.warn('Talents', e); } } /* R36 天赋事件（吸血/魂能/暴击联动） */ if (window.Recall) { try { Recall.log(fo, t, d); } catch (e) { console.warn(e); } } if (window.CombatFX) { try { CombatFX.event(t, fo, d); } catch (e) { console.warn(e); } } if (window.Feel54) { try { Feel54.event(t, fo, d); } catch (e) { } } // 第二十二轮（续 9）：命中/击杀/格挡音效 + 命中准星；R54 受击反应
+    if (!W) return; if (t === 'decap' && window.DecapCam) { try { DecapCam.onEvent(t, fo, d); } catch (e) { } } /* R49h */ if (window.WpnX) { try { WpnX.onEvent(t, fo, d); } catch (e) { } } /* R41主管：单武器熟练度经验 */ if (window.Talents) { try { Talents.onEvent(t, fo, d); } catch (e) { console.warn('Talents', e); } } /* R36 天赋事件（吸血/魂能/暴击联动） */ if (window.Recall) { try { Recall.log(fo, t, d); } catch (e) { console.warn(e); } } if (window.CombatFX) { try { CombatFX.event(t, fo, d); } catch (e) { console.warn(e); } } if (window.Feel54) { try { Feel54.event(t, fo, d); } catch (e) { } } if (window.Living) { try { Living.event(t, fo, d); } catch (e) { } } // 第二十二轮（续 9）：命中/击杀/格挡音效 + 命中准星；R54 受击反应
     const now = performance.now() / 1000, st = W.stats = W.stats || { kill: 0, decap: 0, execute: 0, onecut: 0, sever: 0, halve: 0, parry: 0, combo: 0, maxCombo: 0, lastHit: 0, kills: [] };
     if (t === 'hit') { st.combo = now - st.lastHit < 2.5 ? st.combo + 1 : 1; st.lastHit = now; st.maxCombo = Math.max(st.maxCombo, st.combo); showCombo(st.combo, d && d.brk); if (st.combo >= 10) achAdd('combo', st.combo, true); return; }
     const rw = REW[t]; if (rw) { const tm = window.Talents ? Talents.rewardMul(fo) : { c: 1, x: 1 }, mul = 1 + (fo.rar || 0) * 0.5 + (fo.boss ? 3 : 0), c = Math.round(rw[0] * mul * (1 + Math.min(1, st.combo / 20)) * tm.c); G.addCoins(c); W.trip.coins += c; gainXp(Math.max(1, Math.round(rw[0] * mul * 0.8 * tm.x)));
@@ -908,7 +909,7 @@ window.Worlds = (() => {
     B.sc.add(G.camera); G.camera.far = 400; G.camera.updateProjectionMatrix();
     if (window.Combat && Combat.attach) Combat.attach(B.sc);
     try { const tc0 = performance.now(); const cm = G.camera; cm.position.set(W.pos.x, W.pos.y + EYE, W.pos.z); cm.rotation.set(G.player.pitch, G.player.yaw, 0, 'YXZ'); cm.updateMatrixWorld(true); if (G.post && G.post.on) G.post.render(B.sc, cm); else G.renderer.render(B.sc, cm); tp('firstframe', tc0); } catch (e) { console.warn('precompile', e); } // 进场前先渲一帧：着色器编译/贴图上传都藏在加载画面后面
-    tp('total', tg0); W.dom.load.style.display = 'none'; hud(); banner(node);
+    tp('total', tg0); W.dom.load.style.display = 'none'; hud(); banner(node); if (window.Living) try { Living.enter(node, B); } catch (e) { }
     if (window.Mods && Mods.on && Mods.on('loc_story')) { const enter = await nodeStory(node, true); if (!W) return; if (!enter) { leaveHome(); return; } try { G.lockPointer(); } catch (e) {} } // 第二十一轮：用户不要进场冻结剧情卡 → MOD loc_story 默认关
     if (!fast) await wait(60); fadeTo(0); W.busy = false; prefetchAdj(node);
     if (window.Overhear) try { Overhear.enter(node, { log: t => W && W.trip && W.trip.log.push({ t, cls: 'note' }) }); } catch (e) { console.warn(e); } // 第二十七轮：进场偷听对话框
@@ -974,7 +975,7 @@ window.Worlds = (() => {
       if (!W) return;
       G.player.yaw = Math.atan2(-ins.x, -ins.z); G.player.pitch = -0.05;
       B.sc.add(G.camera); G.camera.far = 400; G.camera.updateProjectionMatrix(); if (window.Combat && Combat.attach) Combat.attach(B.sc);
-      hud(); banner(node); fadeTo(0); W.busy = false; prefetchAdj(node);
+      hud(); banner(node); if (window.Living) try { Living.enter(node, B); } catch (e) { } fadeTo(0); W.busy = false; prefetchAdj(node);
       if (window.Overhear) try { Overhear.enter(node, { log: t => W && W.trip && W.trip.log.push({ t, cls: 'note' }) }); } catch (e) { console.warn(e); }
       if (W.boss) setTimeout(() => { if (W && W.boss) bossSay(W.boss.B.say, 5); }, 1500);
     }, 230);
@@ -1075,7 +1076,7 @@ window.Worlds = (() => {
     if (window.Combat) { try { Combat.update(dt, now); Combat.prerender(); } catch (e) { console.warn(e); } }
     W.hintT -= dt; if (W.hintT <= 0) { W.hintT = 0.12; try { hud(); skillHud(); } catch (e) { console.warn(e); } }
     if (G.S.hp <= 0) dieNow();
-    if (window.CFX3D) try { CFX3D.frame(dt, now); } catch (e) { console.warn(e); } if (window.FPV) try { FPV.frame(dt, now); FPV.pre(dt, now); } catch (e) { console.warn(e); } if (window.DecapCam) { try { DecapCam.pre(dt, now); } catch (e) { } } if (window.Feel54) { try { Feel54.frame(dt); } catch (e) { } } /* R49h */ { const hw = G.HOOK && G.HOOK.world; if (hw) for (const f of hw) { try { f(dt, now); } catch (e) { console.warn(e); } } } /* R49h：出猎世界里补跑 Talents / 技能栏 / 血魂条 的每帧（HOOK.frame 在这里不跑） */ /* R41：3D 战斗特效 / 第一人称兽人手 / 第三人称（HOOK 在出猎世界里不跑，这里直接调） */
+    if (window.CFX3D) try { CFX3D.frame(dt, now); } catch (e) { console.warn(e); } if (window.FPV) try { FPV.frame(dt, now); FPV.pre(dt, now); } catch (e) { console.warn(e); } if (window.DecapCam) { try { DecapCam.pre(dt, now); } catch (e) { } } if (window.Feel54) { try { Feel54.frame(dt); } catch (e) { } } if (window.Living) { try { Living.frame(dt); } catch (e) { } } /* R49h */ { const hw = G.HOOK && G.HOOK.world; if (hw) for (const f of hw) { try { f(dt, now); } catch (e) { console.warn(e); } } } /* R49h：出猎世界里补跑 Talents / 技能栏 / 血魂条 的每帧（HOOK.frame 在这里不跑） */ /* R41：3D 战斗特效 / 第一人称兽人手 / 第三人称（HOOK 在出猎世界里不跑，这里直接调） */
     const post = G.post; if (post && post.setRayLight) post.setRayLight(tmp.set(0, -100, 0), 0);
     if (post && post.on) post.render(B.sc, cam); else G.renderer.render(B.sc, cam);
   }

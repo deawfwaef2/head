@@ -34,16 +34,16 @@ window.FoeDuel = (() => {
   function attack(fo, d, force) {
     if (!on() || !fo.duel || (force && /Throw/.test(force))) return false;
     if (fo.role === 'ranged' && d >= 3.2) return false; // 投掷手远距离仍然扔刀
-    const C = Foe.ctx(); if (!C) return false; const T = fo.duel.T, s = C.st();
-    const n = T.chain[0] + Math.floor(Math.random() * (T.chain[1] - T.chain[0] + 1)), wu = T.wu[0] + Math.random() * (T.wu[1] - T.wu[0]);
+    const C = Foe.ctx(); if (!C) return false; const T = fo.duel.T, s = C.st(), tr = fo.tier || 0; // R54g foe_levels：阶位越高连斩越长、佯攻/重击越多、前摇越短
+    const n = T.chain[0] + Math.floor(Math.random() * (T.chain[1] - T.chain[0] + 1)) + (tr >= 2 ? 1 : 0) + (tr >= 3 && Math.random() < 0.5 ? 1 : 0), wu = (T.wu[0] + Math.random() * (T.wu[1] - T.wu[0])) * (1 - 0.06 * tr);
     const hits = []; let t = wu, prev = fo.duel.lastDir;
-    for (let i = 0; i < n; i++) { const a = pickDir(prev); prev = a; const heavy = Math.random() < T.heavyP && (i === n - 1);
+    for (let i = 0; i < n; i++) { const a = pickDir(prev); prev = a; const heavy = Math.random() < T.heavyP + 0.07 * tr && (i === n - 1 || (tr >= 3 && Math.random() < 0.3));
       hits.push({ t, a: a * D2R, ang: a * D2R, heavy, thrust: false, deg: a, st: i ? t - (T.strike + 0.32) : 0 }); t += T.strike + 0.36 + Math.random() * 0.14 + (heavy ? 0.2 : 0); }
     fo.duel.lastDir = prev;
     const end = hits[n - 1].t + 0.55, act = { time: 0, timeScale: 1, getClip: () => ({ duration: end }) };
     const base = fo.boss ? (fo.rage ? 0.08 : 0.07) : 0.03 + fo.rar * 0.014 + 0.02;
     fo.atk = { clip: 'duel', act, hits, hi: 0, ws: 1, ws2: 1, end, lunge: 0, holdAt: 0, hold: 0, feint: false, reach: 1.95, tot: 0, duel: true,
-      dfeint: Math.random() < T.feint ? 0.55 + Math.random() * 0.2 : 0, dmg: Math.max(1, Math.round(s.maxHp * base * T.dmg * (0.85 + Math.random() * 0.3))) };
+      dfeint: Math.random() < T.feint + 0.08 * tr ? 0.55 + Math.random() * 0.2 : 0, dmg: Math.max(1, Math.round(s.maxHp * base * T.dmg * (fo.dmgMul || 1) * (0.85 + Math.random() * 0.3))) };
     if (window.FoeAI2) try { FoeAI2.tune(fo, fo.atk, d); } catch (e) { }
     fo.atk.ws = Math.max(0.75, Math.min(1.15, fo.atk.ws || 1)); fo.atk.ws2 = fo.atk.ws; fo.atk.hold = Math.min(0.25, fo.atk.hold || 0); fo.atk.feint = false;
     try { if (C.windup) C.windup(fo, hits.some(h => h.heavy) ? 'Sword_Attack' : 'Sword_Regular_A'); } catch (e) { }
