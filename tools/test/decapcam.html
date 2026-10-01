@@ -1,0 +1,35 @@
+<!doctype html><meta charset="utf-8"><title>decap_cam harness</title><base href="/">
+<body style="margin:0;background:#000"><canvas id="cv" width="960" height="540" style="width:100vw;height:100vh;display:block"></canvas>
+<script src="/lib/three.min.js"></script><script src="/js/mods.js"></script>
+<script>
+// 桩环境：只验证 decapcam.js 的 黑边 / 慢放曲线 / 表情 / 喷血 / 相机还原。头与身体为占位几何（测试台专用，不进游戏）。
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('cv'), preserveDrawingBuffer: true, antialias: true });
+renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping;
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#9fb6c9'); scene.fog = new THREE.Fog('#9fb6c9', 8, 40);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x556644, 0.9)); const dl = new THREE.DirectionalLight(0xfff0d8, 1.6); dl.position.set(3, 6, 2); scene.add(dl);
+const gr = new THREE.Mesh(new THREE.PlaneGeometry(80, 80).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x6b7f4a, roughness: 1 })); scene.add(gr);
+const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 200); camera.position.set(0, 1.45, 0); camera.rotation.order = 'YXZ';
+// 占位身体 + 颈骨
+const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 1.0, 4, 10), new THREE.MeshStandardMaterial({ color: 0x884455 })); body.position.set(0.1, 0.85, -2.4); scene.add(body);
+const neck = new THREE.Object3D(); neck.position.set(0.1, 1.5, -2.4); scene.add(neck);
+// 占位头：球 + 画布脸（根据表情画眼/眉/嘴）
+const fc = document.createElement('canvas'); fc.width = fc.height = 256; const fg = fc.getContext('2d'), ftex = new THREE.CanvasTexture(fc); ftex.encoding = THREE.sRGBEncoding;
+let curEx = {}; function drawFace(e) { const sad = e.sad || 0, sur = e.surprised || 0, bl = Math.min(1, e.blink || 0), oh = e.oh || 0; fg.fillStyle = '#f2c9a8'; fg.fillRect(0, 0, 256, 256);
+  for (const x of [84, 172]) { const h = 34 * (1 - bl * 0.9) * (1 + sur * 0.5); fg.fillStyle = '#fff'; fg.beginPath(); fg.ellipse(x, 132, 22, h, 0, 0, 7); fg.fill(); fg.fillStyle = '#3a2a6a'; fg.beginPath(); fg.ellipse(x, 134 + sad * 6, 13 * (1 - sur * 0.3), h * 0.7, 0, 0, 7); fg.fill();
+    fg.strokeStyle = '#4a2f20'; fg.lineWidth = 8; fg.beginPath(); const s = x < 128 ? 1 : -1; fg.moveTo(x - 24 * s, 84 + sad * 18 - sur * 14); fg.lineTo(x + 24 * s, 84 - sad * 14 - sur * 14); fg.stroke(); }
+  fg.fillStyle = '#7a2a30'; fg.beginPath(); fg.ellipse(128, 196, 16 + oh * 6, 6 + oh * 22 + sur * 8, 0, 0, 7); fg.fill(); ftex.needsUpdate = true; } drawFace({});
+const head = new THREE.Group(); const sk = new THREE.Mesh(new THREE.SphereGeometry(0.13, 24, 16), new THREE.MeshStandardMaterial({ color: 0xe8b894 })); head.add(sk);
+const face = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), new THREE.MeshBasicMaterial({ map: ftex })); face.position.set(0, 0, 0.126); head.add(face); const hair = new THREE.Mesh(new THREE.SphereGeometry(0.14, 20, 12, 0, 6.3, 0, 1.4), new THREE.MeshStandardMaterial({ color: 0x2a1c3a })); hair.position.y = 0.01; head.add(hair);
+head.position.set(0.1, 1.55, -2.4); scene.add(head); let hv = new THREE.Vector3(1.4, 2.6, -1.6), headLive = true; head.rotation.y = Math.PI * 0.9 - 0.5;
+let K = 1; const exprLog = [];
+window.G = { camera, S: { hp: 50 }, playing: true, uiOpen: false, postFx: { P: { sat: 1.08, contrast: 1.07, vig: 0.42 } } };
+window.Worlds = { active: true, _W: { B: { sc: scene, H: () => 0 }, stats: { decap: 3 } } };
+window.Foe = { foes: [], slowSet(k) { K = k; } };
+const fo = { f: { holder: head, bones: { neck }, hb: { setExpression(e) { curEx = e; exprLog.push(JSON.stringify(e)); drawFace(e); } } }, h: { name: '艾琳' }, pos: new THREE.Vector3(0.1, 0, -2.4), boss: false };
+let T = 0; const DT = 1 / 30;
+window.begin = () => { DecapCam.onEvent('decap', fo); return Mods.on('decap_cam'); };
+window.stepTo = (t) => { while (T < t) { T += DT; if (headLive) { hv.y -= 9.8 * DT * K; head.position.addScaledVector(hv, DT * K); head.rotation.z += 0.9 * DT * K; if (head.position.y < 0.14) { head.position.y = 0.14; headLive = false; } }
+    camera.rotation.set(0, 0, 0); camera.position.set(0, 1.45, 0); DecapCam.pre(DT, T); renderer.render(scene, camera); } return { T, K, fov: camera.fov, hp: G.S.hp, n: DecapCam._bl() ? DecapCam._bl().P.length : -1 }; };
+window.state = () => ({ fov: camera.fov, rot: [camera.rotation.x, camera.rotation.y], active: DecapCam.active, K, P: G.postFx.P, exprs: exprLog.length, body: document.body.className });
+renderer.render(scene, camera);
+</script><script src="/js/decapcam.js"></script>

@@ -414,6 +414,6 @@ window.Talents = (() => {
   function cdLeft(id) { return Math.max(0, (M.cds[id] || 0) - nowS()); }
   function slotInfo(id) { const sk = D.SK[id]; if (!sk) return null; const l = cdLeft(id), tot = sk.cd * (1 - cdr()); return { sk, left: l, tot, frac: tot > 0 ? clamp(l / tot, 0, 1) : 0, ok: sk.cost <= M.mana + 0.01, cost: sk.cost }; }
 
-  const wait = setInterval(() => { if (window.G && G.HOOK && G.S && window.RPG) { clearInterval(wait); G.HOOK.frame.push(dt => { try { frame(dt); } catch (e) { console.warn('Talents frame', e); } }); } }, 200);
+  const wait = setInterval(() => { if (window.G && G.HOOK && G.S && window.RPG) { clearInterval(wait); const W2 = (fn) => { let ln = -1; const w = (dt, now) => { if (now != null && now === ln) return; ln = now; fn(dt, now); }; G.HOOK.frame.push(w); (G.HOOK.world = G.HOOK.world || []).push(w); }; /* R49h：HOOK.frame 在出猎世界里不跑 → 同时登记到 HOOK.world（worlds.js 每帧调用），按 now 去重防重复 */ W2(dt => { try { frame(dt); } catch (e) { console.warn('Talents frame', e); } }); } }, 200);
   return { D, on, tal, lv, need, pts, spent, left, rank, known, agg, canRank, alloc, undo, allocAttr, reset, resetCost, applyBuild, setSlot, autoPlace, bonus, post, cast, onEvent, onKey, onLevel, outDmg, inDmg, avoid, rewardMul, moveMul, frame, view, slotInfo, cdLeft, maxMana, addMana, heal, M, bm, hitFoe, dot, stun, slow, aimFoe, _S: S_ };
 })();

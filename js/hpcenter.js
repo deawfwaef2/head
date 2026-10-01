@@ -107,6 +107,6 @@ body.hubon #hpC,body.sgcine #hpC{display:none!important}
     if (prev >= 0 && hp < prev - 0.5) { el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }
     prev = hp; el.classList.toggle('low', pc < 35); lowV.classList.toggle('on', pc < 20 && hp > 0);
   }
-  const wait = setInterval(() => { if (window.G && G.HOOK) { clearInterval(wait); G.HOOK.frame.push(() => { try { frame(); } catch (e) { } }); setInterval(() => { try { if (!(window.Worlds && Worlds.active)) frame(); } catch (e) { } }, 250); } }, 300);
+  const wait = setInterval(() => { if (window.G && G.HOOK) { clearInterval(wait); const W2 = (fn) => { let ln = -1; const w = (dt, now) => { if (now != null && now === ln) return; ln = now; fn(dt, now); }; G.HOOK.frame.push(w); (G.HOOK.world = G.HOOK.world || []).push(w); }; /* R49h：HOOK.frame 在出猎世界里不跑 → 同时登记到 HOOK.world（worlds.js 每帧调用），按 now 去重防重复 */ W2(() => { try { frame(); } catch (e) { } }); setInterval(() => { try { frame(); } catch (e) { } }, 250); } }, 300);
   return { on, manaFail, extra: () => (on() && shown && el ? Math.round(el.getBoundingClientRect().height) + 12 : 0), get shown() { return shown; } };
 })();

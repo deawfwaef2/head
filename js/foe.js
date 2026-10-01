@@ -542,7 +542,7 @@ window.Foe = (() => {
       if (x.o.position.y < gy) { x.o.position.y = gy; if (x.decal) { decal(x.o.position, 0.06 + Math.random() * 0.12); x.decal = false; } x.v.set(0, 0, 0); x.t = Math.min(x.t, 0.25); }
       if (x.t <= 0) { x.o.parent && x.o.parent.remove(x.o); FX[i] = FX[FX.length - 1]; FX.pop(); if (POOL.length < 300) POOL.push(x); } }
   }
-  let slowT = 0, slowK = 1; function slowmo(t, k) { slowT = Math.max(slowT, t); slowK = Math.min(k, slowT > 0 ? slowK : 1); }
+  let slowT = 0, slowK = 1; function slowmo(t, k) { slowT = Math.max(slowT, t); slowK = Math.min(k, slowT > 0 ? slowK : 1); } function slowSet(k, t) { slowT = t; slowK = k; } /* R49h：外部（decap_cam）逐帧给出平滑的慢放系数 */
   const ang = a => Math.atan2(Math.sin(a), Math.cos(a)), clampA = (a, m) => Math.max(-m, Math.min(m, a));
   function collideList(p, r, cols) { for (const c of cols) { const ex = p.x - c.x, ez = p.z - c.z, m = c.r + r, e2 = ex * ex + ez * ez; if (e2 >= m * m) continue; const e = Math.sqrt(e2); if (e > 1e-5) { p.x += ex / e * (m - e); p.z += ez / e * (m - e); } } const pr = Math.hypot(p.x, p.z), pl = CTX.R - 1; if (pr > pl) { p.x *= pl / pr; p.z *= pl / pr; } }
   function collide(p, r) { const ctx = CTX; for (const c of ctx.cols) { const ex = p.x - c.x, ez = p.z - c.z, m = c.r + r, e2 = ex * ex + ez * ez; if (e2 >= m * m) continue; const e = Math.sqrt(e2); if (e > 1e-5) { p.x += ex / e * (m - e); p.z += ez / e * (m - e); } } const pr = Math.hypot(p.x, p.z), pl = ctx.R - 1; if (pr > pl) { p.x *= pl / pr; p.z *= pl / pr; } }
@@ -1048,5 +1048,5 @@ window.Foe = (() => {
   }
   function has(name) { return !!(window.BODY_LIST && BODY_LIST.includes(name)); }
   try { setTimeout(() => { if (fastOn()) (window.requestIdleCallback || setTimeout)(() => { loadAnim().catch(() => { }); }); }, 5000); } catch (e) { } // R49：菜单空闲时先把动画包（1.4MB）载好，首次进图不用再等
-  return { preload, bodyFor, say: (fo, t, col) => talk(fo, t, col), hasHead: (h) => HEADS.includes(h), warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, dot: dotDmg, attack, ATK, tokenOK, ctx: () => CTX, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
+  return { slowSet, preload, bodyFor, say: (fo, t, col) => talk(fo, t, col), hasHead: (h) => HEADS.includes(h), warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, dot: dotDmg, attack, ATK, tokenOK, ctx: () => CTX, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
 })();
