@@ -55,6 +55,10 @@ window.Eco = (() => {
   const prCap = () => on() ? Math.min(devicePixelRatio || 1, 1) : Math.min(devicePixelRatio || 1, 1.5);
   function attach(renderer) {
     if (R) return; R = renderer; prSet = renderer.setPixelRatio.bind(renderer);
+    // R54 instant_load：three 默认每个新着色器都同步 getProgramInfoLog 等编译完（实测切图 7.6s 卡在这里）；关掉检查，编译与渲染流水线并行
+    try { if (!(window.Mods && Mods.on('instant_load') === false) && !QS.has('shadercheck')) renderer.debug.checkShaderErrors = false; } catch (e) { }
+    // R54 instant_load：着色器程序常驻——切图 dispose 材质时 three 会把用完的程序删掉，下个地点又整批重编（实测每次切图删 25 建 53）
+    if (!(window.Mods && Mods.on('instant_load') === false)) setInterval(() => { try { for (const p of renderer.info.programs) if (!p.__pin) { p.__pin = 1; p.usedTimes++; } } catch (e) { } }, 500);
     renderer.setPixelRatio = function (v) { prWant = v; if (on()) return; prCur = Math.min(v, prCap()); return prSet(prCur); }; // 节能模式下分辨率只由 GPU 计时决定（旧的按 FPS 调档会被加载卡顿误导，进图后一直停在 0.7）
     try { gl = renderer.getContext(); ext = gl.getExtension('EXT_disjoint_timer_query_webgl2'); } catch (e) { ext = null; }
     prWant = renderer.getPixelRatio(); prCur = on() ? prCap() : Math.min(prWant, prCap()); prSet(prCur);

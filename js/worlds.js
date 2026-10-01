@@ -201,7 +201,16 @@ window.Worlds = (() => {
   const b64sync = (s) => { const bin = atob(s); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; };
   const FL = () => !(window.Mods && Mods.on && Mods.on('fast_load') === false); // R49 MOD fast_load：加载提速（并行预载/去固定等待/地形外圈插值/同步解码）
   const b64buf = async (s) => { if (FL()) return b64sync(s); /* R49：实测 19 个模型 fetch(data:) 735ms vs 同步 atob 500ms */ try { const r = await fetch('data:application/octet-stream;base64,' + s); return await r.arrayBuffer(); } catch (e) { return b64sync(s); } };
-  const loadImg = (url) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url; });
+  const loadImg = (url) => new Promise((res, rej) => { const im = new Image(); im.onload = () => { if (IL() && im.decode) im.decode().then(() => res(im), () => res(im)); else res(im); }; im.onerror = rej; im.src = url; }); // R54 instant_load：异步解码，首帧上传不再同步解 JPEG
+  // R54 MOD instant_load：空闲时把贴图提前传到显卡 + 相邻地点的敌人身体/动画/野兽提前解析，过门时只剩搭场景
+  const IL = () => !(window.Mods && Mods.on && Mods.on('instant_load') === false);
+  const UPQ = []; let upRun = false;
+  function upload(obj) {
+    if (!IL() || !obj) return; const add = t => { if (t && t.isTexture && !t.isRenderTargetTexture && t.image && !t.__up) { t.__up = 1; UPQ.push(t); } };
+    if (obj.isTexture) add(obj); else if (obj.traverse) obj.traverse(o => { if (o.material) for (const m of [].concat(o.material)) for (const k in m) add(m[k]); }); else for (const k in obj) add(obj[k]);
+    if (!upRun && UPQ.length) { upRun = true; idle(upPump); }
+  }
+  function upPump() { const GG = G || window.__game, R = GG && GG.renderer; if (!R || !R.initTexture) { upRun = false; return; } const t0 = performance.now(); while (UPQ.length && performance.now() - t0 < 5) { const t = UPQ.shift(); try { R.initTexture(t); } catch (e) { } } if (UPQ.length) idle(upPump); else upRun = false; }
   const tick = () => new Promise(r => setTimeout(r, 0));
   function script(name) {
     return SCRP[name] || (SCRP[name] = new Promise(res => { const s = document.createElement('script'); s.async = true; s.src = 'big/world/' + name + '.js'; s.onload = () => res(true); s.onerror = () => { console.warn('world asset missing', name); res(false); }; document.head.appendChild(s); }));
@@ -214,9 +223,9 @@ window.Worlds = (() => {
     return PREP[n] = (async () => {
       const t0 = performance.now(); const ok = await script(n); const A = window.ASSETS || {}; const v = A[n];
       if (ok && v) try {
-        if (n.startsWith('tex_')) { const o = {}; await Promise.all(Object.keys(v).map(async k => { const t = new THREE.Texture(await loadImg(v[k])); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; if (k === 'diff') t.encoding = THREE.sRGBEncoding; t.needsUpdate = true; o[k] = t; })); TEX[n.slice(4)] = o; }
+        if (n.startsWith('tex_')) { const o = {}; await Promise.all(Object.keys(v).map(async k => { const t = new THREE.Texture(await loadImg(v[k])); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; if (k === 'diff') t.encoding = THREE.sRGBEncoding; t.needsUpdate = true; o[k] = t; })); TEX[n.slice(4)] = o; upload(o); }
         else if (n.startsWith('sky_')) SKY[n.slice(4)] = await parseSky(v);
-        else { const g = await new Promise(async (rs, rj) => { try { new THREE.GLTFLoader().parse(await b64buf(v), '', rs, rj); } catch (e) { rj(e); } }); prepModel(g.scene); MODELS[n] = g.scene; }
+        else { const g = await new Promise(async (rs, rj) => { try { new THREE.GLTFLoader().parse(await b64buf(v), '', rs, rj); } catch (e) { rj(e); } }); prepModel(g.scene); MODELS[n] = g.scene; upload(g.scene); }
       } catch (e) { console.warn('world asset', n, e); }
       if (A[n]) A[n] = null; DONE[n] = 1; LOADED[n] = 1; delete PREP[n]; tp(n, t0); await tick();
     })();
@@ -792,10 +801,13 @@ window.Worlds = (() => {
     if (window.Foe && Foe.preload && !/[?&]nofoe=1/.test(location.search) && !(window.Mods && !Mods.on('foe_bodies'))) {
       const list = node.prey.map(h => ({ h })), Bo = node.boss && !(G.S.bosses || {})[node.region] && window.Explore && Explore.BOSSES[node.region];
       if (Bo) list.push({ h: node.bossH || null, boss: Bo, bossK: node.region });
-      Foe.preload(list).catch(() => { });
+      Foe.preload(list).then(a => { if (a) a.forEach(T => T && T.root && upload(T.root)); }).catch(() => { });
     }
-    if (window.Beasts && Beasts.prefetch && !/[?&]nobeast=1/.test(location.search) && !(window.Mods && Mods.on('beasts') === false)) Beasts.prefetch(node).catch(() => { });
+    if (window.Beasts && Beasts.prefetch && !/[?&]nobeast=1/.test(location.search) && !(window.Mods && Mods.on('beasts') === false)) Beasts.prefetch(node).then(a => { if (a) a.forEach(T => T && T.scene && upload(T.scene)); }).catch(() => { });
   }
+  // R54 instant_load：进场后空闲时依次预取相邻地点；走近某扇门时立刻预取门后的地点
+  function prefetchNode(i) { if (!W || !IL()) return; const nd = W.graph.nodes[i]; if (!nd || nd._pf) return; nd._pf = 1; try { warm(stylesOf(i)); kickAhead(nd); } catch (e) { console.warn('prefetch', e); } }
+  function prefetchAdj(node) { if (!IL()) return; let k = 0; for (const b of node.adj) setTimeout(() => idle(() => { if (W && !W.busy && W.cur === node.i) prefetchNode(b); }), 1500 + 1200 * k++); }
   async function goto(i, from) {
     W.busy = true; const node = W.graph.nodes[i];
     const fast = FL(); fadeTo(1); let fd = null;
@@ -819,7 +831,7 @@ window.Worlds = (() => {
         const SL = B.site && B.site.slots; node.prey.forEach((h, k) => { const sl = SL && SL[k]; list.push({ h, pos: sl ? new V3(sl.x, 0, sl.z) : spot(B, r) }); }); // R41：集会里各就各位
         if (wantBoss) { const Bo = Explore.BOSSES[node.region]; node.bossH = node.bossH || RPG.bossHead(G.S, G.st(), node.loc, Bo, G.usedNames, G.usedSig); list.push({ h: node.bossH, pos: B.bossAt || new V3(0, 0, 0), boss: Bo, bossK: node.region }); }
         W.dom.loadT.textContent = `「${node.name}」里有人……`;
-        W.foes = await Foe.populate(foeCtx(B, node), list);
+        const tf0 = performance.now(); W.foes = await Foe.populate(foeCtx(B, node), list); tp('foes', tf0);
         if (W.foes && !W.foes.length && list.length) W.foes = null;
         if (W.foes && B.site && window.WSites) WSites.seat(W.foes, B.site);
       } catch (e) { console.warn('Foe', e); W.foes = null; }
@@ -832,7 +844,7 @@ window.Worlds = (() => {
     const ins = d0 ? new V3(-Math.cos(d0.a), 0, -Math.sin(d0.a)) : new V3(0, 0, 1);
     W.pos.set((d0 ? d0.x : 0) + ins.x * 2.4, 0, (d0 ? d0.z : 0) + ins.z * 2.4); W.pos.y = B.H(W.pos.x, W.pos.z); W.vel.set(0, 0, 0);
     if (window.Beasts && !/[?&]nobeast=1/.test(location.search) && !(window.Mods && Mods.on('beasts') === false)) { // 第二十二轮：野兽（掉材料，不掉首级）
-      try { W.dom.loadT.textContent = `「${node.name}」的荒野里有野兽的气味……`; await Beasts.spawn(beastCtx(B, node, r0 => r0), node); } catch (e) { console.warn('Beasts', e); }
+      try { W.dom.loadT.textContent = `「${node.name}」的荒野里有野兽的气味……`; const tb1 = performance.now(); await Beasts.spawn(beastCtx(B, node, r0 => r0), node); tp('beasts', tb1); } catch (e) { console.warn('Beasts', e); }
     }
     G.player.yaw = Math.atan2(-ins.x, -ins.z); G.player.pitch = -0.05;
     B.sc.add(G.camera); G.camera.far = 400; G.camera.updateProjectionMatrix();
@@ -840,7 +852,7 @@ window.Worlds = (() => {
     try { const tc0 = performance.now(); const cm = G.camera; cm.position.set(W.pos.x, W.pos.y + EYE, W.pos.z); cm.rotation.set(G.player.pitch, G.player.yaw, 0, 'YXZ'); cm.updateMatrixWorld(true); if (G.post && G.post.on) G.post.render(B.sc, cm); else G.renderer.render(B.sc, cm); tp('firstframe', tc0); } catch (e) { console.warn('precompile', e); } // 进场前先渲一帧：着色器编译/贴图上传都藏在加载画面后面
     tp('total', tg0); W.dom.load.style.display = 'none'; hud(); banner(node);
     if (window.Mods && Mods.on && Mods.on('loc_story')) { const enter = await nodeStory(node, true); if (!W) return; if (!enter) { leaveHome(); return; } try { G.lockPointer(); } catch (e) {} } // 第二十一轮：用户不要进场冻结剧情卡 → MOD loc_story 默认关
-    if (!fast) await wait(60); fadeTo(0); W.busy = false;
+    if (!fast) await wait(60); fadeTo(0); W.busy = false; prefetchAdj(node);
     if (window.Overhear) try { Overhear.enter(node, { log: t => W && W.trip && W.trip.log.push({ t, cls: 'note' }) }); } catch (e) { console.warn(e); } // 第二十七轮：进场偷听对话框
     if (W.boss) setTimeout(() => { if (W && W.boss) bossSay(W.boss.B.say, 5); }, 1500);
   }
@@ -926,7 +938,7 @@ window.Worlds = (() => {
     if (B.wx) try { B.wx(dt, cam.position, now); } catch (e) { B.wx = null; console.warn(e); }
     if (B.sc.userData.fire) B.sc.userData.fire.intensity = 2.2 * (0.85 + Math.sin(now * 13) * 0.08 + Math.sin(now * 29) * 0.05);
     // 门：靠近提示
-    W.doorNear = null; for (const d of B.doors) { const dd = Math.hypot(W.pos.x - d.x, W.pos.z - d.z); if (dd < 2.6) W.doorNear = d; d.label.visible = Math.hypot(cam.position.x - d.x, cam.position.z - d.z) < 34; }
+    W.doorNear = null; for (const d of B.doors) { const dd = Math.hypot(W.pos.x - d.x, W.pos.z - d.z); if (dd < 2.6) W.doorNear = d; if (dd < 12 && d.to >= 0) prefetchNode(d.to); d.label.visible = Math.hypot(cam.position.x - d.x, cam.position.z - d.z) < 34; }
     W.interNear = null; { let bd = 9; for (const it of B.inter) { const dd = Math.hypot(W.pos.x - it.x, W.pos.z - it.z); if (!it.done && dd < (it.corpse ? 2.3 : 1.9) && dd < bd) { bd = dd; W.interNear = it; } } }
     if (window.Sack) try { Sack.frame(dt); } catch (e) { console.warn(e); }
     // 猎物 / 霸主
