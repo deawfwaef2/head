@@ -49,7 +49,8 @@ window.startGame = function () {
   const lod = LOD_ON ? HeadLOD.create(renderer, scene) : null; // 远处静止首级 → 图集替身，一次 draw call
 
   // ---------------- 状态 ----------------
-  const fresh = () => ({ v: 3, coins: 30, hp: 150, base: { str: 5, con: 5, agi: 5, ter: 5, soul: 5 }, trained: {}, eq: { weapon: 0, helm: 0, armor: 0, charm: 0, bag: 0 }, items: { potion: 1, bigpotion: 0 }, depth: 1, builds: [], heads: [], sigs: [], names: [], logs: [], stats: { trips: 0, kills: 0, earned: 0, pokes: 0 }, nextId: 1, dead: false, intro: false });
+  const NF = !(window.Mods && Mods.on && Mods.on('no_freebies') === false); // R54l：开局不送东西
+  const fresh = () => ({ v: 3, coins: NF ? 0 : 30, hp: 150, base: { str: 5, con: 5, agi: 5, ter: 5, soul: 5 }, trained: {}, eq: { weapon: 0, helm: 0, armor: 0, charm: 0, bag: 0 }, items: { potion: NF ? 0 : 1, bigpotion: 0 }, depth: 1, builds: [], heads: [], sigs: [], names: [], logs: [], stats: { trips: 0, kills: 0, earned: 0, pokes: 0 }, nextId: 1, dead: false, intro: false });
   let S = fresh();
   try { const raw = localStorage.getItem(SAVE_KEY); if (raw) S = Object.assign(fresh(), JSON.parse(raw)); } catch (e) { console.warn(e); }
   try { if (window.Store) Store.loadVault(S); } catch (e) { console.warn('vault', e); }

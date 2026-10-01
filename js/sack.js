@@ -67,7 +67,7 @@ window.Sack = (() => {
       const it = S.items || {}; // 旧存档：药剂搬进储物箱 / 腰带
       if (it.potion) { S.inv.belt[0] = mk('potion', Math.min(3, it.potion)); if (it.potion > 3) S.inv.stash.push(mk('potion', it.potion - 3)); it.potion = 0; }
       if (it.bigpotion) { S.inv.stash.push(mk('bigpotion', it.bigpotion)); it.bigpotion = 0; }
-      S.inv.stash.push(mk('bandage', 2), mk('cloth', 3), mk('herb', 2));
+      if (!(window.Mods && Mods.on && Mods.on('no_freebies') !== false)) S.inv.stash.push(mk('bandage', 2), mk('cloth', 3), mk('herb', 2));
     }
     S.eqPlus = S.eqPlus || { weapon: 0 }; for (const k of ['weapon', 'helm', 'armor', 'charm']) S.eqPlus[k] = S.eqPlus[k] || 0;
     if (!(window.Worlds && Worlds.active)) S.inv.sack.items = S.inv.sack.items.filter(o => o.id !== 'head' || o.h); // 读档后失效的首级格子

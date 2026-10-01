@@ -39,7 +39,7 @@ window.Tutorial = (() => {
       j: ['ステータス', '<kbd>Tab</kbd> でステータスを確認：❤️ HP、⚔️ 戦力、スタミナ、そして<b>訓練</b>。戦力が高いほど外の敵は楽になります。<br>もう一度 <kbd>Tab</kbd>（または <kbd>Esc</kbd>）で閉じます。'],
       e: ['Stats', 'Press <kbd>Tab</kbd> to see ❤️ HP, ⚔️ power, stamina and <b>training</b>. More power makes the outside world easier.<br>Press <kbd>Tab</kbd> (or <kbd>Esc</kbd>) again to close.'] },
     { id: 'build', ch: 0, where: 'cave', tick: (st, c) => { if (c.ui === 'menu' && c.tab === 'build') st.seen = true; return st.seen && !c.ui; },
-      z: ['建造', '按 <kbd>B</kbd> 打开建造菜单：<b>每件建筑都会让你更强</b>；桌子、杆、展示台能让首级自动产魂晶。<br>魂晶够就点一件，在洞里<b>点鼠标放置</b>（<kbd>R</kbd> 旋转）。看完按 <kbd>B</kbd> / <kbd>Esc</kbd> 关闭。'],
+      z: ['建造', '按 <kbd>B</kbd> 打开建造菜单：<b>每件建筑都会让你更强</b>；桌子、杆、展示台上插着的首级，每次回洞按回合结算魂晶。<br>魂晶够就点一件，在洞里<b>点鼠标放置</b>（<kbd>R</kbd> 旋转）。看完按 <kbd>B</kbd> / <kbd>Esc</kbd> 关闭。'],
       j: ['建築', '<kbd>B</kbd> で建築メニュー：<b>建物はすべてあなたを強くします</b>。テーブル・杭・展示台は首から自動で魂晶を生みます。<br>魂晶が足りれば1つ選び、洞窟内で<b>クリックして設置</b>（<kbd>R</kbd> で回転）。<kbd>B</kbd> / <kbd>Esc</kbd> で閉じます。'],
       e: ['Build', 'Press <kbd>B</kbd> for the build menu: <b>every building makes you stronger</b>, and tables, poles and display stands make heads produce crystals automatically.<br>If you can afford one, pick it and <b>click to place</b> (<kbd>R</kbd> rotates). Press <kbd>B</kbd> / <kbd>Esc</kbd> to close.'] },
     { id: 'toexit', ch: 0, where: 'cave', go: c => c.cave && c.cave.exitPos, tick: (st, c) => c.cave && c.dExit < 2.6,
@@ -105,9 +105,9 @@ window.Tutorial = (() => {
       j: ['成長とコレクション', '<kbd>T</kbd> で<b>才能ツリー</b>（ポイント振り・スキル設定）、<kbd>K</kbd> 首コレクション、<kbd>L</kbd> 狩猟ログ、<kbd>Y</kbd> 神霊簿、<kbd>J</kbd> 実績、<kbd>O</kbd> MOD、<kbd>M</kbd> 音楽、<kbd>Esc</kbd> 一時停止。<br>いま <kbd>T</kbd> を押してみましょう。'],
       e: ['Growth & collection', '<kbd>T</kbd> opens the <b>talent tree</b> (spend points, set skills); <kbd>K</kbd> head collection, <kbd>L</kbd> hunt log, <kbd>Y</kbd> spirit book, <kbd>J</kbd> achievements, <kbd>O</kbd> MODs, <kbd>M</kbd> music, <kbd>Esc</kbd> pause.<br>Press <kbd>T</kbd> now to take a look.'] },
     { id: 'end', ch: 3, where: 'any', timeout: 25, tick: () => false,
-      z: ['教程完成！', '要点：<b>出洞搜刮 → 打倒敌人、拿首级 → 见好就收回洞 → 把玩首级出魂晶 → 建造 / 训练 / 强化 → 去更深的地方</b>。<br>随时按 <kbd>F9</kbd> 重看教程；标题菜单也有「📖 新手教程」。祝你好猎，格罗克。<br><small>按 Enter 关闭这张卡片。</small>'],
+      z: ['教程完成！', '要点：<b>出洞搜刮 → 打倒敌人、拿首级 → 见好就收回洞 → 把首级插到建筑上（每次回洞按回合结算魂晶）→ 建造 / 训练 / 强化 → 去更深的地方</b>。<br>随时按 <kbd>F9</kbd> 重看教程；标题菜单也有「📖 新手教程」。祝你好猎，格罗克。<br><small>按 Enter 关闭这张卡片。</small>'],
       j: ['チュートリアル完了！', '要点：<b>外で探索 → 敵を倒して首を得る → 引き際よく帰還 → 首を弄んで魂晶 → 建築・訓練・強化 → さらに深い場所へ</b>。<br>いつでも <kbd>F9</kbd> で再確認。タイトルメニューにも「📖 チュートリアル」があります。幸運を、グロク。<br><small>Enter でこのカードを閉じます。</small>'],
-      e: ['Tutorial complete!', 'Loop: <b>scavenge outside → beat enemies, take heads → leave while ahead → play with heads for crystals → build / train / upgrade → go deeper</b>.<br>Press <kbd>F9</kbd> any time to see this again; the title menu also has a “📖 Tutorial” button. Good hunting, Grok.<br><small>Press Enter to dismiss this card.</small>'] }
+      e: ['Tutorial complete!', 'Loop: <b>scavenge outside → beat enemies, take heads → leave while ahead → mount heads on buildings (they pay out each time you return) → build / train / upgrade → go deeper</b>.<br>Press <kbd>F9</kbd> any time to see this again; the title menu also has a “📖 Tutorial” button. Good hunting, Grok.<br><small>Press Enter to dismiss this card.</small>'] }
   ];
 
   // ---------------- 全局事件计数（只读，不拦截） ----------------

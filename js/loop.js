@@ -92,8 +92,8 @@ window.Loop = (() => {
     const T = pk(CHB), LR = (window.Lore && Lore.RACES) || {}, race = r() < 0.4 || !LR[T.race] ? T.race : pk(Object.keys(LR).length ? Object.keys(LR) : [T.race]), syl = (LR[race] && LR[race].syl) || ['莉', '娜', '丝', '藇'];
     const hr = pk(HAIR), ey = pk(EYE), L = (window.Lore && Lore.LOCS) || [{ k: T.base }], TR = (window.Lore && Lore.TRAITS) || T.traits, tr = [pk(TR), pk(TR)].filter((x, i, a) => a.indexOf(x) === i);
     const look = { hn: hr[0], hc1: hr[1], hc2: hr[2], en: ey[0], ec1: ey[1], ec2: ey[2] }; if (FEAT[race]) look.feat = FEAT[race]; if (r() < 0.5) look.acc = [pk(['tiara', 'crown', 'witchhat'])];
-    const aff = Object.keys(AFN).sort(() => r() - 0.5).slice(0, Math.min(3, 1 + Math.floor((ch - 1) / 3)));
-    const B = Object.assign({}, T, { k: 'ch' + ch, ch, n: Array.from({ length: 2 + (r() < 0.45 ? 1 : 0) }, () => pk(syl)).join(''), race, traits: tr.length ? tr : T.traits, title: pk(TPRE) + '·' + T.title, place: pk(PPRE) + T.place.slice(2), base: pk(L).k, col: hr[1], look, aff, pow: 2.0 + 0.1 * Math.min(20, ch - 1) });
+    const aff = Object.keys(AFN).sort(() => r() - 0.5).slice(0, Math.min(3, 1 + Math.floor((ch - 1) / 3))), sk = ['volley', 'cleave', 'pull', 'quake', 'mark', 'nova', 'rally'].sort(() => r() - 0.5).slice(0, Math.min(6, 3 + Math.floor((ch - 1) / 3)));
+    const B = Object.assign({}, T, { k: 'ch' + ch, ch, sk, n: Array.from({ length: 2 + (r() < 0.45 ? 1 : 0) }, () => pk(syl)).join(''), race, traits: tr.length ? tr : T.traits, title: pk(TPRE) + '·' + T.title, place: pk(PPRE) + T.place.slice(2), base: pk(L).k, col: hr[1], look, aff, pow: 2.0 + 0.1 * Math.min(20, ch - 1) });
     cbC.set(key, B); return B;
   }
   function bossAff(fo) { const B = CB(); fo.aff = fo.aff || {}; for (const k of B.aff) { fo.aff[k] = 1; if (k === 'iron') fo.shield = 2 + Math.floor(B.ch / 4); if (k === 'frenzy') { fo.spdMul = (fo.spdMul || 1) * 1.15; fo.dmgMul = (fo.dmgMul || 1) * 1.08; } } fo.affName = B.aff.map(k => AFN[k]).join(' '); }
@@ -105,7 +105,7 @@ window.Loop = (() => {
   function bossCard() {
     const B = CB(), lv = bossLv(), d = lv - plv(), hk = Math.max(0.7, Math.min(4, Math.pow(1.1, d))) * enemyHp(), dk = Math.max(0.7, Math.min(3, Math.pow(1.07, d))) * enemyDmg();
     return `<div id="lpBoss" style="--bc:${B.col}"><div class="t">第 ${R().chap} 章 · 章节 BOSS · 第 ${B.ch} 位月之使徒（每局随机、无限延续）</div><div class="n">👑 ${B.n} <small>${B.title} · 擂台「${B.place}」</small></div>
-<div class="s"><span>等级 <b>Lv.${lv}</b>（你 Lv.${plv()}${d >= 6 ? ' · <i>极度危险</i>' : d >= 2 ? ' · 危险' : ''}）</span><span>生命 ×<b>${hk.toFixed(2)}</b></span><span>伤害 ×<b>${dk.toFixed(2)}</b></span><span>威压 ×${B.pow.toFixed(1)}</span><span>词缀：<b>${B.aff.map(k => AFN[k]).join(' ')}</b></span><span>${B.traits.join(' · ')}</span></div>
+<div class="s"><span>等级 <b>Lv.${lv}</b>（你 Lv.${plv()}${d >= 6 ? ' · <i>极度危险</i>' : d >= 2 ? ' · 危险' : ''}）</span><span>生命 ×<b>${hk.toFixed(2)}</b></span><span>伤害 ×<b>${dk.toFixed(2)}</b></span><span>威压 ×${B.pow.toFixed(1)}</span><span>词缀：<b>${B.aff.map(k => AFN[k]).join(' ')}</b></span><span>招牌技：<b>${B.sk.map(k => (window.FoeAI2 && FoeAI2.SK2 && FoeAI2.SK2[k] ? FoeAI2.SK2[k].n : k)).join(' · ')}</b></span><span>${B.traits.join(' · ')}</span></div>
 <p>${B.intro}</p><p>她不是哪个地区的霸主——她是月之巫女的「${B.title}」，只在自己的擂台上等你。打赢：进入第 ${R().chap + 1} 章 + 1 次祝福抉择（月之线索要在跑图时的「月之踪迹」里找）；逃回来：下次还是她。</p><button data-lp="boss">⚔️ 前往「${B.place}」</button></div>`;
   }
   function css() { if (document.getElementById('lpCss')) return; const s = document.createElement('style'); s.id = 'lpCss'; s.textContent = `
@@ -153,7 +153,7 @@ window.Loop = (() => {
     for (const k in byId) { const L = byId[k], n = L.length; if (n < 2) continue; const b = n >= 3 ? 0.6 : 0.3; L.forEach(h => add(h, b)); out.sets.push(`👥 同为「${L[0].rec.c.idN || k}」×${n}：+${Math.round(b * 100)}%${n < 3 ? '（3 颗 +60%）' : ''}`); }
     if (new Set(hs.map(h => h.rec.c.rar | 0)).size >= 5) { hs.forEach(h => add(h, 0.25)); out.sets.push('🌈 凡/灵/英/圣/神 五阶齐全：全部 +25%'); }
     const C0 = (window.BuildCat && BuildCat.C) || {}, auras = (g.builds || []).filter(b => C0[b.type] && C0[b.type].aura && C0[b.type].auraMul), aC = new Map();
-    const aura = h => { if (aC.has(h)) return aC.get(h); let m = 1; const p = h.g.position; for (const b of auras) { const d = C0[b.type]; if ((p.x - b.x) ** 2 + (p.z - b.z) ** 2 < d.aura * d.aura) m *= d.auraMul; } try { if (window.Props && Props.on && Props.on()) m *= Props.auraMul(p) * (1 + (Props.pokeMul(p) - 1) * 0.5); } catch (e) { } m = Math.min(2, m); aC.set(h, m); return m; };
+    const aura = h => { if (aC.has(h)) return aC.get(h); let m = 1; const p = h.g.position; for (const b of auras) { const d = C0[b.type]; if ((p.x - b.x) ** 2 + (p.z - b.z) ** 2 < d.aura * d.aura) m *= d.auraMul; } try { if (window.Props && Props.on && Props.on()) m *= Props.roundMul ? Props.roundMul(p) : Props.auraMul(p); } catch (e) { } m = Math.min(2, m); aC.set(h, m); return m; };
     const ctx = { r, g, hv, setK, nb: {}, rm: [], boons: 0, notes: out.notes, val: (h, k = 1) => hv(h) * k * (1 + (setK.get(h) || 0)) * aura(h), st: b => (r.bst[bkey(b)] = r.bst[bkey(b)] || {}), bless: (k, v) => { ctx.nb[k] = (ctx.nb[k] || 0) + v; } };
     const byB = new Map(); for (const h of hs) { if (!byB.has(h.mount)) byB.set(h.mount, []); byB.get(h.mount).push(h); }
     for (const [b, L] of byB) {
@@ -166,7 +166,7 @@ window.Loop = (() => {
       if (pc) { out.v += pc; out.lines.push({ t: '_props', ic: '🧰', n: '摆件产出', k: 0, v: pc, note: '藏宝箱等每回合结算一次' }); } const gs = Object.keys(got); if (gs.length) out.notes.push('🧰 摆件产出材料：' + gs.map(k => Sack.IT[k].icon + Sack.IT[k].n + '×' + got[k]).join('、') + '（已进储物箱）'); } } catch (e) { }
     const chK = 1 + (r.chap - 1) * 0.2, pay = mod('pay', 1), ex = g.exhibit ? 1 + g.exhibit().tier * 0.04 : 1, inc = 1 + (r.inc || 0); r.inc = 0;
     out.mul = { chK, pay, ex, inc }; out.stash = Math.round(r.stash || 0); out.src = Object.assign({}, r.src);
-    out.tot = Math.round((10 + out.v) * chK * pay * ex * inc) + out.stash; out.died = died; out.nb = ctx.nb; out.boons = ctx.boons;
+    out.tot = Math.round(out.v * chK * pay * ex * inc) + out.stash; out.died = died; out.nb = ctx.nb; out.boons = ctx.boons;
     for (const h of ctx.rm) { try { g.burst && g.burst(h.g.position, '#ff8a3a', 30, 1.6, 0.8, 1); g.removeHead(h); } catch (e) { } }
     r.nb = ctx.nb; if (ctx.rm.length) try { g.save(); } catch (e) { }
     return out;
@@ -182,7 +182,7 @@ ${rows ? `<table>${rows}</table>` : '<div class="m">没有首级在岗。把首�
 ${P.sets.length ? `<div class="s">${P.sets.join('<br>')}</div>` : '<div class="m">套装：同族 3/5/7 颗、同身份 2/3 颗、五阶齐全都有加成。</div>'}
 ${P.notes.length ? `<div class="x">${P.notes.join('<br>')}</div>` : ''}
 ${P.boons ? `<div class="x">🎴 额外祝福抉择 ×${P.boons}</div>` : ''}${nbText(P.nb) ? `<div class="x">🎐 下一趟祝福：${nbText(P.nb)}</div>` : ''}
-<div class="m">底薪 +10 · 第 ${R().chap} 章 ×${P.mul.chK.toFixed(2)} · 世道 ×${P.mul.pay.toFixed(2)} · 展厅评级 ×${P.mul.ex.toFixed(2)}${P.mul.inc > 1 ? ` · 🕯️回合香 ×${P.mul.inc.toFixed(2)}` : ''}${P.stash ? `<br>洞内活动（${src || '存着的'}）+${P.stash}` : ''}</div>
+<div class="m">第 ${R().chap} 章 ×${P.mul.chK.toFixed(2)} · 世道 ×${P.mul.pay.toFixed(2)} · 展厅评级 ×${P.mul.ex.toFixed(2)}${P.mul.inc > 1 ? ` · 🕯️回合香 ×${P.mul.inc.toFixed(2)}` : ''}${P.stash ? `<br>洞内活动（${src || '存着的'}）+${P.stash}` : ''}</div>
 <div class="t">🔮 +${P.tot}</div><div class="k">点击关闭 · 首级每回合只结算一次，摆得越巧越多</div>`;
     el.classList.add('on'); clearTimeout(showSettle.t); showSettle.t = setTimeout(() => el.classList.remove('on'), 16000);
     try { SFX.coins && SFX.coins(); } catch (e) { }
@@ -208,15 +208,15 @@ ${P.boons ? `<div class="x">🎴 额外祝福抉择 ×${P.boons}</div>` : ''}${n
       setTimeout(() => { try { G().toast(`🔄 回合 ${r.round} 结算：魂晶 +${P.p}（摆出的首级 ${P.n} 颗${P.b ? ` · 上回合把玩/头棋加成 +${Math.round(P.b * 100)}%` : ''}）`, '#ffe0a0', 4.2); } catch (e) { } }, 1600);
       return;
     }
-    setTimeout(() => { try { const P = settle(died); G().addCoins(P.tot); r.last = P.tot; r.stash = 0; r.src = {}; showSettle(P); if (window.Rogue && Rogue.on && Rogue.on()) { Rogue.roundPick(); if (P.boons) Rogue.grant(P.boons, '建筑'); } try { G().save(); } catch (e) { } } catch (e) { console.warn('settle', e); } }, 1500);
+    setTimeout(() => { try { const P = settle(died); G().addCoins(P.tot); r.last = P.tot; r.stash = 0; r.src = {}; showSettle(P); if (window.Rogue && Rogue.on && Rogue.on()) { const earned = !died && (trip.k >= 3 || trip.c >= 1); if (earned) Rogue.roundPick(); else toast('🎴 这一趟没杀够 3 人、也没清空地点——没有祝福抉择', '#a898b8', 3); if (P.boons) Rogue.grant(P.boons, '建筑'); } try { G().save(); } catch (e) { } } catch (e) { console.warn('settle', e); } }, 1500);
   }
-  let bossKilledThisTrip = false; const W0won = () => bossKilledThisTrip;
+  let bossKilledThisTrip = false; const W0won = () => bossKilledThisTrip; const trip = { k: 0, c: 0 };
   // ---- 清空地点 ----
   function nodeStat() { const w = W(); if (!w || !w.foes) return null; const all = w.foes.filter(f => !f.hunter2 && !f.nemClone && !f.nemX), dead = all.filter(f => f.dead && !f.escaped).length; return { all: all.length, dead }; }
   function clearReward(final) {
     const w = W(), st = nodeStat(); if (!w || !st || !st.all || !node0 || node0.paid) return; const ratio = st.dead / st.all; if (!final && ratio < 1) return; node0.paid = 1;
     const base = (w.graph.loc && w.graph.loc.loot ? (w.graph.loc.loot[0] + w.graph.loc.loot[1]) / 2 : 20) * 0.25 * st.all, c = Math.round(base * ratio * ratio * mod('clear', 1) * (1 + (nb().clear || 0)));
-    if (c <= 0) return; G().addCoins(c); try { w.trip.coins += c; } catch (e) { }
+    if (c <= 0) return; if (ratio >= 1) trip.c++; G().addCoins(c); try { w.trip.coins += c; } catch (e) { }
     try { G().toast(ratio >= 1 ? `🏁 地点清空！所有 ${st.all} 人都倒下了 · 清空奖励 🔮+${c}` : `🏳️ 离开时清空 ${Math.round(ratio * 100)}% · 奖励 🔮+${c}`, ratio >= 1 ? '#ffd890' : '#d8c8b0', 3); SFX.coins && SFX.coins(); } catch (e) { }
   }
   // ---- 离开地点：结算清空 + 正在追你的高阶敌人成为新宿敌 ----
@@ -227,7 +227,7 @@ ${P.boons ? `<div class="x">🎴 额外祝福抉择 ×${P.boons}</div>` : ''}${n
   let wasW = null, node0 = null;
   function tick() {
     if (!on() || !G() || !G().S) return; R(); wrapCoins(); const w = W();
-    if (w !== wasW) { if (w && !wasW) { bossKilledThisTrip = false; if (!bossTrip) R().regs.push(w.graph && w.graph.loc ? w.graph.loc.k : ''); } if (!w && wasW) roundEnd(!!wasW.dead || (G().S.hp <= 0)); wasW = w; node0 = null; }
+    if (w !== wasW) { if (w && !wasW) { bossKilledThisTrip = false; trip.k = 0; trip.c = 0; if (!bossTrip) R().regs.push(w.graph && w.graph.loc ? w.graph.loc.k : ''); } if (!w && wasW) roundEnd(!!wasW.dead || (G().S.hp <= 0)); wasW = w; node0 = null; }
     if (w) { if (!w.busy && w.B && !w.B.corr && (!node0 || node0.i !== w.cur)) node0 = { i: w.cur }; clearReward(false); if (bossTrip && window.Foe && Foe.foes.some(f => f.boss && f.dead)) bossKilledThisTrip = true; }
     else inject();
   }
@@ -236,6 +236,6 @@ ${P.boons ? `<div class="x">🎴 额外祝福抉择 ×${P.boons}</div>` : ''}${n
   function wrapStart() { if (!window.UI || !UI._startTrip || UI._startTrip.__lp) return; const f = UI._startTrip; UI._startTrip = function (k) { if (on() && G() && G().S && R().n >= 2) { k = CB().base; bossTrip = true; } else bossTrip = false; return f.call(this, k); }; UI._startTrip.__lp = 1; }
   wrapStart(); setTimeout(wrapStart, 0);
   // 每杀一人回血（世道“盛宴” / 议会祝福）
-  function onKill() { const h = mod('heal', 0) + (nb().heal || 0); if (h > 0) try { const s = G().st(); G().S.hp = Math.min(s.maxHp, G().S.hp + s.maxHp * h); } catch (e) { } }
+  function onKill() { trip.k++; const h = mod('heal', 0) + (nb().heal || 0); if (h > 0) try { const s = G().st(); G().S.hp = Math.min(s.maxHp, G().S.hp + s.maxHp * h); } catch (e) { } }
   return { on, rOn, R, MODS, runDmg, runHp, runSpd, enemyHp, enemyDmg, nemRate, enemyLv, chapLv, isBossTrip, leaveNode, onKill, payout, capCave, caveGate, ROUND, hv, bf, settle, showSettle, stash, CB, CHB, chBoss, bossLv, bossAff, arena, nb, ward };
 })();

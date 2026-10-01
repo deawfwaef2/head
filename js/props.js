@@ -80,7 +80,7 @@ window.Props = (() => {
     return out.length ? out : null;
   }
   const carcassExtra = () => { const Sk = window.Sack; if (!Sk || !defs()) return []; return Math.random() < 0.6 ? [Sk.mk('sinew', 1 + Math.floor(Math.random() * 2))] : []; };
-  function starter(I) { if (I.propsStart || !defs()) return; I.propsStart = 1; const Sk = window.Sack; for (const [k, n] of [['phal', 4], ['sinew', 4], ['wax', 3], ['lock', 2], ['ash', 3]]) I.stash.push(Sk.mk(k, n)); }
+  function starter(I) { if (I.propsStart || !defs()) return; I.propsStart = 1; if (window.Mods && Mods.on && Mods.on('no_freebies') !== false) return; const Sk = window.Sack; for (const [k, n] of [['phal', 4], ['sinew', 4], ['wax', 3], ['lock', 2], ['ash', 3]]) I.stash.push(Sk.mk(k, n)); }
 
   // ---------------------------------------------------------------- 场景对象
   const pg = new THREE.Group(); pg.name = 'props'; const items = []; let ver = 0, dirty = true, bonusC = null, mode = null, hintEl = null, ringM = null;
@@ -163,9 +163,23 @@ window.Props = (() => {
     return Math.min(m, 3);
   }
   const auraMul = pos => mulOf('aura', pos), pokeMul = pos => mulOf('poke', pos);
+  const RM = () => !!(window.Loop && Loop.rOn && Loop.rOn()), SCAP = () => !(window.Mods && Mods.on && Mods.on('build_stat_cap') === false);
+  function roundMul(pos) { let c = 1; for (const it of items) { if (it.ghost || !it.d.chimeR || !it.p.a) continue; if (segDist(pos, new V3(...it.p.a), new V3(...it.p.b)) < it.d.chimeR * (it.p.th || 1)) { c = 1.2; break; } } return Math.min(2, auraMul(pos) * (1 + (pokeMul(pos) - 1) * 0.5) * c); }
+  const STN = { str: '力量', con: '体魄', agi: '敏捷', ter: '凶威', soul: '魂力' };
+  function effTxt(d) {
+    const o = [], Sk = window.Sack;
+    if (d.aura) o.push(RM() ? `回洞结算时，${d.cord ? '线两侧' : '半径'} ${d.aura.r} 米内的首级 ×${d.aura.m}` : `${d.cord ? '线两侧' : '半径'} ${d.aura.r} 米内首级产出 ×${d.aura.m}`);
+    if (d.poke) o.push(RM() ? `回洞结算时，半径 ${d.poke.r} 米内的首级 ×${(1 + (d.poke.m - 1) / 2).toFixed(2)}` : `半径 ${d.poke.r} 米内亲手戳的收益 ×${d.poke.m}`);
+    if (d.chimeR) o.push(RM() ? `回洞结算时，线两侧 ${d.chimeR} 米内的首级 ×1.2` : `每 25 秒敲响：两侧 ${d.chimeR} 米内首级各产出 ×1.5`);
+    if (d.tick) { const nm = d.tick.kind === 'coin' ? '魂晶' : (Sk && Sk.IT[d.tick.kind] ? Sk.IT[d.tick.kind].n : d.tick.kind); o.push(RM() ? `每回合结算：${nm} +${d.tick.n * 3}` : `每 ${d.tick.every} 秒：${nm} +${d.tick.n}`); }
+    if (d.stat) o.push(Object.entries(d.stat).map(([k, v]) => `${STN[k] || k} +${v}`).join('、') + (SCAP() ? '（同种只算 1 件）' : '（同种最多 3 件）'));
+    if ((d.aura || d.poke) && !d.cord) o.push('放大/拉长它，范围跟着变大');
+    return o;
+  }
+  const flav = d => String(d.desc || '').split('<b>')[0].replace(/<[^>]+>/g, '').trim();
   function bonus() {
     if (!dirty && bonusC !== undefined) return bonusC; dirty = false; const o = { str: 0, con: 0, agi: 0, ter: 0, soul: 0 }, cnt = {}; let any = false;
-    for (const it of items) { if (it.ghost || !it.d.stat) continue; if ((cnt[ckey(it)] = (cnt[ckey(it)] || 0) + 1) > PER) continue; for (const k in it.d.stat) { o[k] += it.d.stat[k]; any = true; } }
+    for (const it of items) { if (it.ghost || !it.d.stat) continue; if ((cnt[ckey(it)] = (cnt[ckey(it)] || 0) + 1) > (SCAP() ? 1 : PER)) continue; for (const k in it.d.stat) { o[k] += it.d.stat[k]; any = true; } }
     return (bonusC = any ? o : null);
   }
   const inWild = () => !!(window.Worlds && Worlds.active);
@@ -317,7 +331,7 @@ window.Props = (() => {
   function onTip(hit, held) {
     if (mode || held || !items.length) return null; if (hit && hit.head) return null; const h = pickProp(); if (!h) return null; const d = h.it.d;
     if (d.organ && window.Organs && h.it.p.og) return Organs.tipHtml(h.it.p.og, h.it.setN || 1);
-    const e = d.aura ? `范围 ${(d.aura.r * scaleOf(h.it.p)).toFixed(1)} 米 ×${d.aura.m}` : d.poke ? `戳击 ×${d.poke.m}` : d.tick ? '定时产出' : d.chimeR ? '风铃' : d.stat ? '属性加成' : '';
+    const e = d.aura ? `范围 ${(d.aura.r * scaleOf(h.it.p)).toFixed(1)} 米 ×${d.aura.m}` : d.poke ? (RM() ? `范围 ${(d.poke.r * scaleOf(h.it.p)).toFixed(1)} 米 ×${(1 + (d.poke.m - 1) / 2).toFixed(2)}` : `戳击 ×${d.poke.m}`) : d.tick ? (RM() ? '每回合结算' : '定时产出') : d.chimeR ? '风铃' : d.stat ? '属性加成' : '';
     return `<b>${d.icon} ${d.n}</b> · ${e} · <b>[E]</b> 拿起${d.cord ? '（靠近端点只拖一端）' : ''}`;
   }
 
@@ -325,14 +339,15 @@ window.Props = (() => {
   function tabHtml() {
     const Sk = window.Sack, S = G.S; defs(); const have = id => Sk.have(id), IT = Sk.IT;
     const need = (id, n) => `<span class="${have(id) >= n ? 'ok' : 'no'}">${IT[id] ? IT[id].icon + IT[id].n : id} ${have(id)}/${n}</span>`;
-    const placed = items.filter(i => !i.ghost).length;
-    const own = KEYS.map(k => { const f = Sk.inv().stash.concat(Sk.inv().sack.items).filter(o => o.id === 'pr_' + k).reduce((a, o) => a + o.n, 0); return [k, f]; }).filter(x => x[1] > 0);
-    const mats = Object.keys(MATS).map(k => `${MATS[k].icon}${MATS[k].n} <b>${have(k)}</b>`).join('　');
-    return `<p style="color:#bba;margin:0 0 8px">🧷 材料从野外容器、尸体和野兽尸骸里翻出来。道具<b>没有碰撞和物理</b>，想摆哪摆哪；放置后还能随时拿起、拉伸、收回。洞里已摆 <b>${placed}/${MAXN}</b> 件。<br>${mats}</p>`
-      + (own.length ? `<div class="sk-rc"><span class="nm">🎒 已制作（未摆放）</span><span class="nd">${own.map(([k, n]) => `${P[k].icon}${P[k].n}×${n} <button class="sk-btn" data-pplace="${k}">放置</button>`).join('　')}</span></div>` : '')
-      + (placed ? `<div class="sk-rc"><span class="nm">🧺 整理</span><span class="nd">洞里的道具：准星对准按 <b>E</b> 拿起 <button class="sk-btn" data-precall="1">全部收回储物箱</button></span></div>` : '')
-      + KEYS.map(k => { const d = P[k], ok = Object.entries(d.need).every(([i, n]) => have(i) >= n) && S.coins >= d.coin;
-        return `<div class="sk-rc"><span class="nm" style="color:${['#b9b4aa', '#7fd07a', '#5fa6ff', '#c27cff', '#ffb347'][d.rar] || '#ddd'}">${d.icon} ${d.n}</span><span class="nd">${Object.entries(d.need).map(([i, n]) => need(i, n)).join(' ')} · <span class="${S.coins >= d.coin ? 'ok' : 'no'}">🔮${d.coin}</span><br><small>${d.desc}</small></span><button class="sk-btn" data-pcraft="${k}" ${ok ? '' : 'disabled'}>制作</button></div>`; }).join('');
+    const placed = items.filter(i => !i.ghost).length, RC = ['#b9b4aa', '#7fd07a', '#5fa6ff', '#c27cff', '#ffb347'];
+    const ownN = k => Sk.inv().stash.concat(Sk.inv().sack.items).filter(o => o.id === 'pr_' + k).reduce((a, o) => a + o.n, 0);
+    const mats = Object.keys(MATS).map(k => `<span>${MATS[k].icon}${MATS[k].n} <b>${have(k)}</b></span>`).join('');
+    return `<div class="wk-mats"><b>🧷 摆件材料</b>${mats}<span style="margin-left:auto">洞里已摆 <b>${placed}/${MAXN}</b>${placed ? ' <button class="sk-btn" data-precall="1">全部收回</button>' : ''}</span></div>`
+      + `<p class="wk-ds" style="margin:0 0 10px">材料从野外容器、尸体和野兽尸骸里翻出来。摆件没有碰撞，准星指哪摆哪；对准已摆的摆件按 <b>E</b> 拿起、拉伸、收回。${RM() ? '<b>回合制：</b>效果在每次回洞结算首级时生效。' : ''}</p><div class="wk-grid">`
+      + KEYS.map(k => { const d = P[k], okN = Object.entries(d.need).every(([i, n]) => have(i) >= n), ok = okN && S.coins >= d.coin, own = ownN(k), col = RC[d.rar] || '#ddd';
+        return `<div class="wk-card ${ok ? 'can' : ''}" style="--rc:${col}"><div class="wk-top"><div class="wk-ic"><i>${d.icon}</i></div><div><div class="wk-nm" style="color:${col}">${esc(d.n)}${own ? ` <small style="font-size:14px;color:#cfc2a8">已有 ${own}</small>` : ''}</div><div class="wk-ds">${esc(flav(d))}</div></div></div>`
+          + `<div class="wk-note">${effTxt(d).map(t => '▸ ' + esc(t)).join('<br>')}</div><div class="wk-need">${Object.entries(d.need).map(([i, n]) => need(i, n)).join('')}<span class="${S.coins >= d.coin ? 'ok' : 'no'}">🔮 ${d.coin}</span></div>`
+          + `<div style="display:flex;gap:8px;margin-top:auto"><button class="sk-btn wk-go" style="flex:1" data-pcraft="${k}" ${ok ? '' : 'disabled'}>${ok ? '制作' : okN ? '魂晶不足' : '材料不足'}</button>${own ? `<button class="sk-btn wk-go" data-pplace="${k}">放置</button>` : ''}</div></div>`; }).join('') + '</div>';
   }
   function bindTab(panel, rerender) {
     panel.querySelectorAll('[data-pcraft]').forEach(b => b.onclick = () => {
@@ -350,5 +365,5 @@ window.Props = (() => {
     if (!window.G || !G.HOOK || !G.scene || !G.S || !G.cave) return; clearInterval(wait);
     G.scene.add(pg); G.HOOK.frame.push(frame); G.HOOK.e.push(onE); G.HOOK.tip.push(onTip); load();
   }, 200);
-  return { on, auraMul, pokeMul, bonus, rollLoot, carcassExtra, starter, tabHtml, bindTab, startPlace, matPool, P, MATS, get items() { return items; }, get mode() { return mode; }, _dbg: { spawn, remove, layout, load, grab, pickProp, commit, cancel, stow, follow, frame } };
+  return { on, auraMul, pokeMul, roundMul, effTxt, bonus, rollLoot, carcassExtra, starter, tabHtml, bindTab, startPlace, matPool, P, MATS, get items() { return items; }, get mode() { return mode; }, _dbg: { spawn, remove, layout, load, grab, pickProp, commit, cancel, stow, follow, frame } };
 })();

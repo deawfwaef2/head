@@ -187,6 +187,7 @@ window.FoeAI2 = (() => {
 
   function startSkill(fo, k, d, P, ctx, face) {
     const f = fo.f, pv = ctx.pvel || { x: 0, z: 0 };
+    if (SK2[k]) return start2(fo, k, d, P, ctx, face);
     if (k === 'leap') {
       const lx = P.pos.x + pv.x * 0.45, lz = P.pos.z + pv.z * 0.45, [tx, tz] = arenaClamp(ctx, lx, lz);
       fo.sk = { k, ph: 'wind', t: 0, tx, tz, x0: fo.pos.x, z0: fo.pos.z, fx: [disc(ctx, tx, tz, 2.0, 0xff3020, 0.9, 0.28)], dmg: baseDmg(fo, ctx, 1.25) };
@@ -242,6 +243,7 @@ window.FoeAI2 = (() => {
         return { turnTo: fo.yaw, spd: 0 }; }
       if (s.t >= 0.6) fin(fo, 0.9, 0); return { turnTo: face, spd: 0 };
     }
+    if (SK2[s.k]) return run2(fo, dt, d, face, dx, dz, P, ctx);
     if (s.k === 'roll') { // 侧翻：躲你的乱挥
       if (s.t < 0.42) { setV(fo, Math.cos(face) * s.dir * 5.6 - Math.sin(face) * 0.6, -Math.sin(face) * s.dir * 5.6 - Math.cos(face) * 0.6); return { turnTo: face, spd: 0 }; }
       fin(fo, 0.1, 0); fo.cd = 0; fo.punish = true; return { turnTo: face, spd: 0 }; // 翻完立刻反击
@@ -253,6 +255,63 @@ window.FoeAI2 = (() => {
       if (s.t >= 0.5) { fin(fo, 0, 0); fo.cd = 0; fo.backstab = true; if (d < 3) F_().attack(fo, d, fo.armed ? 'Sword_Dash' : 'Punch_Cross'); }
       return { turnTo: face, spd: 0 };
     }
+    fin(fo, 1, 0); return null;
+  }
+
+  // ================= R54l MOD foe_skills2：高阶 / BOSS 专属技能（都有预警和解法）=================
+  const SK2 = {
+    volley: { n: '三向飞刃', tip: '⚠ 三向飞刃！站到三条红线之间的空隙里' },
+    cleave: { n: '半月横扫', tip: '⚠ 半月横扫！前方扇形——绕到她身后或后退出扇区' },
+    pull: { n: '锁链拉拽', tip: '⚠ 锁链！红线锁定后横向闪开，否则被拖到她面前挨一刀' },
+    quake: { n: '震地三波', tip: '⚠ 震地！三圈地波一圈一圈往外炸——踩着节奏往里或往外走' },
+    mark: { n: '月蚀印记', tip: '⚠ 月蚀印记！紫圈跟着你，锁定后立刻走开' },
+    rally: { n: '嗜血战吼', tip: '⚠ 战吼！她在回血变强——趁她喊的时候猛码打断', boss: false },
+    nova: { n: '月光新星', tip: '⚠ 月光新星！大红圈格挡无效——跑出去，或卡时机闪身', boss: true }
+  };
+  const SIG = { village: ['cleave', 'volley', 'rally'], forest: ['volley', 'mark', 'pull'], wilds: ['quake', 'cleave', 'pull'], abbey: ['nova', 'mark', 'rally'], swamp: ['mark', 'pull', 'nova'], fortress: ['quake', 'cleave', 'volley'], capital: ['volley', 'mark', 'cleave'], abyss: ['nova', 'quake', 'pull'], peak: ['nova', 'quake', 'mark', 'rally'] };
+  const bossSig = fo => (fo.boss && fo.boss.sk) || SIG[fo.bossK] || ['nova', 'quake', 'cleave'];
+  function ringM(ctx, x, z, r0, r1, col, op) { const t = T(); const m = new t.Mesh(new t.RingGeometry(r0, r1, 48).rotateX(-Math.PI / 2), new t.MeshBasicMaterial({ color: col, transparent: true, opacity: op, depthWrite: false, blending: t.AdditiveBlending, side: t.DoubleSide, fog: false })); m.position.set(x, (ctx.H ? ctx.H(x, z) : 0) + 0.08, z); m.renderOrder = 4; ctx.sc.add(m); const e = { m, life: 9, t: 0, op, kind: 'ring' }; FXL.push(e); return e; }
+  function sector(ctx, x, z, r, th, yaw, col, op) { const t = T(); const m = new t.Mesh(new t.CircleGeometry(1, 28, -Math.PI / 2 - th / 2, th).rotateX(-Math.PI / 2), new t.MeshBasicMaterial({ color: col, transparent: true, opacity: op, depthWrite: false, blending: t.AdditiveBlending, side: t.DoubleSide, fog: false })); m.position.set(x, (ctx.H ? ctx.H(x, z) : 0) + 0.08, z); m.scale.setScalar(r); m.rotation.y = yaw; m.renderOrder = 4; ctx.sc.add(m); const e = { m, life: 9, t: 0, op, kind: 'sector' }; FXL.push(e); return e; }
+  const inStrip = (fo, P, yaw, len, w) => { const rx = P.pos.x - fo.pos.x, rz = P.pos.z - fo.pos.z, ux = Math.sin(yaw), uz = Math.cos(yaw), al = rx * ux + rz * uz, lat = Math.abs(rx * uz - rz * ux); return al > -0.3 && al < len && lat < w / 2 + 0.25; };
+  function start2(fo, k, d, P, ctx, face) {
+    const f = fo.f, S = SK2[k]; hint(ctx, k, S.tip); try { F_().say(fo, `「${S.n}」`, k === 'nova' || k === 'mark' ? '#d8b8ff' : '#ffb0a0'); } catch (e) { }
+    if (k === 'volley') { const fx = [-0.38, 0, 0.38].map(o => { const e = strip(ctx, 0xff4020, 0.9, 0.22); if (e) { e.m.position.set(fo.pos.x, (ctx.H ? ctx.H(fo.pos.x, fo.pos.z) : 0) + 0.07, fo.pos.z); e.m.rotation.y = face + o; e.m.scale.set(0.9, 1, 9); } return e; }); fo.sk = { k, t: 0, yaw: face, fx, dmg: baseDmg(fo, ctx, 0.9) }; f.play('Idle_Shield_Loop', { fade: 0.15 }); }
+    else if (k === 'cleave') { fo.sk = { k, t: 0, yaw: face, fx: [sector(ctx, fo.pos.x, fo.pos.z, 3.4, 2.6, face, 0xff3020, 0.2)], dmg: baseDmg(fo, ctx, 1.15) }; f.play('Sword_Idle', { fade: 0.12 }); }
+    else if (k === 'pull') { const e = strip(ctx, 0xc060ff, 0.8, 0.22); fo.sk = { k, t: 0, yaw: face, len: Math.min(10, d + 1), fx: [e] }; f.play('Spell_Simple_Idle_Loop', { fade: 0.15 }); }
+    else if (k === 'quake') { const B = [[0.4, 2], [2, 3.6], [3.6, 5.2]]; fo.sk = { k, t: 0, B, fx: B.map(b => ringM(ctx, fo.pos.x, fo.pos.z, b[0], b[1], 0xff6020, 0.08)), hit: [0, 0, 0], dmg: baseDmg(fo, ctx, 0.8), x: fo.pos.x, z: fo.pos.z }; f.play('Jump_Start', { once: true, fade: 0.1, restart: true, speed: 0.8 }); }
+    else if (k === 'mark') { fo.sk = { k, t: 0, fx: [disc(ctx, P.pos.x, P.pos.z, 1.7, 0xa040ff, 9, 0.25)], dmg: baseDmg(fo, ctx, 1.35) }; f.play('Spell_Simple_Shoot', { once: true, fade: 0.1, restart: true }); }
+    else if (k === 'rally') { fo.sk = { k, t: 0, hp0: fo.hp, fx: [ringM(ctx, fo.pos.x, fo.pos.z, 0.6, 1.0, 0xff2020, 0.5)] }; f.play('Idle_Shield_Loop', { fade: 0.12 }); cue(fo, 'rage'); }
+    else if (k === 'nova') { fo.sk = { k, t: 0, fx: [disc(ctx, fo.pos.x, fo.pos.z, 4.6, 0xb080ff, 9, 0.18)], dmg: baseDmg(fo, ctx, 1.5) }; f.play('Spell_Simple_Idle_Loop', { fade: 0.15 }); cue(fo, 'cast'); }
+    return true;
+  }
+  function run2(fo, dt, d, face, dx, dz, P, ctx) {
+    const s = fo.sk, f = fo.f, C = ctx, hitP = (mul, h) => C.hitPlayer(fo, Math.round(s.dmg * (mul || 1)), Object.assign({ ang: 0, thrust: true }, h || {}));
+    if (s.k === 'volley') { if (s.t < 0.75) { for (const e of s.fx) if (e) e.m.material.opacity = 0.12 + 0.25 * (s.t / 0.75); return { turnTo: s.yaw, spd: 0 }; }
+      if (!s.done) { s.done = 1; f.play('Spell_Simple_Shoot', { once: true, fade: 0.05, restart: true }); cue(fo, 'cast'); if ([-0.38, 0, 0.38].some(o => inStrip(fo, P, s.yaw + o, 9, 0.9))) hitP(1); for (const e of s.fx) kill(e); s.fx = []; }
+      if (s.t > 1.25) fin(fo, 0.8, 0.5); return { turnTo: s.yaw, spd: 0 }; }
+    if (s.k === 'cleave') { const e = s.fx[0]; if (s.t < 0.7) { if (e) { e.m.position.set(fo.pos.x, e.m.position.y, fo.pos.z); e.m.material.opacity = 0.12 + 0.3 * (s.t / 0.7); } return { turnTo: s.yaw, spd: 0 }; }
+      if (!s.done) { s.done = 1; f.play(fo.armed ? 'Sword_Regular_C' : 'Melee_Hook', { once: true, fade: 0.05, restart: true, speed: 1.4 }); cue(fo, 'backstab'); const a = Math.atan2(P.pos.x - fo.pos.x, P.pos.z - fo.pos.z); if (d < 3.4 && Math.abs(ang(a - s.yaw)) < 1.3) hitP(1, { heavy: true, thrust: false, ang: 0 }); for (const x of s.fx) kill(x); s.fx = []; }
+      if (s.t > 1.35) fin(fo, 0.9, 0.7); return { turnTo: s.yaw, spd: 0 }; }
+    if (s.k === 'pull') { const e = s.fx[0]; if (s.t < 0.55) s.yaw = face;
+      if (s.t < 0.8) { if (e) { e.m.position.set(fo.pos.x, (C.H ? C.H(fo.pos.x, fo.pos.z) : 0) + 0.07, fo.pos.z); e.m.rotation.y = s.yaw; e.m.scale.set(0.8, 1, s.len); e.m.material.opacity = s.t < 0.55 ? 0.15 : 0.45; } return { turnTo: s.yaw, spd: 0 }; }
+      if (!s.done) { s.done = 1; for (const x of s.fx) kill(x); s.fx = []; cue(fo, 'cast');
+        if (inStrip(fo, P, s.yaw, s.len, 0.8)) { s.pull = { x0: P.pos.x, z0: P.pos.z, x1: fo.pos.x + Math.sin(s.yaw) * 1.3, z1: fo.pos.z + Math.cos(s.yaw) * 1.3, t: 0 }; try { C.toast && C.toast('⛓️ 你被锁链拖了过去！', '#d8b0ff', 1.2); } catch (er) { } } }
+      if (s.pull) { s.pull.t += dt; const k2 = Math.min(1, s.pull.t / 0.25); P.pos.x = s.pull.x0 + (s.pull.x1 - s.pull.x0) * k2; P.pos.z = s.pull.z0 + (s.pull.z1 - s.pull.z0) * k2; if (k2 >= 1) { s.pull = null; fin(fo, 0, 0); fo.cd = 0; F_().attack(fo, 1.3, fo.armed ? 'Sword_Dash' : 'Punch_Cross'); return null; } return { turnTo: s.yaw, spd: 0 }; }
+      if (s.t > 1.2) fin(fo, 0.9, 0.6); return { turnTo: face, spd: 0 }; }
+    if (s.k === 'quake') { if (s.t < 0.8) { s.fx.forEach(e => { if (e) e.m.material.opacity = 0.06 + 0.12 * (s.t / 0.8); }); return { turnTo: face, spd: 0 }; }
+      if (!s.slam) { s.slam = 1; f.play('Jump_Land', { once: true, fade: 0.05, restart: true, speed: 1.4 }); cue(fo, 'slam'); try { C.shake && C.shake(0.4); } catch (er) { } }
+      const pd = Math.hypot(P.pos.x - s.x, P.pos.z - s.z); s.B.forEach((b, i) => { const at = 0.8 + i * 0.38, e = s.fx[i]; if (s.t >= at && !s.hit[i]) { s.hit[i] = 1; if (e) e.m.material.opacity = 0.55; if (pd >= b[0] - 0.2 && pd <= b[1] + 0.2) hitP(1, { heavy: true }); } else if (s.hit[i] && e) e.m.material.opacity = Math.max(0, e.m.material.opacity - dt * 1.6); });
+      if (s.t > 2.1) fin(fo, 1.0, 0.9); return { turnTo: face, spd: 0 }; }
+    if (s.k === 'mark') { const e = s.fx[0]; if (s.t < 1.3) { if (e) { e.m.position.x += (P.pos.x - e.m.position.x) * Math.min(1, dt * 6); e.m.position.z += (P.pos.z - e.m.position.z) * Math.min(1, dt * 6); e.m.material.opacity = 0.18 + 0.1 * Math.sin(s.t * 12); } return { turnTo: face, spd: 0 }; }
+      if (s.t < 1.85) { if (e) e.m.material.opacity = 0.5; return { turnTo: face, spd: 0 }; }
+      if (!s.done) { s.done = 1; if (e) { spark(new (T().Vector3)(e.m.position.x, e.m.position.y + 0.4, e.m.position.z), 26, 'blue'); if (Math.hypot(P.pos.x - e.m.position.x, P.pos.z - e.m.position.z) < 1.7) hitP(1, { unblock: true }); } for (const x of s.fx) kill(x); s.fx = []; try { C.shake && C.shake(0.3); } catch (er) { } }
+      if (s.t > 2.2) fin(fo, 0.7, 0); return { turnTo: face, spd: 0 }; }
+    if (s.k === 'rally') { if (fo.hp < s.hp0 - fo.maxHp * 0.08) { for (const x of s.fx) kill(x); s.fx = []; fo.rallied = 1; fin(fo, 1.2, 1.3); try { C.toast && C.toast('💥 打断了她的战吼！', '#ffe070', 1.3); } catch (er) { } return null; }
+      if (s.t < 1.0) { const e = s.fx[0]; if (e) { e.m.position.set(fo.pos.x, e.m.position.y, fo.pos.z); e.m.scale.setScalar(1 + s.t * 1.2); } return { turnTo: face, spd: 0 }; }
+      fo.rallied = 1; fo.hp = Math.min(fo.maxHp, fo.hp + fo.maxHp * 0.1); fo.dmgMul = (fo.dmgMul || 1) * 1.15; for (const x of s.fx) kill(x); s.fx = []; cue(fo, 'rage'); try { C.toast && C.toast('🩸 她的战吼完成了：回血、变狠', '#ff9a80', 1.6); C.bossHp && fo.boss && C.bossHp(fo); } catch (er) { } fin(fo, 0.6, 0); return null; }
+    if (s.k === 'nova') { const e = s.fx[0]; if (s.t < 1.2) { if (e) { e.m.position.set(fo.pos.x, e.m.position.y, fo.pos.z); e.m.material.opacity = 0.1 + 0.3 * (s.t / 1.2); } return { turnTo: face, spd: 0 }; }
+      if (!s.done) { s.done = 1; f.play('Spell_Simple_Shoot', { once: true, fade: 0.05, restart: true }); spark(fo.pos.clone().add(new (T().Vector3)(0, 1, 0)), 40, 'blue'); try { C.shake && C.shake(0.6); C.flash && C.flash('#c8b0ff'); } catch (er) { } if (d < 4.6) hitP(1, { unblock: true, heavy: true }); for (const x of s.fx) kill(x); s.fx = []; }
+      if (s.t > 1.9) fin(fo, 1.2, 1.2); return { turnTo: face, spd: 0 }; }
     fin(fo, 1, 0); return null;
   }
 
@@ -285,6 +344,14 @@ window.FoeAI2 = (() => {
       if (d < 2.7 && fo.armed) pool.push('whirl');
       if (d < 2.6) pool.push('breaker', 'breaker');
       if (fo.skPool) { for (let i = pool.length - 1; i >= 0; i--) if (!fo.skPool.includes(pool[i])) pool.splice(i, 1); } /* R35：猎手/精英限定技能池 */
+      if (M('foe_skills2')) { // R54l：阶位越高技能越多；BOSS 有自己的招牌技
+        const T2 = fo.boss ? 3 : Math.max(0, Math.min(3, fo.tier | 0)), sig = fo.boss ? bossSig(fo) : null, add = (k, ok) => { if (ok && (!sig || sig.includes(k) || !SK2[k].boss)) pool.push(k); };
+        if (T2 >= 1) { add('volley', d >= 3 && d <= 9); add('cleave', d < 3.4); }
+        if (T2 >= 2) { add('pull', d >= 3.5 && d <= 9); add('quake', d < 4.5); }
+        if (T2 >= 3) { add('mark', d < 12); add('rally', fo.hp < fo.maxHp * 0.75 && !fo.rallied); }
+        if (fo.boss) add('nova', d < 4.2);
+        if (sig) for (const k of sig) if (pool.includes(k)) pool.push(k, k); // 招牌技更常见
+      }
       if (!fo.skPool && (fo.role === 'mage' || fo.role === 'healer' || fo.role === 'ranged' || fo.role === 'guard')) { fo.skCd = 3; return null; }
       if (!pool.length) { fo.skCd = 0.6; return null; }
       const forced = window.__forceSkill; const k = forced && pool.includes(forced) ? forced : forced ? forced : pool[Math.floor(Math.random() * pool.length)];
@@ -293,5 +360,5 @@ window.FoeAI2 = (() => {
     return null;
   }
 
-  return { init, tune, after, evade, preHit, onDie, update, tick, clear, packBonus, dmgK, AFF, M, get _fx() { return FXL; } };
+  return { init, tune, after, evade, preHit, onDie, update, tick, clear, packBonus, dmgK, AFF, SK2, SIG, M, get _fx() { return FXL; } };
 })();

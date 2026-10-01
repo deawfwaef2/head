@@ -1988,6 +1988,17 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 章节 BOSS：`Loop.CHB` 七位「月之使徒」（独立形象/台词/擂台），`worlds.genArena()` 单地点擂台（`node.chB`/`node.arena`，只有回洞门），`BOf(node)` 统一查 BOSS，`mkBossH` 设 `c.boss='chN'`；击杀不写 `S.bosses`（地区霸主不受影响）；Lv = 5 + 6×(章-1)；赢了 `Saga.giveClue('chapboss')`（saga.js 新导出）+ 1 次祝福抉择。foe.js `bodyFor` 对未知 bossK 按她的身份挑身体。
 - `small_maps` 默认关（迁移 v20）。
 - 顺手修复：worlds.js `foeCtx` 里 `toast`/`shake` 一直被上一句 `//` 注释吞掉 → 非斩首击杀 `die()` 和每次斩首 `decapitate()` 都会抛异常（之后的 decap 事件、布娃娃击飞没执行）。
+
+## R54l（用户：BOSS 打完了怎么办 / 舒适洞穴视觉 / 属性限次 / 线索=跑图任务 / 工坊围绕新系统 / 人物刺眼 / 技能太少 / 下蹲走路 / 宿敌战穿门 / 光球小精灵 / 开局不送东西）
+- 章节 BOSS 无限随机：`Loop.CB(ch)` 按 `S.run.seed`+章节生成（11 个角色模板 × 种族/名字/发色瞳色/称号前缀/擂台前缀/底图地区/词缀 1~3/招牌技 3~6），`Loop.bossAff` 在 living.foe 里给 BOSS 上 FoeAI2 词缀。打赢只给 1 次祝福抉择，不给线索。
+- 月之线索 = `moon_trail`（js/moontrail.js）：出猎 35% / 杀月使后或用寻月罗盘必定；3 个随机地点的天光月痕，门牌 🌙 指向下一跳（`Worlds.relabel()` + doorName 钩子），限时 7 分钟。saga 的月使在 moon_trail 开着时改为「下一趟必有月之踪迹」。
+- 工坊：`run_kit`（js/runkit.js）9 种围绕循环的道具（Sack.def + `grp:'run'` 配方，`d.onUse`）；材料悬停显示「可合成」；摆件页改卡片 + 回合制效果文字（`Props.effTxt`），光环/戳击/风铃都折算进结算（`Props.roundMul`），定时产出改为每回合结算。与另一位 Agent 的 workshop_plus（js/workshop.js，RGRP 新分组）已合并。
+- `build_stat_cap`：同种建筑属性只算 1 座、每项封顶 6+2×洞层；摆件属性同种只算 1 件。
+- 洞穴舒适：光柱改成交叉柔光面片 + 地面柔光（不再是光环），天窗/光柱/尘埃全部 `raycast=()=>{}`（以前尘埃 Points 阈值 1m 挡住摆头/建造），火边兽皮毯 + 墙边灯；曝光 1.42→1.3。
+- `foe_skills2`（foe_ai2.js SK2）：老兵 volley/cleave，精英 +pull/quake，冠军 +mark/rally，BOSS +nova；地区霸主 SIG 表、章节 BOSS `B.sk`。
+- `soft_glow`（js/fix54l.js）：Master 泛光 0.9/0.9→0.38/1.25，CharLight 逆光轮廓 ×0.4。
+- 下蹲走路：persona sly 走路、刺客绕背改为正常走/小跑，persona 闲置去掉 Crouch_Idle。宿敌战穿门：自然山口自动穿越加 `inFight()`（20m 内有追击/出招的敌人就不穿）。光球小精灵：`popFoes` 载入失败重试 3 次再退回。
+- `no_freebies`：新档 0 魂晶、无药、无材料；结算无底薪；祝福抉择需要这一趟杀满 3 人或清空 1 个地点。
 ## R54 workshop_plus（工坊扩充，MOD 默认开）
 - 用户：合成内容太少、工坊文字有问题；想要更多断肢/器官（肠、胸、心脏、上臂、下臂、大腿、小腿）。
 - **新 js/workshop.js**：配方 12 → 47（药品 / 料理 / 战斗增益 / 护具·饰品 / 材料转化 / 拆解·肢体）；新物品 tonic、salve、soulwine、manadraught(魂能)、bonebroth、jerky、huntstew、ironskin(受伤-25%)、swiftdust(移速+18%)、bloodoil(伤害+40%)、regenbalm(每秒2%) 与肢体材料 ua/la/th/ca/torso。**不做武器配方**（武器只来自搜刮 + 铁匠台强化，用户旧约束）。
