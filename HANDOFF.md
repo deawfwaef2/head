@@ -1837,3 +1837,7 @@ worlds.js 只改了少量接入点，每处都用 `LP ? … : 原值` 包住，M
 
 ### R50-gfx (b) shell grass variety
 `js/wgrass.js`: each node seeds its own look (mulberry of g.seed): palette pair from per-biome pools (fresh/yg/lime/bg/olive/straw/moss/rust), density 11–23, height, blade width, colour-patch + height-patch noise, per-blade brightness jitter, optional flower tips. Same MOD `shell_grass`; still shader-only (no models/textures). Tip colours of straw/yg/rust darkened to avoid washed-out fields. Not verified on real GPU.
+`js/wgrass.js`: each node seeds its own look (mulberry of g.seed): palette pair from per-biome pools (fresh/yg/lime/bg/olive/straw/moss/rust), density 11–23, height, blade width, colour-patch + height-patch noise, per-blade brightness jitter, optional flower tips. Same MOD `shell_grass`; still shader-only (no models/textures). Tip colours of straw/yg/rust darkened to avoid washed-out fields. Not verified on real GPU.
+
+### R50-gfx (c) VRoid Hub 候选扫描（无需登录）
+`tools/hub/hubscan.py`：用 VRoid Hub 公开 API（`/api/search/character_models`，头 `X-Api-Version: 11`）按关键词列出「可下载+VRM meta 暴力/改造/再分发全允许+非R18」的模型，只读元数据；`tools/hub/picks.md` 是我人工看缩略图筛过的 40 个。**下载接口需登录，已确认匿名 404；我不绕过登录/验证码，由用户本人下载后交我转换（vrm2body/vrm2head）。**
