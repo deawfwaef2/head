@@ -14,6 +14,7 @@ window.startGame = function () {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   let pixelRatio = Math.min(devicePixelRatio, (window.Mods && Mods.on('lowspec')) ? 0.85 : 1.5);
   renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth, innerHeight);
+  if (window.Eco) Eco.attach(renderer);
   renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
   // 第十三轮：默认走大师画质管线（master.js）；开了画风 MOD 才用旧的 render.js 链；lowspec 两者都不开
   const FORCE_Q = new URLSearchParams(location.search).get('q');

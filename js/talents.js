@@ -25,7 +25,10 @@ window.Talents = (() => {
   const lv = () => (window.RPG && G0() && G0().S ? RPG.lvOf(G0().S.xp).lv : 1);
   function pts() {
     const S = G0().S, l = lv(), b = Math.min(10, Object.keys(S.bosses || {}).length), el = Math.min(6, S.el && S.el.dead ? Object.keys(S.el.dead).length : 0);
-    return { attr: 3 * (l - 1), skill: l + 1 + Math.floor(l / 10) + b + el, boss: b, elite: el };
+    if (window.Mods && Mods.on('sp_zero') === false) return { attr: 3 * (l - 1), skill: l + 1 + Math.floor(l / 10) + b + el, boss: b, elite: el };
+    // R54 sp_zero：开局 0 技能点（旧档已花掉的旧开局 2 点保留，不出现负数）
+    const sk = l - 1 + Math.floor(l / 10) + b + el, old = Math.max(0, Math.min(2, spent().skill - sk));
+    return { attr: 3 * (l - 1), skill: sk + old, boss: b, elite: el };
   }
   function spent() {
     const t = tal(); let a = 0, s = 0; for (const k in t.at) a += t.at[k] || 0;

@@ -106,7 +106,7 @@ window.WorldMaster = (() => {
     // 软阴影
     try {
       const sh = B.sun && B.sun.shadow; if (sh && tk >= 1) {
-        const sz = tk >= 2 ? 4096 : 2048; if (sh.map) { sh.map.dispose(); sh.map = null; }
+        const sz = Math.min(tk >= 2 ? 4096 : 2048, window.Eco ? Eco.shadowMax() : 4096); if (sh.map) { sh.map.dispose(); sh.map = null; }
         sh.mapSize.set(sz, sz); sh.radius = tk >= 2 ? 4 : 2.5; sh.needsUpdate = true;
       }
     } catch (e) { console.warn('WM shadow', e); }
