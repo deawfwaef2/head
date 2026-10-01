@@ -351,6 +351,7 @@ window.Worlds = (() => {
     const tr = (G.S.stats && G.S.stats.trips) || 0, r = mulberry((node.seed ^ Math.imul(tr + 7, 0x9E3779B1)) >>> 0), ri = Math.max(0, Lore.LOCS.findIndex(l => l.k === node.region));
     node.prey = []; node.chests = [];
     if (node.home) return;
+    if (node.arena) { node.loot = []; return; } // R54k：章节 BOSS 擂台只有她
     let x = r(), n = W && W.graph && W.graph.trip ? (node.boss ? 0 : x < 0.15 ? 0 : x < 0.55 ? 1 : x < 0.88 ? 2 : 3) : (x < 0.3 ? 0 : x < 0.72 ? 1 : x < 0.93 ? 2 : 3);
     if (n > 0 && !node.boss && window.FoeAI2 && FoeAI2.packBonus) n += FoeAI2.packBonus(ri, r); // R34 MOD foe_pack：越深的地区，敌人成群出现
     if (window.Living) try { n = Living.count(node, n, r); } catch (e) { console.warn('Living.count', e); } // R54g：活地区人口 / 局面
@@ -391,6 +392,15 @@ window.Worlds = (() => {
     return { nodes, home, entry: home, far, loc, trip: true, seed, regions: [{ k: loc.k, loc, cx: 75, cy: 45, idx: nodes.map(n => n.i), entry: home, boss: far, stone: home }] };
   }
   function genGraph(loc, seed) { return loc ? genTrip(loc, seed >>> 0) : genWorld((Math.random() * 4294967296) >>> 0); }
+  // R54k：章节 BOSS 的独立擂台——一个广阔地点，只有她 + 回洞魂门（地区霸主不受影响，仍在各自地区最深处）
+  function genArena(loc, seed) {
+    const A = Loop.arena(), pool = REGION[loc.k] || ['meadow'], L2 = Object.assign({}, loc, { n: A.place, rec: A.rec });
+    const nd = { i: 0, x: 75, y: 45, region: loc.k, loc: L2, style: Worlds._forceStyle || pool[0], size: 'l', R: SIZES.l.R[0], name: A.place, seed: seed >>> 0, adj: [], depth: 0,
+      visited: false, known: true, home: false, stone: true, boss: true, chB: A.k, arena: true, prey: null, chests: null };
+    return { nodes: [nd], home: 0, entry: 0, far: 0, loc: L2, trip: true, arena: true, seed, regions: [{ k: loc.k, loc: L2, cx: 75, cy: 45, idx: [0], entry: 0, boss: 0, stone: 0 }] };
+  }
+  const BOf = nd => nd && nd.chB && window.Loop && Loop.chBoss ? Loop.chBoss(nd.chB) : (window.Explore && Explore.BOSSES[nd.region]);
+  function mkBossH(nd, Bo) { const h = RPG.bossHead(G.S, G.st(), nd.loc, Bo, G.usedNames, G.usedSig); if (nd.chB) { h.c.boss = nd.chB; h.c.chBoss = 1; } return h; }
   function noise2(seed) {
     const h = (x, y) => { let n = (x * 374761393 + y * 668265263 + seed * 69069) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
     const v = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), w = yf * yf * (3 - 2 * yf);
@@ -655,7 +665,7 @@ window.Worlds = (() => {
     return {
       sc: B.sc, H: B.H, cols: B.cols, R: B.R, RM: B.RM, edge: B.edge, Rf: B.Rf, doors: B.doors, pvel: W.vel, escaped: (fo) => { const nd = W.graph.nodes[W.cur], i = nd.prey.indexOf(fo.h); if (i >= 0) nd.prey.splice(i, 1); G.toast && G.toast(`🚪 ${NM(fo.h.c)} 从门逃走了……（首级没了）`, '#ffb080', 2.4); W.trip.log.push({ t: `${fo.h.c.name}从「${nd.name}」的门逃走了。` }); if (W.stats) W.stats.combo = 0; }, player: { pos: W.pos, get yaw() { return G.player.yaw; }, get crouch() { return G.player.crouch; } },
       st: () => G.st(), sees: (pos, maxD) => sees({ pos }, maxD), say: (anchor, text, col) => { if (text) say(anchor, text, col); },
-      floatDmg: (pos, n, big) => floatDmg(pos, n, big), renderer: G.renderer, camera: G.camera, event: (t, fo, d) => foeEvent(t, fo, d), windup: (fo, clip) => { if (window.CombatFX && CombatFX.on) { CombatFX.windup(fo, clip); return; } const dd = W ? Math.hypot(fo.pos.x - W.pos.x, fo.pos.z - W.pos.z) : 5, v = Math.max(0, 1 - dd / 14); if (!v) return; SFX.play && SFX.play('draw', 0.5 * v, 0.62, 0.05); if (/Heavy|Sword_Attack/.test(clip)) SFX.play && SFX.play('heavy', 0.45 * v, 0.7, 0.05); }, // 第十九轮：起手音 toast: (t, c, d) => G.toast && G.toast(t, c, d), shake: (k) => { W.shake = Math.max(W.shake || 0, k); },
+      floatDmg: (pos, n, big) => floatDmg(pos, n, big), renderer: G.renderer, camera: G.camera, event: (t, fo, d) => foeEvent(t, fo, d), windup: (fo, clip) => { if (window.CombatFX && CombatFX.on) { CombatFX.windup(fo, clip); return; } const dd = W ? Math.hypot(fo.pos.x - W.pos.x, fo.pos.z - W.pos.z) : 5, v = Math.max(0, 1 - dd / 14); if (!v) return; SFX.play && SFX.play('draw', 0.5 * v, 0.62, 0.05); if (/Heavy|Sword_Attack/.test(clip)) SFX.play && SFX.play('heavy', 0.45 * v, 0.7, 0.05); }, /* 第十九轮：起手音 */ toast: (t, c, d) => G.toast && G.toast(t, c, d), shake: (k) => { W.shake = Math.max(W.shake || 0, k); }, // R54k 修复：toast/shake 以前被上一句的 // 注释吞掉了（击杀/斩首提示与布娃娃击飞被异常打断）
       playerSwinging: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.sw || Combat.state.thrust > 0)),
       playerAiming: () => !!(window.Combat && Combat.drawn && Combat.state && (Combat.state.lmb || Combat.state.tipSpeed > 3)),
       handAng: (fo) => { const CS = window.Combat && Combat.drawn && Combat.state; if (!CS) return null; // 第十八轮：刀尖锁准星 → 刀来自“准星相对这个敌人”的方向；挥动中用挥动来向
@@ -687,6 +697,7 @@ window.Worlds = (() => {
         } else { G.flash && G.flash('#a00000', 0.4, 280); W.shake = Math.max(W.shake || 0, fo.boss ? 0.5 : 0.25); }
         if (W.stats) W.stats.combo = 0;
         if (window.Talents && n > 0) n = Talents.inDmg(fo, n, h); // R36：减伤 / 护盾 / 荆棘 / 不屈
+        if (window.Rogue && n > 0) n = Rogue.inDmg(fo, n, h); // R54k rogue_boons
         if (n > 0) { if (window.Sack) Sack.interrupt(); if (window.CombatFX) CombatFX.hurt(n, fo, h); if (window.Recall) Recall.hurtBy(fo, n); G.damage(n); W.trip.log.push({ t: `${NM(fo.h.c)}${fo.boss ? '' : '反击'}，你受了伤。`, d: `-${n} HP` }); } },
       bossMeet: (fo) => { W.dom.boss.style.display = 'block'; W.boss = { B: fo.boss, pos: fo.pos, foe: fo, hp: 100, dead: false, sayT: 0 }; bossSay(fo.boss.say || pick(Math.random, fo.boss.taunt), 3); },
       bossHp: (fo) => { W.dom.bossHp.style.width = Math.max(0, fo.hp / fo.maxHp * 100) + '%'; if (W.boss && W.boss.sayT <= 0 && Math.random() < 0.3) { bossSay(pick(Math.random, fo.boss.hurt), 2); W.boss.sayT = 4; } },
@@ -723,7 +734,7 @@ window.Worlds = (() => {
   //   现在：声明单独成行；整个事件处理包 try/catch——音效/日志/成就里的任何 bug 都不能再打断伤害结算。
   function foeEvent(t, fo, d) { try { foeEvent0(t, fo, d); } catch (e) { console.warn('foeEvent', t, e); } }
   function foeEvent0(t, fo, d) {
-    if (!W) return; if (t === 'decap' && window.DecapCam) { try { DecapCam.onEvent(t, fo, d); } catch (e) { } } /* R49h */ if (window.WpnX) { try { WpnX.onEvent(t, fo, d); } catch (e) { } } /* R41主管：单武器熟练度经验 */ if (window.Talents) { try { Talents.onEvent(t, fo, d); } catch (e) { console.warn('Talents', e); } } /* R36 天赋事件（吸血/魂能/暴击联动） */ if (window.Recall) { try { Recall.log(fo, t, d); } catch (e) { console.warn(e); } } if (window.CombatFX) { try { CombatFX.event(t, fo, d); } catch (e) { console.warn(e); } } if (window.Feel54) { try { Feel54.event(t, fo, d); } catch (e) { } } if (window.Living) { try { Living.event(t, fo, d); } catch (e) { } } if (window.Loop && t === 'kill') { try { Loop.onKill(fo); } catch (e) { } } // 第二十二轮（续 9）：命中/击杀/格挡音效 + 命中准星；R54 受击反应
+    if (!W) return; if (t === 'decap' && window.DecapCam) { try { DecapCam.onEvent(t, fo, d); } catch (e) { } } /* R49h */ if (window.WpnX) { try { WpnX.onEvent(t, fo, d); } catch (e) { } } /* R41主管：单武器熟练度经验 */ if (window.Talents) { try { Talents.onEvent(t, fo, d); } catch (e) { console.warn('Talents', e); } } /* R36 天赋事件（吸血/魂能/暴击联动） */ if (window.Recall) { try { Recall.log(fo, t, d); } catch (e) { console.warn(e); } } if (window.CombatFX) { try { CombatFX.event(t, fo, d); } catch (e) { console.warn(e); } } if (window.Feel54) { try { Feel54.event(t, fo, d); } catch (e) { } } if (window.Living) { try { Living.event(t, fo, d); } catch (e) { } } if (window.Loop && t === 'kill') { try { Loop.onKill(fo); } catch (e) { } } if (window.Rogue) { try { Rogue.event(t, fo, d); } catch (e) { } } // 第二十二轮（续 9）：命中/击杀/格挡音效 + 命中准星；R54 受击反应
     const now = performance.now() / 1000, st = W.stats = W.stats || { kill: 0, decap: 0, execute: 0, onecut: 0, sever: 0, halve: 0, parry: 0, combo: 0, maxCombo: 0, lastHit: 0, kills: [] };
     if (t === 'hit') { st.combo = now - st.lastHit < 2.5 ? st.combo + 1 : 1; st.lastHit = now; st.maxCombo = Math.max(st.maxCombo, st.combo); showCombo(st.combo, d && d.brk); if (st.combo >= 10) achAdd('combo', st.combo, true); return; }
     const rw = REW[t]; if (rw) { const tm = window.Talents ? Talents.rewardMul(fo) : { c: 1, x: 1 }, mul = 1 + (fo.rar || 0) * 0.5 + (fo.boss ? 3 : 0), c = Math.round(rw[0] * mul * (1 + Math.min(1, st.combo / 20)) * tm.c); G.addCoins(c); W.trip.coins += c; gainXp(Math.max(1, Math.round(rw[0] * mul * 0.8 * tm.x)));
@@ -789,7 +800,7 @@ window.Worlds = (() => {
     return out;
   }
   function spawnBoss(B, node) {
-    const loc = node.loc, Bo = Explore.BOSSES[loc.k]; const col = new THREE.Color(Bo.col || '#ffd060');
+    const loc = node.loc, Bo = BOf(node); const col = new THREE.Color(Bo.col || '#ffd060');
     const g = new THREE.Group(); const core = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow(), color: col.clone().multiplyScalar(3), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false })); core.scale.setScalar(1.3);
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow(), color: col.clone().multiplyScalar(0.9), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false })); halo.scale.setScalar(4.2);
     g.add(core, halo); const pl = new THREE.PointLight(col, 3, 12, 2); pl.position.y = 0.3; g.add(pl);
@@ -803,7 +814,8 @@ window.Worlds = (() => {
     G = window.__game; if (!G) { api.fallback && api.fallback(); return; }
     const bigMap = window.Mods && Mods.on('bigworld'); // 旧的“一整片大陆”保留成可选 MOD（默认关）
     const S = G.S; let graph;
-    if (bigMap) {
+    if (BT() && window.Loop && Loop.arena) graph = genArena(trip.loc, (Math.random() * 4294967296) >>> 0); // R54k：章节 BOSS 独立擂台
+    else if (bigMap) {
       if (!S.world || !S.world.seed) S.world = { seed: (Math.random() * 4294967296) >>> 0, vis: [], known: [], stone: -1 };
       graph = genWorld(S.world.seed);
       for (const i of S.world.vis || []) if (graph.nodes[i]) graph.nodes[i].visited = graph.nodes[i].known = true;
@@ -820,8 +832,7 @@ window.Worlds = (() => {
     if (!provReg && window.Combat) { Combat.addProvider(targets); provReg = true; }
     if (window.Combat && Combat.setThreats) Combat.setThreats(() => (W && W.foes && window.Foe) ? Foe.threats() : []);
     SFX.music && SFX.music('expedition'); SFX.roar && SFX.roar(0.6);
-    if (graph.trip && BT()) { const f = graph.nodes[graph.far]; f.boss = true; f.stone = true; f.known = true; } // R54i run_loop：章节 BOSS 回合直接从最深处开始（有魂门可回洞）
-    const st0 = graph.trip && BT() ? graph.far : !graph.trip && graph.nodes[S.world.stone] && graph.nodes[S.world.stone].stone ? S.world.stone : graph.home;
+    const st0 = graph.arena ? 0 : !graph.trip && graph.nodes[S.world.stone] && graph.nodes[S.world.stone].stone ? S.world.stone : graph.home;
     goto(st0, -1).catch(e => { console.warn('Worlds', e); stop(); api.fallback && api.fallback(); });
   }
   function doorName(node, d) {
@@ -833,7 +844,7 @@ window.Worlds = (() => {
     return t;
   }
   function remember(node) {
-    try { const RS = G.S.rmap && W.graph.trip && G.S.rmap[node.region]; if (RS && !RS.vis.includes(node.i)) RS.vis.push(node.i); } catch (e) { }
+    try { const RS = G.S.rmap && W.graph.trip && !W.graph.arena && G.S.rmap[node.region]; if (RS && !RS.vis.includes(node.i)) RS.vis.push(node.i); } catch (e) { }
     const w = G.S.world; if (!w || W.graph.trip) return; w.vis = w.vis || []; w.known = w.known || [];
     if (!w.vis.includes(node.i)) w.vis.push(node.i);
     node.adj.forEach(b => { if (!w.known.includes(b) && !w.vis.includes(b)) w.known.push(b); });
@@ -846,7 +857,7 @@ window.Worlds = (() => {
   function nodeStory(node, canRetreat) {
     if (!W || W.storySeen.has(node.i)) return Promise.resolve(true);
     W.storySeen.add(node.i); document.exitPointerLock && document.exitPointerLock();
-    const count = (node.prey || []).length + (node.boss ? 1 : 0), boss = node.boss && window.Explore && Explore.BOSSES[node.region];
+    const count = (node.prey || []).length + (node.boss ? 1 : 0), boss = node.boss && BOf(node);
     const mood = node.home ? '洞口的魂火在身后渐渐熄灭。前方的风带来陌生的气味，也带来盔甲与脚步的回声。' : node.stone ? '古老魂门在雾中低鸣。这里曾是旅人的避难所，如今只剩被打断的路标和新鲜足迹。' : count ? `这里并不空旷。你听见 ${count} 道不同的呼吸；有人已经发现了门边的影子，却还没有决定迎战还是逃跑。` : '风穿过无人照看的遗迹。没有人回应，但翻倒的容器和未熄的余烬说明这里刚刚有人离开。';
     const goal = boss ? `霸主「${boss.n || boss.name || '未知之主'}」就在此地。她不会像普通守卫那样轻易露出破绽。` : count ? '观察站位、利用障碍；搜刮后仍可回到门边安全撤离。' : '这是搜寻材料、药剂和装备的好机会，但别在角落里放松警惕。';
     return new Promise(resolve => {
@@ -860,8 +871,9 @@ window.Worlds = (() => {
     if (!node.prey) populate(node);
     if (node.home) return;
     if (window.Foe && Foe.preload && !/[?&]nofoe=1/.test(location.search) && !(window.Mods && !Mods.on('foe_bodies'))) {
-      const list = node.prey.map(h => ({ h })), Bo = node.boss && (!(G.S.bosses || {})[node.region] || BT()) && window.Explore && Explore.BOSSES[node.region];
-      if (Bo) list.push({ h: node.bossH || null, boss: Bo, bossK: node.region });
+      const list = node.prey.map(h => ({ h })), Bo = node.boss && (!(G.S.bosses || {})[node.region] || BT()) && BOf(node);
+      if (Bo && node.chB && !node.bossH) node.bossH = mkBossH(node, Bo);
+      if (Bo) list.push({ h: node.bossH || null, boss: Bo, bossK: node.chB || node.region });
       Foe.preload(list).then(a => { if (a) a.forEach(T => T && T.root && upload(T.root)); }).catch(() => { });
     }
     if (window.Beasts && Beasts.prefetch && !/[?&]nobeast=1/.test(location.search) && !(window.Mods && Mods.on('beasts') === false)) Beasts.prefetch(node).then(a => { if (a) a.forEach(T => T && T.scene && upload(T.scene)); }).catch(() => { });
@@ -886,12 +898,12 @@ window.Worlds = (() => {
     if (!node.prey) populate(node);
     const tb0 = performance.now(); const B = W.B = buildNode(node); tp('build', tb0);
     W.foes = null; W.prey = []; W.boss = null;
-    const wantBoss = node.boss && (!(G.S.bosses || {})[node.region] || BT()) && window.Explore && Explore.BOSSES[node.region];
+    const wantBoss = node.boss && (!(G.S.bosses || {})[node.region] || BT()) && BOf(node);
     if (window.Foe && !/[?&]nofoe=1/.test(location.search) && !(window.Mods && !Mods.on('foe_bodies'))) {
       try {
         const r = mulberry(node.seed ^ 0x5bd1e995), list = [];
         const SL = B.site && B.site.slots; node.prey.forEach((h, k) => { const sl = SL && SL[k]; list.push({ h, pos: sl ? new V3(sl.x, 0, sl.z) : spot(B, r) }); }); // R41：集会里各就各位
-        if (wantBoss) { const Bo = Explore.BOSSES[node.region]; node.bossH = node.bossH || RPG.bossHead(G.S, G.st(), node.loc, Bo, G.usedNames, G.usedSig); list.push({ h: node.bossH, pos: B.bossAt || new V3(0, 0, 0), boss: Bo, bossK: node.region }); }
+        if (wantBoss) { const Bo = BOf(node); node.bossH = node.bossH || mkBossH(node, Bo); list.push({ h: node.bossH, pos: B.bossAt || new V3(0, 0, 0), boss: Bo, bossK: node.chB || node.region }); }
         W.dom.loadT.textContent = `「${node.name}」里有人……`;
         const tf0 = performance.now(); W.foes = await Foe.populate(foeCtx(B, node), list); tp('foes', tf0);
         if (W.foes && !W.foes.length && list.length) W.foes = null;
@@ -951,12 +963,12 @@ window.Worlds = (() => {
     if (!node.prey) populate(node);
     await wait(30); if (!W) return null;
     const tb0 = performance.now(); const B = buildNode(node); tp('build', tb0);
-    let foes = null; const wantBoss = node.boss && (!(G.S.bosses || {})[node.region] || BT()) && window.Explore && Explore.BOSSES[node.region];
+    let foes = null; const wantBoss = node.boss && (!(G.S.bosses || {})[node.region] || BT()) && BOf(node);
     if (window.Foe && !/[?&]nofoe=1/.test(location.search) && !(window.Mods && !Mods.on('foe_bodies'))) {
       try {
         const r = mulberry(node.seed ^ 0x5bd1e995), list = [], SL = B.site && B.site.slots;
         node.prey.forEach((h, k) => { const sl = SL && SL[k]; list.push({ h, pos: sl ? new V3(sl.x, 0, sl.z) : spot(B, r) }); });
-        if (wantBoss) { const Bo = Explore.BOSSES[node.region]; node.bossH = node.bossH || RPG.bossHead(G.S, G.st(), node.loc, Bo, G.usedNames, G.usedSig); list.push({ h: node.bossH, pos: B.bossAt || new V3(0, 0, 0), boss: Bo, bossK: node.region }); }
+        if (wantBoss) { const Bo = BOf(node); node.bossH = node.bossH || mkBossH(node, Bo); list.push({ h: node.bossH, pos: B.bossAt || new V3(0, 0, 0), boss: Bo, bossK: node.chB || node.region }); }
         const tf0 = performance.now(); foes = await Foe.populate(foeCtx(B, node), list); tp('foes', tf0);
         if (foes && !foes.length && list.length) foes = null;
         if (foes && B.site && window.WSites) WSites.seat(foes, B.site);
@@ -1175,9 +1187,9 @@ window.Worlds = (() => {
   }
   function bossWin(hIn, BoIn) {
     achAdd('boss', 1);
-    const bo = W.boss, Bo = BoIn || bo.B, loc = W.graph.nodes[W.cur].loc; if (bo) bo.dead = true;
-    const h = hIn || RPG.bossHead(G.S, G.st(), loc, Bo, G.usedNames, G.usedSig);
-    h.__boss = 1; W.trip.res.heads.push(h); G.S.bosses = G.S.bosses || {}; G.S.bosses[loc.k] = { n: Bo.n, t: Bo.title, date: Date.now() }; G.S.rep = G.S.rep || {}; G.S.rep[loc.k] = (G.S.rep[loc.k] || 0) + 5;
+    const bo = W.boss, Bo = BoIn || bo.B, nd0 = W.graph.nodes[W.cur], loc = nd0.loc; if (bo) bo.dead = true;
+    const h = hIn || mkBossH(nd0, Bo);
+    h.__boss = 1; W.trip.res.heads.push(h); if (!nd0.chB) { G.S.bosses = G.S.bosses || {}; G.S.bosses[loc.k] = { n: Bo.n, t: Bo.title, date: Date.now() }; G.S.rep = G.S.rep || {}; G.S.rep[loc.k] = (G.S.rep[loc.k] || 0) + 5; } // R54k：章节 BOSS 不算地区霸主
     if (!hIn) bossSay(Bo.lose, 4); G.flash && G.flash('#ffffff', 1, 700); SFX.fanfare && SFX.fanfare(4); SFX.levelup && SFX.levelup(); W.shake = 1.2;
     W.trip.log.push({ t: `你击败了${Bo.title}${Bo.n}，带走了她的首级。`, cls: 'gethead' });
     const nd = W.graph.nodes[W.cur];

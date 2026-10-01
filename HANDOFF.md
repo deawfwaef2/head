@@ -1979,3 +1979,12 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 地图回到老版每趟随机生成（`region_persist`/`region_big` 默认关，迁移 v18），`small_maps` 地图更小。
 - 用户：老版敌人战斗更好、程序化举刀姿势不好看 → `foe_duel`/`duel_all` 默认关（迁移 v19）。用户：还是要传送门 → `gate_portal`（默认开，山口雾幕 + 光）。
 - 未做：建筑需资源 + 战利品显示相关配方；月之巫女 ≥7 线索胜利 + 结局动画；头棋盘→下一轮加成；建筑组合效果；精英 BOSS 聚会。
+
+## R54k（用户最新取舍，覆盖上面冲突部分）
+- 用户原话要点：头每次回洞**固定产出、每轮结算**，不是在洞里点点点；不同建筑不同机制但都围绕「轮」；套装可以；多发明放头建筑（不和现有重复）；肉鸽要更多技能种类感、武器感、每局不一样。**章节 BOSS 是独立的，不是把地区霸主搬过去**；地区不缩小更好。
+- `round_yield`（loop.js）：`G.trigger` 在回合模式直接返回 0（把玩/计时都不给魂晶，game.js 计时块与魂轮也跳过）；回洞 1.5s 后 `Loop.settle()` 按建筑结算（基础 10/20/36/60/100 × 异色/霸主 × 建筑系数 `Loop.bf(d)` 或 `Loop.ROUND[type]` 自定义规则 × 章节/世道/展厅），套装：同族 3/5/7、同身份 2/3、五阶齐全；右侧 `#lpSettle` 明细面板。洞里小游戏（curios/rites/oddities/sanctum/play/props/chess 这些文件里的 `G.addCoins`，按调用栈识别）→ `Loop.stash` 存到结算时发，每回合上限 `capCave()`。
+- `round_halls`（js/roundhalls.js）：10 座 `rh_*` 建筑（月相晷台/酿魂坛/审判天平/吞首井/示威矛墙/命运骰塔/亡者议会/烽火首台/百族谱/双生镜龛），状态存 `S.run.bst[type@x,z]`；吞首井/骰 1/烽火第 3 回合会移除首级；议会/烽火/矛墙写 `S.run.nb`（下一趟祝福，Loop.runDmg/runHp/runSpd/enemyHp/onKill/清空奖励读取）；矛墙降低 `Loop.nemRate()`。其它放头建筑说明末尾自动补「回合制」系数。
+- `rogue_boons`（js/rogue.js）：`S.run.rg`；出发面板 `#rgPanel` 选流派（8 选 3 展示）+ 祝福抉择（24 种 / 8 标签 / Lv3 / 同标签 3 种成套）。钩子：foe.js `Rogue.outDmg`（Talents 之后、霸主单刀上限之前）、worlds foeEvent → `Rogue.event`、hitPlayer → `Rogue.inDmg`、Loop.runHp/runSpd ← `Rogue.hpK/spdK`。每回合结算 +1 次抉择，吞首井/百族谱(≥5族)/月之使徒额外给。
+- 章节 BOSS：`Loop.CHB` 七位「月之使徒」（独立形象/台词/擂台），`worlds.genArena()` 单地点擂台（`node.chB`/`node.arena`，只有回洞门），`BOf(node)` 统一查 BOSS，`mkBossH` 设 `c.boss='chN'`；击杀不写 `S.bosses`（地区霸主不受影响）；Lv = 5 + 6×(章-1)；赢了 `Saga.giveClue('chapboss')`（saga.js 新导出）+ 1 次祝福抉择。foe.js `bodyFor` 对未知 bossK 按她的身份挑身体。
+- `small_maps` 默认关（迁移 v20）。
+- 顺手修复：worlds.js `foeCtx` 里 `toast`/`shake` 一直被上一句 `//` 注释吞掉 → 非斩首击杀 `die()` 和每次斩首 `decapitate()` 都会抛异常（之后的 decap 事件、布娃娃击飞没执行）。

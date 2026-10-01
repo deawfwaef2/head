@@ -836,6 +836,7 @@ window.startGame = function () {
     P.tex.needsUpdate = true;
   }
   function trigger(h, src, mult = 1) {
+    if (window.Loop && Loop.rOn && Loop.rOn()) { if (src === 'manual' || src === 'hold') { h.squash = 1; h.swayV.add(new V3((Math.random() - 0.5) * 0.6, 0.4, (Math.random() - 0.5) * 0.6)); } return 0; } // R54k round_yield：首级只在回合结算时产出
     const s = st();
     const cap = hasAff(h, 'charm') ? 20 : 10;
     let v = h.yield * mult * s.yieldMul * globalMul() * auraMul(h.g.position) * (window.Props ? Props.auraMul(h.g.position) : 1) * (window.Props && (src === 'manual' || src === 'hold') ? Props.pokeMul(h.g.position) : 1) * beaconMul(h) * (h.buff && h.buff > clock.elapsedTime ? 2 : 1) * (src === 'manual' || src === 'hold' ? (1 + Math.min(combo, cap) * 0.1) : 1);
@@ -1298,7 +1299,7 @@ window.startGame = function () {
     for (const b of builds) {
       const d = CAT[b.type];
       if (b.g.userData.orb) { const o = b.g.userData.orb, tt = performance.now() / 1000; o.position.y = 0.55 + Math.sin(tt * 1.7) * 0.05; o.rotation.y = tt * 0.8; o.rotation.x = tt * 0.5; }
-      const fh = d.mount ? firstHead(b) : null;
+      const fh = d.mount && !(window.Loop && Loop.rOn && Loop.rOn()) ? firstHead(b) : null; // R54k round_yield：没有计时产出（回洞结算）
       if (fh) {
         b.timer += dt;
         if (b.timer >= d.mount.period) { b.timer = 0; const rs = resonance(b); let top = 0; for (const h of b.heads) if (h) { trigger(h, 'auto', d.mount.mult * rs.mul); burst(h.g.position, '#6a0008', 10, 0.8, 0.5, -6); top = Math.max(top, h.rec.c.rar); } SFX.soul(3, top); }
@@ -1308,7 +1309,7 @@ window.startGame = function () {
         b.g.userData.spin.rotation.y += dt * 0.5;
         b.timer += dt; const on = heads.filter(h => wheelOf(h) === b);
         on.forEach(h => { const dx = h.g.position.x - b.x, dz = h.g.position.z - b.z; const a = dt * 0.5; const c = Math.cos(a), s = Math.sin(a); h.g.position.x = b.x + dx * c - dz * s; h.g.position.z = b.z + dx * s + dz * c; h.g.rotateY(-a); });
-        if (b.timer >= d.period) { b.timer = 0; on.forEach((h, i) => setTimeout(() => { trigger(h, 'auto', 1); SFX.soul(i, h.rec.c.rar); }, i * 90)); }
+        if (b.timer >= d.period) { b.timer = 0; if (!(window.Loop && Loop.rOn && Loop.rOn())) on.forEach((h, i) => setTimeout(() => { trigger(h, 'auto', 1); SFX.soul(i, h.rec.c.rar); }, i * 90)); }
       }
       if (b.g.userData.turn) { b.g.userData.turn.rotation.y += dt * 0.6; const h0 = b.heads && b.heads[0]; if (h0 && held !== h0) { h0.g.rotateOnWorldAxis(UP, dt * 0.6); seatHead(h0, b, 0); } drawPlaque(b); }
       if (b.g.userData.float) { const f = b.g.userData.float; f.rotation.y += dt * 0.6; f.position.y = 1.1 + Math.sin(now * 1.5) * 0.02; }

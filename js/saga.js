@@ -551,5 +551,5 @@ ${rwHTML(sg, win)}<div class="go"><button data-sgok>收下结算 ▶</button></d
     return `<div class="r3-goal" style="display:block;padding:14px 18px"><div style="font-size:20px;font-weight:900;color:#e8e0ff;letter-spacing:.2em">🌙 主线 · 月之魔女　${m ? '✔ 已斩杀' : cn >= D.NEED ? '· 神殿已开' : ''}</div><div style="margin:8px 0">${pips}<b style="font-size:20px;color:#fff;margin-left:8px">${cn}/${D.NEED}</b></div>${list || '<div style="font-size:15px;color:#b8a8d8">在各个地区斩下“月之使者”，或触发章节闪回，得到线索。集齐 7 条，月之魔女的神殿向你敞开。</div>'}</div>`;
   }
   const dbgBtn = null;
-  return { on, cam, get cine() { return CN; }, NEED: D.NEED, clues, goalHTML, gen, script, play, end, next, resolve, onKill, SS, banner, showSettle, FX_TXT, _setT: v => { T = v; }, get T() { return T; }, hint: v => `🌙 月之线索 ${clues()}/${D.NEED} · 月之魔女 ${v.m ? '✔' : '✘'}` };
+  return { on, cam, get cine() { return CN; }, NEED: D.NEED, clues, giveClue, goalHTML, gen, script, play, end, next, resolve, onKill, SS, banner, showSettle, FX_TXT, _setT: v => { T = v; }, get T() { return T; }, hint: v => `🌙 月之线索 ${clues()}/${D.NEED} · 月之魔女 ${v.m ? '✔' : '✘'}` };
 })();

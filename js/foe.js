@@ -254,6 +254,7 @@ window.Foe = (() => {
   // R53 MOD vh_bodies：js/vroid_pack.js 的 VRoid Hub 身体（VH_PACK[file] = {ref: 借用哪具基础身体的身份表}）并入对应身份的候选
   function vhExt(L, id) { if (!window.VH_PACK || (window.Mods && Mods.on && Mods.on('vh_bodies') === false)) return L; const out = L.slice(); for (const k in VH_PACK) if (VH_PACK[k].ids.includes(id)) out.push(k); return out; }
   function bodyFor(h, r, bossK, used) {
+    if (bossK && !BOSS_BODY[bossK]) bossK = h && h.c ? null : 'abbey'; // R54k：章节 BOSS（月之使徒）按她自己的身份挑身体
     if (window.CC0 && CC0.vroidOnly && CC0.vroidOnly()) { if (bossK) return VR_BOSS[bossK] || 'Vita'; const L = vhExt(VR_IDX[h && h.c && h.c.id] || CC0.VRF, h && h.c && h.c.id); const sd = (h && h.look && h.look.seed) || Math.floor(r() * 1e9); return L[CC0.hash(String(sd)) % L.length]; }
     if (window.CC0 && CC0.on() && window.Mods && Mods.on('id_outfit')) { const o = bossK ? OUTFIT_BOSS[bossK] : OUTFIT_ID[h && h.c && h.c.id]; if (o && (!window.BODY_LIST || BODY_LIST.includes(o))) return o; }
     const b = bodyFor0(h, r, bossK, used); return window.CC0 ? CC0.body(b, (h && h.look && h.look.seed) || 0) : b; } /* R38 CC0 模式：只用 CC0 身体 */
@@ -795,7 +796,7 @@ window.Foe = (() => {
     if (!(window.FoeAbs && FoeAbs.on)) dealt = Math.max(dealt, Math.round(fo.maxHp * (fo.boss ? 0.09 : 0.17) * (fo.floorK || 1) * (info.fmul || 1) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：一记正常的砍至少削掉 ~17% 血（≈6 刀），霸主 ~9%（≈11 刀）——实力差距再大也不会出现“砍 20 刀不死”
     if (!(window.FoeAbs && FoeAbs.on)) { fo.nHit = (fo.nHit || 0) + 1; const cap = Math.round((fo.boss ? 12 : 6) * (fo.capK || 1)); /* R34：区域强度大时保险刀数按比例增加 */ if (fo.nHit >= cap - 2) dealt = Math.max(dealt, Math.ceil(fo.hp / (cap + 1 - Math.min(fo.nHit, cap)))); } // 第二十六轮保险（用户：永远打不死）：不管护甲/角色/回血，普通敌人第 6 刀必死、霸主第 12 刀必死
     if (WP && !info.crit && Math.random() * 100 < WP.crit) { info.crit = true; dealt = Math.round(dealt * WP.critD / 100); } // 武器暴击
-    if (window.Talents) { const d2 = Talents.outDmg(fo, info, dealt, zone, brk); if (isFinite(d2)) dealt = d2; } /* R36b：霸主/精英/猎手单刀上限 = 最大血量 10%，不可能再被一击秒杀 */ if (fo.boss || fo.hunter || fo.eliteId) dealt = Math.min(dealt, Math.max(1, Math.ceil(fo.maxHp * 0.1))); // R36：属性/天赋/暴击/背刺/印记
+    if (window.Talents) { const d2 = Talents.outDmg(fo, info, dealt, zone, brk); if (isFinite(d2)) dealt = d2; } if (window.Rogue) { const d3 = Rogue.outDmg(fo, info, dealt, zone, brk); if (isFinite(d3)) dealt = d3; } /* R54k rogue_boons */ /* R36b：霸主/精英/猎手单刀上限 = 最大血量 10%，不可能再被一击秒杀 */ if (fo.boss || fo.hunter || fo.eliteId) dealt = Math.min(dealt, Math.max(1, Math.ceil(fo.maxHp * 0.1))); // R36：属性/天赋/暴击/背刺/印记
     const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.12; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk || !!info.crit);
     { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp * (WP ? WP.kb : 1)); fo.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退：0.16 秒内推完（以前是一帧内整段位移 = “瞬移”）
     ctx.event && ctx.event('hit', fo, { dealt, zone, brk, kind: info.kind, spd, charged: info.charged, crit: info.crit, skill: info.skill, spell: info.spell, proc: info.proc });

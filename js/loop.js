@@ -5,9 +5,12 @@
 // ③ 清空地点：杀光一个地点的人有清空奖励；离开时按清空程度结算（越干净越多）。
 // ④ 肉鸽开局：每个新存档随机 2 条“世道”（全局规则），每一局都不一样。
 // ⑤ 新宿敌：被你逃掉的老兵以上敌人（她正在追你时你离开了地点）会记住你，成为宿敌并随时间变强（由 nemesis 派出）。
+// R54k：章节 BOSS 是独立的 7 位「月之使徒」+ 独立擂台（不再把地区霸主搬过去）；round_yield：首级不再靠点，每次回洞按建筑规则定量结算 + 套装。
 window.Loop = (() => {
   const on = () => !window.Mods || Mods.on('run_loop') !== false;
+  const rOn = () => on() && (!window.Mods || Mods.on('round_yield') !== false);
   const G = () => window.G, W = () => (window.Worlds && Worlds.active ? Worlds._W : null);
+  const toast = (t, c, s) => { try { G().toast(t, c, s); } catch (e) { } };
   const plv = () => { try { return RPG.lvOf(G().S.xp).lv; } catch (e) { return 1; } };
   const MODS = [
     { k: 'bloodmoon', n: '血月之年', d: '敌人生命 +20%，回合产出 +25%', ehp: 1.2, pay: 1.25 },
@@ -22,36 +25,80 @@ window.Loop = (() => {
   function R() {
     const S = G().S; if (!S.run) { const pool = MODS.slice(), m = []; for (let i = 0; i < 2; i++) m.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].k);
       S.run = { chap: 1, n: 0, round: 0, cave: 0, bonus: 0, last: 0, mods: m, boss: false, regs: [] }; setTimeout(() => { try { G().toast(`🎲 这一局的世道：${m.map(k => MODS.find(x => x.k === k).n).join(' · ')}（出洞选地点面板可查看规则）`, '#e8d0ff', 5); } catch (e) { } }, 4000); }
-    return S.run;
+    const r = S.run; if (r.stash == null) r.stash = 0; r.src = r.src || {}; r.nb = r.nb || {}; r.bst = r.bst || {}; r.cbk = r.cbk || [];
+    return r;
   }
   const mod = (f, def) => { if (!on()) return def; let v = def; for (const k of R().mods) { const M = MODS.find(x => x.k === k); if (M && M[f] != null) v = typeof def === 'number' && def === 1 ? v * M[f] : v + M[f]; } return v; };
-  // ---- 玩家/敌人倍率（被 nemesis / living 读取）----
-  const runDmg = () => 1 + mod('dmg', 0), runHp = () => 1 + mod('hp', 0), runSpd = () => 1 + mod('spd', 0), enemyHp = () => mod('ehp', 1), enemyDmg = () => mod('edmg', 1), nemRate = () => mod('nem', 1), enemyLv = () => mod('elv', 0);
+  // ---- 玩家/敌人倍率（被 nemesis / living 读取）；nb = 上回合建筑给的「下一趟」祝福；Rogue = 本局肉鸽流派/祝福 ----
+  const nb = () => (on() && R().nb) || {};
+  const RG = k => (window.Rogue && Rogue.on && Rogue.on() && Rogue[k] ? Rogue[k]() : 1);
+  let wc = { t: 0, v: 0 };
+  function ward() { const n = performance.now(); if (n - wc.t < 2000) return wc.v; wc.t = n; let k = 0; try { for (const h of G().heads || []) if (h && h.mount && h.mount.type === 'rh_palisade') k++; } catch (e) { } wc.v = Math.min(0.45, k * 0.08); return wc.v; }
+  const runDmg = () => (1 + mod('dmg', 0) + (nb().dmg || 0)) * RG('dmgK'), runHp = () => (1 + mod('hp', 0) + (nb().hp || 0)) * RG('hpK'), runSpd = () => (1 + mod('spd', 0) + (nb().spd || 0)) * RG('spdK');
+  const enemyHp = () => mod('ehp', 1) * (1 - Math.min(0.3, nb().fear || 0)), enemyDmg = () => mod('edmg', 1), nemRate = () => mod('nem', 1) * (1 - ward()), enemyLv = () => mod('elv', 0);
   const chapLv = () => on() ? (R().chap - 1) * 5 : 0;
-  // ---- BOSS 回合 ----
-  const BREG = () => { const L = (window.Lore && Lore.LOCS) || []; const done = R().regs; const k = L.map(l => l.k).filter(k => window.Explore && Explore.BOSSES[k]); return k[Math.min(k.length - 1, R().chap - 1)] || (L[0] && L[0].k) || 'village'; };
+  // ---- 章节 BOSS：月之巫女的七使徒，各有独立擂台（地区霸主仍在各自地区最深处，互不相干）----
+  const CHB = [
+    { n: '伊莎贝拉', title: '银镰修女', race: 'human', id: 'nun', traits: ['虔诚', '冷酷'], belief: '月之巫女', goal: '替月亮收割第一批首级', pow: 2.0, col: '#c8d4ff', place: '月蚀礼拜堂', base: 'abbey',
+      look: { hn: '银白', hc1: '#eef0fa', hc2: '#9aa2c8', en: '冰蓝', ec1: '#8ad0ff', ec2: '#e8f6ff', acc: ['tiara'] },
+      intro: '礼拜堂的彩窗只剩一片：一轮被咬掉一角的月亮。修女跪在祭坛前磨镰刀，磨刀声和祷词一个节拍。', say: '月亮说你的头很好看。我只是来取货的。',
+      taunt: ['阿门。', '跪下，好让我够得着。', '月亮在看。'], hurt: ['……主啊。', '你在玷污圣所。'], win: '回去吧。月亮还没准备好收你。', lose: '……月亮……会另派人来……', story: '月之巫女的第一位使徒。她把礼拜堂改成了收头的地方，祷词里的「主」早就换了人。' },
+    { n: '薇洛妮卡', title: '蜡面伯爵夫人', race: 'vampire', id: 'countess', traits: ['高傲', '腹黑'], belief: '月之巫女', goal: '把世上最美的脸都封进蜡里', pow: 2.1, col: '#ff9ab8', place: '千烛长廊', base: 'capital',
+      look: { hn: '酒红', hc1: '#a0203a', hc2: '#3a0812', en: '血红', ec1: '#ff3050', ec2: '#ffb0c0', acc: ['crown'] },
+      intro: '长廊两侧站满了蜡像，每一座都是她请来做客的贵族。蜡还没干透的那一座，正朝你微笑。', say: '你来得正好，我的收藏还缺一张粗糙的脸。',
+      taunt: ['别乱动，蜡会歪。', '真不优雅。', '微笑，亲爱的。'], hurt: ['我的妆！', '你弄花了我的脸！'], win: '走吧。改天我派人接你来——做成蜡像。', lose: '……蜡……要化了……', story: '把客人封进蜡里的伯爵夫人。长廊里一千根蜡烛，每一根都曾是一个名字。' },
+    { n: '赛菈', title: '狼月猎手', race: 'beast', id: 'huntress', traits: ['好战', '冷静'], belief: '月之巫女', goal: '在嚎月石林的最高处挂上你的头骨', pow: 2.2, col: '#ffb060', place: '嚎月石林', base: 'wilds',
+      look: { hn: '灰白', hc1: '#d8d8dc', hc2: '#6a6a74', en: '琥珀', ec1: '#ffb020', ec2: '#ffe090', feat: 'beast', paint: 1, paintC: '#3a3a60' },
+      intro: '石柱上挂满猎物的头骨，最高那根还空着一个位置。银发猎手蹲在柱顶，舔了舔刀背。', say: '食人魔的头骨，挂在最上面正合适。',
+      taunt: ['跑啊。', '我闻到你怕了。', '嗷呜——！'], hurt: ['哈！', '好硬的皮。'], win: '下次跑快点，猎物。', lose: '……柱子……就空着吧……', story: '月光下狩猎的兽人女猎手，月之巫女的猎犬。' },
+    { n: '艾琳', title: '雾纱新娘', race: 'elf', id: 'lady', traits: ['温柔', '偏执'], belief: '月之巫女', goal: '让每位宾客永远留在婚礼上', pow: 2.3, col: '#bff0e0', place: '雾纱婚礼堂', base: 'forest',
+      look: { hn: '淡金', hc1: '#f4e8b8', hc2: '#c8b070', en: '翡翠', ec1: '#40e0a0', ec2: '#d0fff0', feat: 'elf', acc: ['tiara'] },
+      intro: '婚礼堂里坐满了宾客，全都没有头。新娘撩起雾纱，问你是不是她等的那个人。', say: '你来了……你是来娶我的，对吧？对吧？',
+      taunt: ['别走。', '说你愿意。', '我们会很幸福的。'], hurt: ['你……弄疼我了。', '为什么？'], win: '婚礼改期了。你会回来的。', lose: '……我……愿意……', story: '婚礼当天被抛弃的精灵新娘，从此每位客人都会被留下来。' },
+    { n: '玛格丽特', title: '白骨审判官', race: 'human', id: 'inquisitor', traits: ['严谨', '冷酷'], belief: '月之巫女', goal: '给世上每一颗头定罪', pow: 2.4, col: '#f0e6c8', place: '骸骨审判庭', base: 'fortress',
+      look: { hn: '墨黑', hc1: '#2a2a30', hc2: '#0a0a0e', en: '灰白', ec1: '#d8d8d0', ec2: '#ffffff' },
+      intro: '审判庭的长椅是骨头拼的，法槌是一截大腿骨。她翻开卷宗：你的名字下面已经写满了罪名。', say: '被告食人魔，罪名：太多了。判决：斩首。',
+      taunt: ['肃静！', '罪加一等。', '下一项罪名——'], hurt: ['藐视法庭！', '反对无效！'], win: '休庭。下次开庭，你必须到场。', lose: '……判决……驳回……', story: '月之巫女的审判官，从不判无罪。' },
+    { n: '千夜', title: '双月巫祝', race: 'human', id: 'foxmiko', traits: ['狡黠', '神秘'], belief: '月之巫女', goal: '让第二个月亮永远挂在天上', pow: 2.5, col: '#ff8ad8', place: '双月神社', base: 'peak',
+      look: { hn: '雪白', hc1: '#ffffff', hc2: '#d8c8e8', en: '紫红', ec1: '#ff40a0', ec2: '#ffd0f0', feat: 'beast' },
+      intro: '山顶鸟居后面升起了两个月亮。巫女摇着铃，一个月亮在笑，另一个在哭。', say: '两个月亮，一个要你的头，一个要你的魂。你选哪个？',
+      taunt: ['铃——', '月亮转过来了。', '嘻嘻。'], hurt: ['哎呀。', '铃声乱了。'], win: '下次，两个月亮都会等你。', lose: '……月亮……只剩一个了……', story: '侍奉两个月亮的狐巫女。她说其中一个是假的，但她也不确定是哪个。' },
+    { n: '露西菲娅', title: '堕月天使', race: 'angel', id: 'fallen', traits: ['高傲', '绝望'], belief: '月之巫女', goal: '拦住一切走向月亮的人', pow: 2.6, col: '#b090ff', place: '堕月深渊', base: 'abyss',
+      look: { hn: '夜紫', hc1: '#4a3a80', hc2: '#10081e', en: '金', ec1: '#ffd040', ec2: '#fff4c0', feat: 'halo' },
+      intro: '深渊里倒悬着一片天空，天使从月亮上坠下来，翅膀还在燃烧。她是巫女最后的屏障。', say: '我从月亮上掉下来，就是为了拦住你。',
+      taunt: ['坠落吧。', '月亮不会救你。', '跪下，罪人。'], hurt: ['……光在熄灭……', '你竟敢！'], win: '回去。月之巫女还轮不到见你。', lose: '……巫女大人……对不起……', story: '月之巫女最忠诚的护卫，曾经是天使。' }
+  ];
+  function CB(ch) { ch = ch || R().chap; const B = CHB[(ch - 1) % CHB.length]; return Object.assign({}, B, { k: 'ch' + ch, ch, pow: B.pow + 0.3 * Math.floor((ch - 1) / CHB.length) }); }
+  const chBoss = k => CB(parseInt(String(k).slice(2), 10) || R().chap);
+  const bossLv = () => 5 + 6 * (R().chap - 1) + enemyLv();
+  function arena() { const B = CB(), L = (window.Lore && Lore.LOCS) || [], li = Math.min(L.length - 1, Math.round((R().chap - 1) * 1.3)); return { k: B.k, place: B.place, rec: (L[li] && L[li].rec) || 100 }; }
   let bossTrip = false;
   const isBossTrip = () => on() && bossTrip;
   function bossCard() {
-    const k = BREG(), B = window.Explore && Explore.BOSSES[k], L = (window.Lore && Lore.LOCS.find(l => l.k === k)) || { n: k, rec: 100 }; if (!B) return '';
-    const base = 1 + 4 * Math.max(0, Lore.LOCS.findIndex(l => l.k === k)), lv = base + 4 + chapLv() + enemyLv(), d = lv - plv(), hk = Math.max(0.7, Math.min(4, Math.pow(1.1, d))) * enemyHp(), dk = Math.max(0.7, Math.min(3, Math.pow(1.07, d))) * enemyDmg();
-    return `<div id="lpBoss" style="--bc:${B.col || '#ffd060'}"><div class="t">第 ${R().chap} 章 · BOSS 战</div><div class="n">👑 ${B.n} <small>${B.title} · ${L.n}</small></div>
-<div class="s"><span>等级 <b>Lv.${lv}</b>（你 Lv.${plv()}${d >= 6 ? ' · <i>极度危险</i>' : d >= 2 ? ' · 危险' : ''}）</span><span>生命 ×<b>${hk.toFixed(2)}</b></span><span>伤害 ×<b>${dk.toFixed(2)}</b></span><span>威压 ×${(B.pow || 1).toFixed(1)}</span><span>${B.traits ? B.traits.join(' · ') : ''}</span></div>
-<p>你已经在本章去过 2 个地区。洞口被月光封住，只剩一条路——去「${L.n}」的最深处，砍下她的头。打赢进入第 ${R().chap + 1} 章；逃回来下次还是她。</p><button data-lp="boss">⚔️ 迎战</button></div>`;
+    const B = CB(), lv = bossLv(), d = lv - plv(), hk = Math.max(0.7, Math.min(4, Math.pow(1.1, d))) * enemyHp(), dk = Math.max(0.7, Math.min(3, Math.pow(1.07, d))) * enemyDmg();
+    return `<div id="lpBoss" style="--bc:${B.col}"><div class="t">第 ${R().chap} 章 · 章节 BOSS · 月之使徒 ${(B.ch - 1) % CHB.length + 1}/${CHB.length}</div><div class="n">👑 ${B.n} <small>${B.title} · 擂台「${B.place}」</small></div>
+<div class="s"><span>等级 <b>Lv.${lv}</b>（你 Lv.${plv()}${d >= 6 ? ' · <i>极度危险</i>' : d >= 2 ? ' · 危险' : ''}）</span><span>生命 ×<b>${hk.toFixed(2)}</b></span><span>伤害 ×<b>${dk.toFixed(2)}</b></span><span>威压 ×${B.pow.toFixed(1)}</span><span>${B.traits.join(' · ')}</span></div>
+<p>${B.intro}</p><p>她不是哪个地区的霸主——她是月之巫女的「${B.title}」，只在自己的擂台上等你。打赢：进入第 ${R().chap + 1} 章 + 1 条月之线索；逃回来：下次还是她。</p><button data-lp="boss">⚔️ 前往「${B.place}」</button></div>`;
   }
   function css() { if (document.getElementById('lpCss')) return; const s = document.createElement('style'); s.id = 'lpCss'; s.textContent = `
 #lpHead{margin:6px 0 10px;padding:8px 14px;border-left:3px solid #e1c07e;background:linear-gradient(90deg,#1a1410d0,transparent);font-size:13px;color:#e8dcc4;letter-spacing:.04em}#lpHead b{color:#ffd890}#lpHead small{color:#a89880}
 #lpBoss{margin:10px 0;padding:16px 18px;border:1px solid var(--bc);background:radial-gradient(120% 140% at 0 0,#2a1414ee,#0a0607f2);border-radius:4px}#lpBoss .t{font-size:12px;letter-spacing:.3em;color:#c8a8a0}#lpBoss .n{font-size:24px;color:var(--bc);margin:4px 0 8px;font-weight:700}#lpBoss .n small{font-size:13px;color:#c8b8a8;font-weight:400}
-#lpBoss .s{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:#e8d8c0}#lpBoss .s i{color:#ff7a6a;font-style:normal}#lpBoss p{font-size:13px;color:#b8a890;line-height:1.7}#lpBoss button{padding:9px 26px;border:1px solid var(--bc);background:linear-gradient(#4a1c14,#220c08);color:#ffe8c8;font-size:15px;letter-spacing:.2em;cursor:pointer;border-radius:3px}`; document.head.appendChild(s); }
+#lpBoss .s{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:#e8d8c0}#lpBoss .s i{color:#ff7a6a;font-style:normal}#lpBoss p{font-size:13px;color:#b8a890;line-height:1.7}#lpBoss button{padding:9px 26px;border:1px solid var(--bc);background:linear-gradient(#4a1c14,#220c08);color:#ffe8c8;font-size:15px;letter-spacing:.2em;cursor:pointer;border-radius:3px}
+#lpSettle{position:fixed;right:18px;top:84px;z-index:60;width:min(440px,92vw);max-height:78vh;overflow:auto;padding:14px 16px;background:linear-gradient(160deg,#1c1410f4,#0a0706f6);border:1px solid #c9a35e;border-radius:4px;color:#eadcc4;font:13px/1.6 "Microsoft YaHei UI",sans-serif;box-shadow:0 18px 60px #000a;opacity:0;transform:translateX(30px);transition:opacity .35s,transform .35s;pointer-events:none}
+#lpSettle.on{opacity:1;transform:none;pointer-events:auto}#lpSettle .h{font-size:16px;font-weight:700;color:#ffd890;letter-spacing:.1em;margin-bottom:6px}
+#lpSettle table{width:100%;border-collapse:collapse}#lpSettle td{padding:3px 4px;border-bottom:1px solid #ffffff12;vertical-align:top}#lpSettle td.v{color:#ffe08a;text-align:right;white-space:nowrap;font-weight:700}#lpSettle td.c{color:#a89880;white-space:nowrap}#lpSettle .nt{display:block;font-size:11px;color:#b8a890}
+#lpSettle .s{margin-top:6px;color:#c8e0ff;font-size:12px}#lpSettle .x{margin-top:4px;color:#ffc8a0;font-size:12px}#lpSettle .m{margin-top:6px;color:#a89880;font-size:12px}#lpSettle .t{margin-top:6px;font-size:22px;font-weight:800;color:#ffe08a;text-align:right}#lpSettle .k{font-size:11px;color:#8a7a68;text-align:right}`; document.head.appendChild(s); }
+  const nbText = o => [o.dmg ? `伤害 +${Math.round(o.dmg * 100)}%` : '', o.hp ? `生命 +${Math.round(o.hp * 100)}%` : '', o.spd ? `移速 +${Math.round(o.spd * 100)}%` : '', o.fear ? `敌人生命 -${Math.round(o.fear * 100)}%` : '', o.heal ? `每杀回血 ${Math.round(o.heal * 100)}%` : '', o.clear ? `清空奖励 +${Math.round(o.clear * 100)}%` : ''].filter(Boolean).join(' · ');
   function inject() {
     const host = document.querySelector('.rq-pick') || document.querySelector('.locs'); if (!host || !host.offsetParent || document.getElementById('lpHead')) return; css(); const r = R();
-    const h = document.createElement('div'); h.id = 'lpHead';
-    h.innerHTML = `📖 <b>第 ${r.chap} 章</b> · 本章已去 ${Math.min(2, r.n)}/2 个地区${r.n >= 2 ? ' · <b>只能迎战 BOSS</b>' : ''} · 回合 ${r.round} · 洞内收入 ${Math.round(r.cave)}/${capCave()}（超出转为下回合产出 +${Math.round(r.bonus * 100)}%）<br><small>世道：${r.mods.map(k => { const M = MODS.find(x => x.k === k); return M.n + '（' + M.d + '）'; }).join('；')}</small>`;
+    const h = document.createElement('div'); h.id = 'lpHead'; let hn = 0; try { hn = (G().heads || []).filter(x => x && x.mount).length; } catch (e) { }
+    const eco = rOn() ? ` · 在岗首级 <b>${hn}</b> 颗（每次回洞定量结算，上回合 +${r.last || 0}）· 洞内活动已存 ${Math.round(r.stash)}/${capCave()}` : ` · 洞内收入 ${Math.round(r.cave)}/${capCave()}（超出转为下回合产出 +${Math.round(r.bonus * 100)}%）`, bl = nbText(nb());
+    h.innerHTML = `📖 <b>第 ${r.chap} 章</b> · 本章已去 ${Math.min(2, r.n)}/2 个地区${r.n >= 2 ? ' · <b>章节 BOSS 战</b>' : ''} · 回合 ${r.round}${eco}${bl ? `<br>🎐 建筑给这一趟的祝福：<b>${bl}</b>` : ''}<br><small>世道：${r.mods.map(k => { const M = MODS.find(x => x.k === k); return M.n + '（' + M.d + '）'; }).join('；')}</small>`;
     host.parentNode.insertBefore(h, host);
-    if (r.n >= 2) { host.style.display = 'none'; const b = document.createElement('div'); b.innerHTML = bossCard(); host.parentNode.insertBefore(b, host); b.addEventListener('click', e => { if (!e.target.closest('[data-lp="boss"]')) return; e.stopPropagation(); bossTrip = true; try { UI._startTrip(BREG()); } catch (er) { bossTrip = false; console.warn(er); } }); }
+    if (r.n >= 2) { host.style.display = 'none'; const b = document.createElement('div'); b.innerHTML = bossCard(); host.parentNode.insertBefore(b, host); b.addEventListener('click', e => { if (!e.target.closest('[data-lp="boss"]')) return; e.stopPropagation(); try { UI._startTrip(CB().base); } catch (er) { bossTrip = false; console.warn(er); } }); }
   }
   // ---- 回合经济 ----
-  const capCave = () => Math.round(40 + 0.5 * (R().last || 60));
+  const capCave = () => rOn() ? Math.round(30 + 0.35 * (R().last || 60)) : Math.round(40 + 0.5 * (R().last || 60));
   function payout() {
     const r = R(); let v = 0, n = 0; try { for (const h of G().heads || []) { if (!h || !h.mount || !h.rec) continue; n++; v += 2 + 3 * ((h.rec.c && h.rec.c.rar) || 0); } } catch (e) { }
     const p = Math.round((10 + v) * (1 + r.bonus) * mod('pay', 1) * (1 + (r.chap - 1) * 0.15)); return { p, n, b: r.bonus };
@@ -61,21 +108,83 @@ window.Loop = (() => {
     if (extra > 0) { r.bonus = Math.min(0.6, r.bonus + extra / Math.max(60, r.last || 60) * 0.25); if (!caveGate.told) { caveGate.told = 1; try { G().toast(`🔒 本回合洞内收入已到上限 ${cap}——再把玩的魂晶转为下回合结算加成（现在 +${Math.round(r.bonus * 100)}%，最多 +60%）`, '#d8c8ff', 3.6); } catch (e) { } } }
     return keep;
   }
+  // ---- R54k round_yield：首级每次回洞按建筑规则定量结算（把玩不再给魂晶）；洞里小游戏赚的魂晶先存着，回合结算时一起发（有上限）----
+  const ROUND = {}; // 建筑类型 → (b, heads, ctx) => { v, note }（js/roundhalls.js 注册）
+  const BASE = [10, 20, 36, 60, 100];
+  const hv = h => { const c = h.rec.c; return BASE[Math.max(0, Math.min(4, c.rar | 0))] * (c.shiny ? 1.5 : 1) * (c.boss ? 2 : 1) * (h.rec.calm ? 1.1 : 1); };
+  const bf = d => !d || !d.mount || d.mount.mult === 0 ? 0 : Math.min(1.5, 0.85 + 0.12 * Math.min(5, d.mount.mult || 1)) + (d.showcase ? 0.15 : 0);
+  const raceN = k => (window.Lore && Lore.RACES && Lore.RACES[k] && Lore.RACES[k].n) || k;
+  const bkey = b => b.type + '@' + (+b.x).toFixed(1) + ',' + (+b.z).toFixed(1);
+  function settle(died) {
+    const g = G(), r = R(), C = (window.BuildCat && BuildCat.C) || {}, out = { lines: [], sets: [], notes: [], heads: 0, v: 0 };
+    const hs = (g.heads || []).filter(h => h && h.mount && h.rec && h.rec.c);
+    const setK = new Map(), add = (h, k) => setK.set(h, (setK.get(h) || 0) + k);
+    const group = f => { const m = {}; for (const h of hs) { const k = f(h); if (k) (m[k] = m[k] || []).push(h); } return m; };
+    const byRace = group(h => h.rec.c.race), byId = group(h => h.rec.c.id);
+    for (const k in byRace) { const L = byRace[k], n = L.length; if (n < 3) continue; const b = n >= 7 ? 0.8 : n >= 5 ? 0.45 : 0.2; L.forEach(h => add(h, b)); out.sets.push(`🧬 ${raceN(k)} ×${n}：这些首级 +${Math.round(b * 100)}%${n < 5 ? '（5 颗 +45%）' : n < 7 ? '（7 颗 +80%）' : ''}`); }
+    for (const k in byId) { const L = byId[k], n = L.length; if (n < 2) continue; const b = n >= 3 ? 0.6 : 0.3; L.forEach(h => add(h, b)); out.sets.push(`👥 同为「${L[0].rec.c.idN || k}」×${n}：+${Math.round(b * 100)}%${n < 3 ? '（3 颗 +60%）' : ''}`); }
+    if (new Set(hs.map(h => h.rec.c.rar | 0)).size >= 5) { hs.forEach(h => add(h, 0.25)); out.sets.push('🌈 凡/灵/英/圣/神 五阶齐全：全部 +25%'); }
+    const ctx = { r, g, hv, setK, nb: {}, rm: [], boons: 0, notes: out.notes, val: (h, k = 1) => hv(h) * k * (1 + (setK.get(h) || 0)), st: b => (r.bst[bkey(b)] = r.bst[bkey(b)] || {}), bless: (k, v) => { ctx.nb[k] = (ctx.nb[k] || 0) + v; } };
+    const byB = new Map(); for (const h of hs) { if (!byB.has(h.mount)) byB.set(h.mount, []); byB.get(h.mount).push(h); }
+    for (const [b, L] of byB) {
+      const d = C[b.type]; if (!d) continue; let v = 0, note = ''; const fn = ROUND[b.type];
+      if (fn) { try { const o = fn(b, L, ctx) || {}; v = o.v || 0; note = o.note || ''; } catch (e) { console.warn('round', b.type, e); } }
+      else { const f = bf(d); for (const h of L) v += ctx.val(h, f); note = f ? `每颗 ×${f.toFixed(2)}` : '这座建筑不产魂晶'; }
+      v = Math.max(0, Math.round(v)); out.v += v; out.heads += L.length; out.lines.push({ t: b.type, ic: d.icon, n: d.n, k: L.length, v, note });
+    }
+    const chK = 1 + (r.chap - 1) * 0.2, pay = mod('pay', 1), ex = g.exhibit ? 1 + g.exhibit().tier * 0.04 : 1;
+    out.mul = { chK, pay, ex }; out.stash = Math.round(r.stash || 0); out.src = Object.assign({}, r.src);
+    out.tot = Math.round((10 + out.v) * chK * pay * ex) + out.stash; out.died = died; out.nb = ctx.nb; out.boons = ctx.boons;
+    for (const h of ctx.rm) { try { g.burst && g.burst(h.g.position, '#ff8a3a', 30, 1.6, 0.8, 1); g.removeHead(h); } catch (e) { } }
+    r.nb = ctx.nb; if (ctx.rm.length) try { g.save(); } catch (e) { }
+    return out;
+  }
+  const SRCN = { curios: '🎡 洞内玩意', rites: '🕯️ 祭仪', oddities: '🫖 奇物', sanctum: '🗄️ 藏首', play: '🎳 魂球/盗魂灵', props: '🧰 摆件', chess: '♟️ 头棋胜局' };
+  function showSettle(P) {
+    css(); let el = document.getElementById('lpSettle'); if (!el) { el = document.createElement('div'); el.id = 'lpSettle'; document.body.appendChild(el); el.addEventListener('click', () => el.classList.remove('on')); }
+    const M = new Map(); for (const l of P.lines) { const o = M.get(l.t) || { ic: l.ic, n: l.n, k: 0, v: 0, b: 0, nt: new Set() }; o.k += l.k; o.v += l.v; o.b++; if (l.note) o.nt.add(l.note); M.set(l.t, o); }
+    const rows = [...M.values()].sort((a, b) => b.v - a.v).map(o => `<tr><td>${o.ic} ${o.n}${o.b > 1 ? ` ×${o.b}` : ''}<span class="nt">${[...o.nt].slice(0, 2).join('；')}</span></td><td class="c">${o.k} 颗</td><td class="v">+${o.v}</td></tr>`).join('');
+    const src = Object.keys(P.src || {}).filter(k => P.src[k] > 0).map(k => `${SRCN[k] || k} +${Math.round(P.src[k])}`).join(' · ');
+    el.innerHTML = `<div class="h">🔄 第 ${R().round} 回合结算${P.died ? ' <small style="color:#ff9a8a">（你倒下了——首级照常结算）</small>' : ''}</div>
+${rows ? `<table>${rows}</table>` : '<div class="m">没有首级在岗。把首级插到建筑上，下次回洞就有产出——不同建筑规则不同。</div>'}
+${P.sets.length ? `<div class="s">${P.sets.join('<br>')}</div>` : '<div class="m">套装：同族 3/5/7 颗、同身份 2/3 颗、五阶齐全都有加成。</div>'}
+${P.notes.length ? `<div class="x">${P.notes.join('<br>')}</div>` : ''}
+${P.boons ? `<div class="x">🎴 额外祝福抉择 ×${P.boons}</div>` : ''}${nbText(P.nb) ? `<div class="x">🎐 下一趟祝福：${nbText(P.nb)}</div>` : ''}
+<div class="m">底薪 +10 · 第 ${R().chap} 章 ×${P.mul.chK.toFixed(2)} · 世道 ×${P.mul.pay.toFixed(2)} · 展厅评级 ×${P.mul.ex.toFixed(2)}${P.stash ? `<br>洞内活动（${src || '存着的'}）+${P.stash}` : ''}</div>
+<div class="t">🔮 +${P.tot}</div><div class="k">点击关闭 · 首级每回合只结算一次，摆得越巧越多</div>`;
+    el.classList.add('on'); clearTimeout(showSettle.t); showSettle.t = setTimeout(() => el.classList.remove('on'), 16000);
+    try { SFX.coins && SFX.coins(); } catch (e) { }
+  }
+  const CAVE_SRC = /\/js\/(curios|rites|oddities|sanctum|play|props|chess)\.js/;
+  function stash(n, src) {
+    const r = R(), cap = capCave(), keep = Math.max(0, Math.min(n, cap - r.stash)); r.stash += keep; r.src[src] = (r.src[src] || 0) + keep;
+    if (!stash.told) { stash.told = 1; toast(`📦 洞里赚的魂晶不会马上到手——下次回洞的回合结算时一起发（本回合已存 ${Math.round(r.stash)}/${cap}）`, '#d8c8ff', 3.6); }
+    if (keep < n && !stash.full) { stash.full = 1; toast(`🔒 本回合洞内活动收益已满 ${cap}——再玩也不会多了，出去打猎吧`, '#c8b8ff', 3.2); }
+  }
+  function wrapCoins() {
+    const g = G(); if (!g || !g.addCoins || g.addCoins.__lp) return; const f = g.addCoins;
+    g.addCoins = function (n) { if (n > 0 && rOn() && !W()) { const m = CAVE_SRC.exec(new Error().stack || ''); if (m) { stash(n, m[1]); return; } } return f.apply(this, arguments); }; g.addCoins.__lp = 1;
+  }
   function roundEnd(died) {
-    const r = R(); r.round++; caveGate.told = 0;
-    if (bossTrip) { const won = W0won(); if (won) { r.chap++; r.n = 0; try { G().toast(`📖 第 ${r.chap - 1} 章完结！进入第 ${r.chap} 章——之后的 BOSS 会更强`, '#ffd890', 4.5); } catch (e) { } } }
+    const r = R(); r.round++; caveGate.told = 0; stash.told = stash.full = 0;
+    if (bossTrip) { if (W0won()) { const B = CB(); r.cbk.push({ ch: r.chap, n: B.n, t: B.title, at: Date.now() }); r.chap++; r.n = 0; try { window.Rogue && Rogue.grant && Rogue.grant(1, '月之使徒倒下'); } catch (e) { } toast(`📖 第 ${r.chap - 1} 章完结！「${B.title}」${B.n} 倒下了——进入第 ${r.chap} 章，下一位月之使徒更强`, '#ffd890', 5);
+      try { if (window.Saga && Saga.giveClue) { const d = Saga.giveClue('chapboss'); if (d && Saga.banner) setTimeout(() => Saga.banner('🌙 月之线索 +1', d.t.replace(/^“|”$/g, ''), `月之线索 ${Saga.clues()}/${Saga.NEED}`, '#c8b8ff', 6000), 3000); } } catch (e) { } } }
     else if (!died) r.n = Math.min(2, r.n + 1);
     bossTrip = false;
-    if (died) { r.cave = 0; r.bonus = 0; return; }
-    const P = payout(); G().addCoins(P.p); r.last = P.p; r.cave = 0; r.bonus = 0;
-    setTimeout(() => { try { G().toast(`🔄 回合 ${r.round} 结算：魂晶 +${P.p}（摆出的首级 ${P.n} 颗${P.b ? ` · 上回合把玩/头棋加成 +${Math.round(P.b * 100)}%` : ''}）`, '#ffe0a0', 4.2); } catch (e) { } }, 1600);
+    if (!rOn()) {
+      if (died) { r.cave = 0; r.bonus = 0; return; }
+      const P = payout(); G().addCoins(P.p); r.last = P.p; r.cave = 0; r.bonus = 0;
+      setTimeout(() => { try { G().toast(`🔄 回合 ${r.round} 结算：魂晶 +${P.p}（摆出的首级 ${P.n} 颗${P.b ? ` · 上回合把玩/头棋加成 +${Math.round(P.b * 100)}%` : ''}）`, '#ffe0a0', 4.2); } catch (e) { } }, 1600);
+      return;
+    }
+    setTimeout(() => { try { const P = settle(died); G().addCoins(P.tot); r.last = P.tot; r.stash = 0; r.src = {}; showSettle(P); if (window.Rogue && Rogue.on && Rogue.on()) { Rogue.roundPick(); if (P.boons) Rogue.grant(P.boons, '建筑'); } try { G().save(); } catch (e) { } } catch (e) { console.warn('settle', e); } }, 1500);
   }
   let bossKilledThisTrip = false; const W0won = () => bossKilledThisTrip;
   // ---- 清空地点 ----
   function nodeStat() { const w = W(); if (!w || !w.foes) return null; const all = w.foes.filter(f => !f.hunter2 && !f.nemClone && !f.nemX), dead = all.filter(f => f.dead && !f.escaped).length; return { all: all.length, dead }; }
   function clearReward(final) {
     const w = W(), st = nodeStat(); if (!w || !st || !st.all || !node0 || node0.paid) return; const ratio = st.dead / st.all; if (!final && ratio < 1) return; node0.paid = 1;
-    const base = (w.graph.loc && w.graph.loc.loot ? (w.graph.loc.loot[0] + w.graph.loc.loot[1]) / 2 : 20) * 0.25 * st.all, c = Math.round(base * ratio * ratio * mod('clear', 1));
+    const base = (w.graph.loc && w.graph.loc.loot ? (w.graph.loc.loot[0] + w.graph.loc.loot[1]) / 2 : 20) * 0.25 * st.all, c = Math.round(base * ratio * ratio * mod('clear', 1) * (1 + (nb().clear || 0)));
     if (c <= 0) return; G().addCoins(c); try { w.trip.coins += c; } catch (e) { }
     try { G().toast(ratio >= 1 ? `🏁 地点清空！所有 ${st.all} 人都倒下了 · 清空奖励 🔮+${c}` : `🏳️ 离开时清空 ${Math.round(ratio * 100)}% · 奖励 🔮+${c}`, ratio >= 1 ? '#ffd890' : '#d8c8b0', 3); SFX.coins && SFX.coins(); } catch (e) { }
   }
@@ -86,16 +195,16 @@ window.Loop = (() => {
   }
   let wasW = null, node0 = null;
   function tick() {
-    if (!on() || !G() || !G().S) return; R(); const w = W();
+    if (!on() || !G() || !G().S) return; R(); wrapCoins(); const w = W();
     if (w !== wasW) { if (w && !wasW) { bossKilledThisTrip = false; if (!bossTrip) R().regs.push(w.graph && w.graph.loc ? w.graph.loc.k : ''); } if (!w && wasW) roundEnd(!!wasW.dead || (G().S.hp <= 0)); wasW = w; node0 = null; }
     if (w) { if (!w.busy && w.B && !w.B.corr && (!node0 || node0.i !== w.cur)) node0 = { i: w.cur }; clearReward(false); if (bossTrip && window.Foe && Foe.foes.some(f => f.boss && f.dead)) bossKilledThisTrip = true; }
     else inject();
   }
   setInterval(() => { try { tick(); } catch (e) { } }, 500);
-  // 本章已去 2 个地区 → 任何出发入口（地点卡 / 委托 / 精英）都改为迎战本章 BOSS
-  function wrapStart() { if (!window.UI || !UI._startTrip || UI._startTrip.__lp) return; const f = UI._startTrip; UI._startTrip = function (k) { if (on() && G() && G().S && R().n >= 2) { k = BREG(); bossTrip = true; } else bossTrip = false; return f.call(this, k); }; UI._startTrip.__lp = 1; }
+  // 本章已去 2 个地区 → 任何出发入口（地点卡 / 委托 / 精英）都改为前往本章 BOSS 的独立擂台
+  function wrapStart() { if (!window.UI || !UI._startTrip || UI._startTrip.__lp) return; const f = UI._startTrip; UI._startTrip = function (k) { if (on() && G() && G().S && R().n >= 2) { k = CB().base; bossTrip = true; } else bossTrip = false; return f.call(this, k); }; UI._startTrip.__lp = 1; }
   wrapStart(); setTimeout(wrapStart, 0);
-  // 每杀一人回血（世道“盛宴”）
-  function onKill() { const h = mod('heal', 0); if (h > 0) try { const s = G().st(); G().S.hp = Math.min(s.maxHp, G().S.hp + s.maxHp * h); } catch (e) { } }
-  return { on, R, MODS, runDmg, runHp, runSpd, enemyHp, enemyDmg, nemRate, enemyLv, chapLv, isBossTrip, leaveNode, onKill, payout, capCave, caveGate };
+  // 每杀一人回血（世道“盛宴” / 议会祝福）
+  function onKill() { const h = mod('heal', 0) + (nb().heal || 0); if (h > 0) try { const s = G().st(); G().S.hp = Math.min(s.maxHp, G().S.hp + s.maxHp * h); } catch (e) { } }
+  return { on, rOn, R, MODS, runDmg, runHp, runSpd, enemyHp, enemyDmg, nemRate, enemyLv, chapLv, isBossTrip, leaveNode, onKill, payout, capCave, caveGate, ROUND, hv, bf, settle, showSettle, stash, CB, CHB, chBoss, bossLv, arena, nb, ward };
 })();

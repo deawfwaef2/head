@@ -51,7 +51,7 @@ window.Living = (() => {
     if (!onL() || !fo) return; const w = W(), k = (w && w.graph && w.graph.loc && w.graph.loc.k) || (it && it.bossK) || 'village', R = on() && w && w.graph && w.graph.trip ? reg(k) : null;
     let t = 0; if (it && it.boss) t = 3; else { const x = Math.random(); let acc = 0; for (let i = 0; i < TIER.length; i++) { acc += TIER[i][2] * (i && R ? 1 + R.alert * 0.6 : 1); if (x <= acc) { t = i; break; } } } // 越警觉高阶的越多
     const LP = window.Loop && Loop.on() ? Loop : null; // R54i run_loop：章节 BOSS 等级固定可预知、每章 +5；世道改敌人等级/生命/伤害
-    const rg = TIER[t][3], lv = (it && it.boss && LP ? baseLv(k) + 4 + LP.chapLv() : baseLv(k) + rg[0] + Math.floor(Math.random() * (rg[1] - rg[0] + 1)) + (it && it.boss ? 2 : 0)) + (LP ? LP.enemyLv() : 0), d = lv - plv();
+    const rg = TIER[t][3], lv = (it && it.boss && LP ? (LP.isBossTrip() && LP.bossLv ? LP.bossLv() - LP.enemyLv() : baseLv(k) + 4 + LP.chapLv()) : baseLv(k) + rg[0] + Math.floor(Math.random() * (rg[1] - rg[0] + 1)) + (it && it.boss ? 2 : 0)) + (LP ? LP.enemyLv() : 0), d = lv - plv();
     fo.lvl = lv; fo.tier = t;
     const hk = Math.max(0.7, Math.min(4, Math.pow(1.1, d))) * (LP ? LP.enemyHp() : 1), dk = Math.max(0.7, Math.min(3, Math.pow(1.07, d))) * (LP ? LP.enemyDmg() : 1);
     fo.maxHp = fo.hp = Math.max(6, Math.round(fo.maxHp * hk)); fo.dmgMul = (fo.dmgMul || 1) * dk; fo.iq = Math.min(1.3, (fo.iq || 0.5) + t * 0.12); if (t >= 2) fo.brave = true;
