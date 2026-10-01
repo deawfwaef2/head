@@ -228,7 +228,7 @@ window.Talents = (() => {
     const t = nowS(); if ((M.cds[id] || 0) > t) { sfx('thud', 0.15, 2); return false; } if (M.gcd > t) return false;
     const s = g.st(); let cost = sk.cost || 0, over = false;
     if (spellInfo(id) && agg().over && Math.random() * 100 < agg().over) { cost = 0; over = true; }
-    if (cost > M.mana + 0.01) { toast('魂能不足', '#7ad8ff', 0.7); sfx('thud', 0.15, 2); return false; }
+    if (cost > M.mana + 0.01) { let shown = false; try { shown = !!(window.HpCenter && HpCenter.manaFail && HpCenter.manaFail(cost - M.mana)); } catch (e) { } if (!shown) toast('魂能不足', '#7ad8ff', 0.7); sfx('thud', 0.15, 2); return false; }
     if (sk.hp && g.S.hp <= s.maxHp * 0.12) return castFail('生命太低，无法献祭');
     if (sk.st && window.Combat && Combat.state && !Combat.useStam(sk.st)) return castFail('体力不足');
     const ok = S_[id] ? S_[id]({ over, sk, s, W }) : false; if (ok === false) return false;
