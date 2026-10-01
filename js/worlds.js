@@ -232,7 +232,8 @@ window.Worlds = (() => {
   }
   async function need(names, onProg) {
     const list = [...new Set(names)].filter(n => !DONE[n]); let i = 0; list.forEach(script);
-    await Promise.all(list.map(async n => { await prep(n); i++; onProg && onProg(i / list.length, n); }));
+    const all = Promise.all(list.map(async n => { await prep(n); i++; onProg && onProg(i / list.length, n); }));
+    await Promise.race([all, new Promise(r => setTimeout(r, 30000))]); // R54：某个资产脚本一直不返回时不再永远卡在加载画面（缺的资产跳过）
   }
   // 后台预热队列：一次一个，主线程空闲时才做；进图/加载期间暂停（加载优先）
   const WQ = []; let wRun = false;
@@ -557,6 +558,16 @@ window.Worlds = (() => {
         }
       }
     }
+    // R54 MOD nat_gates：地点之间不再是突兀的铁门——按风格用两块巨石 / 两尊石像夹出一道山口，中间是缓缓流动的雾幕（必须在实例化之前摆）
+    const NG = !(window.Mods && Mods.on && Mods.on('nat_gates') === false);
+    const natOk = NG ? doorList.map(d => { try {
+      const arch = /ruins|fortress|capital/.test(node.style || ''), home = d.to < 0;
+      const vs = variants(arch && !home ? ['gothic_statue'] : ['namaqualand_boulder_03', 'namaqualand_boulder_04', 'rock_09']), rk = variants(['namaqualand_boulder_03', 'namaqualand_boulder_04', 'rock_09']);
+      if (!vs.length) return false; const sx = Math.cos(d.a + Math.PI / 2), sz = Math.sin(d.a + Math.PI / 2), ox = Math.cos(d.a), oz = Math.sin(d.a);
+      for (const sg of [-1, 1]) { const v = pick(r, vs), isS = v.n === 'gothic_statue', x = d.x + sx * sg * (isS ? 1.9 : 2.15) + ox * 0.35, z = d.z + sz * sg * (isS ? 1.9 : 2.15) + oz * 0.35;
+        const s = isS ? 2.7 / v.t.size.y : Math.min(2.9 / v.t.size.y, 2.3 / Math.max(v.t.size.x, v.t.size.z)); put(v.t, x, z, s, isS ? -d.a + Math.PI / 2 : r() * 6.28); cols.push({ x, z, r: isS ? 0.55 : 0.9 });
+        if (rk.length) { const v2 = pick(r, rk), x2 = x + sx * sg * 1.1 + ox * 0.6, z2 = z + sz * sg * 1.1 + oz * 0.6, s2 = Math.min(1.5 / v2.t.size.y, 1.6 / Math.max(v2.t.size.x, v2.t.size.z)); put(v2.t, x2, z2, s2, r() * 6.28); cols.push({ x: x2, z: z2, r: 0.6 }); } }
+      return true; } catch (e) { console.warn('nat_gates', e); return false; } }) : null;
     // 实例化
     if (g && g.wd) for (const M of [inst, instNS]) for (const [tm, ms] of M) { const k = ms.filter(m => m.keep || g.wd(m.elements[12], m.elements[14]).d >= 0); if (k.length !== ms.length) M.set(tm, k); } // 水里不长树/石头
     for (const [M, ns] of [[inst, false], [instNS, true]]) for (const [tm, ms] of M) for (const p of tm.parts) {
@@ -566,17 +577,41 @@ window.Worlds = (() => {
       im.instanceMatrix.needsUpdate = true; im.frustumCulled = false; im.castShadow = !ns && !(p.mat.alphaTest > 0 && tm.size.y < 1.2); im.receiveShadow = !ns; sc.add(im);
     }
     // 门
-    const doors = doorList.map(d => {
+    const doors = doorList.map((d, k) => {
       const home = d.to < 0, g = new THREE.Group(); g.position.set(d.x, H(d.x, d.z), d.z); g.rotation.y = -d.a - Math.PI / 2; sc.add(g);
-      const gate = window.Assets && Assets.fit(home ? 'large_castle_door' : 'large_iron_gate', { h: home ? 3.4 : 3.2 }); if (gate) { g.add(gate); }
+      const nat = natOk && natOk[k];
+      const gate = !nat && window.Assets && Assets.fit(home ? 'large_castle_door' : 'large_iron_gate', { h: home ? 3.4 : 3.2 }); if (gate) { g.add(gate); }
       // 门两侧灯笼 + 火光
-      for (const sx of [-1, 1]) { const ln = window.Assets && Assets.fit('Lantern_01', { h: 0.45, x: sx * 1.7, y: 2.2, z: 0.2 }); if (ln) g.add(ln); }
-      const pl = new THREE.PointLight(home ? '#ffb070' : '#9ab8ff', 1.4, 7, 2); pl.position.set(0, 2.4, 1.0); g.add(pl);
-      const label = makeLabel('', home ? '#ffd9a0' : '#cfe0ff'); label.position.set(0, 4.4, 0); g.add(label);
-      cols.push({ x: d.x + Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z + Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 }, { x: d.x - Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z - Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 });
-      return Object.assign(d, { g, label, home });
+      if (!nat) for (const sx of [-1, 1]) { const ln = window.Assets && Assets.fit('Lantern_01', { h: 0.45, x: sx * 1.7, y: 2.2, z: 0.2 }); if (ln) g.add(ln); }
+      else veil(g, home);
+      const pl = new THREE.PointLight(home ? '#ffb070' : '#9ab8ff', nat ? 1.0 : 1.4, 7, 2); pl.position.set(0, nat ? 1.6 : 2.4, 1.0); g.add(pl);
+      const label = makeLabel('', home ? '#ffd9a0' : '#cfe0ff'); label.position.set(0, nat ? 3.9 : 4.4, 0); g.add(label);
+      if (!nat) cols.push({ x: d.x + Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z + Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 }, { x: d.x - Math.cos(d.a + Math.PI / 2) * 1.7, z: d.z - Math.sin(d.a + Math.PI / 2) * 1.7, r: 0.45 });
+      return Object.assign(d, { g, label, home, nat });
     });
     return { grass: GR, site: LY.slots ? LY : null, sc, H, R, Rf: LP ? Rf : null, RM, edge: LP && LP.edge ? LP.edge : null, wx: (LPX && LPX.wx) || GD ? (dt, p, now) => { if (LPX && LPX.wx) LPX.wx(dt, p, now); if (GD) GD.update(dt, p, now); } : null, tag: [LP ? LP.tag : '', g ? g.tag.join(' · ') : ''].filter(Boolean).join(' · '), lp: LP, cols, doors, inter, sun, sunDir, terr, style: st, spots, lay: LY.k, bossAt: LY.boss ? new V3(LY.boss.x, 0, LY.boss.z) : null };
+  }
+  // R54 nat_gates：山口里的雾幕（纯着色器，共用一个材质/几何）+ 地面微光
+  let VEIL = null;
+  function veil(g, home) {
+    if (!VEIL) {
+      const mk = (col) => new THREE.ShaderMaterial({ uniforms: { uT: WIND, uC: { value: new THREE.Color(col) } }, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
+        vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: `uniform float uT; uniform vec3 uC; varying vec2 vUv;
+          float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+          float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1.0, 0.0)), f.x), mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), f.x), f.y); }
+          float fbm(vec2 p){ float a = 0.0, w = 0.5; for (int i = 0; i < 4; i++) { a += w * n(p); p *= 2.03; w *= 0.5; } return a; }
+          void main(){ vec2 uv = vUv; float e = smoothstep(0.0, 0.24, uv.x) * smoothstep(1.0, 0.76, uv.x) * smoothstep(0.0, 0.1, uv.y) * smoothstep(1.0, 0.5, uv.y);
+            vec2 p = vec2(uv.x * 2.4, uv.y * 2.6 - uT * 0.22); float f = fbm(p + 1.3 * fbm(p * 1.6 + vec2(uT * 0.07, -uT * 0.05)));
+            float a = e * (0.18 + 0.82 * smoothstep(0.25, 0.85, f)) * 0.78; gl_FragColor = vec4(uC * (0.55 + 1.35 * f), a); }` });
+      const gm = (col) => new THREE.ShaderMaterial({ uniforms: { uC: { value: new THREE.Color(col) } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+        vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: 'uniform vec3 uC; varying vec2 vUv; void main(){ float d = length(vUv - 0.5) * 2.0; gl_FragColor = vec4(uC * pow(max(0.0, 1.0 - d), 2.2) * 0.55, 1.0); }' });
+      VEIL = { geo: new THREE.PlaneGeometry(3.1, 3.3), ggeo: new THREE.PlaneGeometry(4.6, 4.6).rotateX(-Math.PI / 2), m: mk('#b8d4ff'), mh: mk('#ffd2a0'), g: gm('#7fa8ff'), gh: gm('#ffaa60') };
+    }
+    const v = new THREE.Mesh(VEIL.geo, home ? VEIL.mh : VEIL.m); v.position.set(0, 1.62, 0.1); v.renderOrder = 4; v.userData.noShadow = true; v.userData.veil = 1; g.add(v);
+    const v2 = v.clone(); v2.position.z = -0.35; v2.scale.set(0.85, 0.92, 1); g.add(v2);
+    const gl = new THREE.Mesh(VEIL.ggeo, home ? VEIL.gh : VEIL.g); gl.position.set(0, 0.06, 0.6); gl.renderOrder = 3; gl.userData.veil = 1; g.add(gl);
   }
   // 画布文字 → 精灵（门牌/气泡）
   function makeLabel(text, col) {
@@ -811,7 +846,7 @@ window.Worlds = (() => {
   function prefetchAdj(node) { if (!IL()) return; let k = 0; for (const b of node.adj) setTimeout(() => idle(() => { if (W && !W.busy && W.cur === node.i) prefetchNode(b); }), 1500 + 1200 * k++); }
   async function goto(i, from) {
     W.busy = true; const node = W.graph.nodes[i];
-    const fast = FL(); fadeTo(1); let fd = null;
+    const fast = FL(); fadeTo(1, true); let fd = null;
     if (fast) { fd = wait(260).then(() => { if (W) { W.dom.load.style.display = 'flex'; W.dom.loadT.textContent = `前往「${node.name}」……`; } }); } // R49：淡出与加载并行（不再先干等 260ms）
     else { await wait(260); W.dom.load.style.display = 'flex'; W.dom.loadT.textContent = `前往「${node.name}」……`; }
     const tg0 = performance.now(); PROF.length = 0;
@@ -877,7 +912,7 @@ window.Worlds = (() => {
   const wait = (ms) => new Promise(r => setTimeout(r, ms));
   function leaveHome() {
     const api = W.api, won = window.Explore && Explore.checkVictory ? Explore.checkVictory() : false;
-    W.busy = true; fadeTo(1);
+    W.busy = true; fadeTo(1, true);
     if ((window.Sack && Sack.on())) { W.trip.res.heads = W.trip.res.heads.filter(h => h.__boss).concat(Sack.heads()); Sack.tripEnd(); }
     tripStats();
     setTimeout(() => { stop(); api.finish(); G.setUI(false); try { G.lockPointer(); } catch (e) {} if (won) setTimeout(() => Explore.victoryScreen(), 900); }, 400);
@@ -1146,7 +1181,7 @@ window.Worlds = (() => {
     DOM = { root, top: root.querySelector('#wTop'), stat: root.querySelector('#wStat'), hint: root.querySelector('#wHint'), boss: root.querySelector('#wBoss'), bossHp: root.querySelector('#wBoss i'), banner: root.querySelector('#wBanner'), fade, load, loadT: load.querySelector('.t'), loadB: load.querySelector('.b i'), map };
     W.dom = DOM;
   }
-  function fadeTo(v) { if (DOM) DOM.fade.style.opacity = v; }
+  function fadeTo(v, mist) { if (!DOM) return; if (v) DOM.fade.style.background = mist && !(window.Mods && Mods.on && Mods.on('nat_gates') === false) ? 'radial-gradient(ellipse at 50% 55%, #eef3f7 0%, #b9c6d0 38%, #56616b 75%, #1c2126 100%)' : '#000'; DOM.fade.style.opacity = v; } // R54 nat_gates：穿过雾幕 = 淡入白雾而不是黑屏
   function banner(node) {
     const st = STYLES[node.style], b = DOM.banner; b.querySelector('.n').textContent = node.name; b.querySelector('.s').textContent = `${node.loc.icon} ${node.loc.n} · ${st.n}${node.site && window.WSites ? ' · ' + WSites.KINDS[node.site].ico + ' ' + WSites.label(node) : LAYOUTS[layOf(node)] ? ' · ' + LAYOUTS[layOf(node)].n : ''} · ${SIZES[node.size].n}${node.home ? ' · 回洞的门在这里' : ''}${W.B && W.B.tag ? ' · ' + W.B.tag : ''}`;
     b.style.opacity = 1; clearTimeout(banner._t); banner._t = setTimeout(() => { b.style.opacity = 0; }, 2600);
