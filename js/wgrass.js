@@ -186,7 +186,9 @@ window.WGrass = (() => {
               gc *= mix(vec3(1.0), vColor.rgb, 0.35);
             #endif
             float fr = smoothstep(uFar * 0.45, uFar * 1.05, distance(vTP.xz, cameraPosition.xz));
-            diffuseColor.rgb = mix(diffuseColor.rgb, gc * 1.15, cv * mix(0.45, 0.8, fr));
+            float lg = max(dot(gc, vec3(0.3, 0.59, 0.11)), 1e-3), ld = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+            vec3 gt = gc * clamp(mix(1.0, ld / lg, 0.7), 0.4, 1.8); // 保留地面贴图自身的明暗纹理，只换成草的色相
+            diffuseColor.rgb = mix(diffuseColor.rgb, gt * 1.1, cv * mix(0.45, 0.65, fr));
             diffuseColor.rgb *= mix(1.0, mix(0.55, 1.0, fr), cv); }`);
     };
     mat.customProgramCacheKey = () => (key ? key.call(mat) : '') + '|wg2';

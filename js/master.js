@@ -16,7 +16,7 @@ window.Master = (() => {
     rayStr: 0.55, rayDecay: 0.965, rayDensity: 0.9,
     sat: 1.08, contrast: 1.07, shadowTint: [0.93, 0.98, 1.08], highTint: [1.06, 1.0, 0.9], vig: 0.42, grain: 0.028, ca: 0.0007,
     // R52 world_atmos：空气透视（朝太阳的 Mie 散射）/ 低地薄雾 / 太阳光束
-    mie: 0.9, mieG: 0.76, mieDist: 0.012, mist: 0.55, mistH: 2.2, mistDist: 0.03, sunRay: 0.85, sunRayDecay: 0.972,
+    mie: 0.9, mieG: 0.76, mieDist: 0.012, mist: 0.35, mistH: 2.2, mistDist: 0.03, sunRay: 0.85, sunRayDecay: 0.972,
     cloud: 0.3, cas: 0.55, agxExp: 1.4, agxSat: 1.18
   };
   const MOD = (id) => !(window.Mods && Mods.on && Mods.on(id) === false);

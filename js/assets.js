@@ -55,12 +55,13 @@ window.Assets = (() => {
     m.normalScale = new THREE.Vector2(opt.normal || 1.2, opt.normal || 1.2);
     const U = { uScale: { value: opt.scale || 0.4 }, uArm: { value: set.arm || set.diff }, uAO: { value: opt.ao == null ? 0.85 : opt.ao }, uFlat: { value: opt.flat || 0 }, uMac: { value: opt.macro || 0 } };
     const RK = !!(opt.rock && opt.rock.diff); // R46：坡度贴岩（wterrain）
+    const DET = !(window.Mods && Mods.on && Mods.on('terrain_detail') === false); // R52：近景细节层（同一张贴图以 3.73× 尺度叠加亮度与法线）
     if (RK) { U.uRD = { value: opt.rock.diff }; U.uRN = { value: opt.rock.nor || opt.rock.diff }; U.uRA = { value: opt.rock.arm || opt.rock.diff }; U.uRk = { value: opt.rockLite ? 1 : 2 }; U.uRS = { value: opt.rockScale || 0.3 }; U.uRT = { value: new THREE.Color(...(opt.rockTint || [1, 1, 1])) }; }
     m.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, U);
       sh.vertexShader = sh.vertexShader.replace('void main() {', 'varying vec3 vTP; varying vec3 vTN;\nvoid main() {')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\n vTP = (modelMatrix * vec4(transformed, 1.0)).xyz; vTN = normalize(mat3(modelMatrix) * objectNormal);');
-      sh.fragmentShader = sh.fragmentShader.replace('void main() {', `varying vec3 vTP; varying vec3 vTN; uniform float uScale; uniform sampler2D uArm; uniform float uAO; uniform float uFlat; uniform float uMac; ${RK ? 'uniform sampler2D uRD; uniform sampler2D uRN; uniform sampler2D uRA; uniform float uRk; uniform float uRS; uniform vec3 uRT;' : ''}
+      sh.fragmentShader = sh.fragmentShader.replace('void main() {', `varying vec3 vTP; varying vec3 vTN; uniform float uScale; uniform sampler2D uArm; uniform float uAO; uniform float uFlat; uniform float uMac; float tDk = 0.0; ${RK ? 'uniform sampler2D uRD; uniform sampler2D uRN; uniform sampler2D uRA; uniform float uRk; uniform float uRS; uniform vec3 uRT;' : ''}
         vec3 triW(vec3 n){ vec3 b = pow(abs(n), vec3(5.0)); return b / (b.x + b.y + b.z); }
         vec4 tri(sampler2D t, vec3 p, vec3 w){ return texture2D(t, p.zy) * w.x + texture2D(t, p.xz) * w.y + texture2D(t, p.xy) * w.z; }
         float mH(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -77,7 +78,10 @@ window.Assets = (() => {
           }
           ${RK ? `{ float rn = mN(vTP.xz * 0.31 + 3.1); float sl = 1.0 - tN.y; rk = smoothstep(0.11 + 0.05 * rn, 0.34 + 0.06 * rn, sl + (rn - 0.5) * 0.12);
             vec3 rP = vTP * uRS; vec4 rD = tri(uRD, rP, tW); rD.rgb *= uRT; tDiff = mix(tDiff, rD, rk); rArm = tri(uRA, rP, tW); }` : ''}
-          diffuseColor *= tDiff; vec4 tArm = tri(uArm, tP, tW); ${RK ? 'tArm = mix(tArm, rArm, rk);' : ''}`)
+          diffuseColor *= tDiff; vec4 tArm = tri(uArm, tP, tW); ${RK ? 'tArm = mix(tArm, rArm, rk);' : ''}
+          ${DET ? `tDk = 1.0 - smoothstep(4.0, 22.0, distance(vTP, cameraPosition));
+          if (tDk > 0.003) { vec3 dD = tri(map, tP * 3.73 + vec3(0.37, 0.11, 0.73), tW).rgb; float lm = max(dot(texture2D(map, tP.xz, 9.0).rgb, vec3(0.3, 0.59, 0.11)), 0.03);
+            diffuseColor.rgb *= mix(1.0, clamp(dot(dD, vec3(0.3, 0.59, 0.11)) / lm, 0.5, 1.7), tDk * 0.38 * (1.0 - rk * 0.5)); }` : ''}`)
         .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = roughness * tArm.g;')
         .replace('#include <aomap_fragment>', '#include <aomap_fragment>\n reflectedLight.indirectDiffuse *= mix(1.0, tArm.r, uAO); reflectedLight.directDiffuse *= mix(1.0, tArm.r, uAO * 0.5);')
         .replace('#include <normal_fragment_maps>', `{
@@ -85,12 +89,13 @@ window.Assets = (() => {
           vec3 nX = texture2D(normalMap, tP.zy).xyz * 2.0 - 1.0, nY = texture2D(normalMap, tP.xz).xyz * 2.0 - 1.0, nZ = texture2D(normalMap, tP.xy).xyz * 2.0 - 1.0;
           ${RK ? `if (uRk > 1.5) { vec3 rP2 = vTP * uRS; vec3 qX = texture2D(uRN, rP2.zy).xyz * 2.0 - 1.0, qY = texture2D(uRN, rP2.xz).xyz * 2.0 - 1.0, qZ = texture2D(uRN, rP2.xy).xyz * 2.0 - 1.0; nX = mix(nX, qX, rk); nY = mix(nY, qY, rk); nZ = mix(nZ, qZ, rk); }` : ''}
           nX.xy *= normalScale; nY.xy *= normalScale; nZ.xy *= normalScale;
+          ${DET ? `if (tDk > 0.003) { vec3 dP = tP * 3.73 + vec3(0.37, 0.11, 0.73); float dn = tDk * 0.7; nX.xy += (texture2D(normalMap, dP.zy).xy * 2.0 - 1.0) * dn; nY.xy += (texture2D(normalMap, dP.xz).xy * 2.0 - 1.0) * dn; nZ.xy += (texture2D(normalMap, dP.xy).xy * 2.0 - 1.0) * dn; }` : ''}
           nX = vec3(nX.xy + n0.zy, abs(nX.z) * n0.x); nY = vec3(nY.xy + n0.xz, abs(nY.z) * n0.y); nZ = vec3(nZ.xy + n0.xy, abs(nZ.z) * n0.z);
           vec3 wn = normalize(nX.zyx * tW.x + nY.xzy * tW.y + nZ.xyz * tW.z);
           normal = normalize((viewMatrix * vec4(wn, 0.0)).xyz);
         }`);
     };
-    m.customProgramCacheKey = () => 'tri1' + (opt.flat ? 'f' : '') + (opt.macro ? 'm' : '') + (RK ? 'r' + (opt.rockLite ? 'l' : '') : '');
+    m.customProgramCacheKey = () => 'tri1' + (opt.flat ? 'f' : '') + (opt.macro ? 'm' : '') + (RK ? 'r' + (opt.rockLite ? 'l' : '') : '') + (DET ? 'd' : '');
     return m;
   }
   // 序列帧火焰（建筑用：烛台/火把/火盆），onBeforeRender 自驱动，无需全局 tick
