@@ -1896,3 +1896,19 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - **结果**：约 135 个候选 → 授权不通过被跳过约一半 → 通过质检并推送 68 个，其中登记进游戏的见 `js/vroid_pack.js`。头在 `models/VH_*.js`（未登记，保持随机头池不变）；身体在 `big/body/VH_*.js`。
 - **接入**：MOD `vh_bodies`（默认开）。`js/vroid_pack.js` 的 `VH_PACK[file]={n,a,ids}` → `js/foe.js vhExt()` 把这些身体并入对应身份的 vroid_only 候选（原 8 具仍在，被稀释）；`js/cc0mode.js body()` 在 vroid_only 下放行 VH_PACK 里的名字；`foe.js template0` 对有独立皮肤材质的 VH 身体自动 `TINT[name]=1`（头肤色同步）。boss 仍用原 8 具。测试台 `tools/test/bodygrid.html?list=VH_a,VH_b`（身体拼图）；`fight.html`/`heads_fit.html` 已加载 `vroid_pack.js`。
 - **没做/注意**：身份映射是自动 + 看图粗选，可用 `OVR` 或直接改 `VH_PACK[..].ids`；个别身体是现代校服/便服款，若觉得违和直接从 `VH_PACK` 删对应条。登录文件已从工作区删除；用户应更换 GitHub token。
+
+## R52 记录（画质 Agent）— 新增画质 MOD、性能与去灰、MOD 配置码
+用户追加原话要点（长期有效）：“更新要以 MOD 形式推送”“要最强效果”“不要浪费时间在无效检查，尽可能多加新内容”“画面现在灰蒙蒙的，而且特别卡！性能优化注意！”“MOD 界面加一个哈希值（配置码），我发给 agent 就能算出我开了哪些 MOD，之后可能让你把我要的 MOD 设为默认”“MOD 之间相互影响的关系也标注出来”。
+| MOD（默认） | 文件 | 内容 |
+|---|---|---|
+| `grass_master`（开，依赖 shell_grass） | `js/wgrass.js` | 壳层草 v2：12m 分块实例化壳（ultra 24 / high 16 / mid 10 层，**按像素数自动缩减**；`?gn= ?gk= ?gq=` 测试用），全部块共用 **2 个材质**（深度预通道 + EQUAL 着色，抽层 LOD 只换实例属性 `aL`，不切材质），扫掠线段-椭圆求交，烘焙场进顶点属性（`gm/wgF/wgL`），风浪/拨草/逆光透射/A2C；地面材质染草色（`patchGround`）。关 = R50 v1（同文件 `buildV1`）。 |
+| `world_atmos`（开） | `js/master.js` + `js/gfx52.js` | 野外后处理：朝太阳 Mie（`P.mie/mieDist`）、低地薄雾（`P.mist`）、天空作源的太阳光束；**去灰**：内置 FogExp2 密度 ×0.72（gfx52 每个新场景一次）、合成里压黑位 `P.black`。 |
+| `cloud_shadows`（开，依赖 world_atmos） | `js/master.js` | 噪声云影沿太阳方向投到地面并飘动。 |
+| `filmic_agx`（**关**，迁移 `__v13` 一次性关） | `js/master.js` | AgX 色调映射；用户嫌灰，默认改回 ACES。 |
+| `sharpen`（开）/ `lens_flare`（开） | `js/master.js` | FXAA 后 AMD CAS；泛光高亮的镜头鬼影 + 光环。 |
+| `terrain_detail`（开） | `js/assets.js` | 三平面材质 22m 内叠加 3.73× 细节亮度 + 法线。 |
+| `foliage_glow`（开）/ `sky_master`（开）/ `water_master`（开）/ `pcss_shadows`（开） | `js/gfx52.js` | 树叶逆光透射（全局 chunk，非 CHAR_MAT 的 alpha 裁剪材质）；天空 Catmull-Rom + 太阳 HDR 光晕；水面按反射向量采样清晰天空 + 菲涅尔；PCSS（6+10 采样，只对 `shadow.radius>8` 的光，gfx52 每帧把野外太阳设为 `2070/阴影半宽`）。 |
+- **MOD 配置码**（`js/mods.js`）：O 面板顶部「配置码 MOD1-校验4-默认签名3-内容」，点击复制；底部「📥 导入配置码」可套用。内容 = 与默认不同的每个 MOD 的 `FNV(id)%36^4`（4 位 base36）+ `+/-`，排序拼接。**agent 解码**：`node tools/modcode.js <配置码>`（读当前 `js/mods.js`；“默认集与当前版本不同”时去 git 历史找对应版本）。`Mods.code()` / `Mods.decode()` / `Mods.rels(m)` 已导出。
+- **MOD 关系标注**：每行显示 🔗N；展开后列出 依赖 / 被依赖（关掉会连带关）/ 冲突（双向）/ 同组单选 / 相互影响。软关系写在条目的 `rel: { 其它id: '说明' }` 字段（双向显示）；新 MOD 有已知相互影响请补 `rel`。
+- 性能参考（RTX 2070S，1280×720 ultra）：草 v2 约 +4.7ms（之前 +12ms，主要是每块 2 个材质导致的切材质开销）。卡时依次关：`grass_master` → `pcss_shadows` → `world_atmos`。
+- 本机测试注意：Playwright 先 `page.bringToFront()`（后台 rAF 会停，gfx52/WorldMaster 钩子不跑）；改 js 后用 CDP `Network.setCacheDisabled` 防止吃到旧脚本。
