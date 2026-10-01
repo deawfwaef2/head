@@ -81,7 +81,8 @@ window.RoundHalls = (() => {
       const die = box(0.16, 0.16, 0.16, std('#efe6d0', { roughness: 0.5 }), 0, 0.84, 0); g.add(die); U.die = die;
       for (let i = 0; i < 6; i++) die.add(mesh(new THREE.SphereGeometry(0.018, 6, 4), std('#5a0a0a'), [0.081, -0.081, 0, 0, 0, 0][i], [0, 0, 0.081, -0.081, 0, 0][i], [0, 0, 0, 0, 0.081, -0.081][i])); return g; },
     cols: () => [[-0.25, 0, -0.25, 0.25, 1.32, 0.25]] };
-  RO.rh_dice = (b, L, x) => { const h = L[0], d = 1 + Math.floor(Math.random() * 6), s = x.st(b); s.last = d;
+  RO.rh_dice = (b, L, x) => { const h = L[0], s = x.st(b); let d = 1 + Math.floor(Math.random() * 6); s.last = d;
+    if (d === 1 && x.r.ward) { x.r.ward = 0; return { v: x.val(h, 1), note: '🎲 1 —— 🧿护头符挭住了，她没碎' }; }
     if (d === 1) { x.rm.push(h); return { v: x.val(h, 1), note: `🎲 1 —「${NM(h)}」碎了` }; } const k = d >= 6 ? 6 : d >= 4 ? 3 : 1; return { v: x.val(h, k), note: `🎲 ${d} → ×${k}` }; };
 
   // 7) 亡者议会：五把椅子。每颗 ×0.5；同族 ≥3 = 多数派，给下一趟一条该族的祝福（五颗同族 ×2）

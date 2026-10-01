@@ -5,7 +5,7 @@
 window.CaveCozy = (() => {
   'use strict';
   const on = () => !window.Mods || Mods.on('cave_cozy') !== false;
-  const COZY = { exposure: 1.42, contrast: 1.0, sat: 1.06, vig: 0.17, grain: 0.02, shadowTint: [1.0, 0.97, 0.94] };
+  const COZY = { exposure: 1.3, contrast: 1.06, sat: 1.1, vig: 0.22, grain: 0.02, shadowTint: [1.0, 0.96, 0.92] }; // R54k：以前偏灰白（曝光 1.42），收一点、暖一点、四角稍暗更有“窝”的感觉
   let orig = null, inCave = null;
   function frame() {
     const g = window.G, post = g && g.postFx, P = post && post.P; if (!P) return;

@@ -116,8 +116,9 @@ window.startGame = function () {
   let bonusCache = null;
   function buildBonus() {
     if (bonusCache) return bonusCache;
-    const o = { str: 0, con: 0, agi: 0, ter: 0, soul: 0, regen: 0 };
-    for (const b of builds) { const d = CAT[b.type]; if (d.stat) for (const k in d.stat) o[k] += d.stat[k]; if (d.regen) o.regen += d.regen; }
+    const o = { str: 0, con: 0, agi: 0, ter: 0, soul: 0, regen: 0 }, capOn = !(window.Mods && Mods.on && Mods.on('build_stat_cap') === false), seen = new Set();
+    for (const b of builds) { const d = CAT[b.type]; if (capOn) { if (seen.has(b.type)) continue; seen.add(b.type); } if (d.stat) for (const k in d.stat) o[k] += d.stat[k]; if (d.regen) o.regen += d.regen; }
+    if (capOn) { const cap = 6 + 2 * (S.depth || 1); for (const k of ['str', 'con', 'agi', 'ter', 'soul']) o[k] = Math.min(o[k], cap); o.regen = Math.min(o.regen, 4); } // R54k：同种建筑只算一座，每项属性封顶
     return (bonusCache = o);
   }
   // 第二十二轮：展示在洞里的首级魂印给玩家属性（guardian/warlord/windrunner/keeper/regen/porter/mentor），每种最多计 5 颗；1 秒缓存

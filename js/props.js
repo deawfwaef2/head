@@ -176,7 +176,7 @@ window.Props = (() => {
     const hs = items.some(i => i.d.chimeR) ? G.heads.filter(h => h.mount) : [];
     for (const it of items) {
       if (it.ghost) continue; const d = it.d, p = it.p; it.tm += dt;
-      if (d.tick && G.playing && it.tm >= d.tick.every) {
+      if (d.tick && G.playing && it.tm >= d.tick.every && !(window.Loop && Loop.rOn && Loop.rOn())) { // R54k round_yield：改成每回合结算一次（Loop.settle）
         it.tm = 0; const Sk = window.Sack, pos = it.g.position.clone().add(new V3(0, 0.4, 0));
         if (d.tick.kind === 'coin') { const v = d.tick.n * (G.S.depth || 1); G.addCoins(v); G.floatText('🧰 +' + Math.round(v), pos, '#ffd84a', 15); }
         else if (Sk && Sk.IT[d.tick.kind]) { Sk.stashAdd(Sk.mk(d.tick.kind, d.tick.n)); G.floatText(`${Sk.IT[d.tick.kind].icon} +${d.tick.n}`, pos, '#cfc6ff', 15); G.save && G.save(); }

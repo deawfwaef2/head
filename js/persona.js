@@ -14,12 +14,12 @@ window.Persona = (() => {
   // ---------------- 原型 ----------------
   const A = {
     proud:    { n: '高傲', col: '#ffd27a', rate: 1.0,  brave: 0.95, iq: 0.05, noRetreat: true,  taunt: 1.4, gest: ['Yes', 'Idle_FoldArms_Loop'], idle: ['Idle_FoldArms_Loop', 'Idle_Loop'], walk: 'Walk_Formal_Loop', chat: 0.4 },
-    cold:     { n: '冷静', col: '#9fd8ff', rate: 0.96, brave: 0.8,  iq: 0.18, noRetreat: false, taunt: 0.5, gest: [], idle: ['Idle_Loop', 'Crouch_Idle_Loop'], walk: 'Walk_Loop', chat: 0.05 },
+    cold:     { n: '冷静', col: '#9fd8ff', rate: 0.96, brave: 0.8,  iq: 0.18, noRetreat: false, taunt: 0.5, gest: [], idle: ['Idle_Loop'], walk: 'Walk_Loop', chat: 0.05 },
     gentle:   { n: '温柔', col: '#ffc4e0', rate: 1.0,  brave: 0.45, iq: 0.0,  noRetreat: false, taunt: 0.8, gest: ['Idle_No_Loop'], idle: ['Farm_Harvest', 'Idle_Talking_Loop', 'Idle_Loop'], walk: 'Walk_Loop', chat: 0.8 },
-    timid:    { n: '胆小', col: '#d8f0a0', rate: 1.05, brave: 0.12, iq: -0.05, noRetreat: false, taunt: 0.6, gest: ['Idle_No_Loop'], idle: ['Crouch_Idle_Loop', 'Idle_Loop', 'Farm_Harvest'], walk: 'Walk_Loop', chat: 0.5, fleeHp: 0.55 },
+    timid:    { n: '胆小', col: '#d8f0a0', rate: 1.05, brave: 0.12, iq: -0.05, noRetreat: false, taunt: 0.6, gest: ['Idle_No_Loop'], idle: ['Idle_Loop', 'Farm_Harvest'], walk: 'Walk_Loop', chat: 0.5, fleeHp: 0.55 },
     fierce:   { n: '好战', col: '#ff9a70', rate: 1.0,  brave: 1.0,  iq: 0.0,  noRetreat: true,  taunt: 1.6, gest: ['Yes'], idle: ['Idle_FoldArms_Loop', 'Consume', 'Idle_Loop'], walk: 'Walk_Loop', chat: 0.5 },
     sharp:    { n: '毒舌', col: '#e0a0ff', rate: 1.03, brave: 0.7,  iq: 0.05, noRetreat: false, taunt: 1.5, gest: ['Idle_FoldArms_Loop', 'Idle_No_Loop'], idle: ['Idle_FoldArms_Loop', 'Consume', 'Idle_Loop'], walk: 'Walk_Formal_Loop', chat: 0.6 },
-    sly:      { n: '狡黠', col: '#b0ffcf', rate: 1.0,  brave: 0.6,  iq: 0.12, noRetreat: false, taunt: 1.2, gest: ['Idle_Talking_Loop'], idle: ['Crouch_Idle_Loop', 'PickUp_Table', 'Interact', 'Idle_Loop'], walk: 'Crouch_Fwd_Loop', chat: 0.5 },
+    sly:      { n: '狡黠', col: '#b0ffcf', rate: 1.0,  brave: 0.6,  iq: 0.12, noRetreat: false, taunt: 1.2, gest: ['Idle_Talking_Loop'], idle: ['PickUp_Table', 'Interact', 'Idle_Loop'], walk: 'Walk_Loop', chat: 0.5 },
     cheerful: { n: '开朗', col: '#fff08a', rate: 1.06, brave: 0.55, iq: -0.05, noRetreat: false, taunt: 1.3, gest: ['Idle_Talking_Loop', 'Yes'], idle: ['Idle_Talking_Loop', 'Consume', 'Farm_Harvest', 'Idle_Loop'], walk: 'Walk_Loop', chat: 0.9 },
   };
   const TR = {

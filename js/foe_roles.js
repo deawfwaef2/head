@@ -101,7 +101,7 @@ window.FoeRoles = (() => {
       if (fo.cd > 0 || !behind || d > 3.4) { // 潜行绕背
         const sg = delta >= 0 ? 1 : -1, w = clamp(Math.abs(delta) / 0.7, 0.35, 1), R = 2.4, rad = clamp(d - R, -1, 1.2) * 3;
         fo.rv = { x: Math.cos(ca) * sg * 4.3 * w + (dx / d) * rad, z: -Math.sin(ca) * sg * 4.3 * w + (dz / d) * rad };
-        f.play('Crouch_Fwd_Loop', { fade: 0.25, speed: 1.7 }); const hd = Math.atan2(fo.rv.x, fo.rv.z); return { turnTo: face + clamp(ang(hd - face), -1.25, 1.25), spd: 0 };
+        f.play('Jog_Fwd_Loop', { fade: 0.25, speed: 1.1 }); const hd = Math.atan2(fo.rv.x, fo.rv.z); return { turnTo: face + clamp(ang(hd - face), -1.25, 1.25), spd: 0 }; // R54l：不再蹲着快走（用户：看着违和）
       }
       return null;
     }

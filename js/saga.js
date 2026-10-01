@@ -445,9 +445,12 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
   function onKill(sg) {
     if (sg.done) return; sg.done = true; sg.res = 'win'; const A = sg.arch, s = SS();
     if (sg.envoy) {
+      if (window.MoonTrail && MoonTrail.on()) { MoonTrail.promise(); banner('🌙 月使倒下', '她的血在地上画出一弯月牙——指向某处。', '下一趟必定出现「月之踪迹」：在地区里找齐月痕就能得到线索', '#c8b8ff', 7200); try { Foe.say && sg.fo && Foe.say(sg.fo, fill(pick1(D.ELINE.die), sg.ctx), '#d8d0ff'); } catch (e) { } }
+      else {
       const d = giveClue('envoy', sg);
       banner('🌙 月使倒下', d ? d.t.replace(/^“|”$/g, '') : '月之线索已集齐', d ? `月之线索 ${clues()}/${D.NEED}${clues() >= D.NEED ? ' · 月之魔女的神殿向你敞开了' : ''}` : '', '#c8b8ff', 7200);
       try { Foe.say && sg.fo && Foe.say(sg.fo, fill(pick1(D.ELINE.die), sg.ctx), '#d8d0ff'); } catch (e) { }
+      }
     } else {
       banner('✦ 异变平息', fill(pick1(A.good), sg.ctx), FX_LONG[A.boon], '#ffe28a', 6200);
       try { Foe.say && sg.fo && Foe.say(sg.fo, fill(pick1(D.TLINE.die), sg.ctx), '#ffc8c8'); } catch (e) { }

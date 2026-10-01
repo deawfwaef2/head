@@ -840,6 +840,7 @@ window.Worlds = (() => {
     if (d.home) return node.home ? '🕳️ 回魂首窟' : '🌀 魂门 · 回洞';
     const m = W.graph.nodes[d.to]; let t = m.visited ? m.name : m.name + ' ？';
     if (m.boss && m.visited) t += ' 👑';
+    if (window.MoonTrail && MoonTrail.mark(m)) t += ' 🌙';
     if (window.WSites && WSites.ico(m)) t += ' ' + WSites.ico(m) + (m.visited ? '' : ' ' + WSites.label(m)); // R41：集会隔着门就能听见
     if (m.region !== node.region) { const L = m.loc, weak = G.st && G.st().power < L.rec * 0.8; t = `${weak ? '⚠️' : ''}${L.icon}${L.n} · ${t}`; }
     return t;
@@ -906,7 +907,7 @@ window.Worlds = (() => {
         const SL = B.site && B.site.slots; node.prey.forEach((h, k) => { const sl = SL && SL[k]; list.push({ h, pos: sl ? new V3(sl.x, 0, sl.z) : spot(B, r) }); }); // R41：集会里各就各位
         if (wantBoss) { const Bo = BOf(node); node.bossH = node.bossH || mkBossH(node, Bo); list.push({ h: node.bossH, pos: B.bossAt || new V3(0, 0, 0), boss: Bo, bossK: node.chB || node.region }); }
         W.dom.loadT.textContent = `「${node.name}」里有人……`;
-        const tf0 = performance.now(); W.foes = await Foe.populate(foeCtx(B, node), list); tp('foes', tf0);
+        const tf0 = performance.now(); W.foes = await popFoes(B, node, list); tp('foes', tf0);
         if (W.foes && !W.foes.length && list.length) W.foes = null;
         if (W.foes && B.site && window.WSites) WSites.seat(W.foes, B.site);
       } catch (e) { console.warn('Foe', e); W.foes = null; }
@@ -934,6 +935,11 @@ window.Worlds = (() => {
   // ================= R54 MOD corridor：穿门走进即时生成的弯曲走廊，后台准备下一个地点，走到雾门出口就到（不再有加载画面）=================
   const CORR = () => !!window.Corridor && !(window.Mods && Mods.on && Mods.on('corridor') === false) && !/[?&]nocorr=1/.test(location.search);
   const BT = () => !!(window.Loop && Loop.isBossTrip());
+  const inFight = () => !!(W && window.Foe && Foe.foes && Foe.foes.some(f => f && !f.dead && f.pos && (f.atk || (f.seen && f.state === 'chase')) && Math.hypot(f.pos.x - W.pos.x, f.pos.z - W.pos.z) < 20));
+  async function popFoes(B, node, list) { // R54l：载入失败先重试，不要动不动退回「光球小精灵」
+    for (let a = 0; a < 3; a++) { try { const f = await Foe.populate(foeCtx(B, node), list); if (f && (f.length || !list.length)) return f; } catch (e) { console.warn('Foe.populate', a, e); } if (!W) return null; await wait(500 + a * 700); }
+    return null;
+  }
   function travel(i, from) { if (window.Loop) try { Loop.leaveNode(); } catch (e) { } if (CORR() && W && W.B && !W.B.corr) return gotoCorr(i, from).catch(e => { console.warn('corridor', e); if (W) goto(i, from); }); return goto(i, from); }
   const KIT = { templates: (n) => templates(n), veil: (g, home) => veil(g, home) };
   function corrSize(n) { const t = templates(n)[0]; return t ? { x: t.size.x, z: t.size.z, big: t.size.y > 1.5 || Math.max(t.size.x, t.size.z) > 2.5 } : { x: 1, z: 1, big: false }; }
@@ -970,7 +976,7 @@ window.Worlds = (() => {
         const r = mulberry(node.seed ^ 0x5bd1e995), list = [], SL = B.site && B.site.slots;
         node.prey.forEach((h, k) => { const sl = SL && SL[k]; list.push({ h, pos: sl ? new V3(sl.x, 0, sl.z) : spot(B, r) }); });
         if (wantBoss) { const Bo = BOf(node); node.bossH = node.bossH || mkBossH(node, Bo); list.push({ h: node.bossH, pos: B.bossAt || new V3(0, 0, 0), boss: Bo, bossK: node.chB || node.region }); }
-        const tf0 = performance.now(); foes = await Foe.populate(foeCtx(B, node), list); tp('foes', tf0);
+        const tf0 = performance.now(); foes = await popFoes(B, node, list); tp('foes', tf0);
         if (foes && !foes.length && list.length) foes = null;
         if (foes && B.site && window.WSites) WSites.seat(foes, B.site);
       } catch (e) { console.warn('Foe', e); foes = null; }
@@ -1083,7 +1089,7 @@ window.Worlds = (() => {
     if (B.sc.userData.fire) B.sc.userData.fire.intensity = 2.2 * (0.85 + Math.sin(now * 13) * 0.08 + Math.sin(now * 29) * 0.05);
     // 门：靠近提示
     W.doorNear = null; for (const d of B.doors) { const dd = Math.hypot(W.pos.x - d.x, W.pos.z - d.z); if (dd < 2.6) W.doorNear = d; if (dd < 12 && d.to >= 0) prefetchNode(d.to); d.label.visible = Math.hypot(cam.position.x - d.x, cam.position.z - d.z) < 34;
-      if (d.nat && !d.home && dd < 1.6 && !W.busy && CORR() && (W.vel.x * Math.cos(d.a) + W.vel.z * Math.sin(d.a)) > 1.2 && !(W.foes && W.foes.some(f => !f.dead && f.seen && f.atk))) { travel(d.to, W.cur); break; } } // R54e：顺着山口走出去就上路（不用按 E）
+      if (d.nat && !d.home && dd < 1.6 && !W.busy && CORR() && (W.vel.x * Math.cos(d.a) + W.vel.z * Math.sin(d.a)) > 1.2 && !inFight()) { travel(d.to, W.cur); break; } } // R54e：顺着山口走出去就上路（不用按 E）；R54l：战斗中（含宿敌）不会自动穿门
     W.interNear = null; { let bd = 9; for (const it of B.inter) { const dd = Math.hypot(W.pos.x - it.x, W.pos.z - it.z); if (!it.done && dd < (it.corpse ? 2.3 : 1.9) && dd < bd) { bd = dd; W.interNear = it; } } }
     if (window.Sack) try { Sack.frame(dt); } catch (e) { console.warn(e); }
     // 猎物 / 霸主
@@ -1346,5 +1352,5 @@ window.Worlds = (() => {
     for (let t = 0; t < 6; t++) { const nd = ns[Math.floor(r() * ns.length)]; if (!nd.prey) { try { populate(nd); } catch (e) { return null; } } if (nd.prey && nd.prey.length) { const h = nd.prey[Math.floor(r() * nd.prey.length)]; if (h && h.c) return { c: h.c, where: `${nd.loc.n}·${nd.name}` }; } }
     return null;
   }
-  return { start, frame, onKey, onDown, stop, peekPrey, get active() { return !!W; }, get _W() { return W; }, STYLES, REGION, genGraph, genWorld, need, warm, warmRegion, _debug: { goto: (i) => W && goto(i, W.cur), buildNode, targets, stylesOfN, layOf, populate } };
+  return { start, frame, onKey, onDown, stop, peekPrey, relabel() { if (!W || !W.B || !W.B.doors || W.B.corr) return; const nd = W.graph.nodes[W.cur]; W.B.doors.forEach(d => { try { d.label.userData.set(doorName(nd, d)); } catch (e) { } }); }, get active() { return !!W; }, get _W() { return W; }, STYLES, REGION, genGraph, genWorld, need, warm, warmRegion, _debug: { goto: (i) => W && goto(i, W.cur), buildNode, targets, stylesOfN, layOf, populate } };
 })();

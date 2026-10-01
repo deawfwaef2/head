@@ -37,7 +37,13 @@ window.Loop = (() => {
   const runDmg = () => (1 + mod('dmg', 0) + (nb().dmg || 0)) * RG('dmgK'), runHp = () => (1 + mod('hp', 0) + (nb().hp || 0)) * RG('hpK'), runSpd = () => (1 + mod('spd', 0) + (nb().spd || 0)) * RG('spdK');
   const enemyHp = () => mod('ehp', 1) * (1 - Math.min(0.3, nb().fear || 0)), enemyDmg = () => mod('edmg', 1), nemRate = () => mod('nem', 1) * (1 - ward()), enemyLv = () => mod('elv', 0);
   const chapLv = () => on() ? (R().chap - 1) * 5 : 0;
-  // ---- 章节 BOSS：月之巫女的七使徒，各有独立擂台（地区霸主仍在各自地区最深处，互不相干）----
+  // ---- 章节 BOSS：月之巫女的使徒，无限随机生成（下面是角色模板；名字/种族/长相/称号/擂台/词缀每局每章都不同），各有独立擂台 ----
+  const AFN = { frenzy: '🔥狂热', iron: '🛡️铁壁', leech: '🩸噬血', volatile: '💥爆裂', phantom: '👻幽影', relentless: '⚔️连斩', regen: '✚再生' };
+  const HAIR = [['银白', '#eef0fa', '#9aa2c8'], ['酒红', '#a0203a', '#3a0812'], ['灰白', '#d8d8dc', '#6a6a74'], ['淡金', '#f4e8b8', '#c8b070'], ['墨黑', '#2a2a30', '#0a0a0e'], ['雪白', '#ffffff', '#d8c8e8'], ['夜紫', '#4a3a80', '#10081e'], ['血红', '#c02028', '#40080a'], ['冰蓝', '#bfe6ff', '#4a7aa8'], ['翡翠', '#6ae09a', '#1a7a4a'], ['蜜糖金', '#f0c860', '#b07a28'], ['玫瑰', '#ff9ab8', '#a03a5a']];
+  const EYE = [['冰蓝', '#8ad0ff', '#e8f6ff'], ['血红', '#ff3050', '#ffb0c0'], ['琥珀', '#ffb020', '#ffe090'], ['翡翠', '#40e0a0', '#d0fff0'], ['灰白', '#d8d8d0', '#ffffff'], ['紫红', '#ff40a0', '#ffd0f0'], ['金', '#ffd040', '#fff4c0'], ['月银', '#c8e8ff', '#ffffff']];
+  const TPRE = ['霜月', '血月', '蚀月', '骨月', '雾月', '烬月', '盲月', '倒月', '镜月', '新月', '残月', '朔月', '哭月', '无面'], PPRE = ['沉月', '无光', '倒悬', '蚀骨', '白雾', '千烛', '血色', '寂静', '碎镜', '锈蚀', '哭泣', '永夜'];
+  const FEAT = { elf: 'elf', darkelf: 'elf', halfelf: 'elf', beast: 'beast', angel: 'halo', demon: 'horn', dragon: 'horn2' };
+  const cbC = new Map();
   const CHB = [
     { n: '伊莎贝拉', title: '银镰修女', race: 'human', id: 'nun', traits: ['虔诚', '冷酷'], belief: '月之巫女', goal: '替月亮收割第一批首级', pow: 2.0, col: '#c8d4ff', place: '月蚀礼拜堂', base: 'abbey',
       look: { hn: '银白', hc1: '#eef0fa', hc2: '#9aa2c8', en: '冰蓝', ec1: '#8ad0ff', ec2: '#e8f6ff', acc: ['tiara'] },
@@ -66,19 +72,41 @@ window.Loop = (() => {
     { n: '露西菲娅', title: '堕月天使', race: 'angel', id: 'fallen', traits: ['高傲', '绝望'], belief: '月之巫女', goal: '拦住一切走向月亮的人', pow: 2.6, col: '#b090ff', place: '堕月深渊', base: 'abyss',
       look: { hn: '夜紫', hc1: '#4a3a80', hc2: '#10081e', en: '金', ec1: '#ffd040', ec2: '#fff4c0', feat: 'halo' },
       intro: '深渊里倒悬着一片天空，天使从月亮上坠下来，翅膀还在燃烧。她是巫女最后的屏障。', say: '我从月亮上掉下来，就是为了拦住你。',
-      taunt: ['坠落吧。', '月亮不会救你。', '跪下，罪人。'], hurt: ['……光在熄灭……', '你竟敢！'], win: '回去。月之巫女还轮不到见你。', lose: '……巫女大人……对不起……', story: '月之巫女最忠诚的护卫，曾经是天使。' }
+      taunt: ['坠落吧。', '月亮不会救你。', '跪下，罪人。'], hurt: ['……光在熄灭……', '你竟敢！'], win: '回去。月之巫女还轮不到见你。', lose: '……巫女大人……对不起……', story: '月之巫女最忠诚的护卫，曾经是天使。' },
+    { n: '沃尔兹', title: '断头台女工', race: 'human', id: 'merc', traits: ['冷酷'], belief: '月之巫女', goal: '把刃口磨到能切开月光', pow: 2.2, col: '#d0c0a0', place: '血槽刑场', base: 'fortress',
+      intro: '刑场中央的断头台擦得发亮。她把一篮子头倒进坑里，坐在篮沆上等你。', say: '工钱按颗算。你这颗，算三颗。',
+      taunt: ['下一个。', '别乱动，会切歪。', '价钱不变。'], hurt: ['工伤……', '你把我的刃弄钝了。'], win: '今天收工。明天开工先穿你。', lose: '……工钱……归你了……', story: '给月亮切了一辈子头的女刑手。' },
+    { n: '内洛', title: '挂尸歌姬', race: 'elf', id: 'singer', traits: ['高傲'], belief: '月之巫女', goal: '用一首歌让所有头一起唱', pow: 2.2, col: '#ffc0e0', place: '无声剧院', base: 'capital',
+      intro: '剧院座席上都是头，她们一起张嘴，却只有一个声音——歌姬的。', say: '你的头很适合唱低音部。',
+      taunt: ['啦——', '跟上节拍。', '安可！'], hurt: ['走音了！', '我的嗓子！'], win: '谢幕。下一场你当主角。', lose: '……幕……落……', story: '把观众的头训练成合唱团的精灵歌姬。' },
+    { n: '格蕾塔', title: '守墓人', race: 'human', id: 'shepherd', traits: ['沉默'], belief: '月之巫女', goal: '让每一座墓都有头可埋', pow: 2.1, col: '#a8c0a0', place: '无碑墓园', base: 'village',
+      intro: '墓园里的墓碑都是空的，只有一块刻着字——是你的名字。守墓人扶着铁锹等着。', say: '坑挖好了。尺寸按你的头量的。',
+      taunt: ['安息吧。', '土很软。', '别挤。'], hurt: ['……大地在哭。', '还没到时候。'], win: '你的坑我留着。', lose: '……把我……埋浅一点……', story: '月之巫女的守墓人，她埋的头比任何人都多。' },
+    { n: '科莉尔', title: '魂水炼金师', race: 'darkelf', id: 'alchemist', traits: ['狡黠'], belief: '月之巫女', goal: '把月光蒸馏成一滴水', pow: 2.3, col: '#90f0d0', place: '蒸馏温室', base: 'swamp',
+      intro: '玻璃缸里泡着一排排头，管子把她们的眼泪收集到一只烧瓶里。炼金师摇了摇瓶子，很不满意。', say: '就差一味——食人魔的眉毛。',
+      taunt: ['加热中。', '别打翻烧瓶。', '反应很激烈。'], hurt: ['实验失败……', '配方乱了！'], win: '样本不够，下次再采。', lose: '……记录……失败……', story: '把月光当配方的暗精灵炼金师。' }
   ];
-  function CB(ch) { ch = ch || R().chap; const B = CHB[(ch - 1) % CHB.length]; return Object.assign({}, B, { k: 'ch' + ch, ch, pow: B.pow + 0.3 * Math.floor((ch - 1) / CHB.length) }); }
+  function CB(ch) {
+    ch = ch || R().chap; const r0 = R(); if (!r0.seed) r0.seed = (Math.random() * 4294967296) >>> 0; const key = r0.seed + ':' + ch; if (cbC.has(key)) return cbC.get(key);
+    let s = (r0.seed ^ Math.imul(ch + 11, 2654435761)) >>> 0; const r = () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }, pk = a => a[Math.floor(r() * a.length) % a.length];
+    const T = pk(CHB), LR = (window.Lore && Lore.RACES) || {}, race = r() < 0.4 || !LR[T.race] ? T.race : pk(Object.keys(LR).length ? Object.keys(LR) : [T.race]), syl = (LR[race] && LR[race].syl) || ['莉', '娜', '丝', '藇'];
+    const hr = pk(HAIR), ey = pk(EYE), L = (window.Lore && Lore.LOCS) || [{ k: T.base }], TR = (window.Lore && Lore.TRAITS) || T.traits, tr = [pk(TR), pk(TR)].filter((x, i, a) => a.indexOf(x) === i);
+    const look = { hn: hr[0], hc1: hr[1], hc2: hr[2], en: ey[0], ec1: ey[1], ec2: ey[2] }; if (FEAT[race]) look.feat = FEAT[race]; if (r() < 0.5) look.acc = [pk(['tiara', 'crown', 'witchhat'])];
+    const aff = Object.keys(AFN).sort(() => r() - 0.5).slice(0, Math.min(3, 1 + Math.floor((ch - 1) / 3)));
+    const B = Object.assign({}, T, { k: 'ch' + ch, ch, n: Array.from({ length: 2 + (r() < 0.45 ? 1 : 0) }, () => pk(syl)).join(''), race, traits: tr.length ? tr : T.traits, title: pk(TPRE) + '·' + T.title, place: pk(PPRE) + T.place.slice(2), base: pk(L).k, col: hr[1], look, aff, pow: 2.0 + 0.1 * Math.min(20, ch - 1) });
+    cbC.set(key, B); return B;
+  }
+  function bossAff(fo) { const B = CB(); fo.aff = fo.aff || {}; for (const k of B.aff) { fo.aff[k] = 1; if (k === 'iron') fo.shield = 2 + Math.floor(B.ch / 4); if (k === 'frenzy') { fo.spdMul = (fo.spdMul || 1) * 1.15; fo.dmgMul = (fo.dmgMul || 1) * 1.08; } } fo.affName = B.aff.map(k => AFN[k]).join(' '); }
   const chBoss = k => CB(parseInt(String(k).slice(2), 10) || R().chap);
-  const bossLv = () => 5 + 6 * (R().chap - 1) + enemyLv();
+  const bossLv = () => Math.max(1, 5 + 6 * (R().chap - 1) + enemyLv() - (R().bdeb || 0));
   function arena() { const B = CB(), L = (window.Lore && Lore.LOCS) || [], li = Math.min(L.length - 1, Math.round((R().chap - 1) * 1.3)); return { k: B.k, place: B.place, rec: (L[li] && L[li].rec) || 100 }; }
   let bossTrip = false;
   const isBossTrip = () => on() && bossTrip;
   function bossCard() {
     const B = CB(), lv = bossLv(), d = lv - plv(), hk = Math.max(0.7, Math.min(4, Math.pow(1.1, d))) * enemyHp(), dk = Math.max(0.7, Math.min(3, Math.pow(1.07, d))) * enemyDmg();
-    return `<div id="lpBoss" style="--bc:${B.col}"><div class="t">第 ${R().chap} 章 · 章节 BOSS · 月之使徒 ${(B.ch - 1) % CHB.length + 1}/${CHB.length}</div><div class="n">👑 ${B.n} <small>${B.title} · 擂台「${B.place}」</small></div>
-<div class="s"><span>等级 <b>Lv.${lv}</b>（你 Lv.${plv()}${d >= 6 ? ' · <i>极度危险</i>' : d >= 2 ? ' · 危险' : ''}）</span><span>生命 ×<b>${hk.toFixed(2)}</b></span><span>伤害 ×<b>${dk.toFixed(2)}</b></span><span>威压 ×${B.pow.toFixed(1)}</span><span>${B.traits.join(' · ')}</span></div>
-<p>${B.intro}</p><p>她不是哪个地区的霸主——她是月之巫女的「${B.title}」，只在自己的擂台上等你。打赢：进入第 ${R().chap + 1} 章 + 1 条月之线索；逃回来：下次还是她。</p><button data-lp="boss">⚔️ 前往「${B.place}」</button></div>`;
+    return `<div id="lpBoss" style="--bc:${B.col}"><div class="t">第 ${R().chap} 章 · 章节 BOSS · 第 ${B.ch} 位月之使徒（每局随机、无限延续）</div><div class="n">👑 ${B.n} <small>${B.title} · 擂台「${B.place}」</small></div>
+<div class="s"><span>等级 <b>Lv.${lv}</b>（你 Lv.${plv()}${d >= 6 ? ' · <i>极度危险</i>' : d >= 2 ? ' · 危险' : ''}）</span><span>生命 ×<b>${hk.toFixed(2)}</b></span><span>伤害 ×<b>${dk.toFixed(2)}</b></span><span>威压 ×${B.pow.toFixed(1)}</span><span>词缀：<b>${B.aff.map(k => AFN[k]).join(' ')}</b></span><span>${B.traits.join(' · ')}</span></div>
+<p>${B.intro}</p><p>她不是哪个地区的霸主——她是月之巫女的「${B.title}」，只在自己的擂台上等你。打赢：进入第 ${R().chap + 1} 章 + 1 次祝福抉择（月之线索要在跑图时的「月之踪迹」里找）；逃回来：下次还是她。</p><button data-lp="boss">⚔️ 前往「${B.place}」</button></div>`;
   }
   function css() { if (document.getElementById('lpCss')) return; const s = document.createElement('style'); s.id = 'lpCss'; s.textContent = `
 #lpHead{margin:6px 0 10px;padding:8px 14px;border-left:3px solid #e1c07e;background:linear-gradient(90deg,#1a1410d0,transparent);font-size:13px;color:#e8dcc4;letter-spacing:.04em}#lpHead b{color:#ffd890}#lpHead small{color:#a89880}
@@ -124,7 +152,9 @@ window.Loop = (() => {
     for (const k in byRace) { const L = byRace[k], n = L.length; if (n < 3) continue; const b = n >= 7 ? 0.8 : n >= 5 ? 0.45 : 0.2; L.forEach(h => add(h, b)); out.sets.push(`🧬 ${raceN(k)} ×${n}：这些首级 +${Math.round(b * 100)}%${n < 5 ? '（5 颗 +45%）' : n < 7 ? '（7 颗 +80%）' : ''}`); }
     for (const k in byId) { const L = byId[k], n = L.length; if (n < 2) continue; const b = n >= 3 ? 0.6 : 0.3; L.forEach(h => add(h, b)); out.sets.push(`👥 同为「${L[0].rec.c.idN || k}」×${n}：+${Math.round(b * 100)}%${n < 3 ? '（3 颗 +60%）' : ''}`); }
     if (new Set(hs.map(h => h.rec.c.rar | 0)).size >= 5) { hs.forEach(h => add(h, 0.25)); out.sets.push('🌈 凡/灵/英/圣/神 五阶齐全：全部 +25%'); }
-    const ctx = { r, g, hv, setK, nb: {}, rm: [], boons: 0, notes: out.notes, val: (h, k = 1) => hv(h) * k * (1 + (setK.get(h) || 0)), st: b => (r.bst[bkey(b)] = r.bst[bkey(b)] || {}), bless: (k, v) => { ctx.nb[k] = (ctx.nb[k] || 0) + v; } };
+    const C0 = (window.BuildCat && BuildCat.C) || {}, auras = (g.builds || []).filter(b => C0[b.type] && C0[b.type].aura && C0[b.type].auraMul), aC = new Map();
+    const aura = h => { if (aC.has(h)) return aC.get(h); let m = 1; const p = h.g.position; for (const b of auras) { const d = C0[b.type]; if ((p.x - b.x) ** 2 + (p.z - b.z) ** 2 < d.aura * d.aura) m *= d.auraMul; } try { if (window.Props && Props.on && Props.on()) m *= Props.auraMul(p) * (1 + (Props.pokeMul(p) - 1) * 0.5); } catch (e) { } m = Math.min(2, m); aC.set(h, m); return m; };
+    const ctx = { r, g, hv, setK, nb: {}, rm: [], boons: 0, notes: out.notes, val: (h, k = 1) => hv(h) * k * (1 + (setK.get(h) || 0)) * aura(h), st: b => (r.bst[bkey(b)] = r.bst[bkey(b)] || {}), bless: (k, v) => { ctx.nb[k] = (ctx.nb[k] || 0) + v; } };
     const byB = new Map(); for (const h of hs) { if (!byB.has(h.mount)) byB.set(h.mount, []); byB.get(h.mount).push(h); }
     for (const [b, L] of byB) {
       const d = C[b.type]; if (!d) continue; let v = 0, note = ''; const fn = ROUND[b.type];
@@ -132,9 +162,11 @@ window.Loop = (() => {
       else { const f = bf(d); for (const h of L) v += ctx.val(h, f); note = f ? `每颗 ×${f.toFixed(2)}` : '这座建筑不产魂晶'; }
       v = Math.max(0, Math.round(v)); out.v += v; out.heads += L.length; out.lines.push({ t: b.type, ic: d.icon, n: d.n, k: L.length, v, note });
     }
-    const chK = 1 + (r.chap - 1) * 0.2, pay = mod('pay', 1), ex = g.exhibit ? 1 + g.exhibit().tier * 0.04 : 1;
-    out.mul = { chK, pay, ex }; out.stash = Math.round(r.stash || 0); out.src = Object.assign({}, r.src);
-    out.tot = Math.round((10 + out.v) * chK * pay * ex) + out.stash; out.died = died; out.nb = ctx.nb; out.boons = ctx.boons;
+    try { if (window.Props && Props.on && Props.on() && window.Sack) { let pc = 0; const got = {}; for (const it of Props.items || []) { const d = it.d; if (it.ghost || !d || !d.tick) continue; if (d.tick.kind === 'coin') pc += d.tick.n * 3; else if (Sack.IT[d.tick.kind]) { Sack.stashAdd(Sack.mk(d.tick.kind, d.tick.n * 3)); got[d.tick.kind] = (got[d.tick.kind] || 0) + d.tick.n * 3; } }
+      if (pc) { out.v += pc; out.lines.push({ t: '_props', ic: '🧰', n: '摆件产出', k: 0, v: pc, note: '藏宝箱等每回合结算一次' }); } const gs = Object.keys(got); if (gs.length) out.notes.push('🧰 摆件产出材料：' + gs.map(k => Sack.IT[k].icon + Sack.IT[k].n + '×' + got[k]).join('、') + '（已进储物箱）'); } } catch (e) { }
+    const chK = 1 + (r.chap - 1) * 0.2, pay = mod('pay', 1), ex = g.exhibit ? 1 + g.exhibit().tier * 0.04 : 1, inc = 1 + (r.inc || 0); r.inc = 0;
+    out.mul = { chK, pay, ex, inc }; out.stash = Math.round(r.stash || 0); out.src = Object.assign({}, r.src);
+    out.tot = Math.round((10 + out.v) * chK * pay * ex * inc) + out.stash; out.died = died; out.nb = ctx.nb; out.boons = ctx.boons;
     for (const h of ctx.rm) { try { g.burst && g.burst(h.g.position, '#ff8a3a', 30, 1.6, 0.8, 1); g.removeHead(h); } catch (e) { } }
     r.nb = ctx.nb; if (ctx.rm.length) try { g.save(); } catch (e) { }
     return out;
@@ -150,7 +182,7 @@ ${rows ? `<table>${rows}</table>` : '<div class="m">没有首级在岗。把首�
 ${P.sets.length ? `<div class="s">${P.sets.join('<br>')}</div>` : '<div class="m">套装：同族 3/5/7 颗、同身份 2/3 颗、五阶齐全都有加成。</div>'}
 ${P.notes.length ? `<div class="x">${P.notes.join('<br>')}</div>` : ''}
 ${P.boons ? `<div class="x">🎴 额外祝福抉择 ×${P.boons}</div>` : ''}${nbText(P.nb) ? `<div class="x">🎐 下一趟祝福：${nbText(P.nb)}</div>` : ''}
-<div class="m">底薪 +10 · 第 ${R().chap} 章 ×${P.mul.chK.toFixed(2)} · 世道 ×${P.mul.pay.toFixed(2)} · 展厅评级 ×${P.mul.ex.toFixed(2)}${P.stash ? `<br>洞内活动（${src || '存着的'}）+${P.stash}` : ''}</div>
+<div class="m">底薪 +10 · 第 ${R().chap} 章 ×${P.mul.chK.toFixed(2)} · 世道 ×${P.mul.pay.toFixed(2)} · 展厅评级 ×${P.mul.ex.toFixed(2)}${P.mul.inc > 1 ? ` · 🕯️回合香 ×${P.mul.inc.toFixed(2)}` : ''}${P.stash ? `<br>洞内活动（${src || '存着的'}）+${P.stash}` : ''}</div>
 <div class="t">🔮 +${P.tot}</div><div class="k">点击关闭 · 首级每回合只结算一次，摆得越巧越多</div>`;
     el.classList.add('on'); clearTimeout(showSettle.t); showSettle.t = setTimeout(() => el.classList.remove('on'), 16000);
     try { SFX.coins && SFX.coins(); } catch (e) { }
@@ -167,8 +199,7 @@ ${P.boons ? `<div class="x">🎴 额外祝福抉择 ×${P.boons}</div>` : ''}${n
   }
   function roundEnd(died) {
     const r = R(); r.round++; caveGate.told = 0; stash.told = stash.full = 0;
-    if (bossTrip) { if (W0won()) { const B = CB(); r.cbk.push({ ch: r.chap, n: B.n, t: B.title, at: Date.now() }); r.chap++; r.n = 0; try { window.Rogue && Rogue.grant && Rogue.grant(1, '月之使徒倒下'); } catch (e) { } toast(`📖 第 ${r.chap - 1} 章完结！「${B.title}」${B.n} 倒下了——进入第 ${r.chap} 章，下一位月之使徒更强`, '#ffd890', 5);
-      try { if (window.Saga && Saga.giveClue) { const d = Saga.giveClue('chapboss'); if (d && Saga.banner) setTimeout(() => Saga.banner('🌙 月之线索 +1', d.t.replace(/^“|”$/g, ''), `月之线索 ${Saga.clues()}/${Saga.NEED}`, '#c8b8ff', 6000), 3000); } } catch (e) { } } }
+    if (bossTrip) { if (W0won()) { const B = CB(); r.cbk.push({ ch: r.chap, n: B.n, t: B.title, at: Date.now() }); r.chap++; r.n = 0; r.bdeb = 0; try { window.Rogue && Rogue.grant && Rogue.grant(1, '章节 BOSS 倒下'); } catch (e) { } toast(`📖 第 ${r.chap - 1} 章完结！「${B.title}」${B.n} 倒下了——进入第 ${r.chap} 章，下一位 BOSS 更强`, '#ffd890', 5); } }
     else if (!died) r.n = Math.min(2, r.n + 1);
     bossTrip = false;
     if (!rOn()) {
@@ -206,5 +237,5 @@ ${P.boons ? `<div class="x">🎴 额外祝福抉择 ×${P.boons}</div>` : ''}${n
   wrapStart(); setTimeout(wrapStart, 0);
   // 每杀一人回血（世道“盛宴” / 议会祝福）
   function onKill() { const h = mod('heal', 0) + (nb().heal || 0); if (h > 0) try { const s = G().st(); G().S.hp = Math.min(s.maxHp, G().S.hp + s.maxHp * h); } catch (e) { } }
-  return { on, rOn, R, MODS, runDmg, runHp, runSpd, enemyHp, enemyDmg, nemRate, enemyLv, chapLv, isBossTrip, leaveNode, onKill, payout, capCave, caveGate, ROUND, hv, bf, settle, showSettle, stash, CB, CHB, chBoss, bossLv, arena, nb, ward };
+  return { on, rOn, R, MODS, runDmg, runHp, runSpd, enemyHp, enemyDmg, nemRate, enemyLv, chapLv, isBossTrip, leaveNode, onKill, payout, capCave, caveGate, ROUND, hv, bf, settle, showSettle, stash, CB, CHB, chBoss, bossLv, bossAff, arena, nb, ward };
 })();

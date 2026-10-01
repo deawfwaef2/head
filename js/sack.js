@@ -201,6 +201,7 @@ window.Sack = (() => {
     if (d.buff) { buffT = 120; toast('🪨 刀刃磨得雪亮：120 秒内伤害 +25%', '#ffd27a', 2); }
     if (d.mana && window.Talents && Talents.addMana) { Talents.addMana(d.mana); SFX.soul && SFX.soul(6, 2); G.flash && G.flash('#5ab8ff'); toast(`用了${d.n}，魂能 +${d.mana}`, '#8fd0ff', 1.6); } /* R54：魂能药 */
     if (d.bf) { addBuff(d.bf.kind, d.bf.k, d.bf.t); toast(`${d.icon} ${d.bf.msg}`, '#ffd27a', 2.2); } /* R54：新增益（防御/疾行/再生/暴伤） */
+    if (d.onUse) try { d.onUse(); } catch (e) { console.warn('onUse', id, e); }
     G.save && G.save();
   }
   let buffT = 0; const BF = {}; const addBuff = (kind, k, t) => { BF[kind] = { k, t, t0: t }; };
@@ -341,7 +342,7 @@ window.Sack = (() => {
   let itemFilter = 'all', craftOnly = false;
   const FILT = [['all', '全部'], ['equip', '⚔️ 装备'], ['mat', '🪨 材料'], ['use', '🧪 药品'], ['body', '💀 首级·器官'], ['book', '📖 典籍'], ['prop', '🧷 摆件']];
   const catOf = (o) => { const k = (IT[o.id] || {}).kind; return k === 'equip' ? 'equip' : k === 'use' ? 'use' : (k === 'head' || k === 'organ') ? 'body' : k === 'book' ? 'book' : k === 'prop' ? 'prop' : 'mat'; };
-  const RGRP = [['🧪 药品 · 消耗', r => r.g === 'med' || ['potion', 'bandage', 'stew', 'bigpotion'].includes(r.out), '出猎前带上，腰带按 H 瞬间喝'], ['🍲 料理 · 汤食', r => r.g === 'food', '便宜顶饱，出猎前多备几份'], ['🗡️ 战斗增益', r => r.g === 'buff' || r.out === 'whet', '喝下 / 使用后限时生效：伤害、防御、疾行、再生'], ['🛡️ 护具 · 饰品', r => r.g === 'gear', '用野外材料直接打造；做好后在「装备」页穿上'], ['♻️ 材料转化', r => r.g === 'conv', '把多余的材料换成缺的那一种'], ['🩸 拆解 · 肢体', r => r.g === 'body', '砍断的肢体会收进麻袋；在这里拆成骨、筋、皮'], ['🎒 背篓 · 扩容', r => /^b\d/.test(r.out), '合成后自动换上，麻袋格子变大、能多装东西']];
+  const RGRP = [['🌙 回合 · 肉鸽 · 月之踪迹', r => r.grp === 'run', '围绕章节/回合循环：祈福、结算、宿敌、章节 BOSS、月之线索（大多每回合/每章限用）'], ['🧪 药品 · 消耗', r => r.g === 'med' || ['potion', 'bandage', 'stew', 'bigpotion'].includes(r.out), '出猎前带上，腰带按 H 瞬间喝'], ['🍲 料理 · 汤食', r => r.g === 'food', '便宜顶饱，出猎前多备几份'], ['🗡️ 战斗增益', r => r.g === 'buff' || r.out === 'whet', '喝下 / 使用后限时生效：伤害、防御、疾行、再生'], ['🛡️ 护具 · 饰品', r => r.g === 'gear', '用野外材料直接打造；做好后在「装备」页穿上'], ['♻️ 材料转化', r => r.g === 'conv', '把多余的材料换成缺的那一种'], ['🩸 拆解 · 肢体', r => r.g === 'body', '砍断的肢体会收进麻袋；在这里拆成骨、筋、皮'], ['🎒 背篓 · 扩容', r => /^b\d/.test(r.out), '合成后自动换上，麻袋格子变大、能多装东西']];
   function recipeCard(rc, i) {
     const S = G.S, d = IT[rc.out], okN = Object.entries(rc.need).every(([k, n]) => have(k) >= n), ok = okN && S.coins >= rc.coin, u = window.ItemIcons && ItemIcons.url && ItemIcons.url(rc.out);
     const bag = d.slot === 'bag' ? `<div class="wk-note">麻袋 ${inv().sack.w}×${inv().sack.h} → <b>${BAGSZ[d.tier][0]}×${BAGSZ[d.tier][1]}</b>${d.tier <= (S.eq.bag || 0) ? ' <span class="no">（你已有同级或更高）</span>' : ''}</div>` : '';
@@ -394,7 +395,7 @@ window.Sack = (() => {
     else if (d.kind === 'equip' && window.RPG) {
       const E = RPG.EQUIP[d.slot], t = E.tiers[d.tier], c = E.tiers[G.S.eq[d.slot] || 0], K = ['atk', 'def', 'hp', 'str', 'con', 'agi', 'ter', 'soul', 'cap'], NM = { atk: '攻击', def: '防御', hp: '生命', str: '力量', con: '体魄', agi: '敏捷', ter: '凶威', soul: '魂力', cap: '背篓' };
       body = K.filter(k => t[k] || c[k]).map(k => { const a = t[k] || 0, b = c[k] || 0, df = a - b; return `${NM[k]} <b>${a}</b> <span style="color:${df > 0 ? '#8fe88f' : df < 0 ? '#ff8f86' : '#998'}">${df > 0 ? '▲+' + df : df < 0 ? '▼' + df : '＝'}</span>`; }).join('<br>') + `<br><span style="color:#a99">${esc(t.desc || '')}</span>` + (d.slot === 'weapon' && window.WpnSpec ? WpnSpec.tip(d.tier, o.plus || 0, G.S.eq.weapon || 0, (G.S.eqPlus || {}).weapon || 0) : '');
-    } else body = esc(d.desc || '');
+    } else { body = esc(d.desc || ''); const us = [...new Set(RECIPES.filter(rc => rc.need[o.id]).map(rc => IT[rc.out] ? IT[rc.out].icon + IT[rc.out].n : rc.out))]; if (us.length) body += `<br><span style="color:#9fd0a0">🔨 可合成：${esc(us.slice(0, 8).join('、'))}${us.length > 8 ? ' …' : ''}</span>`; }
     return `<div class="tn" style="color:${RARC[r]}">${d.icon || ''} ${esc(nameOf(o))}${o.n > 1 ? ' ×' + o.n : ''}</div><div class="tr" style="color:${RARC[r]}">${RARN[r]} · ${({ equip: '装备', use: '消耗品', head: '首级', organ: '人体器官', book: '典籍', prop: '摆件' })[d.kind] || '材料'}${d.st > 1 ? ' · 可堆叠 ' + d.st : ''} · ${dims(o).join('×')} 格</div><div class="tb">${body}</div>`;
   }
   function bindTips(root) {
