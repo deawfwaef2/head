@@ -36,7 +36,7 @@ window.RecallIW = (() => {
   // ---------------- 姿势（相机局部坐标：x 右，y 上，-z 前）----------------
   // 每个姿势 = { H:[x,y,z,rx,ry,rz], L:[...], R:[...], C:[x,y,z,rx,ry,rz,fov] }；手：rz 决定掌心朝向（0=向下，PI=向上，-PI/2=朝左，PI/2=朝右），rx>0 手指上翘
   const BASE = { H: [0, -0.07, -0.44, -0.1, 0, 0], L: [-0.105, -0.2, -0.43, 0.95, 0, PI / 2 + 0.35], R: [0.105, -0.2, -0.43, 0.95, 0, -PI / 2 - 0.35], C: [0, 0, 0, -0.06, 0, 0, -14] };
-  const YOFF = 0.04;
+  const YOFF = 0.09; // R51：0.04→0.09，动作栏恢复可见后，头（两眼）抬到画面中部偏下，下巴不压栏
   const cp = p => ({ H: p.H.slice(), L: p.L.slice(), R: p.R.slice(), C: p.C.slice() });
   const P = (o) => { const p = cp(BASE); for (const k in o) { if (k === 'dH' || k === 'dC') { const t = k === 'dH' ? p.H : p.C; o[k].forEach((v, i) => t[i] += v); } else p[k] = o[k].slice(); } return p; };
   const RSIDE = [0.13, -0.19, -0.37, 1.05, 0, -PI / 2], LSIDE = [-0.13, -0.19, -0.37, 1.05, 0, PI / 2]; // 双手夹住两侧脸颊
@@ -122,14 +122,14 @@ window.RecallIW = (() => {
   }
 
   // ---------------- UI ----------------
-  const CSS = `#riw{position:fixed;inset:0;z-index:60;pointer-events:none;color:#efe4d4;font:14px/1.55 system-ui,'PingFang SC','Microsoft YaHei',sans-serif;opacity:0;transition:opacity .35s}
+  const CSS = `#riw{position:fixed;inset:0;z-index:70;pointer-events:none;color:#efe4d4;font:14px/1.55 system-ui,'PingFang SC','Microsoft YaHei',sans-serif;opacity:0;transition:opacity .35s}
 #riw.on{opacity:1}#riw .vg{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,transparent 42%,rgba(0,0,0,.55) 100%)}#riw .fl{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 30%,#8a0010 100%);opacity:0}
-#riw .card{position:absolute;left:18px;top:18px;width:318px;max-height:calc(100% - 230px);overflow:auto;pointer-events:auto;background:rgba(14,10,12,.82);border:1px solid rgba(232,192,112,.28);border-left:4px solid var(--c);border-radius:12px;padding:12px 14px;box-shadow:0 8px 28px #0009}
-#riw .rr{font-size:12px;letter-spacing:.25em;color:var(--c)}#riw .nm{font:700 22px/1.25 serif;letter-spacing:.06em;margin:2px 0}#riw .tt{font-size:12px;color:#c9b59c}#riw .id{font-size:12.5px;color:#d9ccb8;margin-top:4px}
+#riw .rcard{position:absolute;left:18px;top:18px;width:318px;max-height:calc(100% - 230px);overflow:auto;pointer-events:auto;background:rgba(14,10,12,.82);border:1px solid rgba(232,192,112,.28);border-left:4px solid var(--c);border-radius:12px;padding:12px 14px;box-shadow:0 8px 28px #0009}
+#riw .rr{font-size:12px;letter-spacing:.25em;color:var(--c)}#riw .nm{font:700 22px/1.25 serif;letter-spacing:.06em;margin:2px 0}#riw .rtt{font-size:12px;color:#c9b59c}#riw .id{font-size:12.5px;color:#d9ccb8;margin-top:4px}
 #riw .pg{display:flex;align-items:center;gap:8px;margin:9px 0 8px;font-size:12px;color:#c9b59c}#riw .pg i{flex:1;height:6px;background:#0008;border-radius:3px;overflow:hidden}#riw .pg i b{display:block;height:100%;background:linear-gradient(90deg,#c03040,#ffd27a);transition:width .6s}
 #riw .fr{display:grid;grid-template-columns:22px 70px 1fr;gap:4px;align-items:baseline;padding:4px 6px;border-radius:6px;font-size:12.5px;cursor:pointer}#riw .fr:hover{background:#ffffff10}#riw .fr .i{text-align:center}#riw .fr .n{color:#bba88f}#riw .fr .v{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#f4eadb}
-#riw .fr.u .v{color:#7d6d62}#riw .fr.u .v em{font-style:normal;color:#e8c070;margin-left:4px}#riw .fr.nw{animation:riwn 1.8s}@keyframes riwn{0%,40%{background:rgba(255,210,122,.35)}}
-#riw .bar{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:14px;align-items:flex-end;pointer-events:auto}
+#riw .fr.open .v{white-space:normal;overflow:visible;line-height:1.55}#riw .fr.open{background:#ffffff0d}#riw .fr:not(.u) .n:after{content:' ▸';color:#8a7660;font-size:10px}#riw .fr.open .n:after{content:' ▾'}#riw .fr.u .v{color:#7d6d62}#riw .fr.u .v em{font-style:normal;color:#e8c070;margin-left:4px}#riw .fr.nw{animation:riwn 1.8s}@keyframes riwn{0%,40%{background:rgba(255,210,122,.35)}}
+#riw .rbar{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:14px;align-items:flex-end;pointer-events:auto}
 #riw .grp{display:flex;flex-direction:column;align-items:center;gap:4px}#riw .grp>small{font-size:11px;letter-spacing:.3em;color:#bba88f;text-shadow:0 1px 4px #000}#riw .grp>div{display:flex;gap:6px}
 #riw .b{position:relative;width:66px;height:70px;border-radius:10px;background:rgba(18,12,14,.86);border:1px solid rgba(232,192,112,.3);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:transform .1s,border-color .15s,background .15s}
 #riw .b:hover{transform:translateY(-3px);border-color:#ffd27a;background:rgba(60,34,30,.92)}#riw .b .ic{font-size:25px;line-height:1.1}#riw .b .l{font-size:11.5px;margin-top:3px;white-space:nowrap}#riw .b .k{position:absolute;left:4px;top:2px;font:700 10px monospace;color:#e8c070}
@@ -142,37 +142,38 @@ window.RecallIW = (() => {
 #riw .x{position:absolute;right:18px;top:14px;pointer-events:auto;padding:7px 14px;border-radius:10px;background:rgba(18,12,14,.85);border:1px solid rgba(232,192,112,.35);color:#efe4d4;cursor:pointer;font:13px system-ui}#riw .x:hover{border-color:#ffd27a}
 #riw .pn{position:absolute;right:18px;top:60px;width:390px;max-height:calc(100% - 260px);overflow:auto;pointer-events:auto;background:rgba(14,10,12,.9);border:1px solid rgba(232,192,112,.35);border-radius:12px;padding:14px 18px;display:none;box-shadow:0 10px 36px #000b}#riw .pn.on{display:block;animation:riwp .3s}@keyframes riwp{from{opacity:0;transform:translateX(12px)}}
 #riw .pn .px{position:absolute;right:10px;top:6px;cursor:pointer;color:#9d8a78}#riw .pn p{margin:4px 0;font-size:13.5px;line-height:1.7}
-body.riw-on #cross,body.riw-on #tip,body.riw-on #hint,body.riw-on #labels,body.riw-on #hud{opacity:0!important;transition:opacity .3s}`;
+body.riw-on #cross,body.riw-on #tip,body.riw-on #hint,body.riw-on #labels,body.riw-on #hud{opacity:0!important;transition:opacity .3s}
+html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body.riw-on #toast,html body.riw-on #hintTag,html body.riw-on #feelBubble,html body.riw-on #spbubs,html body.riw-on #spchip,html body.riw-on #tip,html body.riw-on #hint{visibility:hidden!important;opacity:0!important}`;
   function build() {
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     el = document.createElement('div'); el.id = 'riw';
-    el.innerHTML = `<div class="vg"></div><div class="fl"></div><div class="card"></div><div class="hint"><b>拖动鼠标</b> 转动她　<b>滚轮</b> 拿近 / 拿远　<b>数字键</b> 动作　<b>F / Esc</b> 放下</div><button class="x">✕ 放下（F）</button>
-      <div class="pn rc-host"><span class="px">✕</span><div class="pb"></div></div><div class="sub"></div><div class="pr"><b></b></div><div class="tipb"></div><div class="bar"></div>`;
+    el.innerHTML = `<div class="vg"></div><div class="fl"></div><div class="rcard"></div><div class="hint"><b>拖动鼠标</b> 转动她　<b>滚轮</b> 拿近 / 拿远　<b>数字键</b> 动作　<b>F / Esc</b> 放下</div><button class="x">✕ 放下（F）</button>
+      <div class="pn rc-host"><span class="px">✕</span><div class="rpb"></div></div><div class="sub"></div><div class="pr"><b></b></div><div class="tipb"></div><div class="rbar"></div>`;
     document.body.appendChild(el);
     el.querySelector('.x').onclick = () => close(); el.querySelector('.px').onclick = () => panel(null);
-    el.querySelector('.bar').addEventListener('click', e => { const b = e.target.closest('.b'); if (b) go(b.dataset.a); });
-    el.querySelector('.bar').addEventListener('mouseover', e => { const b = e.target.closest('.b'), t = el.querySelector('.tipb'); if (!b) { t.style.display = 'none'; return; } t.innerHTML = b.dataset.tip || ''; t.style.display = b.dataset.tip ? 'block' : 'none'; });
-    el.querySelector('.bar').addEventListener('mouseleave', () => el.querySelector('.tipb').style.display = 'none');
-    el.querySelector('.card').addEventListener('click', e => { const f = e.target.closest('.fr'); if (!f) return; const k = f.dataset.k, F = Recall.FK[k]; if (!Recall.known(S.rec.c, k)) { sub(`<span class="d">还想不起来她的${F.n}。试试「${esc(howTo(k))}」。</span>`); return; } sub(`<b>${F.ic} ${F.n}</b>：${esc(F.v(S.rec))}`); if (k === 'fight') panel(Recall.fightHTML(S.rec)); else if (k === 'chess') panel(Recall.chessHTML(S.rec)); else if (k === 'card') panel(Recall.cardHTML(S.rec)); else if (k === 'rank' && window.Ranks) panel(`<div class="rc-p-h">阶位 · 传承</div>${Ranks.ladderHTML(S.rec.c)}`); else if (k === 'bio' && window.Overhear) panel(`<div class="rc-p-h">小习惯与秘密</div>${Overhear.bioHTML(S.rec.c)}`); });
+    el.querySelector('.rbar').addEventListener('click', e => { const b = e.target.closest('.b'); if (b) go(b.dataset.a); });
+    el.querySelector('.rbar').addEventListener('mouseover', e => { const b = e.target.closest('.b'), t = el.querySelector('.tipb'); if (!b) { t.style.display = 'none'; return; } t.innerHTML = b.dataset.tip || ''; t.style.display = b.dataset.tip ? 'block' : 'none'; });
+    el.querySelector('.rbar').addEventListener('mouseleave', () => el.querySelector('.tipb').style.display = 'none');
+    el.querySelector('.rcard').addEventListener('click', e => { const f = e.target.closest('.fr'); if (!f) return; const k = f.dataset.k, F = Recall.FK[k]; if (Recall.known(S.rec.c, k)) { S.openRows = S.openRows || new Set(); if (S.openRows.has(k)) S.openRows.delete(k); else S.openRows.add(k); f.classList.toggle('open', S.openRows.has(k)); } if (!Recall.known(S.rec.c, k)) { sub(`<span class="d">还想不起来她的${F.n}。试试「${esc(howTo(k))}」。</span>`); return; } sub(`<b>${F.ic} ${F.n}</b>：${esc(F.v(S.rec))}`); if (k === 'fight') panel(Recall.fightHTML(S.rec)); else if (k === 'chess') panel(Recall.chessHTML(S.rec)); else if (k === 'card') panel(Recall.cardHTML(S.rec)); else if (k === 'rank' && window.Ranks) panel(`<div class="rc-p-h">阶位 · 传承</div>${Ranks.ladderHTML(S.rec.c)}`); else if (k === 'bio' && window.Overhear) panel(`<div class="rc-p-h">小习惯与秘密</div>${Overhear.bioHTML(S.rec.c)}`); });
   }
   // 哪个动作能想起哪一项
   function howTo(k) { const out = []; for (const a of Object.keys(Recall.ACT)) { const x = Recall.ACT[a]; if (a === 'handle') continue; if (x.fac === k || x.fac2 === k) out.push(x.n); } if (k === 'adorn') out.unshift('把玩'); if (k === 'rank') out.push('想起任意 4 项'); if (k === 'goal') out.push('想起 7 项'); return out.join(' / ') || '？'; }
   let subT = 0;
   function sub(html) { const s = el.querySelector('.sub'); s.style.opacity = 0; clearTimeout(subT); subT = setTimeout(() => { s.innerHTML = html; s.style.opacity = 1; }, 120); }
-  function panel(html) { const p = el.querySelector('.pn'); if (!html) { p.classList.remove('on'); return; } p.querySelector('.pb').innerHTML = html; p.classList.add('on'); }
+  function panel(html) { const p = el.querySelector('.pn'); if (!html) { p.classList.remove('on'); return; } p.querySelector('.rpb').innerHTML = html; p.classList.add('on'); }
   let ORD = [];
   function refresh(fresh) {
     const r = S.rec, c = r.c, K = Recall.known, n = Recall.nKnown(c), tot = Recall.FAC.length;
-    const card = el.querySelector('.card'); card.style.setProperty('--c', RC[c.rar] || '#ccc');
+    const card = el.querySelector('.rcard'); card.style.setProperty('--c', RC[c.rar] || '#ccc');
     const title = window.Ranks && K(c, 'rank') ? Ranks.text(c) : (c.title || '');
-    card.innerHTML = `<div class="rr">${RN[c.rar] || ''}${c.shiny ? ' · ✨异色' : ''}</div><div class="nm">${esc(window.NM ? NM(c) : c.name)}</div>${title ? `<div class="tt">${esc(title)}</div>` : ''}
+    card.innerHTML = `<div class="rr">${RN[c.rar] || ''}${c.shiny ? ' · ✨异色' : ''}</div><div class="nm">${esc(window.NM ? NM(c) : c.name)}</div>${title ? `<div class="rtt">${esc(title)}</div>` : ''}
       <div class="id">${K(c, 'race') ? esc(`${c.raceN} · ${c.idN} · ${c.age} 岁`) : '身份：？？？'} · 得自 ${esc(c.locN || '？')}</div>
       <div class="pg">记忆 <i><b style="width:${n / tot * 100}%"></b></i> ${n} / ${tot}</div>` +
-      Recall.FAC.map(f => { const k = K(c, f.k); return `<div class="fr${k ? '' : ' u'}${fresh === f.k ? ' nw' : ''}" data-k="${f.k}" title="${k ? esc(f.v(r)) : '点击查看怎么想起'}"><span class="i">${f.ic}</span><span class="n">${f.n}</span><span class="v">${k ? esc(f.v(r)) : `？？？<em>${esc(howTo(f.k).split(' / ')[0])}</em>`}</span></div>`; }).join('');
+      Recall.FAC.map(f => { const k = K(c, f.k); return `<div class="fr${k ? '' : ' u'}${fresh === f.k ? ' nw' : ''}${k && S.openRows && S.openRows.has(f.k) ? ' open' : ''}" data-k="${f.k}" title="${k ? esc(f.v(r)) : '点击查看怎么想起'}"><span class="i">${f.ic}</span><span class="n">${f.n}</span><span class="v">${k ? esc(f.v(r)) : `？？？<em>${esc(howTo(f.k).split(' / ')[0])}</em>`}</span></div>`; }).join('');
     // 动作栏
     ORD = []; const grp = (name, keys) => { let h = `<div class="grp"><small>${name}</small><div>`; for (const a of keys) { const x = PLAY[a] || Recall.ACT[a], lock = x.need && !Recall.hasB(x.need); ORD.push(a); const i = ORD.length, key = i <= 9 ? i : i === 10 ? 0 : ''; const done = !PLAY[a] && !lock && K(c, x.fac); const tip = lock ? `🔒 需要建筑：${esc(Recall.bn(x.need))}` : `${esc(x.d)}${PLAY[a] ? '' : `　→ 想起：${esc(Recall.FK[x.fac].n)}`}`; h += `<div class="b${lock ? ' lk' : ''}${done ? ' dn' : ''}${S.act === a ? ' run' : ''}" data-a="${lock ? '' : a}" data-tip="${tip}"><span class="k">${key}</span><span class="ic">${x.ic}</span><span class="l">${x.n.replace(/ ·.*$/, '')}</span></div>`; } return h + '</div></div>'; };
     const bld = ['seance', 'tea', 'mirror', 'dress', 'appraise', 'chess', 'card'], avail = bld.filter(a => Recall.hasB(Recall.ACT[a].need)), lockd = bld.filter(a => !Recall.hasB(Recall.ACT[a].need));
-    el.querySelector('.bar').innerHTML = grp('回忆', ['stare', 'stroke', 'sniff', 'listen', 'battle']) + grp(`把玩 ${Math.min(8, S.play)}/8`, ['toss', 'spin', 'poke', 'pat']) + grp('建筑', avail.concat(lockd).slice(0, Math.max(3, avail.length)));
+    el.querySelector('.rbar').innerHTML = grp('回忆', ['stare', 'stroke', 'sniff', 'listen', 'battle']) + grp(`把玩 ${Math.min(8, S.play)}/8`, ['toss', 'spin', 'poke', 'pat']) + grp('建筑', avail.concat(lockd).slice(0, Math.max(3, avail.length)));
     el.classList.toggle('busy', !!S.act);
   }
 
@@ -214,7 +215,22 @@ body.riw-on #cross,body.riw-on #tip,body.riw-on #hint,body.riw-on #labels,body.r
     return cp(BASE);
   }
   let cur = null;
+  // R51：头大小/位置——旧算法用整颗头的包围盒：k = 盒高/0.26、对准盒中心。同一张脸因发长不同 k 从 1.4 跳到 3（长发=拿得远=头显得特别小），
+  // 戴高帽子则盒中心上移、脸沉到动作栏后面。ModelHeads 已按脸把每颗头归一（hb.group 缩放 1.55~1.59），所以：
+  //   k = 1.4 × 头组世界缩放 / 1.55（与发型、帽子无关）；对准点 = 两眼（iris 网格）中心，没有 iris 才退回盒中心。
+  //   刚生成的头网格可能未就绪 → 打开后 0.6s / 1.6s 各复测一次，k 与对准点平滑过渡。
+  const _ws = new THREE.Vector3();
+  function faceFit(h) {
+    const root = h.hb && h.hb.group ? h.hb.group : h.g, q0 = h.g.quaternion.clone(); h.g.quaternion.identity(); h.g.updateMatrixWorld(true);
+    root.getWorldScale(_ws); const k = Math.max(1.1, Math.min(1.8, 1.4 * Math.abs(_ws.x) / 1.55));
+    const eb = new THREE.Box3(), tb = new THREE.Box3(); let ne = 0;
+    root.traverse(o => { if (o.isMesh && o.userData && o.userData.kind === 'iris' && o.geometry) { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); tb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); eb.union(tb); ne++; } });
+    let hc = null; if (ne) { hc = eb.getCenter(new THREE.Vector3()).sub(h.g.position); if (hc.length() > 0.6) hc = null; }
+    h.g.quaternion.copy(q0); h.g.updateMatrixWorld(true);
+    return { k, hc };
+  }
   function pre(dt, now) {
+    if (S.active && S.h) { const el2 = performance.now() - (S.openAt || 0); if ((S.kM === 0 && el2 > 600) || (S.kM === 1 && el2 > 1600)) { S.kM++; const ff = faceFit(S.h); S.kT = ff.k; if (ff.hc) S.hcT = ff.hc; } const a5 = Math.min(1, (dt || 0.016) * 5); if (S.kT && Math.abs(S.kT - S.k) > 1e-3) S.k += (S.kT - S.k) * a5; if (S.hcT && S.hc) S.hc.lerp(S.hcT, a5); }
     if (!S.active || !S.h) return; const cam = G.camera, h = S.h;
     if (!h.g || !h.g.parent) { close(true); return; }
     S.openT = Math.min(1, S.openT + dt / 0.55); const oe = sm(S.openT);
@@ -261,10 +277,10 @@ body.riw-on #cross,body.riw-on #tip,body.riw-on #hint,body.riw-on #labels,body.r
     e.stopImmediatePropagation();
     const m = /^Digit(\d)$/.exec(e.code); if (m) { const i = m[1] === '0' ? 10 : +m[1]; const a = ORD[i - 1]; if (a) { const x = PLAY[a] || Recall.ACT[a]; if (!x.need || Recall.hasB(x.need)) go(a); else snd('deny'); } }
   }
-  function onDown(e) { if (!S.active || e.target.closest && e.target.closest('#riw .card,#riw .bar,#riw .pn,#riw .x')) return; S.drag = { x: e.clientX, y: e.clientY, acc: 0 }; e.preventDefault(); }
+  function onDown(e) { if (!S.active || e.target.closest && e.target.closest('#riw .rcard,#riw .rbar,#riw .pn,#riw .x')) return; S.drag = { x: e.clientX, y: e.clientY, acc: 0 }; e.preventDefault(); }
   function onMove(e) { if (!S.active || !S.drag) return; const dx = e.clientX - S.drag.x, dy = e.clientY - S.drag.y; S.drag.x = e.clientX; S.drag.y = e.clientY; S.yaw += dx * 0.012; S.pitch = Math.max(-0.9, Math.min(0.9, S.pitch + dy * 0.008)); S.drag.acc += Math.abs(dx) * 0.012 + Math.abs(dy) * 0.008; if (S.drag.acc > 1.4) { S.drag.acc = 0; S.play++; if (window.SFX && SFX.on && SFX.ctx) noise(SFX.ctx.currentTime, 0.3, 0.05, 'highpass', 2600, 4200, 0.6); if (S.play === 8 && !Recall.known(S.rec.c, 'adorn')) finish('pat'); else refresh(); } }
   function onUp() { if (S.drag) { S.drag = null; } }
-  function onWheel(e) { if (!S.active) return; if (e.target.closest && e.target.closest('#riw .card,#riw .pn')) return; e.preventDefault(); e.stopPropagation(); S.dist = Math.max(-0.12, Math.min(0.14, S.dist + (e.deltaY > 0 ? 0.02 : -0.02))); }
+  function onWheel(e) { if (!S.active) return; if (e.target.closest && e.target.closest('#riw .rcard,#riw .pn')) return; e.preventDefault(); e.stopPropagation(); S.dist = Math.max(-0.12, Math.min(0.14, S.dist + (e.deltaY > 0 ? 0.02 : -0.02))); }
   // 按住左键时也会触发 game.js 的把玩(poke)；回忆中屏蔽 canvas 的 mousedown
   function block(e) { if (S.active && !(e.target.closest && e.target.closest('#riw'))) { e.stopImmediatePropagation(); } }
 
@@ -286,8 +302,9 @@ body.riw-on #cross,body.riw-on #tip,body.riw-on #hint,body.riw-on #labels,body.r
     { /* 测量首级：包围盒中心（头局部坐标）与高度 → 姿势整体按 k 缩放（设计基准：头高 0.26m） */
       const q0 = h.g.quaternion.clone(); h.g.quaternion.identity(); h.g.updateMatrixWorld(true);
       const bb = new THREE.Box3().setFromObject(h.hb && h.hb.group ? h.hb.group : h.g), sz = bb.getSize(new THREE.Vector3()), ctr = bb.getCenter(new THREE.Vector3());
-      S.hc = ctr.sub(h.g.position); S.k = Math.max(0.5, Math.min(3, (sz.y || 0.26) / 0.26)); { /* R37：非 VRoid 头（MMD 系）的包围盒把发量/发饰/兽耳都算进去（0.27~0.59 vs VRoid 中位 0.30）→ k 偏大 → 手被放大、头显得小。非 VRoid 头的 k 向 VRoid 中位数（1.15）收敛 */ let gp = ''; try { const lk = (h.rec && h.rec.look) || (rec && rec.look); const mt = lk && window.ModelHeads && ModelHeads.meta(lk); gp = (mt && mt.grp) || ''; } catch (e) { } if (gp && gp !== 'vroid') { S.kRaw = S.k; S.k = Math.max(1.05, Math.min(1.3, 1.15 + 0.1 * (S.k - 1.15))); } } h.g.quaternion.copy(q0); h.g.updateMatrixWorld(true); S.hsz = sz.toArray().map(v => +v.toFixed(3)); }
-    Object.assign(S, { openAt: performance.now(), active: true, h, rec, cb: cb || {}, act: '', t: 0, yaw: 0, pitch: 0, dist: 0, drag: null, play: 0, fov0: G.camera.fov, openT: 0, shake: 0, pend: null });
+      S.hc = ctr.sub(h.g.position); S.k = Math.max(0.5, Math.min(3, (sz.y || 0.26) / 0.26)); { /* R37：非 VRoid 头（MMD 系）的包围盒把发量/发饰/兽耳都算进去（0.27~0.59 vs VRoid 中位 0.30）→ k 偏大 → 手被放大、头显得小。非 VRoid 头的 k 向 VRoid 中位数（1.15）收敛 */ let gp = ''; try { const lk = (h.rec && h.rec.look) || (rec && rec.look); const mt = lk && window.ModelHeads && ModelHeads.meta(lk); gp = (mt && mt.grp) || ''; } catch (e) { } if (gp && gp !== 'vroid') { S.kRaw = S.k; S.k = Math.max(1.05, Math.min(1.3, 1.15 + 0.1 * (S.k - 1.15))); } } { const ff = faceFit(h); S.kOld = S.k; S.k = ff.k; if (ff.hc) S.hc = ff.hc; S.kT = 0; S.hcT = null; S.kM = 0; }
+      h.g.quaternion.copy(q0); h.g.updateMatrixWorld(true); S.hsz = sz.toArray().map(v => +v.toFixed(3)); }
+    Object.assign(S, { openAt: performance.now(), active: true, h, rec, cb: cb || {}, act: '', openRows: new Set(), t: 0, yaw: 0, pitch: 0, dist: 0, drag: null, play: 0, fov0: G.camera.fov, openT: 0, shake: 0, pend: null });
     cur = null; G.setUI(true); document.body.classList.add('riw-on');
     el.style.display = 'block'; requestAnimationFrame(() => el.classList.add('on')); panel(null); refresh();
     const c = rec.c; sub(Recall.nKnown(c) > 3 ? `你把<b>${esc(NM(c))}</b>捧到面前。她的眼睛半睁着，已经不会再眨了。` : `一颗陌生的头。你把她捧到面前——还想不起她是谁。<br><span class="d">试试下面的动作，一点点想起来。</span>`);

@@ -1924,3 +1924,12 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 用户再次亲手登录（`tools/hub/livelogin.py` 在 8081 端口给用户实时页面；验证码只由用户点，用户过了验证码后我才替他点“登录”按钮）。重新筛选 39 个候选（骑士/精灵/暗精灵/弓手/佣兵等）→ 下载转换 32 个、质检拒 2 个、转换失败 5 个（头部无脸）。人工看图剔除 7 个（现代便服/过矮/暴露）后登记 25 个，`js/vroid_pack.js` 现共 76 个。
 - 身份是看渲染图后手工指定的：骑士类（`VH_507309` `VH_476605` `VH_996092` 等 → knight/paladin/guard/general/dragonknight），精灵类（`VH_579317` `VH_110696` `VH_477048` → elfprincess/ranger/archer/druid），暗色 → courtmage/hexer/fallen，等等。`tools/hub/mkpack.py` 现为追加模式（保留已登记）；`VH_IDS` 环境变量可手工指定。
 - 事实：Hub 上“允许暴力+改造+再分发”的骑士/盔甲女角色极少（多为男性、机甲或比基尼甲），所以骑士类仍然少；要更多请告诉我具体想要什么风格，或让用户在 Hub 上手动收藏条目 URL，我按 URL 下载。
+
+## R41（主管）k — R51 F 查看（回忆 recall_iw）三个 bug
+用户：“F 查看界面底部那些栏都被挡住了，信息栏无法展开，有的头比较小”。真实 index 启动 + Playwright 逐颗打开实测定位：
+- **底部动作栏被挡/看不见**：`js/talents_ui.js:50` 有**全局** `.bar{height:21px;overflow:hidden}` 和 `.bar span{position:absolute;inset:0}`（另有 `.card` / `body.ui3a .card` / `.pb` / `.tt` 等全局规则）漏到回忆界面 → 70px 的动作按钮被裁成 21px 高的空框、点击落到 canvas。修法只在我自己的文件里：recall_iw.js 的类名改为 `rbar / rcard / rpb / rtt`（选择器/HTML/querySelector 全同步）。**talents_ui.js 的全局 `.bar` 仍会污染任何叫 .bar 的元素，归属者请加作用域。**
+- 同时：`#riw` z-index 60→70（高于 #spbubs 64、低于神灵对话 #spdlg 75）；`html body.riw-on` 用 visibility:hidden!important 隐藏 #hud/#labels/#cross/#toast/#hintTag/#feelBubble/#spbubs/#spchip/#tip/#hint（旧写法被 ui3a 的 !important 压过，左上 HUD 和提示条会透出来）。
+- `js/spirits.js` busy() 加 `|| (window.RecallIW && RecallIW.active)`：F 查看中不再弹神灵对话（一行，他人文件最小改动）。
+- **信息栏展开**：已想起的行点击展开/收起全文（`.fr.open` 换行显示，▸/▾ 标记，刷新后保持）。
+- **头大小**：旧 k = 整颗头包围盒高/0.26 → 同一张脸因发长/帽子 k 从 1.33 跳到 3.0（长发=拿得远=头特别小；高帽=盒中心上移、脸沉到动作栏后）。改为 `faceFit()`：k = 1.4 × hb.group 世界缩放/1.55（ModelHeads 已按脸归一），对准点 = iris 网格中心；打开后 0.6s/1.6s 复测并平滑（刚生成的头网格可能未就绪）。YOFF 0.04→0.09（两眼在画面中部偏下、下巴不压栏）。
+- 测试工具：`/var/work/riw2.py`（备份在 /home/user/bak/tools）——index 真实启动、加头、逐个 F 打开，输出 k/对准点/按钮遮挡/全局样式泄漏/可见 HUD 并截图。注意：全量 models 在 2GB 沙盒会 OOM，只 sparse 检出少量头测试。

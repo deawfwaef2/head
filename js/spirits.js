@@ -25,7 +25,7 @@ window.Spirits = (() => {
   const litN = () => Object.keys(st().lit).length;
   const friends = () => Object.keys(st().met).filter(k => k !== 'chudai' && st().met[k].aff >= 45).length;
   const inCave = () => { const g = G0(); return g && g.playing && !(window.Explore && Explore.active) && !(window.Worlds && Worlds.active); };
-  const busy = () => { const g = G0(); return !g || g.uiOpen || g.cine || (window.Explore && Explore.active) || (window.Worlds && Worlds.active) || !g.playing || dlg.open || pan.open; };
+  const busy = () => { const g = G0(); return !g || g.uiOpen || g.cine || (window.Explore && Explore.active) || (window.Worlds && Worlds.active) || !g.playing || dlg.open || pan.open || (window.RecallIW && RecallIW.active); }; // R51：F 查看中不弹神灵对话（之前会盖住回忆界面的动作栏）
   const headsHere = () => G0().S.heads.filter(r => !r.inBag && !r.vault);
   const fmt = (t, cx) => String(t).replace(/\{(\w+)\}/g, (m, k) => ({ heads: headsHere().length, coins: Math.floor(G0().S.coins), depth: G0().S.depth, lit: litN(), head: (cx && cx.head) || '那颗头', land: (cx && cx.land) || '' }[k] ?? m));
 
