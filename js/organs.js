@@ -33,6 +33,7 @@ window.Organs = (() => {
     forearm:  { cat: 'limb', n: '前臂', icon: '🤚', st: { agi: 1, str: 1 }, pk: 0.1, r: 3, p: 0.9, note: '细长的两根骨，握过无数次刀柄。戳击加成。' },
     thigh:    { cat: 'limb', n: '大腿', icon: '🦵', st: { con: 2 }, au: 0.05, p: 0.9, note: '全身最粗的一块肌腱与骨。体魄加成，带光环。' },
     calf:     { cat: 'limb', n: '小腿', icon: '🦶', st: { agi: 2 }, tk: { every: 55, kind: 'herb', n: 1 }, p: 0.9, note: '又直又硬的小腿骨。敏捷加成，定时出草药。' },
+    piece:    { cat: 'piece', hid: 1, n: '残块', icon: '🥩', note: '解剖台上切下来的一块。' },
     chest:    { cat: 'limb', n: '胸腔', icon: '🦴', st: { con: 2, ter: 1 }, au: 0.07, r: 3.5, p: 0.7, note: '肋骨围成的笼子，里面空了。体魄与胆魄加成，光环范围大。' }
   };
   for (const k in OG) if (!OG[k].cat) OG[k].cat = 'organ';
@@ -45,6 +46,7 @@ window.Organs = (() => {
   // ---------------------------------------------------------------- 属性换算
   function grade(og, setN) { return (1 + (og.rar || 0) * 0.45) * (0.75 + (og.q || 0) * 0.5) * (og.af ? 1.15 : 1) * (setN >= 3 ? 1.3 : 1); }
   function effect(og, setN) {
+    if (og.t === 'piece' && window.Autopsy) return Autopsy.effect(og, setN);
     const d = OG[og.t]; if (!d) return {}; const g = grade(og, setN || 1), e = {};
     if (d.st) { e.stat = {}; for (const k in d.st) e.stat[k] = Math.round(d.st[k] * g * 10) / 10; }
     if (d.au) e.aura = { r: d.r || 3, m: +(1 + d.au * g).toFixed(3) };
@@ -60,15 +62,16 @@ window.Organs = (() => {
     if (e.tick) a.push(`每 ${e.tick.every}s 产出 ${e.tick.kind === 'coin' ? '🔮魂晶' : (Sk() && Sk().IT[e.tick.kind] ? Sk().IT[e.tick.kind].n : e.tick.kind)} ×${e.tick.n}`);
     return a.join(' · ');
   }
-  const name = (o) => { const og = o.og, d = og && OG[og.t]; return d ? `${og.own}的${d.n}` : (o.id || '器官'); };
+  const dn = (og, d) => og.t === 'piece' ? (og.nm || d.n) : d.n;
+  const name = (o) => { const og = o.og, d = og && OG[og.t]; return d ? `${og.own}的${dn(og, d)}` : (o.id || '器官'); };
   const info = (o) => {
     const og = o.og, d = OG[og.t]; if (!d) return '';
     return `归属：${og.own}（${og.race || '?'} · ${RN[og.rar] || RN[0]}${og.age ? ' · ' + og.age + '岁' : ''}）\n`
       + `品质：${Math.round(og.q * 100)}%${og.tr && og.tr.length ? '　性格：' + og.tr.join('、') : ''}${og.af ? '　遗传词缀：' + og.af : ''}\n`
-      + `效果（摆成标本）：${effText(og, 1)}\n${d.note}`;
+      + `效果（摆成标本）：${effText(og, 1)}\n${og.note || d.note}`;
   };
   const tipHtml = (og, setN, total) => {
-    const d = OG[og.t]; return `<b style="color:${RC[og.rar] || '#ddd'}">${d.icon} ${og.own}的${d.n}</b> · ${og.race || '?'} ${RN[og.rar] || ''} · 品质 ${Math.round(og.q * 100)}%${og.af ? ' · ' + og.af : ''}<br><small>${effText(og, setN)}${setN >= 2 ? ` · 同主 ${setN}/3${setN >= 3 ? ' 套装 ×1.3' : ''}` : ''}</small> · <b>[E]</b> 拿起`;
+    const d = OG[og.t]; return `<b style="color:${RC[og.rar] || '#ddd'}">${d.icon} ${og.own}的${dn(og, d)}</b> · ${og.race || '?'} ${RN[og.rar] || ''} · 品质 ${Math.round(og.q * 100)}%${og.af ? ' · ' + og.af : ''}<br><small>${effText(og, setN)}${setN >= 2 ? ` · 同主 ${setN}/3${setN >= 3 ? ' 套装 ×1.3' : ''}` : ''}</small> · <b>[E]</b> 拿起`;
   };
 
   // ---------------------------------------------------------------- 物品
@@ -166,8 +169,8 @@ window.Organs = (() => {
     return g;
   }
   function model(og) {
-    const cm0 = window.PartStore && PartStore.model(og.t); // R55：自制/替换模型；jar:false → 不带标本罐直接展示
-    if (cm0 && cm0.userData.nojar) { const w = new THREE.Group(); cm0.scale.multiplyScalar(2.2); cm0.position.y = 0.2; w.add(cm0); w.userData.ext = new THREE.Box3().setFromObject(w).getSize(new V3()); return w; }
+    if (og.t === 'piece' && window.Autopsy) return Autopsy.model(og); // R55：解剖台切下的块——直接展示，不带标本罐
+    const cm0 = null;
     const g = new THREE.Group(), blood = og.t === 'blood', rc = new THREE.Color(RC[og.rar] || '#999');
     const brass = M('#8a6a3a', { metalness: 0.7, roughness: 0.35 });
     add(g, cyl(0.12, 0.125, 0.03, 20), brass, 0, 0.015, 0);

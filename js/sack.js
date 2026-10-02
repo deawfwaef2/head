@@ -418,7 +418,7 @@ window.Sack = (() => {
     root.querySelectorAll('[data-wonly]').forEach(b => b.onchange = () => { craftOnly = b.checked; render(); });
     root.querySelectorAll('[data-ench]').forEach(b => b.onclick = () => { const k = b.dataset.ench; if (k.indexOf('eq') === 0) enchant('eq', k.split(':')[1] || 'weapon'); else enchant(inv().stash.find(o => o.u === +k)); });
     root.querySelectorAll('[data-craft]').forEach(b => b.onclick = () => craft(RECIPES[+b.dataset.craft]));
-    const dsb = root.querySelector('[data-act="dissect"]'); if (dsb) dsb.onclick = () => { if (!near(cont)) { toast('离尸体太远了', '#ccc'); return; } if (window.Dissect && Dissect.on()) Dissect.open(cont, () => render()); else { Organs.dissect(cont); render(); } };
+    const dsb = root.querySelector('[data-act="dissect"]'); if (dsb) dsb.onclick = () => { if (!near(cont)) { toast('离尸体太远了', '#ccc'); return; } if (window.Autopsy && Autopsy.canOpen(cont)) Autopsy.open(cont, () => render()); else if (window.Dissect && Dissect.on()) Dissect.open(cont, () => render()); else { Organs.dissect(cont); render(); } };
     const pour = root.querySelector('[data-act="pour"]'); if (pour) pour.onclick = () => pourWild();
     root.querySelectorAll('.sk-it').forEach(el => { el.onmousedown = (e) => itemDown(e, el); el.oncontextmenu = (e) => e.preventDefault(); });
   }

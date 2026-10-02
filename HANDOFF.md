@@ -2070,3 +2070,10 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 光环：MOD `lens_flare`（master.js 镜头光晕/彩虹光环）默认关。以上两项靠 `mods.js` 迁移 `__v 25` 对旧存档生效。
 - 敌人弯腰/不面对：`stance.js` 架势体态不再前压/后仰（lean=0）、歪头和侧身减小，上身扭回更多；`foe.js` 受击硬直 0.62→0.42（BOSS 0.4→0.32），硬直中也持续转向面对玩家；`locomo.js` 转身侧倾 ±0.12→±0.04。
 - 未动：顶部「护盾被打光了」等 toast（若用户也嫌黑框，下一步统一改成无框描边字）；`Foe.say` 头顶气泡。
+## R56 — 3D body autopsy (js/autopsy.js, MOD `autopsy`, default ON)
+- Replaces the R55 part editor (removed per user: "我不要这种编辑器了"): deleted js/partstore.js, js/partedit.js, assets/custom_parts/.
+- Autopsy.open(corpse) bakes the corpse's skinned body into static geometry (stride 16: pos nrm col colB uv tw reg), real textures kept via a patched MeshStandardMaterial (attribute `tw`: 1 = textured shell, 0 = flat wax cut face). Vertex-colour baking of textures was ragged — don't retry.
+- Cut = plane slice anywhere, any angle, repeatable; wax caps; component split; each piece is a `piece` organ item (OG.piece in organs.js) with random affixes by region; piece geometry persisted in IndexedDB `soulhead_pieces` (textures downscaled to 512px). `Organs.model` -> `Autopsy.model`.
+- Clothes toggle swaps to linen (never nude); single-mesh Genshin bodies have no separable clothes. No head organs, no reproductive organs, no blood/gibs.
+- sack.js opens Autopsy for humanoid corpses, falls back to Dissect (R55). Harness: tools/test/autopsy.html.
+- NOTE: three build here has no `mapTexelToLinear` in map_fragment (hardware sRGB decode); the shader hack must not call it.

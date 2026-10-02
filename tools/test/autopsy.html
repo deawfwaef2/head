@@ -1,0 +1,12 @@
+<!doctype html><meta charset="utf-8"><title>autopsy harness</title><base href="/">
+<body style="margin:0;background:#222">
+<script src="/lib/three.min.js"></script><script src="/lib/GLTFLoader.js"></script>
+<script>
+window.Mods={on:()=>true};
+const IT={herb:{n:'草药',icon:'🌿'},dust:{n:'魂尘'},bone:{n:'骨头'}};window.Sack={IT,def(id,o){IT[id]=Object.assign({},o)},mk(id,n,x){return Object.assign({id,n},x)},itemsOf:L=>L.items||(L.items=[]),inv:()=>({stash:[],sack:{items:[]}})};
+window.G={toast(t){window.__toast=t},save(){}};window.Props={};
+function cloneSkinned(src){const clone=src.clone(true);const map={};clone.traverse(o=>{map[o.name]=o});const s=[],d=[];src.traverse(o=>{if(o.isSkinnedMesh)s.push(o)});clone.traverse(o=>{if(o.isSkinnedMesh)d.push(o)});d.forEach((m,i)=>{const q=s[i];m.bind(new THREE.Skeleton(q.skeleton.bones.map(b=>map[b.name]),q.skeleton.boneInverses),q.bindMatrix);m.material=Array.isArray(q.material)?q.material.map(x=>x.clone()):q.material.clone()});return clone}
+window.Foe={cloneSkinned};
+window.loadBody=async n=>{await new Promise((ok,no)=>{const s=document.createElement('script');s.src='big/body/'+n+'.js';s.onload=ok;s.onerror=no;document.head.appendChild(s)});const E=BODY_MODELS[n],b=atob(E.glb),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const g=await new Promise((a,r)=>new THREE.GLTFLoader().parse(u.buffer,'',a,r));g.scene.traverse(o=>{if(o.isMesh&&o.material&&o.material.name==='__CUT__'){o.visible=false;o.userData.cut=true}if(o.isMesh&&o.material){const m=o.material;m.userData.skin=/SKIN|肌/i.test(m.name)||(/body/i.test(m.name)&&!/cloth|tops|bottom|shoe|acc/i.test(m.name))}});return g.scene};
+</script>
+<script src="/js/organs.js"></script><script src="/js/autopsy.js"></script>
