@@ -4343,3 +4343,10 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 逐张看身体拼图后只登记 92 个进 `js/vroid_pack.js`（现 168 条）：剔除裸体/泳装感、现代休闲（卫衣/牛仔/西装/校服）、幼态（身高过矮）、男性、版权角色（绫波/重音テト/古明地等）。被剔除的文件仍在 origin 但没登记（和第 1/2 轮一样），`VH_OUT` 名单见本次 commit 说明。
 - 身份由标签+外观粗分（NOSTATS，未量明度），villager/smithgirl/herbalist 等偏多；想细分可自己改 `js/vroid_pack.js` 的 `ids`。
 - 授权统一：暴力/改造/再分发全允许；署名见 `CREDITS.md`。id 清单：`tools/hub/ids/h1..h6.txt`（`<characterId> <modelId>`，h1 为最高评分）。
+
+## R58g（解剖台：底衬样式切换）
+- 用户要求：底衬改成绷带缠裹，并做左右切换（共 3 款，第 2、3 款用户稍后加本地模型，先做好切换）。
+- **覆盖范围保持不变（躯干到大腿根，不裸体——开发者决定，用户曾要求“不遮挡肉体”，已婉拒）。** 只改外观：绷带缠裹＝程序化斜向缠绕条纹（shader：`vTw<-2.5` 分支，`cp.x` 存条纹坐标，`tw=-3`），不是新建模型。
+- 衣橱面板底部有 ◀ 样式 ▶ 切换（`data-bs`），`BASE_STYLES = [bandage, slot2(empty), slot3(empty)]`，选择存 localStorage `autopsy_base`；切换会就地重涂所有底衬（`restyleBase`），`Autopsy.baseStyles` 暴露，`Autopsy.ui.base.{set,idx}`。
+- 槽位 2/3：`empty:true`，暂时显示素色。接模型时：给对应项提供 `paint(V,o)`（改顶点色/tw/cp）或另写加载逻辑并去掉 `empty`；需要用户给出模型格式/路径。
+- 测试 t22.js。
