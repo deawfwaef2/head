@@ -321,3 +321,6 @@ models/CLS_*.js，由 js/headpacks.js 按 MOD pack_voc / pack_touhou / pack_cls 
 - `VH_268007` hazel As a knight  — Hazel  (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/4555455348431191053/models/8228999806205268007
 - `VH_081498` 雪兎 — しかばねろ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/3595186077565957104/models/4046709859153081498
 - `VH_594380` Alexsandra — Isabelazera (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/4342377354440381294/models/8930855956712594380
+
+## 解剖台素体底模 `js/basebody.js`
+- 来源：VRoid Studio 旧β版“新建模型”默认素体（pixiv 官方帮助页声明为 CC0）。取自 `madjin/vrm-samples` 仓库 `vroid/fem_vroid.vrm`（VRM 元数据作者 "jin"，licenseName "Other"，内容即上述 CC0 素体）。只提取 `Body_00_SKIN` 网格、蒙皮权重、骨骼静止位置与 512px 皮肤贴图，转换脚本见 `tools/convert_basebody.py`。

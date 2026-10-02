@@ -4389,3 +4389,10 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
   - `js/nemstory.js`：`st.stage` 时 `rig()` 只返回演员表，`start()` 调 `CineStage.playHere`。
   - `js/mods.js` 新 MOD；`index.html` 在 nemesis.js 前加 `<script src="js/cinestage.js">`。
 - 测试台：`tools/test/cine.html`（真实 foe/heads/VRoid + 假地图），`startCine('talk'|'intro')` 后 `step(秒)` 推进；驱动脚本思路：playwright 截图（swiftshader 下截图偶尔超时，可退回 canvas.toDataURL）。
+## R61 解剖台·CC0 素体底模（MOD `autopsy_base`，默认开）
+用户需求：删掉大衣、保留衬衣时手臂不要空；用网上 CC0 的 VRM 素体作底模；脸和身体肤色要一致；不动协作者的遮罩（R58h/i）。
+- 新文件 `js/basebody.js`（`window.BASE_BODY`，约 470KB：Body_00_SKIN 的位置/UV/索引/蒙皮 + 骨骼静止位置 + 512px PNG 贴图）；转换脚本 `tools/convert_basebody.py`（源 VRM 不入库，来源见 CREDITS.md）。`index.html` 与 `tools/test/autopsy.html` 在 autopsy.js 前加载。
+- `js/autopsy.js`：新增 `attachBase(sets,BN,root,look)`，在 `bake(root,look)` 里 BN 算好后、hasLin 之前调用。判定：角色皮肤层（skin && cap===1）按区域（躯干/双臂/双腿）的面积，与素体按腿长比例缩放后的面积比较，任一区 <45% 就视为皮肤层不完整 → 用素体替换皮肤层。素体按骨骼“逐骨重定位”（旧骨→新骨方向旋转+长度缩放，再按蒙皮权重混合），带 `rg`（布娃娃分组）、reg 码、UV；之后协作者的遮罩/skinBand 照常工作（未改动）。单网格身体（Jean/Amber 等无 skin 材质）不触发。`bake` 返回 `base:{used,need,ratios}`。
+- 肤色：`faceColorOf` 取 `look.skinHex`（头部着色器的目标肤色，且 foe.js 会让头随身体），素体顶点色 = 脸色 / 素体贴图均色（限幅 0.55–1.08）。`open()` 现在调用 `bake(root, f.look)`。
+- 素体贴图自带黑色“内衣”涂装区（VRoid 默认），与躯干到大腿的遮罩叠加，不裸露；内容边界不变。
+- 实测：VH_007034/009210/012045/021977 会触发；t13/t22 通过。扫描脚本 `/home/user/work/t23.js`（不入库）。

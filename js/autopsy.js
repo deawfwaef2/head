@@ -71,7 +71,50 @@ window.Autopsy = (() => {
       const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; for (const k of [a, b, c]) { V[k + 3] += nx; V[k + 4] += ny; V[k + 5] += nz; } }
     for (let i = 0; i < n; i++) { const k = i * S, l = Math.hypot(V[k + 3], V[k + 4], V[k + 5]) || 1; V[k + 3] /= l; V[k + 4] /= l; V[k + 5] /= l; }
   }
-  function bake(root) { // root：已克隆的带骨骼模型（调用方负责去掉头与武器）
+  // ---------------------------------------------------------------- 素体底模（CC0：VRoid Studio 旧β版默认女性素体，js/basebody.js）
+  // 角色自带的皮肤层不完整（衣服底下的皮肤被删掉了，手臂/躯干/腿缺一块）→ 把这具素体按骨骼关节位置“重定位”到角色身上，替换掉不完整的皮肤层；
+  // 肤色按角色脸部皮肤贴图的平均色校准，脸和身体同色。
+  let baseDec = null, baseTexC = null;
+  const BPAR = { spine: 'hips', chest: 'spine', upperChest: 'chest', neck: 'upperChest', head: 'neck', leftShoulder: 'upperChest', rightShoulder: 'upperChest', leftUpperArm: 'leftShoulder', rightUpperArm: 'rightShoulder', leftLowerArm: 'leftUpperArm', rightLowerArm: 'rightUpperArm', leftHand: 'leftLowerArm', rightHand: 'rightLowerArm', leftUpperLeg: 'hips', rightUpperLeg: 'hips', leftLowerLeg: 'leftUpperLeg', rightLowerLeg: 'rightUpperLeg', leftFoot: 'leftLowerLeg', rightFoot: 'rightLowerLeg', leftToes: 'leftFoot', rightToes: 'rightFoot' };
+  const BCHILD = { hips: ['spine'], spine: ['chest'], chest: ['upperChest', 'neck'], upperChest: ['neck'], neck: ['head'], leftShoulder: ['leftUpperArm'], rightShoulder: ['rightUpperArm'], leftUpperArm: ['leftLowerArm'], rightUpperArm: ['rightLowerArm'], leftLowerArm: ['leftHand'], rightLowerArm: ['rightHand'], leftUpperLeg: ['leftLowerLeg'], rightUpperLeg: ['rightLowerLeg'], leftLowerLeg: ['leftFoot'], rightLowerLeg: ['rightFoot'], leftFoot: ['leftToes'], rightFoot: ['rightToes'] };
+  function baseData() {
+    if (baseDec) return baseDec; const B = window.BASE_BODY; if (!B) return null; const dec = (str, C) => { const bin = atob(str), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new C(u.buffer); };
+    baseDec = { n: B.n, pos: dec(B.pos, Float32Array), uv: dec(B.uv, Float32Array), idx: dec(B.idx, B.n < 65536 ? Uint16Array : Uint32Array), jn: dec(B.jn, Uint8Array), jw: dec(B.jw, Uint8Array), names: B.names, bones: B.bones, avg: B.avg, tex: B.tex };
+    const D = baseDec; D.reg = new Int32Array(D.n); for (let i = 0; i < D.n; i++) { let bi = 0, bw = -1; for (let k = 0; k < 4; k++) if (D.jw[i * 4 + k] > bw) { bw = D.jw[i * 4 + k]; bi = D.jn[i * 4 + k]; } D.reg[i] = regOf(D.names[bi]); }
+    return D;
+  }
+  const regionOf = c => c < 3 ? 0 : (c >= 6 && c <= 14) ? 1 : (c >= 18 && c <= 23) ? 2 : -1;
+  function faceColorOf(root, look) { // 脸的肤色：优先取角色头部的目标肤色（look.skinHex，头部着色器就是把脸调到这个色），否则取头部皮肤贴图平均色；数值空间同着色器里直接采样贴图
+    let out = null; if (look && look.skinHex) { try { const c = new T.Color(look.skinHex); return [c.r, c.g, c.b]; } catch (e) { } } root.traverse(o => { if (out || !o.isMesh) return; const mats = Array.isArray(o.material) ? o.material : [o.material]; for (const m of mats) { if (!m || !/face.*skin|skin.*face/i.test((m.name || '') + ' ' + o.name) || !m.map) continue; const td = texData(m.map); if (!td) continue; let r = 0, g = 0, b = 0, n = 0; for (let i = 0; i < td.px.length; i += 16) { const R = td.px[i], G = td.px[i + 1], Bc = td.px[i + 2], A = td.px[i + 3]; if (A < 128 || (R + G + Bc) < 330) continue; r += R; g += G; b += Bc; n++; } if (n > 50) { const mc = m.color || { r: 1, g: 1, b: 1 }; out = [r / n / 255 * mc.r, g / n / 255 * mc.g, b / n / 255 * mc.b]; return; } } }); return out;
+  }
+  function attachBase(sets, BN, root, look) {
+    const info = { used: false }; try {
+      if (window.Mods && Mods.on && !Mods.on('autopsy_base')) return info; const D = baseData(); if (!D || !rigOk(BN)) return info; const skins = sets.filter(q => q.skin && q.cap === 1); if (!skins.length) return info;
+      const area = (V, I) => { const a = [0, 0, 0]; for (let t = 0; t < I.length; t += 3) { const p = I[t] * S, q = I[t + 1] * S, r = I[t + 2] * S, c = regionOf(V[p + S - 1] | 0); if (c < 0) continue; const ux = V[q] - V[p], uy = V[q + 1] - V[p + 1], uz = V[q + 2] - V[p + 2], vx = V[r] - V[p], vy = V[r + 1] - V[p + 1], vz = V[r + 2] - V[p + 2]; a[c] += 0.5 * Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx); } return a; };
+      const ca = [0, 0, 0]; for (const q of skins) { const a = area(q.V, q.I); for (let k = 0; k < 3; k++) ca[k] += a[k]; }
+      const BV = []; for (let i = 0; i < D.n; i++) { const o = [D.pos[i * 3], D.pos[i * 3 + 1], D.pos[i * 3 + 2], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, D.reg[i]]; BV.push(o); }
+      if (!D.area) { const flat = []; for (const o of BV) flat.push(...o); D.area = area(flat, Array.from(D.idx)); }
+      const lg = (A, a, b) => Math.hypot(A[a][0] - A[b][0], A[a][1] - A[b][1], A[a][2] - A[b][2]), sc = Math.pow(lg(BN, 'leftUpperLeg', 'leftFoot') / (lg(D.bones, 'leftUpperLeg', 'leftFoot') || 1), 2);
+      info.ratios = ca.map((x, k) => x / ((D.area[k] * sc) || 1)); info.need = info.ratios.some(r => r < 0.45); if (!info.need) return info;
+      // —— 重定位：每根骨头 M(x) = T + s·R·(x − S)，R 把素体这段骨头的方向转到角色这段的方向，s 是长度比；顶点按素体蒙皮权重混合
+      const TF = {}, Q = T.Quaternion, getTF = name => { if (TF[name]) return TF[name]; const par = BPAR[name], pt = par ? getTF(par) : { R: new Q(), s: 1, Sb: D.bones.hips, Tb: BN.hips };
+        const Sb = D.bones[name], Tb = BN[name]; let R = pt.R, sg = pt.s; const ch = (BCHILD[name] || []).find(c => D.bones[c] && BN[c]);
+        if (Sb && Tb && ch) { const ds = new V3(...D.bones[ch]).sub(new V3(...Sb)), dt = new V3(...BN[ch]).sub(new V3(...Tb)); if (ds.length() > 1e-4 && dt.length() > 1e-4) { R = new Q().setFromUnitVectors(ds.clone().normalize(), dt.clone().normalize()); sg = clamp(dt.length() / ds.length(), 0.6, 1.6); } }
+        return (TF[name] = { R, s: sg, Sb: Sb && Tb ? Sb : pt.Sb, Tb: Sb && Tb ? Tb : pt.Tb }); };
+      const tf = D.names.map(n => getTF(n)), V = [], pp = new V3(), acc = new V3(), tmp = new V3();
+      const tint = (() => { const fc = faceColorOf(root, look); if (!fc) return [1, 1, 1]; return [0, 1, 2].map(k => clamp(fc[k] / (D.avg[k] || 1), 0.55, 1.08)); })(), cw = tint.map(x => Math.min(1, x * 0.92));
+      const P = new Float32Array(D.n * 3), sk = [];
+      for (let i = 0; i < D.n; i++) { pp.set(D.pos[i * 3], D.pos[i * 3 + 1], D.pos[i * 3 + 2]); acc.set(0, 0, 0); const gw = new Float32Array(11);
+        for (let k = 0; k < 4; k++) { const w = D.jw[i * 4 + k] / 255; if (w <= 0) continue; const f = tf[D.jn[i * 4 + k]]; tmp.copy(pp).sub(new V3(...f.Sb)).applyQuaternion(f.R).multiplyScalar(f.s).add(new V3(...f.Tb)); acc.addScaledVector(tmp, w); gw[rgOf(D.names[D.jn[i * 4 + k]])] += w; }
+        let g1 = 0, w1 = -1, g2 = 0, w2 = 0; for (let g = 0; g < 11; g++) { if (gw[g] > w1) { g2 = g1; w2 = w1 < 0 ? 0 : w1; g1 = g; w1 = gw[g]; } else if (gw[g] > w2) { g2 = g; w2 = gw[g]; } } const ws = w1 + w2; if (ws < 1e-6) { g1 = 0; w1 = 1; g2 = 0; w2 = 0; } else { w1 /= ws; w2 /= ws; if (w2 < 0.04) { w1 = 1; w2 = 0; g2 = g1; } } sk.push(g1, w1, g2, w2);
+        P[i * 3] = acc.x; P[i * 3 + 1] = acc.y; P[i * 3 + 2] = acc.z; V.push(acc.x, acc.y, acc.z, 0, 1, 0, tint[0], tint[1], tint[2], cw[0], cw[1], cw[2], D.uv[i * 2], D.uv[i * 2 + 1], 1, 0, 0, D.reg[i]); }
+      const I = Array.from(D.idx); calcNormals(V, I); const N = new Float32Array(D.n * 3); for (let i = 0; i < D.n; i++) { N[i * 3] = V[i * S + 3]; N[i * 3 + 1] = V[i * S + 4]; N[i * 3 + 2] = V[i * S + 5]; }
+      if (!baseTexC) { baseTexC = new T.TextureLoader().load(D.tex); baseTexC.flipY = false; baseTexC.encoding = T.sRGBEncoding; baseTexC.wrapS = baseTexC.wrapT = T.RepeatWrapping; }
+      let at = sets.findIndex(q => q.skin && q.cap === 1); for (let i = sets.length - 1; i >= 0; i--) if (sets[i].skin && sets[i].cap === 1) sets.splice(i, 1); if (at < 0) at = 0;
+      sets.splice(at, 0, { V, I, skin: true, cap: 1, cloth: false, nm: '素体 N00_000_00_Body_00_SKIN', map: baseTexC, at: 0, rg: { P, N, sk: Float32Array.from(sk) } }); info.used = true; return info;
+    } catch (e) { console.warn('attachBase', e); return info; }
+  }
+  function bake(root, look) { // root：已克隆的带骨骼模型（调用方负责去掉头与武器）
     root.position.set(0, 0, 0); root.quaternion.identity(); if (root.parent) root.parent.remove(root);
     root.traverse(o => { if (o.isSkinnedMesh && o.skeleton) o.skeleton.pose(); }); root.updateMatrixWorld(true);
     const bk = new Map(); root.traverse(o => { if (o.name && o.name.startsWith('H_')) bk.set(o, o.name.slice(2)); });
@@ -101,6 +144,7 @@ window.Autopsy = (() => {
     const c = bb.getCenter(new V3()), dx = -c.x, dy = -bb.min.y, dz = -c.z; for (const s of sets) for (let i = 0; i < s.V.length; i += S) { s.V[i] += dx; s.V[i + 1] += dy; s.V[i + 2] += dz; }
     for (const s of sets) { const n = s.V.length / S, P = new Float32Array(n * 3), N = new Float32Array(n * 3); for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) { P[i * 3 + k] = s.V[i * S + k]; N[i * 3 + k] = s.V[i * S + 3 + k]; } s.rg = { P, N, sk: Float32Array.from(s.sk) }; delete s.sk; }
     const BN = {}; for (const [o, k] of bk) { const p = new V3().setFromMatrixPosition(o.matrixWorld); BN[k] = [p.x + dx, p.y + dy, p.z + dz]; }
+    const baseInfo = attachBase(sets, BN, root, look);
     // 「素衣」：只保留躯干到大腿根这一段（用顶点的 reg 低位=0 且高度在带内）；reg 的第 5 位(+32)记为“素衣保留”
     const HH = bb.max.y - bb.min.y, legs = ['leftUpperLeg', 'rightUpperLeg'].map(k => BN[k]).filter(Boolean), nk = BN.neck || BN.upperChest; let hasLin = false;
     if (legs.length && nk) { const hem = legs.reduce((a, b) => a + b[1], 0) / legs.length - 0.17 * HH, top = nk[1] - 0.02 * HH; let n3 = 0, y0 = 1e9, y1 = -1e9;
@@ -113,7 +157,7 @@ window.Autopsy = (() => {
       if (hasLin) for (const s of sets) if (s.skin && s.cap !== 2) { const V = s.V; for (let i = 0; i < V.length; i += S) { const y = V[i + 1], code = V[i + S - 1] | 0; if ((code === 0 || code === 18 || code === 19 || code === 20) && y >= hem && y <= top) V[i + S - 1] = code + 32; } } }
     const BONES = [['hips', 'spine', 0.032], ['spine', 'chest', 0.03], ['chest', 'upperChest', 0.028], ['upperChest', 'neck', 0.022], ['leftUpperArm', 'leftLowerArm', 0.014], ['leftLowerArm', 'leftHand', 0.011], ['rightUpperArm', 'rightLowerArm', 0.014], ['rightLowerArm', 'rightHand', 0.011], ['leftUpperLeg', 'leftLowerLeg', 0.026], ['leftLowerLeg', 'leftFoot', 0.019], ['rightUpperLeg', 'rightLowerLeg', 0.026], ['rightLowerLeg', 'rightFoot', 0.019], ['leftFoot', 'leftToes', 0.011], ['rightFoot', 'rightToes', 0.011], ['upperChest', 'leftUpperArm', 0.012], ['upperChest', 'rightUpperArm', 0.012], ['hips', 'leftUpperLeg', 0.02], ['hips', 'rightUpperLeg', 0.02]];
     const bones = BONES.filter(b => BN[b[0]] && BN[b[1]]).map(b => ({ a: BN[b[0]].slice(), b: BN[b[1]].slice(), r: b[2] }));
-    return { sets, BN, bones, height: HH, hasCloth: hasLin, rig: rigOk(BN) };
+    return { sets, BN, bones, height: HH, hasCloth: hasLin, rig: rigOk(BN), base: baseInfo };
   }
   // ---------------------------------------------------------------- 词条分布
   const SEG = [['hips', 'spine'], ['spine', 'chest'], ['chest', 'upperChest'], ['upperChest', 'neck'], ['leftUpperArm', 'leftLowerArm'], ['leftLowerArm', 'leftHand'], ['rightUpperArm', 'rightLowerArm'], ['rightLowerArm', 'rightHand'], ['leftUpperLeg', 'leftLowerLeg'], ['leftLowerLeg', 'leftFoot'], ['rightUpperLeg', 'rightLowerLeg'], ['rightLowerLeg', 'rightFoot'], ['leftFoot', 'leftToes'], ['rightFoot', 'rightToes']];
@@ -398,7 +442,7 @@ if ( vTw < -2.5 ) {
   function open(L, done) {
     if (UI) return; if (!canOpen(L)) return; addCss(); try { document.exitPointerLock && document.exitPointerLock(); } catch (e) { }
     const fo = L.fo, f = fo.f; let B = L.apBake; // 只烘一次、词条只掷一次
-    if (!B) { let root; try { root = Foe.cloneSkinned(f.root); B = bake(root); } catch (e) { console.warn('autopsy bake', e); B = null; } if (!B) { window.G && G.toast && G.toast('这具尸体没法放上解剖台', '#e88', 2); if (window.Dissect) Dissect.open(L, done); return; } const c = fo.h && fo.h.c, rar = c ? c.rar | 0 : 0; B.pts = rollAffixes(B.BN, rar, !!(fo.boss || fo.isBoss)); L.apBake = B; }
+    if (!B) { let root; try { root = Foe.cloneSkinned(f.root); B = bake(root, f.look); } catch (e) { console.warn('autopsy bake', e); B = null; } if (!B) { window.G && G.toast && G.toast('这具尸体没法放上解剖台', '#e88', 2); if (window.Dissect) Dissect.open(L, done); return; } const c = fo.h && fo.h.c, rar = c ? c.rar | 0 : 0; B.pts = rollAffixes(B.BN, rar, !!(fo.boss || fo.isBoss)); L.apBake = B; }
     const c = fo.h && fo.h.c, own = c ? c.name : (L.name || '无名者').replace(/的尸体$/, ''), race = c ? (c.raceN || c.race) : '', rar = c ? c.rar | 0 : 0;
     const root = document.createElement('div'); root.id = 'apRoot'; root.innerHTML = `<canvas id="apCv"></canvas><svg id="apLn"><circle id="apT0" r="11" fill="rgba(255,210,120,.18)" stroke="#ffd27a" stroke-width="3" display="none"/><circle id="apT1" r="11" fill="rgba(255,210,120,.18)" stroke="#ffd27a" stroke-width="3" display="none"/><polyline id="apLx" fill="none" stroke="#ffe9a8" stroke-opacity=".6" stroke-width="2.5" stroke-dasharray="2 10" stroke-linecap="round" display="none"/><polyline id="apL" fill="none" stroke="#ffe9a8" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 6px #ff9a40)" display="none"/></svg>
 <div class="hd"><h1>🔪 解剖台</h1><p>尸体：<b>${esc(own)}</b>　${esc(race || '')} · ${(window.Organs && Organs.RN[rar]) || ''}</p></div>
