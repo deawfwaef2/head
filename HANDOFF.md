@@ -4486,3 +4486,8 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - `lodMix()`：出招/决斗/硬直/受击闪红/受击反应/喷血中的敌人动画照常逐帧；其余 >32m 隔帧推进、视锥外且 >10m 每 3 帧推进（累计 dt 一次性补上，速度不变）。关 MOD = 原行为 `f.mixer.update(dt)`。
 - 未验证：多人（10+ 敌人）实测帧率；本机只验证了单敌人场景无报错。后续可看 `ctx.sees`（每敌每帧视线检测）和 AI steer/avoid 的开销。
 - 未做：UI 逐页大改。
+
+## R63b（UI 续：图标补全 / 页面舞台）
+- `js/ui3a.js`：新增 30 个 SVG 图标（mouse/globe/speaker/archery/gear/menu/hand/plus/compass/person/chart/clipboard/cards/coin/ring/wings/eyeoff/helmet/boot/target/ruler/nut/question/dice/door/bulb/sun）和约 120 个 emoji 映射，覆盖 13 个总览页 + MOD 页，实测 `.u-emo`（未映射 emoji）残留为 0。
+- `css/ui63.css`：§6 页面顶对齐 + 窄屏抽屉化侧栏（血祭 / 章节）；打开 Hub 页面时隐藏 `#combatHud/#cross/#atkCd/#hitHud`（以前体力条漏在舞台中央）。
+- 未做：游戏中的死亡结算 / 交易 / 对话 / 建造模式 HUD / 解剖台界面逐一重塑；日文模式下顶栏标签字体（`キャラクター` 等）字距偏窄。

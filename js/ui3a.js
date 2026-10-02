@@ -106,7 +106,34 @@ window.UI3A = (() => {
     fog: '<path d="M4 8h12M8 12h12M4 16h12M8 20h10"/>',
     bandage: '<rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(-35 12 12)"/>',
     disk: '<path d="M4 4h13l3 3v13H4ZM8 4v5h8V4M8 20v-6h8v6"/>',
-    scales: '<path d="M12 4v16M6 20h12M5 7h14M5 7l-3 7a3 3 0 0 0 6 0ZM19 7l-3 7a3 3 0 0 0 6 0Z"/>'
+    scales: '<path d="M12 4v16M6 20h12M5 7h14M5 7l-3 7a3 3 0 0 0 6 0ZM19 7l-3 7a3 3 0 0 0 6 0Z"/>',
+    mouse: '<rect x="7" y="3" width="10" height="18" rx="5"/><path d="M12 3v6M7 9h10"/>',
+    globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+    speaker: '<path d="M4 9.500v5h4l5 4v-13l-5 4ZM16.500 9a4 4 0 0 1 0 6M19 6.500a8 8 0 0 1 0 11"/>',
+    archery: '<path d="M5 4c8 3 8 13 0 16M5 12h15M16 8l4 4-4 4"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="6.500"/><path d="M12 2.500v3M12 18.500v3M2.500 12h3M18.500 12h3M5.300 5.300l2.100 2.100M16.600 16.600l2.100 2.100M18.700 5.300l-2.100 2.100M7.400 16.600l-2.100 2.100"/>',
+    menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+    hand: '<path d="M8 12V6a1.500 1.500 0 0 1 3 0v5M11 11V4.500a1.500 1.500 0 0 1 3 0V11M14 11V6a1.500 1.500 0 0 1 3 0v8a6 6 0 0 1-6 6c-3 0-4-1.500-5.500-4L4 12.500a1.500 1.500 0 0 1 2.500-1.500L8 13"/>',
+    plus: '<path d="M12 4v16M4 12h16"/>',
+    compass: '<circle cx="12" cy="12" r="9"/><path d="m15.500 8.500-2 5-5 2 2-5Z"/>',
+    person: '<circle cx="12" cy="8" r="3.500"/><path d="M5 20c0-4 3-6.500 7-6.500s7 2.500 7 6.500"/>',
+    chart: '<path d="M4 20V4M4 20h16M8 16v-5M12 16V8M16 16v-3"/>',
+    clipboard: '<rect x="5" y="4.500" width="14" height="16.500" rx="1.500"/><path d="M9 4.500V3h6v1.500M8.500 10h7M8.500 14h7"/>',
+    cards: '<rect x="5" y="3.500" width="10" height="15" rx="1.500"/><path d="M9 6.500h2M15 8l4 1-3 11-4-1"/>',
+    coin: '<circle cx="12" cy="12" r="8.500"/><circle cx="12" cy="12" r="5"/><path d="M12 9.500v5"/>',
+    ring: '<circle cx="12" cy="15" r="5.500"/><path d="M9 6.500 12 3l3 3.500-3 2.500Z"/>',
+    wings: '<path d="M12 8c-2-3-6-4-9-3 1 4 3 8 9 11 6-3 8-7 9-11-3-1-7 0-9 3ZM12 8v11"/>',
+    eyeoff: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12ZM4 4l16 16"/>',
+    helmet: '<path d="M4 16a8 8 0 0 1 16 0ZM3 16h18v2.500H3ZM12 8V4"/>',
+    boot: '<path d="M8 3h6v8l5 3v5H5v-4l3-2Z"/>',
+    target: '<circle cx="12" cy="12" r="8.500"/><circle cx="12" cy="12" r="4.500"/><circle cx="12" cy="12" r=".8"/>',
+    ruler: '<path d="m3 17 14-14 4 4L7 21ZM8 10l2.500 2.500M11 7l2 2M5.500 14.500l2 2"/>',
+    nut: '<path d="M12 3 19 7v8l-7 4-7-4V7Z"/><circle cx="12" cy="11" r="2.800"/>',
+    question: '<circle cx="12" cy="12" r="9"/><path d="M9.500 9.500a2.500 2.500 0 1 1 3.500 2.300c-.7.400-1 .9-1 1.700M12 17v.5"/>',
+    dice: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8.500 8.500h.01M15.500 8.500h.01M12 12h.01M8.500 15.500h.01M15.500 15.500h.01" stroke-width="2.400"/>',
+    door: '<path d="M6 21V4h12v17M4 21h16M14.500 12.500h.01" stroke-width="1.600"/>',
+    bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.500 10.900c.6.500 1 1.200 1 2.100h5c0-.9.400-1.600 1-2.100A6 6 0 0 0 12 3Z"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.500v3M12 18.500v3M2.500 12h3M18.500 12h3M5.300 5.300l2.100 2.100M16.600 16.600l2.100 2.100M18.700 5.300l-2.100 2.100M7.400 16.600l-2.100 2.100"/>'
   };
   const MAP = {
     '🔮': 'crystal', '💎': 'crystal', '💠': 'crystal', '👑': 'crown', '⚔': 'swords', '🗡': 'dagger', '✨': 'sparkle', '✦': 'sparkle', '✧': 'sparkle',
@@ -121,7 +148,14 @@ window.UI3A = (() => {
     '✅': 'check', '⬆': 'up', '🔔': 'bell', '🌿': 'leaf', '🍃': 'leaf', '🍀': 'leaf', '🎬': 'clap', '🎨': 'palette', '💤': 'zzz', '🪨': 'rock', '🌊': 'wave', '⚖': 'scales',
     '💪': 'fist', '🔱': 'trident', '🪵': 'log', '🎳': 'bowling', '☸': 'wheel', '🛏': 'bed', '♨': 'steam', '🏋': 'dumbbell', '🥩': 'meat', '😤': 'face', '🐻': 'paw', '🐺': 'paw', '🦁': 'paw',
     '🍄': 'mushroom', '⛓': 'chain', '🌋': 'volcano', '🐲': 'dragon', '🐉': 'dragon', '🏘': 'village', '🌲': 'tree', '⛪': 'church', '🧙': 'witch', '🏰': 'castle', '🎪': 'tent', '📿': 'beads',
-    '🎤': 'mic', '⏳': 'hourglass', '🗿': 'statue', '🗽': 'statue', '❄': 'snow', '📣': 'megaphone', '🌄': 'mountain', '⛰': 'mountain', '🌫': 'fog', '🩹': 'bandage', '💾': 'disk'
+    '🎤': 'mic', '⏳': 'hourglass', '🗿': 'statue', '🗽': 'statue', '❄': 'snow', '📣': 'megaphone', '🌄': 'mountain', '⛰': 'mountain', '🌫': 'fog', '🩹': 'bandage', '💾': 'disk',
+    '🖱': 'mouse', '🔊': 'speaker', '🔉': 'speaker', '🔈': 'speaker', '🌐': 'globe', '🌳': 'tree', '🏹': 'archery', '⚙': 'gear', '☰': 'menu', '✋': 'hand', '💚': 'heart', '💗': 'heart', '✓': 'check', '✔': 'check',
+    '🧭': 'compass', '🧑': 'person', '👤': 'person', '📊': 'chart', '📋': 'clipboard', '🎴': 'cards', '🎐': 'bell', '🏃': 'walker', '😱': 'face', '🪙': 'coin', '💍': 'ring', '🦅': 'wings', '✚': 'plus', '➕': 'plus',
+    '🙈': 'eyeoff', '🐸': 'paw', '⛑': 'helmet', '🎖': 'medal', '🎗': 'bow', '🥾': 'boot', '🎯': 'target', '🔰': 'shield', '📏': 'ruler', '💬': 'speech', '🔩': 'nut',
+    '📅': 'scroll', '❔': 'question', '❓': 'question', '🎲': 'dice', '🐢': 'paw', '🛠': 'hammer', '🔗': 'chain', '🏁': 'flag', '🔪': 'dagger', '🧍': 'person', '🧠': 'spiral', '🌍': 'globe', '🕰': 'hourglass', '🫀': 'heart', '🧷': 'chain',
+    '🥊': 'fist', '😮': 'face', '😰': 'face', '🤺': 'swords', '🦘': 'walker', '📶': 'chart', '📈': 'chart', '🎞': 'clap', '🎥': 'clap', '👥': 'person', '🧒': 'person', '💇': 'person', '👗': 'person', '🎎': 'person', '🎭': 'face', '🗞': 'scroll', '🌾': 'leaf', '🌱': 'leaf',
+    '🧲': 'bolt', '🚪': 'door', '🎧': 'note', '👣': 'paw', '🤜': 'fist', '🤲': 'hand', '🏕': 'tent', '🧢': 'helmet', '🚂': 'wheel', '📼': 'disk', '🌃': 'moon', '🌗': 'moon', '⛩': 'columns', '🔆': 'sun', '🌤': 'sun', '🌅': 'sun', '☁': 'fog', '📐': 'ruler',
+    '📷': 'eye', '📸': 'eye', '✒': 'dagger', '🖋': 'dagger', '✏': 'dagger', '🖌': 'palette', '✂': 'dagger', '🏞': 'mountain', '🫧': 'drop', '💡': 'bulb', '🎛': 'gear', '🧊': 'rock', '🥔': 'rock', '🖤': 'heart', '🗯': 'speech', '📑': 'clipboard', '🔎': 'magnifier', '🧹': 'wind', '🎮': 'puzzle', '🚀': 'bolt', '🛤': 'map'
   };
   const icon = k => `<span class="u-i" data-i="${k}"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#u3-${k}"/></svg></span>`;
   function sprite() {
