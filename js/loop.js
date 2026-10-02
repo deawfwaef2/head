@@ -163,19 +163,16 @@ window.Loop = (() => {
     const aura = h => { if (aC.has(h)) return aC.get(h); let m = 1; const p = h.g.position; for (const b of auras) { const d = C0[b.type]; if ((p.x - b.x) ** 2 + (p.z - b.z) ** 2 < d.aura * d.aura) m *= d.auraMul; } try { if (window.Props && Props.on && Props.on()) m *= Props.roundMul ? Props.roundMul(p) : Props.auraMul(p); } catch (e) { } m = Math.min(2, m); aC.set(h, m); return m; };
     const ctx = { r, g, hv, setK, nb: {}, rm: [], boons: 0, notes: out.notes, val: (h, k = 1) => hv(h) * k * (1 + (setK.get(h) || 0)) * aura(h), st: b => (r.bst[bkey(b)] = r.bst[bkey(b)] || {}), bless: (k, v) => { ctx.nb[k] = (ctx.nb[k] || 0) + v; } };
     const byB = new Map(); for (const h of hs) { if (!byB.has(h.mount)) byB.set(h.mount, []); byB.get(h.mount).push(h); }
-    const sanB = [];
     for (const [b, L] of byB) {
       const d = C[b.type]; if (!d) continue; let v = 0, note = ''; const fn = ROUND[b.type];
-      if (!fn && window.San && San.on() && San.kind(b.type) === 'san') { out.heads += L.length; sanB.push(d.icon + d.n + '×' + L.length); continue; } // R56：SAN 型建筑在洞里挂机产 SAN，不进魂晶结算
       if (fn) { try { const o = fn(b, L, ctx) || {}; v = o.v || 0; note = o.note || ''; } catch (e) { console.warn('round', b.type, e); } }
       else { const f = bf(d); for (const h of L) v += ctx.val(h, f); note = f ? `每颗 ×${f.toFixed(2)}` : '这座建筑不产魂晶'; }
       v = Math.max(0, Math.round(v)); out.v += v; out.heads += L.length; out.lines.push({ t: b.type, ic: d.icon, n: d.n, k: L.length, v, note });
     }
     try { if (window.Props && Props.on && Props.on() && window.Sack) { let pc = 0; const got = {}; for (const it of Props.items || []) { const d = it.d; if (it.ghost || !d || !d.tick) continue; if (d.tick.kind === 'coin') pc += d.tick.n * 3; else if (Sack.IT[d.tick.kind]) { Sack.stashAdd(Sack.mk(d.tick.kind, d.tick.n * 3)); got[d.tick.kind] = (got[d.tick.kind] || 0) + d.tick.n * 3; } }
       if (pc) { out.v += pc; out.lines.push({ t: '_props', ic: '🧰', n: '摆件产出', k: 0, v: pc, note: '藏宝箱等每回合结算一次' }); } const gs = Object.keys(got); if (gs.length) out.notes.push('🧰 摆件产出材料：' + gs.map(k => Sack.IT[k].icon + Sack.IT[k].n + '×' + got[k]).join('、') + '（已进储物箱）'); } } catch (e) { }
-    out.sanB = sanB.length; if (sanB.length) out.notes.push('🌀 SAN 型建筑（' + sanB.slice(0, 4).join('、') + (sanB.length > 4 ? ' 等 ' + sanB.length + ' 座' : '') + '）在洞里持续产 SAN，不计入魂晶结算；魂晶靠高阶建筑 / 祭仪厅 / 出猎');
-    try { if (window.San && San.on()) { const t = San.endTrip(); if (t) out.notes.push(t); } } catch (e) { }
-    const chK = 1 + (r.chap - 1) * 0.2, pay = mod('pay', 1), ex = g.exhibit ? 1 + g.exhibit().tier * 0.04 : 1, inc = 1 + (r.inc || 0); r.inc = 0;
+    let incS = 0; try { if (window.San && San.on()) { incS = San.incense(); const t = San.endTrip(); if (t) out.notes.push(t); } } catch (e) { } // R59：SAN 魂晶香并入结算；结算后重置本回合计数
+    const chK = 1 + (r.chap - 1) * 0.2, pay = mod('pay', 1), ex = g.exhibit ? 1 + g.exhibit().tier * 0.04 : 1, inc = 1 + (r.inc || 0) + incS; r.inc = 0;
     out.mul = { chK, pay, ex, inc }; out.stash = Math.round(r.stash || 0); out.src = Object.assign({}, r.src);
     out.tot = Math.round(out.v * chK * pay * ex * inc) + out.stash; out.died = died; out.nb = ctx.nb; out.boons = ctx.boons;
     for (const h of ctx.rm) { try { g.burst && g.burst(h.g.position, '#ff8a3a', 30, 1.6, 0.8, 1); g.removeHead(h); } catch (e) { } }
@@ -191,7 +188,7 @@ window.Loop = (() => {
     if (window.GrandUI && GrandUI.on()) {
       const rw = [...M.values()].sort((a, b) => b.v - a.v).map(o => ({ ic: o.ic, n: o.n + (o.b > 1 ? ` ×${o.b}` : ''), sub: `${o.k} 颗首级在岗${o.nt.size ? ' · ' + [...o.nt].slice(0, 2).join('；') : ''}`, v: '+' + o.v }));
       if (P.stash) rw.push({ ic: '📦', n: '洞内活动', sub: src || '存着的收益', v: '+' + P.stash });
-      if (!rw.length) rw.push(P.sanB ? { ic: '🌀', n: '首级都在 SAN 型建筑上', sub: '它们在洞里挂机产 SAN，没有魂晶。魂晶靠高阶建筑 / 祭仪厅 / 出猎', v: '+0' } : { ic: '🕸️', n: '空荡的洞穴', sub: '没有首级在岗——把首级插到建筑上，下次回洞就有产出', v: '+0' });
+      if (!rw.length) rw.push({ ic: '🕸️', n: '空荡的洞穴', sub: '没有首级在岗——把首级插到建筑上，下次回洞就有产出', v: '+0' });
       const ex = [...P.sets, ...P.notes, P.boons ? `🎴 额外祝福抉择 ×${P.boons}` : '', nbText(P.nb) ? `🎐 下一趟祝福：${nbText(P.nb)}` : '', `第 ${R().chap} 章 ×${P.mul.chK.toFixed(2)} · 世道 ×${P.mul.pay.toFixed(2)} · 展厅 ×${P.mul.ex.toFixed(2)}${P.mul.inc > 1 ? ` · 回合香 ×${P.mul.inc.toFixed(2)}` : ''}`].filter(Boolean);
       GrandUI.ceremony({ kicker: `第 ${R().round} 回 合`, title: P.died ? '你倒下了，但首级还在' : '魂首归窟', sub: '洞里的首级替你干完了这一回合的活', rows: rw, extras: ex, total: P.tot, ok: '收下', onClose: () => { try { if (window.Rogue && Rogue.st().pend > 0) setTimeout(Rogue.openBoon, 300); } catch (e) { } } });
       try { SFX.coins && SFX.coins(); } catch (e) { } return;
@@ -209,6 +206,7 @@ ${P.boons ? `<div class="x">🎴 额外祝福抉择 ×${P.boons}</div>` : ''}${n
   const CAVE_SRC = /\/js\/(curios|rites|oddities|sanctum|play|props|chess)\.js/;
   function stash(n, src) {
     const r = R(), cap = capCave(), keep = Math.max(0, Math.min(n, cap - r.stash)); r.stash += keep; r.src[src] = (r.src[src] || 0) + keep;
+    try { if (window.San && San.live()) San.play(n, src); } catch (e) { } // R59\uff1a\u6d1e\u91cc\u73a9\u610f\u8d5a\u7684\u6bcf 1 \u9b42\u6676\u540c\u65f6\u6298\u6210 SAN\uff08\u9b42\u6676\u6709\u56de\u5408\u4e0a\u9650\uff0cSAN \u6ca1\u6709\uff09
     if (!stash.told) { stash.told = 1; toast(`📦 洞里赚的魂晶不会马上到手——下次回洞的回合结算时一起发（本回合已存 ${Math.round(r.stash)}/${cap}）`, '#d8c8ff', 3.6); }
     if (keep < n && !stash.full) { stash.full = 1; toast(`🔒 本回合洞内活动收益已满 ${cap}——再玩也不会多了，出去打猎吧`, '#c8b8ff', 3.2); }
   }

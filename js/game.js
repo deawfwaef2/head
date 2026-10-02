@@ -853,9 +853,9 @@ window.startGame = function () {
     let val = Math.max(1, Math.round(v));
     if (!SANM && window.Loop && Loop.caveGate) { const k = Loop.caveGate(val); if (k < val && (src === 'manual' || src === 'hold')) { floatText('🔒→' + (k ? '+' + k : '下回合加成'), h.g.position.clone().add(new V3(0, 0.6, 0)), '#c8b8ff', 14); } val = k; } // R54i run_loop：洞内收入每回合有上限，超出转为下回合产出加成
     if (tag) floatText(tag, h.g.position.clone().add(new V3(0, 0.45, 0)), '#ffe27a', 24);
-    if (SANM) val = San.gain(val, h, src); else if (val > 0) addCoins(val);
+    if (SANM) val = San.gain(val, h, src, combo); else if (val > 0) addCoins(val);
     const r = h.rec.c.rar;
-    floatText(SANM ? '🌀+' + val : '+' + val, h.g.position.clone().add(new V3(0, 0.25, 0)), SANM ? '#8fe6ff' : RAR[r].c, 18 + r * 4 + Math.min(combo, 10));
+    floatText(SANM ? '🌀+' + SAN_CFG.fmt(val) : '+' + val, h.g.position.clone().add(new V3(0, 0.25, 0)), SANM ? '#8fe6ff' : RAR[r].c, 18 + r * 4 + Math.min(combo, 10));
     if (Math.random() < 0.6) soulWisp(h.g.position.clone().add(new V3(0, 0.1, 0)), RAR[r].c);
     burst(h.g.position, RAR[r].c, 6 + r * 4, 0.8, 0.6, 1.2);
     h.squash = 1; h.swayV.add(new V3((Math.random() - 0.5) * 0.6, 0.4, (Math.random() - 0.5) * 0.6));
@@ -1303,17 +1303,18 @@ window.startGame = function () {
     for (const b of builds) {
       const d = CAT[b.type];
       if (b.g.userData.orb) { const o = b.g.userData.orb, tt = performance.now() / 1000; o.position.y = 0.55 + Math.sin(tt * 1.7) * 0.05; o.rotation.y = tt * 0.8; o.rotation.x = tt * 0.5; }
-      const fh = d.mount && (!(window.Loop && Loop.rOn && Loop.rOn()) || (window.San && San.live() && San.kind(b.type) === 'san')) ? firstHead(b) : null; // R54k round_yield：魂晶类建筑没有计时产出（回洞结算）；R56：SAN 类建筑挂机持续产 SAN
+      const SPc = d.mount ? ((window.San && San.live()) ? San.spec(b.type) : (!(window.Loop && Loop.rOn && Loop.rOn()) ? d.mount : null)) : null; // R54k 回合制下魂晶只在回洞结算；R59：所有建筑挂机持续产 SAN（规格见 san_cfg.js）
+      const fh = SPc ? firstHead(b) : null;
       if (fh) {
         b.timer += dt;
-        if (b.timer >= d.mount.period) { b.timer = 0; const rs = resonance(b); let top = 0; for (const h of b.heads) if (h) { trigger(h, 'auto', d.mount.mult * rs.mul); burst(h.g.position, '#6a0008', 10, 0.8, 0.5, -6); top = Math.max(top, h.rec.c.rar); } SFX.soul(3, top); }
-        if (b.label) { const sp = screenPos(new V3(b.x, (d.mount.labelY || d.mount.y) + 0.55, b.z)); const dd = camera.position.distanceTo(fh.g.position); if (sp.vis && dd < 9) { b.label.style.display = 'block'; b.label.style.left = sp.x + 'px'; b.label.style.top = sp.y + 'px'; b.label.querySelector('i').style.width = (b.timer / d.mount.period * 100) + '%'; if (b.heads.length > 1) { const rs = resonance(b), k = b.heads.filter(Boolean).length + '/' + b.heads.length + (rs.tags.length ? ' ' + rs.tags.join('·') + ' ×' + rs.mul.toFixed(2) : ''); if (b.label.dataset.k !== k) { b.label.dataset.k = k; let s = b.label.querySelector('s'); if (!s) { s = document.createElement('s'); b.label.appendChild(s); } s.textContent = k; } } } else b.label.style.display = 'none'; }
+        if (b.timer >= SPc.period) { b.timer = 0; const rs = resonance(b); let top = 0; for (const h of b.heads) if (h) { trigger(h, 'auto', SPc.mult * rs.mul); burst(h.g.position, '#6a0008', 10, 0.8, 0.5, -6); top = Math.max(top, h.rec.c.rar); } SFX.soul(3, top); }
+        if (b.label) { const sp = screenPos(new V3(b.x, (d.mount.labelY || d.mount.y) + 0.55, b.z)); const dd = camera.position.distanceTo(fh.g.position); if (sp.vis && dd < 9) { b.label.style.display = 'block'; b.label.style.left = sp.x + 'px'; b.label.style.top = sp.y + 'px'; b.label.querySelector('i').style.width = (b.timer / SPc.period * 100) + '%'; if (b.heads.length > 1) { const rs = resonance(b), k = b.heads.filter(Boolean).length + '/' + b.heads.length + (rs.tags.length ? ' ' + rs.tags.join('·') + ' ×' + rs.mul.toFixed(2) : ''); if (b.label.dataset.k !== k) { b.label.dataset.k = k; let s = b.label.querySelector('s'); if (!s) { s = document.createElement('s'); b.label.appendChild(s); } s.textContent = k; } } } else b.label.style.display = 'none'; }
       } else if (b.label) b.label.style.display = 'none';
       if (d.period && b.type === 'wheel') {
         b.g.userData.spin.rotation.y += dt * 0.5;
         b.timer += dt; const on = heads.filter(h => wheelOf(h) === b);
         on.forEach(h => { const dx = h.g.position.x - b.x, dz = h.g.position.z - b.z; const a = dt * 0.5; const c = Math.cos(a), s = Math.sin(a); h.g.position.x = b.x + dx * c - dz * s; h.g.position.z = b.z + dx * s + dz * c; h.g.rotateY(-a); });
-        if (b.timer >= d.period) { b.timer = 0; if (!(window.Loop && Loop.rOn && Loop.rOn()) || (window.San && San.live() && San.kind('wheel') === 'san')) on.forEach((h, i) => setTimeout(() => { trigger(h, 'auto', 1); SFX.soul(i, h.rec.c.rar); }, i * 90)); }
+        if (b.timer >= d.period) { b.timer = 0; if (!(window.Loop && Loop.rOn && Loop.rOn()) || (window.San && San.live())) on.forEach((h, i) => setTimeout(() => { trigger(h, 'auto', 1); SFX.soul(i, h.rec.c.rar); }, i * 90)); }
       }
       if (b.g.userData.turn) { b.g.userData.turn.rotation.y += dt * 0.6; const h0 = b.heads && b.heads[0]; if (h0 && held !== h0) { h0.g.rotateOnWorldAxis(UP, dt * 0.6); seatHead(h0, b, 0); } drawPlaque(b); }
       if (b.g.userData.float) { const f = b.g.userData.float; f.rotation.y += dt * 0.6; f.position.y = 1.1 + Math.sin(now * 1.5) * 0.02; }

@@ -183,11 +183,11 @@ window.UI = (() => {
     } else {
       const vis = Object.keys(C).filter(k => C[k].cat === sub && (!window.Unlocks || Unlocks.has(k)));
       grid = vis.map(k => {
-        const d = C[k], lock = d.depth && d.depth > S.depth, c = G.cost(k), own = G.bought(k), maxed = d.max && own >= d.max, rmN = window.RegEcon && RegEcon.need ? RegEcon.need(k) : {}, rmOk = !window.RegEcon || RegEcon.hasAll(rmN);
+        const d = C[k], lock = d.depth && d.depth > S.depth, c = G.cost(k), own = G.bought(k), maxed = d.max && own >= d.max, rmN = window.RegEcon && RegEcon.need ? RegEcon.need(k) : {}, rmOk = !window.RegEcon || RegEcon.hasAll(rmN), BB = window.BuildBrief && BuildBrief[k], PR = window.San && San.prodLine && !lock ? San.prodLine(k) : '';
         return `<div class="bp-item ${lock ? 'locked' : maxed ? 'done' : S.coins < c || !rmOk ? 'poor' : ''}" ${lock || maxed ? '' : `data-a="place" data-v="${k}"`}>
           ${own ? `<div class="bp-own">已建 ${own}</div>` : ''}<div class="bp-icon">${lock ? '🔒' : d.icon}</div><div class="bp-name">${d.n}${window.San && San.badge ? San.badge(k) : ''}</div>
           <div class="bp-cost">${lock ? `需洞窟第 ${d.depth} 层` : maxed ? '已建成' : '🔮 ' + fmt(c)}</div>${lock || maxed || !window.RegEcon ? '' : RegEcon.needHTML(rmN)}
-          <div class="bp-stat">${statTxt(d.stat)}${d.regen ? ' 恢复+' + d.regen + '%' : ''}${own && (d.stat || d.regen) && !(window.Mods && Mods.on('build_stat_cap') === false) ? ' <small style="opacity:.7">（属性同种只算 1 座）</small>' : ''}</div><div class="bp-desc" title="${esc((d.desc || '').replace(/<[^>]+>/g, ''))}">${esc((d.desc || '').replace(/<br\s*\/?>/g, ' ').replace(/<[^>]+>/g, ''))}</div></div>`;
+          <div class="bp-stat">${statTxt(d.stat)}${d.regen ? ' 恢复+' + d.regen + '%' : ''}${own && (d.stat || d.regen) && !(window.Mods && Mods.on('build_stat_cap') === false) ? ' <small style="opacity:.7">（属性同种只算 1 座）</small>' : ''}</div><div class="bp-desc ${BB ? 'br' : ''}" title="${esc((d.desc || '').replace(/<br\s*\/?>/g, ' ').replace(/<[^>]+>/g, ''))}">${esc(BB ? BB.s : (d.desc || '').replace(/<br\s*\/?>/g, ' ').replace(/<[^>]+>/g, ''))}</div>${PR ? `<div class="bp-prod">${PR}</div>` : ''}${BB && BB.e ? `<div class="bp-e">${esc(BB.e)}</div>` : ''}</div>`;
       }).join('');
       const hid = Object.keys(C).filter(k => C[k].cat === sub).length - vis.length;
       if (hid > 0) grid += `<div class="bp-item locked"><div class="bp-icon">❔</div><div class="bp-name">??? × ${hid}</div><div class="bp-desc">还有未发现的建造灵感，条件未知。</div></div>`;

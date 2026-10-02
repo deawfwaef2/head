@@ -251,7 +251,7 @@ window.Spirits = (() => {
     for (const r of S.heads) { if (!r.sp && r.c) { r.sp = 1; const l = r.c.loc; if (l) { T.loc[l] = (T.loc[l] || 0) + 1; if (!T.firstHead) T.firstHead = {}; if (!T.firstHead[l]) T.firstHead[l] = NMF(r.c); } added++; } }
     for (const l of D.LANDS) { if (T.lit[l] || (T.loc[l] || 0) < 3) continue; const ok = !window.Recall || S.heads.some(r => r.c && r.c.loc === l && Recall.nKnown(r.c) >= 3); if (ok) { T.lit[l] = 1; queue({ k: 'ward', land: l }); } }
     if (T.flags.prolog) for (const l of D.LANDS) { const sid = D.LAND_SPIRIT[l]; if ((T.loc[l] || 0) >= 1 && sid && !T.met[sid] && !T.q.some(e => e.k === 'arrive' && e.id === sid)) queue({ k: 'arrive', id: sid, land: l }); }
-    if (!T.flags.prolog && headsHere().length >= 1 && !T.q.some(e => e.k === 'prolog')) queue({ k: 'prolog' });
+    if (!T.flags.prolog && !dlg.open && headsHere().length >= 1 && !T.q.some(e => e.k === 'prolog')) queue({ k: 'prolog' }); // 序章播放中 flag 还没写，不能再排一次（否则小烛对话弹两遍）
     if (T.flags.prolog && litN() >= 5 && !T.flags.half_seen && !T.q.some(e => e.k === 'half')) queue({ k: 'half' });
     if (litN() >= 9 && friends() >= 6 && !T.flags.ready_seen && !T.end && !T.q.some(e => e.k === 'ready')) queue({ k: 'ready' }); }
   function queue(e) { const T = st(); if (!T.q.some(x => x.k === e.k && x.id === e.id && x.land === e.land)) T.q.push(e); }
