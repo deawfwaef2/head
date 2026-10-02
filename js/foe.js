@@ -402,6 +402,22 @@ window.Foe = (() => {
   }
   // ---- 每帧 ----
   const tv = new V3(), tv2 = new V3(), up = new V3(0, 1, 0);
+  // R62 foe_lod（用户：多人战斗很卡）：视锥外的敌人整个不进渲染（蒙皮/阴影/描边全省）、>22m 的敌人不投影、远处/屏外且不在出招的敌人动画隔帧推进
+  const _fr = new THREE.Frustum(), _pm = new THREE.Matrix4(), _pm2 = new THREE.Matrix4(), _lsp = new THREE.Sphere();
+  function lodFoe(fo, fr, d) {
+    const f = fo.f, R = f.root; _lsp.center.set(fo.pos.x, fo.pos.y + 1, fo.pos.z); _lsp.radius = 3 * (fo.sc || 1);
+    const vis = d < 4 || fr.intersectsSphere(_lsp); if (R.visible !== vis) R.visible = vis; fo.lodVis = vis;
+    const far = d > (fo.lodSh ? 18 : 22);
+    if (far !== !!fo.lodSh) {
+      if (far) { const L = fo.lodSh = []; R.traverse(o => { if (o.isMesh && o.castShadow) { o.castShadow = false; L.push(o); } }); }
+      else { for (const o of fo.lodSh) o.castShadow = true; fo.lodSh = null; }
+    }
+  }
+  function lodMix(fo, dt, d) { // 返回本帧要推进的动画时间（0 = 跳过）
+    if (fo.atk || fo.duel || fo.stag > 0 || fo.flash > 0 || fo.hr || fo.spurt > 0) { fo.lodAcc = 0; return dt; }
+    const k = fo.lodVis === false ? (d > 10 ? 3 : 1) : d > 32 ? 2 : 1; if (k === 1) { const a = fo.lodAcc || 0; fo.lodAcc = 0; return dt + a; }
+    fo.lodAcc = (fo.lodAcc || 0) + dt; fo.lodN = ((fo.lodN || 0) + 1) % k; if (fo.lodN) return 0; const a = fo.lodAcc; fo.lodAcc = 0; return a;
+  }
   function update(dt, now) {
     if (window.FaceFill) try { FaceFill.world(); } catch (e) { foeErr(e); } // 第二十四轮：野外用更高的面部补光下限
     if (!CTX) return; const ctx = CTX, P = ctx.player;
@@ -410,9 +426,10 @@ window.Foe = (() => {
     if (window.Steps) try { Steps.foes(FOES, dt); } catch (e) { foeErr(e); } // 第二十四轮：敌人脚步（用上一帧到这一帧的位移）
     if (slowT > 0) { slowT -= dt; dt *= slowK; if (slowT <= 0) slowK = 1; } // 击杀慢动作：只作用于敌人/尸体/头/血，玩家照常
     const SMART = !window.Mods || Mods.on('foe_smart'), DOORESC = !window.Mods || Mods.on('foe_door_escape');
+    let LODF = null; if ((!window.Mods || Mods.on('foe_lod')) && ctx.camera) { ctx.camera.updateMatrixWorld(); _pm2.copy(ctx.camera.matrixWorld).invert(); _pm.multiplyMatrices(ctx.camera.projectionMatrix, _pm2); _fr.setFromProjectionMatrix(_pm); LODF = _fr; }
     for (const fo of FOES) {
       const f = fo.f; try {
-      if (fo.dead) { if (fo.rag) ragStep(fo, dt); if (fo.warn) fo.warn.visible = false; if (fo.gs) fo.gs.visible = false; if (fo.duel && fo.duel.rib) fo.duel.rib.visible = false;
+      if (fo.dead) { if (fo.lodVis === false || fo.lodSh) { fo.f.root.visible = true; fo.lodVis = true; if (fo.lodSh) { for (const o of fo.lodSh) o.castShadow = true; fo.lodSh = null; } } if (fo.rag) ragStep(fo, dt); if (fo.warn) fo.warn.visible = false; if (fo.gs) fo.gs.visible = false; if (fo.duel && fo.duel.rib) fo.duel.rib.visible = false;
         if (fo.spurt > 0 && !fo.headOnPiece) { fo.spurt -= dt; const nb = f.bones.neck; if (nb && Math.random() < 0.8) { nb.getWorldPosition(tv2); const up = tv.set(0, 1, 0).applyQuaternion(nb.getWorldQuaternion(_q)); blood(tv2.addScaledVector(up, 0.05), 1, up, 0.9 + fo.spurt * 0.3); } }
         continue; }
       fo.t += dt; fo.cd -= dt; fo.sayT -= dt; if (fo.stag > 0) fo.stag -= dt; if (fo.block > 0) fo.block -= dt;
@@ -539,7 +556,7 @@ window.Foe = (() => {
       collide(fo.pos, 0.35); fo.pos.y = ctx.H(fo.pos.x, fo.pos.z) + (fo.yOff || 0); f.root.rotation.y = fo.yaw;
       if (window.Locomo) Locomo.tick(fo, dt); // R47 npc_locomo
       if (window.Feel54 && Feel54.pre) Feel54.pre(fo); if (window.Stance && Stance.pre) Stance.pre(fo); // R55e：先还原上一帧叠加的骨骼偏移（以前两个模块互相认不出对方改过的骨头 → 偏移逐帧累积 = 打着打着身体侧过去）
-      f.mixer.update(dt);
+      if (LODF) { lodFoe(fo, LODF, d); const md = lodMix(fo, dt, d); if (md > 0) f.mixer.update(md); } else f.mixer.update(dt);
       if (window.Stance) Stance.post(fo, dt); // R51 npc_strafe / npc_stance：下肢朝移动方向+上身扭回、架势体态
       if (fo.duel && window.FoeDuel) FoeDuel.post(fo, dt);
       if (fo.hr && window.Feel54) Feel54.post(fo, dt); // R54 hit_react：程序化受击后仰/侧歪

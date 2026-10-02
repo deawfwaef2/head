@@ -4480,3 +4480,9 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 教训：写文件时 `\n` / `\uXXXX` 不能以字面转义形式进入源码，否则整段变成注释/语法错误（本轮 heads.js 因此一度整体加载失败，已修）。每次改完用 `node --check` 或页面内 fetch+`new Function` 验证。
 - 已验证：断面贴图画布目视（解剖结构清晰）；15 种脸在离屏渲染器里渲出，泪痕/血口/鼻血可见。未验证：身体断面与 autopsy 新着色器的实机效果（本地无 `big/` 身体模型），淤青位置强度。
 - 待做：UI 逐页大改（总览/建造/首级收藏）、多敌人战斗性能优化。
+
+### R62b 多人战斗减负（MOD `foe_lod`，perf，默认开）
+- `js/foe.js` `update()`：每帧用主相机建视锥，`lodFoe()` 对每个敌人做球体测试（半径 3，d<4 强制可见）：视锥外 `f.root.visible=false`（蒙皮/阴影/描边整体省掉）；>22m（回滞 18m）把身上 castShadow 的网格关掉并记在 `fo.lodSh`，近了还原；死亡分支会把 visible/castShadow 复位。
+- `lodMix()`：出招/决斗/硬直/受击闪红/受击反应/喷血中的敌人动画照常逐帧；其余 >32m 隔帧推进、视锥外且 >10m 每 3 帧推进（累计 dt 一次性补上，速度不变）。关 MOD = 原行为 `f.mixer.update(dt)`。
+- 未验证：多人（10+ 敌人）实测帧率；本机只验证了单敌人场景无报错。后续可看 `ctx.sees`（每敌每帧视线检测）和 AI steer/avoid 的开销。
+- 未做：UI 逐页大改。
