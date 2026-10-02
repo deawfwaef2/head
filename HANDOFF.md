@@ -4332,3 +4332,8 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 用户：衣服本来是单独模型，试试直接隐藏/删除来实现更衣。→ 「衣着」按钮改为打开衣橱面板：按类别（鞋/连衣裙/上衣/下装/袜…，按 set.nm 里的 _Shoes/_Onepiece/_Tops 等识别）逐件隐藏/穿回；隐藏＝对应 set 标 `hid:true`（mesh 不可见、不可拾取、不进 bbOf/hull/pack），可再点穿回，也可 Ctrl+Z。
 - **底线不变：不裸体。** 脱掉一件时会生成该件的 `bandSet`（只留躯干到大腿根的素麻色底衬，`bandOf=类别`），穿回时删掉。面板另有「全部换素衣」（原来的整套素衣流程，`st.wdForce`）。仅当 `B.hasCloth`（皮肤层是完整人形）才可用。
 - `hid/bandOf` 已穿过 cutPart/components/摆姿锁定。测试 t20.js（t13 的素衣一步改为点 `[data-wd=lin]`）。
+
+## R58f（解剖台：🧩 网格编辑）
+- 新工具 🧩网格（键 6）：点一块网格选中（连通块＝按顶点位置焊接后的连通族；整层＝这一层材质的全部），金色高亮；按住拖动可在镜头平面内把它挪走；底部条可染色（10 色 + 取色器；叠色＝保留花纹，涂满＝纯色）、删除、取消选择。全部可 Ctrl+Z。
+- **不裸体底线保持：** 挪走/删除一个衣服连通块时，自动在原位留下该块的素麻底衬（`wearBand`，bandOf='编辑'）；底衬层、以及素衣状态下的衣服层是受保护的（不能删/挪，只能染色）。
+- 实现：`ccOf/edSelect/edEdit/edDye/edDelete/edDown/edMove/edUp`（autopsy.js）；每次编辑复制 sets 后重建块（挪动会丢 rig，染色/删除保留）。`Autopsy.ui.edit={dye,del,st}`。测试 t21.js。
