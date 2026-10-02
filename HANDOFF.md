@@ -4433,3 +4433,20 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
   - 摄影棚模式下不再预留猎手（`hReady/hLate`），电影结束 1.2s 后调用 `Hunters2.ambush`。
 - `js/worlds.js`：渲染处由 `CineStage.active&&draw` 改为 `CineStage.hook`。`js/nemstory.js`：播放前调用 `CineScript.nem`。
 - 测试：`tools/test/cine.html` 新增 `startCine('region')`（假 sg）和 `skipTo(bi)`。只在测试台验证过 14 拍分镜，真实地图尚未实机验证。
+
+## R63（开发者工坊 DevLab：独立大面板，随机人物/尸体/首级 + 无限建造/材料）
+- 用户：“开发者模式加强，单独 UI 面板，随机人物、随机尸体、随机头部，各种材料无限随便建造”。
+- 新文件 `js/devlab.js`（`window.DevLab`，依附 MOD `dev_mode`，仍默认关）：F8 / 右下角「🛠 DEV」打开居中大面板，6 个页签：
+  - 👤 人物：地区（当前/任选）、稀有度、身体（随机或指定 VRF+VH_PACK）、数量 1/3/5/10、行为（敌对 / 胆小 / 假人＝每帧 stag 锁 AI，可随便砍）。走 `Foe.populate(ctx,list,{keep:true})`，并推入 `W.foes`；生成在面前 3 m 一排，面朝玩家。「清掉我生成的」移除本面板生成的全部。
+  - ⚰️ 尸体：同上参数；完整尸体（`Foe.dot` 致死 → 布娃娃，可搜身/解剖/斩首）或无头尸体（再 `Foe._decap`，首级落地可 E 拾取）。
+  - 💀 首级：数量 1~200、稀有度、去向（魂库 / 洞里面前），调用 `DevMode.addHeads`。
+  - 🏗 建造：列出 `BuildCat.C` 全部建筑（按 CATS 分组）+ `Rig.KD` 装具（点一下送 50 件并进入放置）；“免费无限建造”开关 `DevLab.free()`。
+  - 📦 材料：`Sack.IT` 中 mat/use/loot/pile 全部物品，点击给 ×1/×10/×99/×999；全部 ×999、+100 万魂晶、药剂 ×99。
+  - ⚙ 开关：原 DevMode 的 4 个开关 + 一键（装备满阶/等级/全解锁/回忆全开）。
+  - 人物/尸体只在野外可用（洞里没有角色系统，会提示）。
+- 改动他人文件（最小）：
+  - `js/foe.js` populate：`const bodyName = it.body || bodyFor(...)`（list 项可指定身体）。
+  - `js/game.js` placeBuild：`FREE = DevLab.free()` 时跳过放不下/魂晶/上限/RegEcon 检查与扣费，放完不退出放置。
+  - `js/devmode.js`：toggle 和 F8 转给 DevLab（DevLab 不存在时保持旧小面板）。
+  - `js/mods.js`：dev_mode 描述前加 R63 说明。
+  - `index.html`：devmode.js 后加 `<script src="js/devlab.js">`。
