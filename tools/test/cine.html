@@ -10,9 +10,9 @@ window.SFX = new Proxy({}, { get: (t, k) => k === 'ctx' || k === 'out' ? undefin
 <script src="/models/AvatarSample_K.js"></script><script src="/js/hair_cover.js"></script><script src="/js/cc0mode.js"></script><script src="/js/heads.js"></script><script src="/js/headwear.js"></script><script src="/js/idlook.js"></script>
 <script src="/js/combat.js"></script><script src="/assets/limb_hand_avatar.js"></script><script src="/assets/ogre_body.js"></script><script src="/js/cfx3d.js"></script><script src="/js/fpv.js"></script><script src="/js/stamina.js"></script><script src="/js/vroid_pack.js"></script><script src="/js/foe.js"></script><script src="/js/foe_roles.js"></script><script src="/js/foe_roles2.js"></script><script src="/js/foe_roles3.js"></script><script src="/js/foe_ai2.js"></script><script src="/js/foe_mind.js"></script><script src="/js/foe_abs.js"></script><script src="/js/talents_data.js"></script><script src="/js/talents.js"></script>
 <script src="/js/persona_lines.js"></script><script src="/js/persona.js"></script>
-<script src="/js/cinestage.js"></script>
+<script src="/js/saga_data.js"></script><script src="/js/cinescript.js"></script><script src="/js/cinestage.js"></script>
 <script>
-const V3 = THREE.Vector3;
+const V3 = THREE.Vector3; const COLS = [];
 async function setup() {
   const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('cv'), antialias: true, stencil: true, preserveDrawingBuffer: true });
   renderer.setSize(innerWidth, innerHeight, false); renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
@@ -21,9 +21,9 @@ async function setup() {
   const gm = new THREE.MeshStandardMaterial({ color: 0x5d6b3a, roughness: 1 }); const fl = new THREE.Mesh(new THREE.PlaneGeometry(200, 200, 1, 1).rotateX(-Math.PI / 2), gm); sc.add(fl);
   const rnd = (() => { let a = 5; return () => (a = (a * 16807) % 2147483647) / 2147483647; })();
   for (let i = 0; i < 90; i++) { const r = 6 + rnd() * 40, an = rnd() * 6.28, x = Math.cos(an) * r, z = Math.sin(an) * r; const h = 3 + rnd() * 5;
-    const t = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.25, h, 7), new THREE.MeshStandardMaterial({ color: 0x4a3626 })); t.position.set(x, h / 2, z); sc.add(t);
+    COLS.push({ x, z, r: 1.0 }); const t = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.25, h, 7), new THREE.MeshStandardMaterial({ color: 0x4a3626 })); t.position.set(x, h / 2, z); sc.add(t);
     const c = new THREE.Mesh(new THREE.ConeGeometry(1.3 + rnd(), 3 + rnd() * 2, 8), new THREE.MeshStandardMaterial({ color: 0x2f4a2a })); c.position.set(x, h + 0.8, z); sc.add(c); }
-  for (let i = 0; i < 14; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(2 + rnd() * 3, 1.5 + rnd() * 3, 2 + rnd() * 3), new THREE.MeshStandardMaterial({ color: 0x8a7f72, roughness: 0.9 })); const an = rnd() * 6.28, r = 9 + rnd() * 20; b.position.set(Math.cos(an) * r, 0.8, Math.sin(an) * r); b.rotation.y = rnd() * 3; sc.add(b); }
+  for (let i = 0; i < 14; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(2 + rnd() * 3, 1.5 + rnd() * 3, 2 + rnd() * 3), new THREE.MeshStandardMaterial({ color: 0x8a7f72, roughness: 0.9 })); const an = rnd() * 6.28, r = 9 + rnd() * 20; b.position.set(Math.cos(an) * r, 0.8, Math.sin(an) * r); b.rotation.y = rnd() * 3; sc.add(b); COLS.push({ x: b.position.x, z: b.position.z, r: 1.8 }); }
   const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 500); sc.add(camera);
   window.G = { renderer, camera, scene: sc, S: { eq: {}, stats: {}, bosses: {} }, player: { pos: new V3(), yaw: 0, pitch: 0 }, setUI() { }, lockPointer() { }, toast() { } };
   window.__game = G; G.HOOK = { frame: [], pre: [] };
@@ -31,6 +31,16 @@ async function setup() {
   return 'ok';
 }
 const BODIES = ['Vita', 'Victoria_Rubin', 'HairSample_Female', 'Osage'];
+Foe.bodyFor = (h, r, boss, used) => { const free = BODIES.filter(b => !used || !used.has(b)); const a = free.length ? free : BODIES; return a[Math.floor(r() * a.length)]; };
+function fakeSg(k, seed) {
+  const D = SagaData, R = D.REG[k], r = (() => { let a = seed; return () => (a = (a * 16807) % 2147483647) / 2147483647; })(), pk = a => a[Math.floor(r() * a.length)];
+  const L = Lore.LOCS.find(l => l.k === k), rid = pk(R.roles), wid = pk(R.wit);
+  const env = { L: L.n, fac: R.fac, src: pk(R.src), sym: pk(R.sym), craft: pk(R.craft), beast: pk(R.beast), light: pk(R.light), place: pk(R.place), sound: pk(R.sound), sky: pk(R.sky), scent: pk(R.scent), folk: pk(R.folk), num: 4, mot: pk(D.MOT) };
+  const nm = () => pk(R.names[0]) + pk(R.names[1]);
+  const sg = { seed, k, vis: 3, arch: pk(D.ARCH), envoy: false, env, r, pk, prev: null, T: { n: nm(), id: rid, role: '', title: pk(D.EPI) + ((Lore.ID[rid] || {}).n || '') }, W: { n: nm(), id: wid, role: (Lore.ID[wid] || {}).n || '' }, V: nm() };
+  sg.ctx = Object.assign({}, env, { T: sg.T.n, Tt: sg.T.title, W: sg.W.n, Wr: sg.W.role, V: sg.V });
+  return sg;
+}
 function mkH(seed, name, li) { const h = RPG.foe(G.S, Lore.LOCS[li || 2], seed >>> 0, new Set(), new Set()); h.c = Object.assign({}, h.c, { name }); return h; }
 function startCine(kind) {
   const L = (t, w, col, it) => ({ t, w: w || '', col: col || '', it: !!it });
@@ -56,9 +66,11 @@ function startCine(kind) {
       { shot: 'cOver', castFo: actors[1], finale: true, lines: [L('石阵。点灯的人。今晚就去。', '我', '#fff', true)] }
     ];
   }
+  if (kind === 'region') { const sg = fakeSg('wilds', 777); const sp = CineScript.region(sg, { ge: '✦ 魂晶 +35% · 持续 2 趟', be: '✧ 敌人伤害 +12% · 持续 2 趟' }); actors = sp.actors; beats = sp.beats; window.__beats = beats.map(b => b.shot + (b.scene ? '@' + b.scene.key : '')); }
   window.__ended = null;
-  const w = { sc: G.scene, H: () => 0, ctr: new V3(0, 0, -3.2), aud: new V3(0, 0, 1), hide: () => { } };
+  const w = { sc: G.scene, H: () => 0, ctr: new V3(0, 0, -3.2), aud: new V3(0, 0, 1), hide: () => { }, cols: COLS, R: 40, P0: new V3(0, 0, 0), samp: null };
   return CineStage.play({ actors, beats, col: '#c8b8ff', info, world: w, onEnd: n => { window.__ended = n ? 'nat' : 'skip'; } });
 }
 function step(sec) { const n = Math.round(sec * 30); for (let i = 0; i < n; i++) { window.__vt += 1 / 30; CineStage.draw(G.renderer); } }
+function skipTo(bi) { let g = 0; while (CineStage._A() && CineStage._A().bi < bi && g++ < 4000) { window.__vt += 1 / 30; CineStage.draw(G.renderer); } step(0.1); }
 </script>

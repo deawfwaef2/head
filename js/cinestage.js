@@ -1,14 +1,15 @@
-// R59s MOD cine_stage：剧情短片的“摄影棚”。宿敌插曲（NemStory）与地区入场对话（Saga talk）都在这里播。
-// 旧做法（R57s）的问题：演员放在完整的大地图里、每帧渲染整张图 + 后处理 → 全程掉帧；镜头又近又快、站桩、无布光、卡片杂乱。
-// 新做法：
-//  · 单独的小场景 stage：只有演员 + 三点布光（暖主光 / 冷轮廓光 / 补光）+ 脚下柔影。
-//  · 背景 = 每个镜头开始时用该镜头的相机把大地图拍一张低分辨率照片，铺满全屏并做景深虚化。大地图之后不再每帧渲染 → 不卡。
-//    演员站在真实地形高度上、背景与镜头同机位，所以脚下与地面透视一致。
-//  · 只渲染 2.39:1 画幅（上下黑边不画），开播前在黑场里 compile 着色器。
-//  · 表演：说话者播放说话循环 + 口型 + 开口点头；听者看着说话的人；每人眨眼；头/颈程序化注视（夹角限制）。
-//  · 镜头：遵守 180° 轴线（相机永远在观众一侧），过肩/反打、中近景、特写、双人、低机位、侧面跟拍；慢推 + 轻微手持感。
-//  · UI：单行字幕（上方说话人名）、首次出场下三分之一名牌、干净的标题卡/变强卡/恩祸卡；空格 = 下一句，Esc = 跳过。
-// 接口：CineStage.play({ actors:[{h, body?, clip?, nm?, col?, pair?}], beats:[Saga 格式 beat，castFo 指向 actors 元素], col, onBeat, onEnd, info })
+// R59s MOD cine_stage：剧情短片的“摄影棚”。宿敌插曲（NemStory）与地区入场电影（Saga）都在这里播。
+// v1（R59s）：独立小场景 + 三点布光 + 每镜头一张虚化大地图背景 → 不再每帧渲染大地图，不掉帧。
+// v2（R59t，用户：“太土了，应该各种剧情对话、各种场景特写描写转换”；“刚进场就能看见电影人物”）：
+//  · 多场景：一段电影 2–3 个地点（自动在地图里找带地标的空地），每个场景的背景都不同；场景之间黑场/溶接转场 + 地点字幕。
+//  · 镜头语言：环境空镜（清晰全景 + 慢推，变焦与背景同步缩放，透视不穿帮）、手部特写、眼部特写、背影看远方、脚步、
+//    固定机位人物走入画面、过肩/反打、听者反应镜头（长台词说到一半切过去）、低机位、侧面。
+//  · 表演：跪地/蹲下/施法/持剑连斩/抱臂/摇头……（UAL 动作库），姿势类动作说话时不会站起来；走位入画。
+//  · 转场：dip（黑场）/ dissolve（截上一帧淡出）/ flash（闪白）。
+//  · 进图黑场：有电影要播时，从地图第一帧起就盖黑（hook），看不到场上的人，直到电影开始。
+// 接口：CineStage.play({ actors:[{h, body?, clip?, nm?, col?, pair?, wpn?}], beats:[...], col, onBeat, onEnd, world })
+// beat：{ shot, castFo(actor spec), lines:[{t,w,col,it}], scene:{key,cap,sub,cast:[spec]}, act:Map|[[spec,clip]], walk:{who,d,side,clip},
+//         tr:'cut'|'dip'|'dissolve'|'flash', card:{a,b,c}, cc:{k,n,t,ch,col}, boost, stake:{good,bad,ge,be,head}, min, tag }
 window.CineStage = (() => {
   const on = () => !window.Mods || Mods.on('cine_stage') !== false;
   const G = () => window.G || window.__game;
@@ -19,6 +20,7 @@ window.CineStage = (() => {
   const sm = u => { u = clamp(u, 0, 1); return u * u * u * (u * (u * 6 - 15) + 10); };
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const mul = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const STAND = new Set(['Idle_Loop', 'Idle_FoldArms_Loop', 'Idle_Talking_Loop']);
   let A = null; // 正在播放 / 搭建的短片
   let ST = null; // 摄影棚（复用）
 
@@ -26,23 +28,24 @@ window.CineStage = (() => {
   function shadowTex() {
     const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
     const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(0,0,0,0.85)'); g.addColorStop(0.45, 'rgba(0,0,0,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-    x.fillStyle = g; x.fillRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); return t;
+    x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c);
   }
   function stage() {
     if (ST) return ST;
     const sc = new THREE.Scene();
     const cam = new THREE.PerspectiveCamera(30, 2.39, 0.04, 600);
-    const hemi = new THREE.HemisphereLight(0xdfe6ff, 0x3a2e28, 0.7);
-    const key = new THREE.DirectionalLight(0xffe2c4, 1.4), rim = new THREE.DirectionalLight(0xbfd4ff, 2.0), fill = new THREE.DirectionalLight(0x9fb0ff, 0.3);
+    const hemi = new THREE.HemisphereLight(0xdfe6ff, 0x3a2e28, 0.55);
+    const key = new THREE.DirectionalLight(0xffe2c4, 1.25), rim = new THREE.DirectionalLight(0xbfd4ff, 2.8), fill = new THREE.DirectionalLight(0x9fb0ff, 0.3);
     sc.add(hemi); for (const l of [key, rim, fill]) { sc.add(l); sc.add(l.target); }
     const bgMat = new THREE.ShaderMaterial({
-      uniforms: { tMap: { value: null }, uR: { value: new THREE.Vector2(0.006, 0.014) }, uTint: { value: new THREE.Color(1, 1, 1) }, uDim: { value: 0.8 }, uVig: { value: 0.6 }, uSat: { value: 0.8 } },
+      uniforms: { tMap: { value: null }, uR: { value: new THREE.Vector2(0.006, 0.014) }, uZ: { value: 1 }, uTint: { value: new THREE.Color(1, 1, 1) }, uDim: { value: 0.8 }, uVig: { value: 0.6 }, uSat: { value: 0.8 } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }',
-      fragmentShader: `uniform sampler2D tMap; uniform vec2 uR; uniform vec3 uTint; uniform float uDim, uVig, uSat; varying vec2 vUv;
+      fragmentShader: `uniform sampler2D tMap; uniform vec2 uR; uniform float uZ; uniform vec3 uTint; uniform float uDim, uVig, uSat; varying vec2 vUv;
 void main(){
+  vec2 uv = 0.5 + (vUv - 0.5) * uZ;
   vec3 c = vec3(0.0);
-  for (int i = 0; i < 20; i++) { float fi = float(i); float r = sqrt((fi + 0.5) / 20.0); float a = fi * 2.39996; c += texture2D(tMap, vUv + vec2(cos(a), sin(a)) * r * uR).rgb; }
-  c /= 20.0;
+  if (uR.x < 0.0004) c = texture2D(tMap, uv).rgb;
+  else { for (int i = 0; i < 20; i++) { float fi = float(i); float r = sqrt((fi + 0.5) / 20.0); float a = fi * 2.39996; c += texture2D(tMap, uv + vec2(cos(a), sin(a)) * r * uR).rgb; } c /= 20.0; }
   float l = dot(c, vec3(0.299, 0.587, 0.114)); c = mix(vec3(l), c, uSat) * uTint * uDim;
   vec2 q = vUv - 0.5; c *= clamp(1.0 - uVig * dot(q, q) * 1.8, 0.0, 1.0);
   gl_FragColor = vec4(c, 1.0);
@@ -72,16 +75,19 @@ void main(){
     const rc = fog.clone().lerp(new THREE.Color(0xc8dcff), 0.5); const hsl = {}; rc.getHSL(hsl); rc.setHSL(hsl.h, Math.min(0.5, hsl.s), Math.max(0.72, hsl.l));
     S.rim.color.copy(rc); S.rim.intensity = 2.8;
     S.fill.color.copy(fog).lerp(new THREE.Color(0x9fb0ff), 0.5); S.fill.intensity = 0.35;
-    if (hemi) { S.hemi.color.copy(hemi.color).lerp(new THREE.Color(0xffffff), 0.3); S.hemi.groundColor.copy(hemi.groundColor); S.hemi.intensity = 0.55; }
-    else { S.hemi.color.copy(fog).lerp(new THREE.Color(0xffffff), 0.5); S.hemi.groundColor.set(0x3a2e28); S.hemi.intensity = 0.55; }
-    // 背景调色：往雾色偏一点、压暗 → 人物跳出来
+    if (hemi) { S.hemi.color.copy(hemi.color).lerp(new THREE.Color(0xffffff), 0.3); S.hemi.groundColor.copy(hemi.groundColor); }
+    else { S.hemi.color.copy(fog).lerp(new THREE.Color(0xffffff), 0.5); S.hemi.groundColor.set(0x3a2e28); }
+    S.hemi.intensity = 0.55;
     S.bgMat.uniforms.uTint.value.copy(new THREE.Color(1, 1, 1).lerp(fog, 0.18));
     S.sc.environment = wsc && wsc.environment || null;
   }
 
   // ================= 演员 =================
+  const _v = new V3();
   function headPos(a, out) { const b = a.f.bones.head || a.f.root; b.getWorldPosition(out); return out; }
-  function bonePos(a, n, out) { const b = a.f.bones[n] || a.f.bones.head || a.f.root; b.getWorldPosition(out); return out; }
+  function boneW(a, n, out) { const b = a.f.bones[n] || a.f.bones.head || a.f.root; b.getWorldPosition(out); return out; }
+  // 规划镜头用的“站位头部”：站位点 + 当前姿势的头高（不受走位/呼吸影响）
+  function headRef(a, out) { headPos(a, out); const y = out.y - a.f.root.position.y; return out.set(a.home.x, a.home.y + y, a.home.z).addScaledVector(a.facing, 0.04); }
   async function buildActor(spec, used) {
     const h = spec.h;
     if (window.IdLook) { try { IdLook.apply(h); } catch (e) { } }
@@ -97,7 +103,7 @@ void main(){
     const rest = new Map(); for (const n of ['neck', 'head', 'spine', 'chest', 'upperChest']) { const b = f.bones[n]; if (b) rest.set(b, b.quaternion.clone()); }
     const nm = spec.nm || (h.c && h.c.name) || '';
     return { spec, h, f, sh, nm, col: spec.col || '#f0e6d8', title: spec.title || '', rest, idle: spec.clip || 'Idle_Loop', clip: '', ly: 0, lp: 0, tgt: new V3(), hasT: false,
-      blinkT: 1 + Math.random() * 3, talk: 0, talkT: 0, nodT: 9, exT: 0, emo: spec.emo || null, intro: false, seed: Math.random() * 100 };
+      blinkT: 1 + Math.random() * 3, talkT: 0, nodT: 9, exT: 0, emo: spec.emo || null, seed: Math.random() * 100, home: new V3(), facing: new V3(0, 0, 1), yaw: 0, walk: null, turn: null, on: true };
   }
   function dropActors(list) {
     for (const a of list || []) {
@@ -107,31 +113,33 @@ void main(){
     }
   }
   function setClip(a, name, fade) {
-    if (a.clip === name) return; const ok = a.f.clips && a.f.clips[name] ? name : (a.f.clips && a.f.clips[a.idle] ? a.idle : 'Idle_Loop');
+    const ok = a.f.clips && a.f.clips[name] ? name : (a.f.clips && a.f.clips[a.idle] ? a.idle : 'Idle_Loop');
     if (a.clip === ok) return; try { a.f.play(ok, { fade: fade == null ? 0.5 : fade }); a.clip = ok; } catch (e) { }
   }
+  function show(a, v) { a.on = v; a.f.root.visible = v; a.sh.visible = v; }
   // 站位：相机永远在观众一侧（aud = 从舞台中心指向观众），演员彼此相对再朝观众侧转一点
   function block(acts, ctr, aud, H) {
     const rt = new V3(-aud.z, 0, aud.x), n = acts.length;
     const put = (a, off, faceTo, turn) => {
       const p = ctr.clone().addScaledVector(rt, off.x).addScaledVector(aud, off.z); p.y = H(p.x, p.z);
-      a.f.root.position.copy(p); a.home = p.clone();
-      const d = faceTo.clone().sub(p), y0 = Math.atan2(d.x, d.z), t = Math.abs(turn), dotA = y => Math.sin(y) * aud.x + Math.cos(y) * aud.z; const yaw = dotA(y0 + t) >= dotA(y0 - t) ? y0 + t : y0 - t; a.f.root.rotation.y = yaw; a.yaw = yaw; // 朝观众侧转 |turn|
-      a.sh.position.set(p.x, p.y + 0.015, p.z);
+      a.f.root.position.copy(p); a.home.copy(p);
+      const d = faceTo.clone().sub(p), y0 = Math.atan2(d.x, d.z), t = Math.abs(turn), dotA = y => Math.sin(y) * aud.x + Math.cos(y) * aud.z;
+      const yaw = dotA(y0 + t) >= dotA(y0 - t) ? y0 + t : y0 - t; a.f.root.rotation.y = yaw; a.yaw = yaw; a.facing.set(Math.sin(yaw), 0, Math.cos(yaw));
+      a.sh.position.set(p.x, p.y + 0.015, p.z); a.walk = null; a.turn = null;
     };
     const audPt = ctr.clone().addScaledVector(aud, 6);
-    if (n === 1) put(acts[0], { x: 0.15, z: 0 }, audPt, 0.35);
+    if (n === 1) put(acts[0], { x: 0.1, z: 0 }, audPt, 0.5);
     else if (n === 2) {
       const pa = ctr.clone().addScaledVector(rt, -0.62), pb = ctr.clone().addScaledVector(rt, 0.62);
-      put(acts[0], { x: -0.62, z: 0 }, pb, -0.6); put(acts[1], { x: 0.62, z: 0.05 }, pa, 0.6);
+      put(acts[0], { x: -0.62, z: 0 }, pb, 0.6); put(acts[1], { x: 0.62, z: 0.05 }, pa, 0.6);
     } else if (n === 3) {
       const pa = ctr.clone().addScaledVector(rt, -0.7), pb = ctr.clone().addScaledVector(rt, 0.7);
-      put(acts[0], { x: -0.7, z: 0 }, pb, -0.45); put(acts[1], { x: 0.7, z: 0 }, pa, 0.45); put(acts[2], { x: 0.05, z: -0.95 }, audPt, 0);
+      put(acts[0], { x: -0.7, z: 0 }, pb, 0.55); put(acts[1], { x: 0.7, z: 0 }, pa, 0.55); put(acts[2], { x: 0.05, z: -0.95 }, audPt, 0);
     } else {
       const xs = [-1.65, -0.55, 0.55, 1.65];
       acts.forEach((a, i) => { const x = xs[i] != null ? xs[i] : (i - n / 2) * 1.1; put(a, { x, z: -Math.abs(x) * 0.28 }, ctr.clone().addScaledVector(aud, 3.2), 0); });
     }
-    for (const a of acts) { a.f.root.updateMatrixWorld(true); a.facing = new V3(Math.sin(a.yaw), 0, Math.cos(a.yaw)); }
+    for (const a of acts) a.f.root.updateMatrixWorld(true);
   }
   // 骨骼绕世界轴转（同 stance.js）
   const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _ax = new V3();
@@ -141,14 +149,26 @@ void main(){
   }
   const _hp = new V3(), _d = new V3(), _r = new V3();
   function act(a, dt, t) {
+    if (!a.on) return;
+    // 走位
+    if (a.walk) {
+      const w = a.walk; w.t += dt; const u = clamp(w.t / w.dur, 0, 1);
+      a.f.root.position.lerpVectors(w.from, w.to, u); a.f.root.position.y = A.world.H(a.f.root.position.x, a.f.root.position.z);
+      a.f.root.rotation.y = w.yw;
+      if (u >= 1) { a.walk = null; setClip(a, a.idle, 0.45); a.turn = { from: w.yw, to: a.yaw, t: 0 }; }
+    } else if (a.turn) {
+      const tr = a.turn; tr.t += dt; const u = sm(tr.t / 0.6); let d = tr.to - tr.from; d = Math.atan2(Math.sin(d), Math.cos(d));
+      a.f.root.rotation.y = tr.from + d * u; if (u >= 1) a.turn = null;
+    }
+    a.sh.position.set(a.f.root.position.x, a.f.root.position.y + 0.015, a.f.root.position.z);
     for (const [b, q] of a.rest) b.quaternion.copy(q);
     try { a.f.mixer.update(dt); } catch (e) { }
     a.f.root.updateMatrixWorld(true);
-    // 注视
+    // 注视（走路时不扭头）
     let dy = 0, dp = 0;
-    if (a.hasT) {
+    if (a.hasT && !a.walk) {
       headPos(a, _hp); _d.copy(a.tgt).sub(_hp); const hz = Math.hypot(_d.x, _d.z) || 1e-4;
-      const yawT = Math.atan2(_d.x, _d.z); let rel = yawT - a.yaw; rel = Math.atan2(Math.sin(rel), Math.cos(rel));
+      const yawT = Math.atan2(_d.x, _d.z); let rel = yawT - a.f.root.rotation.y; rel = Math.atan2(Math.sin(rel), Math.cos(rel));
       dy = clamp(rel, -0.55, 0.55); dp = clamp(Math.atan2(_d.y, hz), -0.35, 0.3);
     }
     const k = 1 - Math.exp(-dt * 5);
@@ -158,7 +178,7 @@ void main(){
     const yaw = a.ly + nx, pitch = a.lp + 0.07 - nod + Math.sin(t * 2.3 + a.seed) * 0.02 * tk;
     const ch = a.f.bones.upperChest || a.f.bones.chest, nk = a.f.bones.neck, hd = a.f.bones.head;
     rotW(ch, UP, yaw * 0.2); rotW(nk, UP, yaw * 0.35); rotW(hd, UP, yaw * 0.45);
-    const fy = a.yaw + yaw; _r.set(Math.cos(fy), 0, -Math.sin(fy));
+    const fy = a.f.root.rotation.y + yaw; _r.set(Math.cos(fy), 0, -Math.sin(fy));
     rotW(nk, _r, -pitch * 0.4); rotW(hd, _r, -pitch * 0.6);
     // 表情：眨眼 + 口型 + 情绪（setExpression 每次会清空全部形变，必须合在一次调用里；30Hz）
     a.blinkT -= dt; let bl = 0;
@@ -175,34 +195,67 @@ void main(){
     }
   }
 
+  // ================= 场景地点 =================
+  // key 'A' = 玩家面前；其他 key = 地图里另找一块空地（离之前的地点 ≥ 9m），背后有地标（大柱/树/石）
+  function spotFor(key) {
+    if (A.spots.has(key)) return A.spots.get(key);
+    const W = A.world; let sp = null;
+    if (!A.spots.size || !W.cols) sp = { ctr: W.ctr.clone(), aud: W.aud.clone() };
+    else {
+      const R = W.R || 30, prev = [...A.spots.values()].map(s => s.ctr), cols = W.cols || [];
+      let best = null, bs = -1e9;
+      for (let i = 0; i < 48; i++) {
+        let x, z; const p0 = W.samp ? W.samp() : null;
+        if (p0) { x = p0[0]; z = p0[1]; } else { const an = Math.random() * 6.283, d = R * (0.15 + Math.random() * 0.55); x = W.P0.x + Math.cos(an) * d; z = W.P0.z + Math.sin(an) * d; }
+        if (cols.some(c => Math.hypot(c.x - x, c.z - z) < c.r + 1.7)) continue;
+        const y = W.H(x, z); if (Math.abs(W.H(x + 1.5, z) - y) > 0.5 || Math.abs(W.H(x, z + 1.5) - y) > 0.5) continue;
+        const dp = Math.min(...prev.map(p => Math.hypot(p.x - x, p.z - z))); if (dp < 9) continue;
+        let lm = null, ld = 1e9; for (const c of cols) { const d = Math.hypot(c.x - x, c.z - z); if (c.r >= 0.5 && d > 3 && d < 14 && d - c.r * 2 < ld) { ld = d - c.r * 2; lm = c; } }
+        const sc = (lm ? 3 : 0) - Math.abs(dp - 16) * 0.05 + Math.random();
+        if (sc > bs) { bs = sc; best = { x, z, lm }; }
+      }
+      if (best) { const ctr = new V3(best.x, W.H(best.x, best.z), best.z); let aud; if (best.lm) aud = new V3(best.x - best.lm.x, 0, best.z - best.lm.z).normalize(); else { const an = Math.random() * 6.283; aud = new V3(Math.cos(an), 0, Math.sin(an)); } sp = { ctr, aud }; }
+      else sp = { ctr: W.ctr.clone(), aud: W.aud.clone().applyAxisAngle(UP, 1.6 * A.spots.size) };
+    }
+    A.spots.set(key, sp); return sp;
+  }
+  function enterScene(sc) {
+    const sp = spotFor(sc.key || 'A'); A.aud = sp.aud.clone(); A.ctr = sp.ctr.clone();
+    const cast = (sc.cast || A.acts.map(a => a.spec)).map(s => A.byFo.get(s)).filter(Boolean);
+    for (const a of A.acts) show(a, cast.includes(a));
+    if (cast.length) block(cast, sp.ctr, sp.aud, A.world.H);
+    A.cast = cast; A.scene = sc;
+  }
+
   // ================= 镜头 =================
-  // 所有镜头都在“观众侧”（aud）——两人对话时不越轴
   function sideOf(u) { const s = A.aud.clone().addScaledVector(u, -A.aud.dot(u)); s.y = 0; if (s.lengthSq() < 1e-4) s.set(-u.z, 0, u.x); return s.normalize(); }
+  const camRt = v => new V3(-v.z, 0, v.x);
   function planShot(type, X, L) {
-    const S = {}, hX = headPos(X, new V3()), feet = X.f.root.position.clone();
-    const hL = L ? headPos(L, new V3()) : null;
+    const S = { type, follow: null };
+    if (type === 'est' || !X) return planEst(S, X);
+    const hX = headRef(X, new V3()), feet = X.home.clone();
+    const hL = L ? headRef(L, new V3()) : null;
     const toL = hL ? hL.clone().sub(hX).setY(0).normalize() : X.facing.clone();
     const fwdish = X.facing.clone().multiplyScalar(0.75).add(A.aud.clone().multiplyScalar(0.55)).setY(0).normalize();
-    const camRt = v => new V3(-v.z, 0, v.x); // v = 相机朝向（水平）的右手
     const look3 = (p, look, side) => { const dir = look.clone().sub(p).setY(0).normalize(); return look.clone().addScaledVector(camRt(dir), side); };
     switch (type) {
-      case 'ecu': { const d = fwdish; S.p0 = hX.clone().addScaledVector(d, 0.95).addScaledVector(UP, 0.06); S.p1 = hX.clone().addScaledVector(d, 0.82).addScaledVector(UP, 0.06); const lk = hX.clone().addScaledVector(UP, 0.07); S.l0 = look3(S.p0, lk, L ? toL.dot(camRt(d.clone().negate())) * 0.07 : 0.05); S.l1 = S.l0; S.f0 = 22; S.f1 = 21; S.blur = 2.2; break; }
+      case 'ecu': { const d = fwdish; S.p0 = hX.clone().addScaledVector(d, 0.95).addScaledVector(UP, 0.06); S.p1 = hX.clone().addScaledVector(d, 0.82).addScaledVector(UP, 0.06); const lk = hX.clone().addScaledVector(UP, 0.07); S.l0 = look3(S.p0, lk, L ? toL.dot(camRt(d.clone().negate())) * 0.07 : 0.05); S.l1 = S.l0; S.f0 = 22; S.f1 = 21; S.blur = 2.2; S.follow = 'head'; break; }
       case 'ots': {
-        if (!L) return planShot('mcu', X, null);
+        if (!L || !L.on) return planShot('mcu', X, null);
         const u = hX.clone().sub(hL).setY(0).normalize(), s = sideOf(u);
         S.p0 = hL.clone().addScaledVector(u, -0.62).addScaledVector(s, 0.5).addScaledVector(UP, 0.04); S.p1 = S.p0.clone().addScaledVector(u, 0.14);
         S.l0 = hX.clone().lerp(hL, 0.16).addScaledVector(UP, -0.05); S.l1 = S.l0.clone(); S.f0 = 30; S.f1 = 27.5; S.blur = 1.6; break;
       }
-      case 'two': case 'over': {
-        const B = L || A.acts.find(a => a !== X) || X, hB = headPos(B, new V3()), M = hX.clone().lerp(hB, 0.5), u = hB.clone().sub(hX).setY(0); const dAB = u.length() || 1; u.normalize(); const s = sideOf(u);
+      case 'two': {
+        const B = (L && L.on) ? L : A.cast.find(a => a !== X) || X, hB = headRef(B, new V3()), M = hX.clone().lerp(hB, 0.5), u = hB.clone().sub(hX).setY(0); const dAB = u.length() || 1; u.normalize(); const s = sideOf(u);
         const dist = Math.max(2.7, dAB * 2.1);
         S.p0 = M.clone().addScaledVector(s, dist).addScaledVector(u, -0.25).addScaledVector(UP, -0.12); S.p1 = S.p0.clone().addScaledVector(u, 0.5).addScaledVector(s, -0.2);
         S.l0 = M.clone().addScaledVector(UP, -0.2); S.l1 = S.l0.clone().addScaledVector(u, 0.1); S.f0 = 31; S.f1 = 30; S.blur = 1.0; break;
       }
       case 'wide': {
-        const C = new V3(); let sp = 0; for (const a of A.acts) C.add(headPos(a, new V3())); C.multiplyScalar(1 / A.acts.length);
-        for (const a of A.acts) sp = Math.max(sp, headPos(a, new V3()).distanceTo(C));
-        const rt = camRt(A.aud.clone().negate()); const dist = 2.6 + sp * 1.8;
+        const C = new V3(); let sp = 0; const cs = A.cast.length ? A.cast : [X]; for (const a of cs) C.add(headRef(a, new V3())); C.multiplyScalar(1 / cs.length);
+        for (const a of cs) sp = Math.max(sp, headRef(a, new V3()).distanceTo(C));
+        const rt = camRt(A.aud.clone().negate()); const dist = 2.4 + sp * 1.7;
         S.p0 = C.clone().addScaledVector(A.aud, dist).addScaledVector(rt, -0.35).addScaledVector(UP, 0.05); S.p1 = S.p0.clone().addScaledVector(A.aud, -0.55).addScaledVector(rt, 0.5);
         S.l0 = C.clone().addScaledVector(UP, -0.28); S.l1 = S.l0.clone(); S.f0 = 36; S.f1 = 34; S.blur = 0.7; break;
       }
@@ -213,17 +266,46 @@ void main(){
       }
       case 'side': {
         const s = sideOf(toL), d = s.clone().addScaledVector(toL, 0.25).normalize();
-        S.p0 = hX.clone().addScaledVector(d, 1.35).addScaledVector(toL, -0.3).addScaledVector(UP, -0.08); S.p1 = S.p0.clone().addScaledVector(toL, 0.35);
-        S.l0 = hX.clone().addScaledVector(UP, -0.12).addScaledVector(toL, 0.12); S.l1 = S.l0.clone().addScaledVector(toL, 0.12); S.f0 = 29; S.f1 = 28; S.blur = 1.6; break;
+        S.p0 = hX.clone().addScaledVector(d, 1.5).addScaledVector(toL, -0.3).addScaledVector(UP, -0.1); S.p1 = S.p0.clone().addScaledVector(toL, 0.35);
+        S.l0 = hX.clone().addScaledVector(UP, -0.2).addScaledVector(toL, 0.12); S.l1 = S.l0.clone().addScaledVector(toL, 0.12); S.f0 = 31; S.f1 = 30; S.blur = 1.5; break;
+      }
+      case 'entr': { // 固定机位：人物从画外走到站位（背景静止，透视正确）
+        const d = fwdish; S.p0 = hX.clone().addScaledVector(d, 2.6).addScaledVector(UP, -0.25); S.p1 = S.p0.clone().addScaledVector(d, -0.08);
+        S.l0 = hX.clone().addScaledVector(UP, -0.4); S.l1 = S.l0.clone(); S.f0 = 33; S.f1 = 32.5; S.blur = 1.2; break;
+      }
+      case 'hand': { // 手部特写（跟着手走）
+        const hn = X.f.bones.rightHand ? 'rightHand' : 'leftHand', hp = boneW(X, hn, new V3());
+        const d = fwdish.clone().addScaledVector(camRt(fwdish), 0.35).normalize();
+        S.p0 = hp.clone().addScaledVector(d, 0.62).addScaledVector(UP, 0.16); S.p1 = hp.clone().addScaledVector(d, 0.52).addScaledVector(UP, 0.13);
+        S.l0 = hp.clone().addScaledVector(UP, 0.03); S.l1 = S.l0.clone(); S.f0 = 31; S.f1 = 29; S.blur = 2.6; S.follow = hn; S.fk = 0.85; break;
+      }
+      case 'back': { // 背影：越过她的肩膀看远处
+        const r = camRt(X.facing);
+        S.p0 = hX.clone().addScaledVector(X.facing, -1.05).addScaledVector(r, 0.34).addScaledVector(UP, 0.08); S.p1 = S.p0.clone().addScaledVector(X.facing, 0.18);
+        S.l0 = hX.clone().addScaledVector(X.facing, 4).addScaledVector(UP, -0.25); S.l1 = S.l0.clone().addScaledVector(r, -0.2); S.f0 = 36; S.f1 = 34; S.blur = 0.45; S.dim = 0.9; break;
+      }
+      case 'feet': {
+        const d = fwdish;
+        S.p0 = feet.clone().addScaledVector(d, 0.9).addScaledVector(UP, 0.22); S.p1 = S.p0.clone().addScaledVector(d, -0.12);
+        S.l0 = feet.clone().addScaledVector(UP, 0.18).addScaledVector(d, 0.1); S.l1 = S.l0.clone().addScaledVector(UP, 0.05); S.f0 = 36; S.f1 = 34; S.blur = 2.0; break;
       }
       default: { // mcu：3/4 正面中近景，留出视线方向空间
-        const d = fwdish; S.p0 = hX.clone().addScaledVector(d, 1.45).addScaledVector(UP, 0.0); S.p1 = hX.clone().addScaledVector(d, 1.25).addScaledVector(UP, 0.0);
+        const d = fwdish; S.p0 = hX.clone().addScaledVector(d, 1.45); S.p1 = hX.clone().addScaledVector(d, 1.25);
         const room = L ? 0.13 : 0.08, sgn = L ? Math.sign(toL.dot(camRt(d.clone().negate()))) || 1 : 1;
-        const lk = hX.clone().addScaledVector(UP, -0.02); S.l0 = look3(S.p0, lk, room * sgn); S.l1 = look3(S.p1, lk, room * 0.9 * sgn); S.f0 = 27; S.f1 = 25; S.blur = 1.8;
+        const lk = hX.clone().addScaledVector(UP, -0.02); S.l0 = look3(S.p0, lk, room * sgn); S.l1 = look3(S.p1, lk, room * 0.9 * sgn); S.f0 = 27; S.f1 = 25; S.blur = 1.8; S.follow = 'head'; S.fk = 0.5;
       }
     }
-    S.type = type; if (type !== 'ots' && type !== 'two' && type !== 'over' && type !== 'wide') clearLine(S, X, hX);
+    if (S.follow) { S.fa = X; S.ref = boneW(X, S.follow, new V3()); }
+    if (!['ots', 'two', 'wide', 'est', 'back'].includes(type)) clearLine(S, X, hX);
     return S;
+  }
+  // 环境空镜：从远处高一点看这片地点（人物很小或不在），清晰背景 + 慢推
+  function planEst(S, X) {
+    const c = (X ? X.home : A.ctr).clone(), r = A.rng || Math.random, side = r() < 0.5 ? -1 : 1;
+    const dir = A.aud.clone().applyAxisAngle(UP, side * (0.45 + r() * 0.5)), dist = 5.5 + r() * 2.5, hgt = 1.2 + r() * 0.9;
+    S.p0 = c.clone().addScaledVector(dir, dist).addScaledVector(UP, hgt); S.p1 = S.p0.clone();
+    S.l0 = c.clone().addScaledVector(UP, 1.0).addScaledVector(camRt(dir), side * 0.9); S.l1 = S.l0.clone();
+    S.f0 = 40; S.f1 = 30; S.blur = 0; S.dim = 0.95; S.sharp = 1; S.type = 'est'; return S;
   }
   // 单人镜头：别让别的演员挡在镜头和主角之间（绕主角转相机，最多 6 次）
   const _sg = new V3(), _pt = new V3();
@@ -231,20 +313,21 @@ void main(){
   function clearLine(S, X, hX) {
     for (let k = 0; k < 6; k++) {
       let worst = null, wd = 0.55;
-      for (const a of A.acts) { if (a === X) continue; const h = headPos(a, new V3()), c = h.clone().addScaledVector(UP, -0.45); const d = Math.min(segD(h, S.p0, hX), segD(c, S.p0, hX), segD(h, S.p1, hX), segD(c, S.p1, hX)); if (d < wd) { wd = d; worst = h; } }
+      for (const a of A.cast) { if (a === X || !a.on) continue; const h = headRef(a, new V3()), c = h.clone().addScaledVector(UP, -0.45); const d = Math.min(segD(h, S.p0, hX), segD(c, S.p0, hX), segD(h, S.p1, hX), segD(c, S.p1, hX)); if (d < wd) { wd = d; worst = h; } }
       if (!worst) return;
-      const v = S.p0.clone().sub(hX), w = worst.clone().sub(hX), side = Math.sign(v.x * w.z - v.z * w.x) || 1; // 往远离挡路者的方向转
+      const v = S.p0.clone().sub(hX), w = worst.clone().sub(hX), side = Math.sign(v.x * w.z - v.z * w.x) || 1;
       const q = new THREE.Quaternion().setFromAxisAngle(UP, side * 0.3);
       for (const kk of ['p0', 'p1', 'l0', 'l1']) S[kk] = S[kk].clone().sub(hX).applyQuaternion(q).add(hX);
     }
   }
   const SHOT = { cLow: 'low', cFace: 'mcu', cOS: 'ots', cEyes: 'ecu', cHand: 'side', cTwo: 'two', cOver: 'two', cWide: 'wide' };
-  const _c = new V3(), _l = new V3();
-  function camAt(S, u, t) {
+  const _c = new V3(), _l = new V3(), _fd = new V3();
+  function camAt(S, u, t, dt) {
     const e = sm(u) * 0.7 + u * 0.3; _c.lerpVectors(S.p0, S.p1, e); _l.lerpVectors(S.l0, S.l1, e);
-    // 手持感：很轻
-    _c.x += Math.sin(t * 0.9) * 0.006 + Math.sin(t * 2.3) * 0.002; _c.y += Math.sin(t * 1.3 + 1) * 0.004; _l.y += Math.sin(t * 1.1 + 2) * 0.003;
-    return { p: _c, l: _l, fov: lerp(S.f0, S.f1, e), roll: Math.sin(t * 0.7) * 0.004 };
+    if (S.follow && S.fa && dt != null) { boneW(S.fa, S.follow, _fd).sub(S.ref).multiplyScalar(S.fk || 0.6); if (!S.fv) S.fv = _fd.clone(); else S.fv.lerp(_fd, 1 - Math.exp(-dt * 4)); _c.add(S.fv); _l.add(S.fv); }
+    const hh = S.sharp ? 0.5 : 1; // 手持感：很轻（空镜更稳）
+    _c.x += (Math.sin(t * 0.9) * 0.006 + Math.sin(t * 2.3) * 0.002) * hh; _c.y += Math.sin(t * 1.3 + 1) * 0.004 * hh; _l.y += Math.sin(t * 1.1 + 2) * 0.003 * hh;
+    return { p: _c, l: _l, fov: lerp(S.f0, S.f1, e), roll: Math.sin(t * 0.7) * 0.004 * hh };
   }
   // 布光跟着镜头走：主光在相机侧 45°上方，轮廓光在人物背后
   function lightFor(S, subj) {
@@ -258,36 +341,43 @@ void main(){
   function shootBg(renderer, S) {
     const T = stage(), W = A.world; if (!W || !W.sc) return;
     const sz = renderer.getSize(new THREE.Vector2()), pr = renderer.getPixelRatio();
-    const bw = Math.max(1, Math.round(sz.x * pr * 0.3)), bh = Math.max(1, Math.round(bw / A.asp));
-    const rt = rtFor(renderer, bw, bh), c = T.bgCam, m = camAt(S, 0.5, A.t);
-    c.aspect = A.asp; c.fov = m.fov; c.near = 0.1; c.far = 2000; c.position.copy(m.p); c.up.set(0, 1, 0); c.lookAt(m.l); c.updateProjectionMatrix(); c.updateMatrixWorld(true);
+    const bw = Math.max(1, Math.round(sz.x * pr * (S.sharp ? 0.75 : 0.3))), bh = Math.max(1, Math.round(bw / A.asp));
+    const rt = rtFor(renderer, bw, bh), c = T.bgCam, m = camAt(S, 0, A.t);
+    const fBg = Math.max(S.f0, S.f1) + 2; // 拍得比镜头略宽，慢推/变焦时用 uZ 缩放，不露边
+    c.aspect = A.asp; c.fov = fBg; c.near = 0.1; c.far = 2000; c.position.copy(m.p); c.up.set(0, 1, 0); c.lookAt(m.l); c.updateProjectionMatrix(); c.updateMatrixWorld(true);
+    S.fBg = fBg;
     const hide = []; try { for (const fn of A.hideFns) fn(hide); } catch (e) { }
     const sky = W.sc.userData && W.sc.userData.skyM, skyP = sky ? sky.position.clone() : null; if (sky) sky.position.copy(c.position);
     const prevT = renderer.getRenderTarget(), ac = renderer.autoClear; renderer.autoClear = true;
     try { renderer.setRenderTarget(rt); renderer.clear(); renderer.render(W.sc, c); } catch (e) { console.warn('cine bg', e); }
     renderer.setRenderTarget(prevT); renderer.autoClear = ac;
     if (sky) sky.position.copy(skyP); for (const [o, v] of hide) o.visible = v;
-    const b = S.blur || 1; T.bgMat.uniforms.uR.value.set(0.0085 * b, 0.0085 * b * A.asp);
-    T.bgMat.uniforms.uDim.value = S.type === 'wide' || S.type === 'two' ? 0.8 : 0.66;
+    const b = S.blur || 0; T.bgMat.uniforms.uR.value.set(0.0085 * b, 0.0085 * b * A.asp);
+    T.bgMat.uniforms.uDim.value = S.dim || (S.type === 'wide' || S.type === 'two' ? 0.8 : 0.66);
+    T.bgMat.uniforms.uSat.value = S.sharp ? 0.92 : 0.8;
+    // 背景照片只在镜头起点拍：相机平移后只做缩放，所以起点相机必须等于拍照相机（不加跟随偏移）
   }
 
-  // ================= 剧本转换（Saga beat → 镜头 / 台词） =================
-  function convert(beats, acts, byFo) {
-    const actOf = fo => fo ? byFo.get(fo) || null : null, out = [];
-    const shotOf = b => b.stake ? 'two' : SHOT[b.shot] || b.shot || 'mcu';
+  // ================= 剧本（beats 原样使用；castFo → 演员） =================
+  function convert(beats) {
+    const actOf = fo => fo ? A.byFo.get(fo) || null : null, out = [];
     const findSpk = (l, def) => {
       if (l.it || !l.w || l.w === '我') return null;
+      if (l.who) return actOf(l.who) || def;
       const w = String(l.w).split(' · ')[0];
-      for (const a of acts) { const n = a.nm || ''; if (!n) continue; if (w === n || n.startsWith(w) || w.startsWith(n) || n.split('·')[0] === w.split('·')[0]) return a; }
+      for (const a of A.acts) { const n = a.nm || ''; if (!n) continue; if (w === n || n.startsWith(w) || w.startsWith(n) || n.split('·')[0] === w.split('·')[0]) return a; }
       return def;
     };
-    for (const b of beats) {
-      const X = actOf(b.castFo) || acts[0];
-      const lines = (b.lines || []).map(l => Object.assign({}, l, { spk: findSpk(l, X) }));
-      out.push({ src: b, X, shot: shotOf(b), lines: b.stake ? [] : lines, card: b.card || null, title: b.title || null, finale: b.finale || null, cc: b.cc && !b.cc2 ? b.cc : null, boost: b.boost || null, stake: b.stake || null, tag: b.tag || '', min: b.min || 0 });
-    }
-    // 开场：两人以上、第一镜不是全景 → 先给一个双人/群像建立镜头
-    if (out.length && acts.length >= 2 && !['two', 'wide'].includes(out[0].shot) && (!out[0].lines.length || out[0].card || out[0].title)) out[0].shot = acts.length >= 3 ? 'wide' : 'two';
+    let lastScene = null;
+    beats.forEach((b, i) => {
+      const X = actOf(b.castFo) || null;
+      let scene = b.scene || null; if (!scene && i === 0) scene = { key: 'A' };
+      if (scene) lastScene = scene;
+      const lines = (b.stake ? [] : (b.lines || [])).map(l => Object.assign({}, l, { spk: findSpk(l, X) }));
+      const actL = b.act ? (b.act instanceof Map ? [...b.act] : b.act).map(([s, c]) => [actOf(s), c]).filter(x => x[0]) : [];
+      out.push({ src: b, X, shot: b.stake ? 'two' : SHOT[b.shot] || b.shot || 'mcu', lines, scene, act: actL, walk: b.walk ? Object.assign({}, b.walk, { a: actOf(b.walk.who) }) : null, tr: b.tr || (scene && i ? 'dip' : 'cut'),
+        card: b.card || null, cc: b.cc && !b.cc2 ? b.cc : null, boost: b.boost || null, stake: b.stake || null, tag: b.tag || '', min: b.min || 0, react: b.react !== false });
+    });
     return out;
   }
 
@@ -310,12 +400,12 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
 #csRoot .ln{font-size:clamp(17px,1.55vw,25px);line-height:1.55;letter-spacing:.04em;text-shadow:0 2px 10px rgba(0,0,0,.9);min-height:1.55em;opacity:0;transition:opacity .2s}
 #csRoot .ln.on{opacity:1}#csRoot .ln.it{font-style:italic;color:#d9cdb8}
 #csRoot .ln .gh{opacity:0}
-#csRoot .lt{position:absolute;left:6.5vw;bottom:calc(var(--bh,12vh) + 5vh);opacity:0;transform:translateX(-18px);transition:opacity .5s,transform .7s cubic-bezier(.2,.9,.3,1)}
+#csRoot .lt{position:absolute;right:6vw;text-align:right;bottom:calc(var(--bh,12vh) + 5vh);opacity:0;transform:translateX(18px);transition:opacity .5s,transform .7s cubic-bezier(.2,.9,.3,1)}
 #csRoot .lt.on{opacity:1;transform:none}
-#csRoot .lt:before{content:"";position:absolute;left:-7vw;right:-8vw;top:-3vh;bottom:-3vh;background:radial-gradient(ellipse at 30% 50%,rgba(0,0,0,.55),transparent 72%);z-index:-1}
+#csRoot .lt:before{content:"";position:absolute;left:-7vw;right:-8vw;top:-3vh;bottom:-3vh;background:radial-gradient(ellipse at 70% 50%,rgba(0,0,0,.55),transparent 72%);z-index:-1}
 #csRoot .lt .k{font-family:system-ui,"PingFang SC",sans-serif;font-size:11px;letter-spacing:.45em;color:var(--c,#e7c27a);margin-bottom:6px}
 #csRoot .lt .n{font-size:clamp(26px,2.6vw,40px);font-weight:900;letter-spacing:.08em;line-height:1.1;text-shadow:0 3px 18px rgba(0,0,0,.8)}
-#csRoot .lt .rule{height:2px;width:0;background:linear-gradient(90deg,var(--c,#e7c27a),transparent);margin:9px 0 7px;transition:width .9s .15s cubic-bezier(.2,.9,.3,1)}
+#csRoot .lt .rule{height:2px;width:0;background:linear-gradient(270deg,var(--c,#e7c27a),transparent);margin:9px 0 7px auto;transition:width .9s .15s cubic-bezier(.2,.9,.3,1)}
 #csRoot .lt.on .rule{width:min(340px,30vw)}
 #csRoot .lt .t{font-family:system-ui,"PingFang SC",sans-serif;font-size:13px;letter-spacing:.12em;color:#d8cdbd}
 #csRoot .lt .ch{margin-top:6px;font-family:system-ui,"PingFang SC",sans-serif;font-size:12px;color:#e0d5c4;text-shadow:0 1px 4px #000;letter-spacing:.06em}
@@ -351,6 +441,15 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
 #csRoot .prog{position:absolute;left:0;bottom:0;height:2px;background:var(--tc,#e7c27a);opacity:.5;width:0;transition:width .4s}
 #csRoot .ld{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:120px;height:1px;background:rgba(255,255,255,.12);overflow:hidden;opacity:0;transition:opacity .4s}
 #csRoot .ld.on{opacity:1}#csRoot .ld:after{content:"";position:absolute;inset:0;width:40%;background:var(--tc,#e7c27a);animation:csLd 1.2s infinite ease-in-out}
+#csRoot .fd{position:absolute;inset:0;width:100%;height:100%;opacity:0}
+#csRoot .fl{position:absolute;inset:0;background:#fff;opacity:0}
+#csRoot .fl.on{animation:csFl .7s ease-out}
+@keyframes csFl{0%{opacity:.9}100%{opacity:0}}
+#csRoot .loc{position:absolute;left:4.2vw;bottom:calc(var(--bh,12vh) + 3.2vh);opacity:0;transform:translateY(8px);transition:opacity .8s,transform 1s cubic-bezier(.2,.9,.3,1);text-shadow:0 2px 12px rgba(0,0,0,.9)}
+#csRoot .loc.on{opacity:1;transform:none}
+#csRoot .loc .c{font-size:clamp(18px,1.7vw,26px);font-weight:700;letter-spacing:.18em}
+#csRoot .loc .c:before{content:"";display:inline-block;width:28px;height:1px;background:var(--tc,#e7c27a);vertical-align:middle;margin-right:12px}
+#csRoot .loc .s{margin:6px 0 0 40px;font-family:system-ui,"PingFang SC",sans-serif;font-size:12px;letter-spacing:.3em;color:#d8ccb8}
 @keyframes csLd{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}
 @keyframes csIn{to{opacity:1;transform:none}}`;
     document.head.appendChild(s);
@@ -358,7 +457,8 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
   function ensureUI() {
     css(); if (root && root.isConnected) return;
     root = document.createElement('div'); root.id = 'csRoot';
-    root.innerHTML = `<div class="blk"></div><div class="bar t"></div><div class="bar b"><div class="prog"></div></div><div class="ld"></div><div class="tag"></div>
+    root.innerHTML = `<canvas class="fd"></canvas><div class="fl"></div><div class="blk"></div><div class="bar t"></div><div class="bar b"><div class="prog"></div></div><div class="ld"></div><div class="tag"></div>
+<div class="loc"><div class="c"></div><div class="s"></div></div>
 <div class="lt"><div class="k"></div><div class="n"></div><div class="rule"></div><div class="t"></div><div class="ch"></div></div>
 <div class="ttl"><div class="a"></div><div class="b"></div><div class="c"></div></div>
 <div class="bst"></div><div class="sh"></div>
@@ -367,7 +467,7 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
 <div class="hint"><b>空格</b>继续　<b>Esc</b>跳过</div>`;
     document.body.appendChild(root);
     const q = s => root.querySelector(s);
-    el = { blk: q('.blk'), who: q('.who'), ln: q('.ln'), lt: q('.lt'), ttl: q('.ttl'), tag: q('.tag'), bst: q('.bst'), stk: q('.stk'), sg: q('.cd.g'), sx: q('.cd.x'), sh: q('.sh'), prog: q('.prog'), ld: q('.ld') };
+    el = { fd: q('.fd'), fl: q('.fl'), blk: q('.blk'), who: q('.who'), ln: q('.ln'), lt: q('.lt'), ttl: q('.ttl'), tag: q('.tag'), loc: q('.loc'), bst: q('.bst'), stk: q('.stk'), sg: q('.cd.g'), sx: q('.cd.x'), sh: q('.sh'), prog: q('.prog'), ld: q('.ld') };
     root.addEventListener('pointerdown', () => { if (A && A.phase === 'play') next(); });
   }
   function barH() { const w = innerWidth, h = innerHeight; return Math.max(h * 0.085, (h - w / 2.39) / 2); }
@@ -376,92 +476,110 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
     const c = cc || { k: '', n: a.nm, t: a.title, ch: [], col: a.col };
     el.lt.style.setProperty('--c', c.col || a.col); el.lt.querySelector('.k').textContent = c.k || ''; el.lt.querySelector('.n').textContent = c.n || a.nm;
     el.lt.querySelector('.t').textContent = c.t || ''; el.lt.querySelector('.ch').innerHTML = (c.ch || []).slice(0, 3).map(x => `<span>${esc(x)}</span>`).join('');
-    el.lt.classList.remove('on'); void el.lt.offsetWidth; el.lt.classList.add('on'); A.ltT = 3.6;
+    el.lt.classList.remove('on'); void el.lt.offsetWidth; el.lt.classList.add('on'); A.ltT = 3.8;
   }
+  function showLoc(c, s) { el.loc.querySelector('.c').textContent = c || ''; el.loc.querySelector('.s').textContent = s || ''; el.loc.classList.remove('on'); void el.loc.offsetWidth; el.loc.classList.add('on'); A.locT = 3.6; }
   function showBoost(B) {
     if (!B) { el.bst.classList.remove('on'); return; }
     el.bst.style.setProperty('--nc', B.col || '#ffb070');
     el.bst.innerHTML = `<div class="k">${esc(B.k)}</div><div class="n">${esc(B.n)}</div>${B.lv ? `<div class="lv">${B.lv}</div>` : ''}` + (B.rows || []).map((r, i) => `<div class="r" style="animation-delay:${0.4 + i * 0.3}s"><i>${r.ic}</i><div><div class="a" style="color:${r.col || '#fff'}">${esc(r.a)}</div><div class="e">${esc(r.e)}</div></div></div>`).join('') + (B.f ? `<div class="f">${esc(B.f)}</div>` : '');
     el.bst.classList.remove('on'); void el.bst.offsetWidth; el.bst.classList.add('on');
   }
+  function hideAll() { if (!el.ttl) return; for (const k of ['ttl', 'lt', 'bst', 'stk', 'sg', 'sx', 'sh', 'tag', 'ln', 'who', 'loc']) el[k].classList.remove('on'); }
 
   // ================= 播放 =================
   const lineDur = l => clamp(0.9 + String(l.t).replace(/[“”「」—…，。？！、]/g, '').length * 0.12, 1.8, 6.2);
   async function play(o) {
-    if (A || !o || !o.beats || !o.beats.length || !o.actors || !o.actors.length) return false;
+    if (A || !o || !o.beats || !o.beats.length || !o.actors || !o.actors.length || !o.world) return false;
     ensureUI(); const T = stage();
-    A = { phase: 'build', o, t0: now(), acts: [], hideFns: [], world: o.world || null, asp: 2.39, t: 0, last: 0 };
+    A = { phase: 'build', o, t0: now(), acts: [], hideFns: o.hide ? [o.hide] : [], world: o.world, asp: 2.39, t: 0, last: 0, spots: new Map(), byFo: new Map(), cast: [], rng: mul((Math.random() * 1e9) | 0) };
     root.style.setProperty('--tc', o.col || '#e7c27a'); root.style.setProperty('--bh', barH() + 'px');
-    root.className = 'on'; el.blk.classList.remove('off'); el.ld.classList.add('on'); hideAll();
+    root.className = 'on'; el.blk.classList.remove('off'); el.ld.classList.add('on'); hideAll(); veilShown = false;
     document.body.classList.add('cscine');
     try { G() && G().setUI && G().setUI(true); } catch (e) { }
     const g = G(); A.saved = []; try { for (const c of g.camera.children) { A.saved.push([c, c.visible]); c.visible = false; } } catch (e) { }
-    let ok = false; const me = A; setTimeout(() => { if (A === me && A.phase === 'build') { console.warn('CineStage: build timeout'); stop(false); } }, 45000); // 慢机器：超时放弃
+    let ok = false; const me = A; setTimeout(() => { if (A === me && A.phase === 'build') { console.warn('CineStage: build timeout'); stop(false); } }, 45000);
     try {
-      const used = new Set(), byFo = new Map();
-      for (const sp of o.actors) { const a = await buildActor(sp, used); if (A !== me) { dropActors([a]); return false; } A.acts.push(a); byFo.set(sp, a); }
-      for (const a of A.acts) { const pr = a.spec.pair; a.pair = pr ? byFo.get(pr) || null : null; T.sc.add(a.f.root); T.sc.add(a.sh); setClip(a, a.idle, 0); try { a.f.mixer.setTime(Math.random() * 3); } catch (e) { } }
-      const W = A.world;
-      A.aud = W.aud.clone().setY(0).normalize(); block(A.acts, W.ctr, A.aud, W.H);
-      matchLights(W.sc);
-      A.beats = convert(o.beats, A.acts, byFo);
-      A.hideFns = o.hide ? [o.hide] : [];
-      // 黑场里先编译着色器（第一帧不卡）
-      try { const r = g.renderer || (o.renderer); const S0 = planShot('two', A.acts[0], A.acts[1] || null); const m = camAt(S0, 0, 0); T.cam.position.copy(m.p); T.cam.lookAt(m.l); T.cam.updateMatrixWorld(true); r.compile(T.sc, T.cam); } catch (e) { }
+      const used = new Set();
+      for (const sp of o.actors) { const a = await buildActor(sp, used); if (A !== me) { dropActors([a]); return false; } A.acts.push(a); A.byFo.set(sp, a); }
+      for (const a of A.acts) { const pr = a.spec.pair; a.pair = pr ? A.byFo.get(pr) || null : null; T.sc.add(a.f.root); T.sc.add(a.sh); setClip(a, a.idle, 0); try { a.f.mixer.setTime(Math.random() * 3); } catch (e) { } }
+      matchLights(A.world.sc);
+      A.beats = convert(o.beats);
+      enterScene(A.beats[0].scene || { key: 'A' });
+      try { const r = g.renderer || o.renderer; T.cam.position.copy(A.ctr).addScaledVector(A.aud, 3).addScaledVector(UP, 1.4); T.cam.lookAt(A.ctr.clone().addScaledVector(UP, 1.2)); T.cam.updateMatrixWorld(true); for (const a of A.acts) show(a, true); r.compile(T.sc, T.cam); for (const a of A.acts) show(a, A.cast.includes(a)); } catch (e) { }
       ok = true;
     } catch (e) { console.warn('CineStage build', e); }
     if (A !== me) return false;
     if (!ok) { stop(false); return false; }
-    A.phase = 'play'; A.bi = -1; A.t = 0; A.last = now(); A.introduced = new Set();
+    A.phase = 'play'; A.bi = -1; A.t = 0; A.last = now();
     el.ld.classList.remove('on'); root.classList.add('in');
-    setTimeout(() => { if (A) el.blk.classList.add('off'); }, 120);
-    beginBeat(0);
+    beginBeat(0, true);
+    setTimeout(() => { if (A === me) el.blk.classList.add('off'); }, 150);
     return true;
   }
-  function hideAll() { if (!el.ttl) return; el.ttl.classList.remove('on'); el.lt.classList.remove('on'); el.bst.classList.remove('on'); el.stk.classList.remove('on'); el.sg.classList.remove('on'); el.sx.classList.remove('on'); el.sh.classList.remove('on'); el.tag.classList.remove('on'); el.ln.classList.remove('on'); el.who.classList.remove('on'); }
-  function beginBeat(i) {
+  // 进入下一拍：按转场方式处理
+  function beginBeat(i, first) {
     const b = A.beats[i]; if (!b) return stop(true);
-    A.bi = i; A.bt = 0; A.li = -1; A.cut = null; A.lineT = 0; A.typed = 0; A.done = false;
+    const tr = first ? 'cut' : b.tr;
+    el.ln.classList.remove('on'); el.who.classList.remove('on');
+    if (tr === 'dip') { A.trans = { k: 'dip', t: 0, i }; el.blk.classList.remove('off'); return; }
+    if (tr === 'dissolve') { A.capReq = () => coreBeat(i); return; }
+    if (tr === 'flash') { el.fl.classList.remove('on'); void el.fl.offsetWidth; el.fl.classList.add('on'); }
+    coreBeat(i);
+  }
+  function coreBeat(i) {
+    const b = A.beats[i];
+    A.bi = i; A.bt = 0; A.li = -1; A.cut = null; A.lineT = 0; A.typed = 0; A.done = false; A.chars = [];
     el.prog.style.width = ((i + 1) / A.beats.length * 100).toFixed(1) + '%';
-    el.ttl.classList.remove('on'); el.stk.classList.remove('on'); el.sg.classList.remove('on'); el.sx.classList.remove('on'); el.sh.classList.remove('on');
+    for (const k of ['ttl', 'stk', 'sg', 'sx', 'sh']) el[k].classList.remove('on');
     el.tag.textContent = b.tag || ''; el.tag.classList.toggle('on', !!b.tag);
     if (!b.boost) showBoost(null);
-    const info = A.o.info || {};
-    b.titleT = 0; b.lead = 0.4;
-    if (b.card) { b.cardShow = [b.card.a, b.card.b, b.card.c]; b.lead = b.lines.length ? 2.8 : 0.4; }
-    else if (b.title && info.title) { b.cardShow = [info.title.a, info.title.b, info.title.c]; b.lead = b.lines.length ? 2.8 : 0.4; }
-    else b.cardShow = null;
-    if (b.finale && info.finale) b.finaleShow = [info.finale.a, info.finale.b, info.finale.c];
+    if (b.scene && (i > 0 || A.scene !== b.scene)) enterScene(b.scene);
+    if (b.scene && b.scene.cap && !b.card) showLoc(b.scene.cap, b.scene.sub);
+    // 动作 / 走位
+    for (const [a, c] of b.act) { a.idle = c; setClip(a, c, 0); try { a.f.mixer.update(0.001); a.f.root.updateMatrixWorld(true); } catch (e) { } }
+    if (b.walk && b.walk.a && b.walk.a.on) {
+      const a = b.walk.a, d = b.walk.d || 2.6, rt = camRt(A.aud), sd = b.walk.side || (a.home.clone().sub(A.ctr).dot(rt) >= 0 ? 1 : -1);
+      const from = a.home.clone().addScaledVector(rt, sd * d).addScaledVector(A.aud, -0.6), dir = a.home.clone().sub(from).setY(0);
+      a.walk = { from, to: a.home.clone(), t: 0, dur: dir.length() / (b.walk.speed || 1.15), yw: Math.atan2(dir.x, dir.z) };
+      a.f.root.position.copy(from); setClip(a, b.walk.clip || 'Walk_Loop', 0);
+    }
+    b.lead = b.card ? (b.lines.length ? 2.8 : 0.4) : (b.walk ? 1.2 : 0.45);
+    b.cardShow = b.card ? [b.card.a, b.card.b, b.card.c] : null; b.cardOn = b.cardOff = b.bOn = false;
     if (b.stake) {
       el.sg.querySelector('.v').textContent = b.stake.good || ''; el.sx.querySelector('.v').textContent = b.stake.bad || '';
       el.sg.querySelector('.e').textContent = b.stake.ge || ''; el.sx.querySelector('.e').textContent = b.stake.be || '';
       el.sh.textContent = b.stake.head || '';
     }
-    b.total = b.stake ? 7.5 : b.lead + b.lines.reduce((s, l) => s + lineDur(l) + 0.35, 0) + 0.5; b.total = Math.max(b.total, b.min || 0, b.lines.length ? 0 : 3.4);
+    b.total = b.stake ? 7.5 : b.lead + b.lines.reduce((s, l) => s + lineDur(l) + 0.35, 0) + 0.5; b.total = Math.max(b.total, b.min || 0, b.lines.length ? 0 : 3.2);
     try { if (A.o.onBeat) A.o.onBeat(b.src, i); } catch (e) { console.warn('cine beat', e); }
-    // 第一镜
-    const l0 = b.lines[0], X = (l0 && l0.spk) || b.X;
-    cutTo(b.shot, X, b);
-    if (b.cc) { showLT(b.X, b.cc); A.introduced.add(b.X); }
+    const l0 = b.lines[0], X = b.shot === 'est' ? b.X : ((l0 && l0.spk && l0.spk.on && !['hand', 'back', 'feet', 'entr', 'low', 'side'].includes(b.shot)) ? l0.spk : b.X || A.cast[0]);
+    cutTo(b.walk && b.shot !== 'est' ? 'entr' : b.shot, X, b);
+    if (b.cc && b.X) showLT(b.X, b.cc);
   }
-  function partnerOf(X) { if (!X) return null; if (X.pair) return X.pair; return A.acts.find(a => a !== X) || null; }
+  function partnerOf(X) { if (!X) return null; if (X.pair && X.pair.on) return X.pair; return A.cast.find(a => a !== X && a.on) || null; }
   function cutTo(type, X, b) {
-    const L = partnerOf(X); A.cut = { S: planShot(type, X, L), t: 0, X, L, dur: 4 };
-    const est = b ? b.total : 4; A.cut.dur = clamp(est, 2.5, 9);
-    lightFor(A.cut.S, headPos(X, new V3()).addScaledVector(UP, -0.4));
+    const L = partnerOf(X); A.cut = { S: planShot(type, X, L), t: 0, X, L, dur: clamp(b ? b.total : 4, 2.5, 9) };
+    lightFor(A.cut.S, X ? headRef(X, new V3()).addScaledVector(UP, -0.4) : A.ctr.clone().addScaledVector(UP, 1.1));
     // 注视：所有人看说话者；说话者看搭档（独白时看向观众侧前方一点，不正对镜头）
-    for (const a of A.acts) {
-      if (a === X) { if (L) headPos(L, a.tgt).addScaledVector(UP, 0.08); else a.tgt.copy(headPos(a, new V3())).addScaledVector(A.aud, 3).addScaledVector(new V3(-A.aud.z, 0, A.aud.x), 0.8); a.hasT = true; }
-      else { headPos(X, a.tgt).addScaledVector(UP, 0.08); a.hasT = true; }
+    for (const a of A.cast) {
+      if (!X) { a.hasT = false; continue; }
+      if (a === X) { if (L) headRef(L, a.tgt).addScaledVector(UP, 0.08); else a.tgt.copy(headRef(a, new V3())).addScaledVector(A.aud, 3).addScaledVector(camRt(A.aud), 0.8); a.hasT = true; }
+      else { headRef(X, a.tgt).addScaledVector(UP, 0.08); a.hasT = true; }
     }
     if (A.renderer) shootBg(A.renderer, A.cut.S); else A.needBg = true;
   }
   function startLine(b, li) {
-    const l = b.lines[li]; A.li = li; A.lineT = 0; A.typed = 0; A.lineD = lineDur(l);
-    const spk = l.spk;
-    if (li > 0 && spk && A.cut && spk !== A.cut.X) cutTo(spk.pair && A.cut.X === spk.pair ? 'ots' : 'mcu', spk, null);
-    for (const a of A.acts) { if (a === spk) { a.talkT = A.lineD * 0.85; a.nodT = 0; setClip(a, 'Idle_Talking_Loop'); } else if (a.clip === 'Idle_Talking_Loop' && a.idle !== 'Idle_Talking_Loop') setClip(a, a.idle, 0.8); }
-    if (spk && !A.introduced.has(spk) && !b.cc && spk.nm) { A.introduced.add(spk); }
+    const l = b.lines[li]; A.li = li; A.lineT = 0; A.typed = 0; A.lineD = lineDur(l); A.reactAt = 0;
+    const spk = l.spk && l.spk.on ? l.spk : null;
+    if (li > 0 && spk && A.cut && spk !== A.cut.X && A.cut.S.type !== 'est') cutTo(spk.pair && A.cut.X === spk.pair ? 'ots' : 'mcu', spk, null);
+    // 反应镜头：长台词说到一半，切到听者
+    const lst = spk && partnerOf(spk);
+    if (b.react && spk && lst && String(l.t).length > 15 && A.rng() < 0.55 && A.cut && ['mcu', 'ots', 'ecu'].includes(A.cut.S.type)) A.reactAt = A.lineD * (0.5 + A.rng() * 0.15);
+    for (const a of A.acts) {
+      if (a === spk) { a.talkT = A.lineD * 0.85; a.nodT = 0; if (STAND.has(a.idle) && !a.walk) setClip(a, 'Idle_Talking_Loop'); }
+      else if (a.clip === 'Idle_Talking_Loop' && a.idle !== 'Idle_Talking_Loop' && !a.walk) setClip(a, a.idle, 0.8);
+    }
     el.who.textContent = l.it ? '' : (l.w || ''); el.who.style.color = l.col || '#e7c27a'; el.who.classList.toggle('on', !!l.w && !l.it);
     el.ln.classList.toggle('it', !!l.it); el.ln.style.color = l.it ? '' : '#f6efe4';
     A.chars = Array.from(String(l.t)); el.ln.innerHTML = `<span class="vis"></span><span class="gh">${esc(l.t)}</span>`; el.ln.classList.add('on');
@@ -469,43 +587,58 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
   function typeTo(n) { const v = el.ln.querySelector('.vis'), gh = el.ln.querySelector('.gh'); if (!v) return; v.textContent = A.chars.slice(0, n).join(''); gh.textContent = A.chars.slice(n).join(''); }
   function update(dt) {
     if (!A || A.phase !== 'play') return;
-    A.t += dt; A.bt += dt; const b = A.beats[A.bi]; if (!b) return;
+    A.t += dt;
+    if (A.trans) { // 黑场转场：0.45s 变黑 → 换场 → 变亮
+      const tr = A.trans; tr.t += dt;
+      if (tr.t >= 0.5 && !tr.done) { tr.done = true; coreBeat(tr.i); el.blk.classList.add('off'); }
+      if (tr.t < 0.5) return; if (tr.t > 0.7) A.trans = null;
+    }
+    if (A.capReq) return;
+    A.bt += dt; const b = A.beats[A.bi]; if (!b) return;
     if (A.cut) A.cut.t += dt;
     if (A.ltT > 0 && (A.ltT -= dt) <= 0) el.lt.classList.remove('on');
-    // 标题卡
-    if (b.cardShow && A.bt > 0.35 && !b.cardOn && !b.cardOff) { b.cardOn = true; showTitle(...b.cardShow); }
-    if (b.cardOn && !b.cardOff && A.bt > (b.lines.length ? b.lead - 0.2 : b.total - 0.6)) { b.cardOff = true; el.ttl.classList.remove('on'); }
-    if (b.finaleShow && A.bt > 0.9 && !b.finOn) { b.finOn = true; showTitle(...b.finaleShow); }
+    if (A.locT > 0 && (A.locT -= dt) <= 0) el.loc.classList.remove('on');
+    if (b.cardShow && A.bt > 0.35 && !b.cardOn) { b.cardOn = true; showTitle(...b.cardShow); }
+    if (b.cardOn && !b.cardOff && A.bt > (b.lines.length ? b.lead - 0.2 : b.total - 0.6) && !b.finale) { b.cardOff = true; el.ttl.classList.remove('on'); }
     if (b.boost && A.bt > 0.5 && !b.bOn) { b.bOn = true; showBoost(b.boost); }
     if (b.stake) { if (A.bt > 0.3) el.stk.classList.add('on'); if (A.bt > 0.6) el.sg.classList.add('on'); if (A.bt > 2.2) el.sx.classList.add('on'); if (A.bt > 1 && b.stake.head) el.sh.classList.add('on'); }
-    // 台词
     if (b.lines.length) {
       if (A.li < 0 && A.bt >= b.lead) startLine(b, 0);
       else if (A.li >= 0) {
-        A.lineT += dt; const l = b.lines[A.li];
+        A.lineT += dt;
         const n = Math.min(A.chars.length, Math.floor(A.lineT * 26)); if (n !== A.typed) { A.typed = n; typeTo(n); }
+        if (A.reactAt && A.lineT > A.reactAt) { A.reactAt = 0; const l = b.lines[A.li], lst = l.spk && partnerOf(l.spk); if (lst) cutTo('mcu', lst, null), lst.nodT = 0.15; for (const a of A.cast) if (a !== l.spk) headRef(l.spk, a.tgt).addScaledVector(UP, 0.08); }
         if (A.lineT > A.lineD + 0.35) {
           if (A.li < b.lines.length - 1) startLine(b, A.li + 1);
           else if (!A.done) { A.done = true; A.doneT = A.bt; }
         }
       }
     } else if (!A.done && A.bt > b.total) { A.done = true; A.doneT = A.bt; }
-    if (b.stake && !A.done && A.bt > b.total) { A.done = true; A.doneT = A.bt; }
-    if (A.done && A.bt > A.doneT + (b.boost || b.finale ? 1.2 : 0.25)) { if (A.bi < A.beats.length - 1) { el.ln.classList.remove('on'); el.who.classList.remove('on'); beginBeat(A.bi + 1); } else stop(true); }
+    if (!A.done && A.bt > b.total + 3) { A.done = true; A.doneT = A.bt; }
+    if (A.done && A.bt > A.doneT + (b.boost || b.card ? 1.0 : 0.25)) advance();
   }
+  function advance() { if (A.bi < A.beats.length - 1) beginBeat(A.bi + 1); else stop(true); }
   function next() {
-    if (!A || A.phase !== 'play') return; const b = A.beats[A.bi]; if (!b || A.bt < 0.45) return;
+    if (!A || A.phase !== 'play' || A.trans || A.capReq) return; const b = A.beats[A.bi]; if (!b || A.bt < 0.45) return;
     if (A.li >= 0 && A.typed < A.chars.length) { A.typed = A.chars.length; typeTo(A.typed); A.lineT = Math.max(A.lineT, A.chars.length / 26); return; }
     if (A.li >= 0 && A.li < b.lines.length - 1) { startLine(b, A.li + 1); return; }
     if (b.lines.length && A.li < 0) { startLine(b, 0); return; }
-    if (A.bi < A.beats.length - 1) { el.ln.classList.remove('on'); el.who.classList.remove('on'); beginBeat(A.bi + 1); } else stop(true);
+    advance();
   }
-  // 每帧由宿主调用（worlds.js 的渲染处）：更新演员 + 镜头并渲染摄影棚。返回 true = 本帧已渲染
+  // 截当前画面给溶接用（必须在 render 之后、同一帧里）
+  function capture(renderer) {
+    try {
+      const src = renderer.domElement, cv = el.fd; cv.width = Math.max(2, src.width >> 1); cv.height = Math.max(2, src.height >> 1);
+      cv.getContext('2d').drawImage(src, 0, 0, cv.width, cv.height);
+      cv.style.transition = 'none'; cv.style.opacity = '1'; void cv.offsetWidth; cv.style.transition = 'opacity .8s ease'; requestAnimationFrame(() => { cv.style.opacity = '0'; });
+    } catch (e) { }
+  }
+  // 每帧由宿主调用（worlds.js 的渲染处）。返回 true = 本帧已由摄影棚渲染
   function draw(renderer) {
     if (!A) return false;
     const T = stage(); A.renderer = renderer;
     const tn = now(), dt = Math.min(0.05, Math.max(0, tn - (A.last || tn))); A.last = tn;
-    const pr = renderer.getPixelRatio(), sz = renderer.getSize(new THREE.Vector2());
+    const sz = renderer.getSize(new THREE.Vector2());
     const bh = Math.round(Math.max(sz.y * 0.085, (sz.y - sz.x / 2.39) / 2)), vh = sz.y - bh * 2; A.asp = sz.x / Math.max(1, vh);
     const cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha();
     renderer.setRenderTarget(null); renderer.setClearColor(0x000000, 1); renderer.setScissorTest(false); renderer.clear();
@@ -516,13 +649,15 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
       for (const a of A.acts) act(a, dt, A.t);
       if (A.needBg && A.cut) { A.needBg = false; shootBg(renderer, A.cut.S); }
       if (A.cut) {
-        const m = camAt(A.cut.S, A.cut.t / A.cut.dur, A.t), c = T.cam;
+        const S = A.cut.S, m = camAt(S, A.cut.t / A.cut.dur, A.t, dt), c = T.cam;
         c.aspect = A.asp; c.fov = m.fov; c.position.copy(m.p); c.up.set(Math.sin(m.roll), Math.cos(m.roll), 0); c.lookAt(m.l); c.updateProjectionMatrix(); c.updateMatrixWorld(true);
+        T.bgMat.uniforms.uZ.value = S.fBg ? Math.tan(m.fov * Math.PI / 360) / Math.tan(S.fBg * Math.PI / 360) : 1;
         const ac = renderer.autoClear; renderer.autoClear = false;
         renderer.setViewport(0, bh, sz.x, vh); renderer.setScissor(0, bh, sz.x, vh); renderer.setScissorTest(true);
         renderer.clearDepth(); renderer.render(T.sc, c);
         renderer.setScissorTest(false); renderer.setViewport(0, 0, sz.x, sz.y); renderer.autoClear = ac;
-      }
+        if (A.capReq) { const fn = A.capReq; A.capReq = null; capture(renderer); fn(); }
+      } else if (A.capReq) { const fn = A.capReq; A.capReq = null; fn(); }
     }
     renderer.setClearColor(cc, ca);
     return true;
@@ -531,7 +666,7 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
     if (!A) return; const a0 = A; A = null;
     window.__skipMenuUntil = performance.now() + 1500;
     el.blk.classList.remove('off'); hideAll();
-    setTimeout(() => { if (!A && root) root.className = ''; }, 380);
+    setTimeout(() => { if (!A && root && !veilShown) root.className = ''; }, 380);
     try { root.classList.remove('in'); } catch (e) { }
     document.body.classList.remove('cscine');
     try { for (const [o, v] of a0.saved || []) o.visible = v; } catch (e) { }
@@ -549,23 +684,47 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
   addEventListener('keyup', e => { if (A) e.stopImmediatePropagation(); }, true);
   addEventListener('resize', () => { if (root) root.style.setProperty('--bh', barH() + 'px'); });
 
-  // 在大地图里取舞台：玩家前方 3m，观众侧 = 玩家这边
+  // ================= 进图黑场（有电影要播时，先别让玩家看到场上的人）=================
+  let veilShown = false, lastB = null, bAt = 0;
+  function veilWanted() {
+    if (!on()) return false; const W = window.Worlds && Worlds.active && Worlds._W; if (!W || !W.B) return false;
+    if (W.B !== lastB) { lastB = W.B; bAt = performance.now(); }
+    if (performance.now() - bAt > 14000) return false;
+    if (window.Saga && Saga.cine) return false; // 旧播放器在播
+    if (window.Arrival2 && Arrival2.isOpen && Arrival2.isOpen()) return false;
+    const sagaP = window.Saga && Saga.pendingCine && Saga.pendingCine(), nemP = window.NemStory && (NemStory.busy || (NemStory.pending && NemStory.pending()));
+    return !!(sagaP || nemP);
+  }
+  function hook(renderer) {
+    if (A) return draw(renderer);
+    if (veilWanted()) {
+      ensureUI(); if (!veilShown) { veilShown = true; root.className = 'on'; el.blk.classList.remove('off'); el.ld.classList.add('on'); hideAll(); }
+      const cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha(); renderer.setRenderTarget(null); renderer.setClearColor(0, 1); renderer.clear(); renderer.setClearColor(cc, ca);
+      return true;
+    }
+    if (veilShown) { veilShown = false; if (!A && root) { el.blk.classList.add('off'); el.ld.classList.remove('on'); setTimeout(() => { if (!A && !veilShown && root) root.className = ''; }, 460); } }
+    return false;
+  }
+
+  // 在大地图里取舞台：玩家前方 3m，观众侧 = 玩家这边；其余场景地点由 spotFor 在地图里找
   function worldHere(extraHide) {
     const g = G(), W = window.Worlds && Worlds._W; if (!g || !W || !W.B) return null;
-    const P0 = W.pos, yaw = g.player.yaw, fw = new V3(-Math.sin(yaw), 0, -Math.cos(yaw));
+    const P0 = W.pos.clone(), yaw = g.player.yaw, fw = new V3(-Math.sin(yaw), 0, -Math.cos(yaw));
     let d = 3.2; const B = W.B;
-    // 舞台中心别落进柱子/树里：往回收
     for (let k = 0; k < 4; k++) { const c = P0.clone().addScaledVector(fw, d); if (!(B.cols || []).some(o => Math.hypot(c.x - o.x, c.z - o.z) < o.r + 1.1)) break; d -= 0.6; }
     const ctr = P0.clone().addScaledVector(fw, Math.max(1.6, d));
     const hide = list => {
       try { for (const fo of (window.Foe && Foe.foes) || []) { const r = fo.f && fo.f.root; if (r) { list.push([r, r.visible]); r.visible = false; } if (fo.warn) { list.push([fo.warn, fo.warn.visible]); fo.warn.visible = false; } } } catch (e) { }
       try { for (const c of g.camera.children) { list.push([c, c.visible]); c.visible = false; } } catch (e) { }
+      try { for (const dd of B.doors || []) if (dd.label) { list.push([dd.label, dd.label.visible]); dd.label.visible = false; } } catch (e) { }
       if (extraHide) extraHide(list);
     };
-    return { sc: B.sc, H: (x, z) => { try { return B.H(x, z); } catch (e) { return P0.y; } }, ctr, aud: fw.clone().negate(), hide };
+    const H = (x, z) => { try { return B.H(x, z); } catch (e) { return P0.y; } };
+    const inside = (x, z) => { const rr = Math.hypot(x, z), lim = (B.Rf ? B.Rf(Math.atan2(z, x)) : B.R) - 2; return rr < lim; };
+    const samp = () => { for (let i = 0; i < 6; i++) { const p = B.lp && B.lp.samp ? B.lp.samp(Math.random, 6) : null; if (p) return p; const a = Math.random() * 6.283, r = (B.R || 30) * (0.1 + Math.random() * 0.6); const x = Math.cos(a) * r, z = Math.sin(a) * r; if (inside(x, z)) return [x, z]; } return null; };
+    return { sc: B.sc, H, ctr, aud: fw.clone().negate(), hide, cols: B.cols || [], R: B.R || 30, P0, samp };
   }
-  // NemStory / Saga 用的便捷入口：自动取大地图舞台
   function playHere(o) { const w = worldHere(); if (!w) return Promise.resolve(false); o.world = w; o.hide = w.hide; return play(o); }
 
-  return { on, play, playHere, draw, next, stop: () => stop(false), get active() { return !!A; }, get playing() { return !!A && A.phase === 'play'; }, _A: () => A, _stage: stage, SHOT };
+  return { on, play, playHere, draw, hook, next, stop: () => stop(false), get active() { return !!A; }, get playing() { return !!A && A.phase === 'play'; }, _A: () => A, _stage: stage, SHOT };
 })();

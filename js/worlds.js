@@ -1107,7 +1107,7 @@ window.Worlds = (() => {
     if (G.S.hp <= 0) dieNow();
     if (window.CFX3D) try { CFX3D.frame(dt, now); } catch (e) { console.warn(e); } if (window.FPV) try { FPV.frame(dt, now); FPV.pre(dt, now); } catch (e) { console.warn(e); } if (window.DecapCam) { try { DecapCam.pre(dt, now); } catch (e) { } } if (window.Feel54) { try { Feel54.frame(dt); } catch (e) { } } if (window.Living) { try { Living.frame(dt); } catch (e) { } } /* R49h */ { const hw = G.HOOK && G.HOOK.world; if (hw) for (const f of hw) { try { f(dt, now); } catch (e) { console.warn(e); } } } /* R49h：出猎世界里补跑 Talents / 技能栏 / 血魂条 的每帧（HOOK.frame 在这里不跑） */ /* R41：3D 战斗特效 / 第一人称兽人手 / 第三人称（HOOK 在出猎世界里不跑，这里直接调） */
     const post = G.post; if (post && post.setRayLight) post.setRayLight(tmp.set(0, -100, 0), 0);
-    if (window.CineStage && CineStage.active && CineStage.draw(G.renderer)) { /* R59 cine_stage：过场期间只渲染摄影棚（大地图只在切镜头时拍一张虚化背景） */ } else if (post && post.on) post.render(B.sc, cam); else G.renderer.render(B.sc, cam);
+    if (window.CineStage && CineStage.hook(G.renderer)) { /* R59 cine_stage：过场期间只渲染摄影棚（大地图只在切镜头时拍一张虚化背景） */ } else if (post && post.on) post.render(B.sc, cam); else G.renderer.render(B.sc, cam);
   }
   function sees(p, maxD) { // 视线：距离 + 前方无墙
     const dx = W.pos.x - p.pos.x, dz = W.pos.z - p.pos.z, d = Math.hypot(dx, dz); if (d > maxD) return false;

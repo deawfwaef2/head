@@ -325,25 +325,25 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
   function play(sg) {
     const g = G(), W = window.Worlds && Worlds._W; if (!W || !W.B || CN) return false;
     ensure(); sg.shown = true;
+    if (stagePlay(sg)) return true;
     const L = LOC(sg.k); let beats = null;
     if (talkOn()) { try { const cast = castPick(sg); beats = talkScript(sg, cast); if (beats) { const hu = cast.filter(c => c.hunter); if (hu.length) { const cb = castBeats(hu, 1); if (cb.length) { cb[cb.length - 1].cut = true; beats.splice(1, 0, ...cb); } } } } catch (e) { console.warn('Saga talk', e); beats = null; } }
-    if (beats && stagePlay(sg, beats, D.REG[sg.k] ? D.REG[sg.k].col : '#e7c27a')) return true;
     if (!beats) beats = script(sg);
     if (!talkOn() || !beats.some(b => b.castFo)) try { const cast = castPick(sg), lv = sg.vis <= 2 ? 0 : sg.vis <= 5 ? 1 : 2, cb = castBeats(cast.slice(0, lv === 2 ? 1 : 2), lv); if (cb.length) { let ti = beats.findIndex(b => b.title); ti = ti < 0 ? 0 : ti; beats.splice(ti + 1, 0, ...cb); } } catch (e) { console.warn('Saga cast', e); }
     return startCN(sg, beats, D.REG[sg.k] ? D.REG[sg.k].col : '#e7c27a', 700);
   }
-  // R59 cine_stage：对话剧本交给摄影棚（演员 = 在场女人的克隆，同身体同头）；失败时退回旧播放器
+  // R59s/R59t cine_stage：地区电影交给摄影棚（CineScript.region：多场景 + 特写 + 转场；演员是不在场的“这片土地上的人”）。失败时退回旧播放器
   const STAGE_CN = { stage: 1, beats: [], bi: -1 };
-  function stagePlay(sg, beats, col) {
-    if (!window.CineStage || !CineStage.on() || !beats.length || !beats.every(b => b.castFo && b.castFo.f && b.castFo.h)) return false;
-    const map = new Map(), actors = [];
-    for (const b of beats) { const fo = b.castFo; if (map.has(fo)) continue; const sp = { h: fo.h, body: fo.f.bodyName, clip: /Idle/.test(fo.idleClip || '') ? fo.idleClip : 'Idle_Loop', nm: (fo.h.c && fo.h.c.name) || '', boss: !!fo.boss, src: fo }; map.set(fo, sp); actors.push(sp); }
-    for (const sp of actors) sp.pair = sp.src.pair ? map.get(sp.src.pair) || null : null;
-    const A = sg.arch || {}, L = LOC(sg.k), T0 = sg.T || {};
-    const sb = beats.map(b => { const o = Object.assign({}, b, { castFo: map.get(b.castFo) }); if (b.stake) o.stake = Object.assign({}, b.stake, { ge: A.boon && FX_TXT[A.boon] ? (sg.envoy ? `✦ 月之线索 +1（${clues() + 1}/${D.NEED}）· ${FX_TXT[A.boon][0]}` : '✦ ' + FX_TXT[A.boon][0] + ' · 持续 2 趟') : '', be: A.bane && FX_TXT[A.bane] ? '✧ ' + FX_TXT[A.bane][0] + (A.bane === 'hate' || A.bane === 'plunder' ? '' : ' · 持续 2 趟') : '' }); return o; });
-    const info = { title: { a: sg.vis <= 1 ? '初 访' : `第 ${sg.vis} 次 踏 入`, b: L.n, c: (sg.env && sg.env.sky) || '' }, finale: T0.n ? { a: '讨 伐', b: T0.n, c: T0.title ? `「${T0.title}」` : '' } : null };
-    const fin = () => { sg.cinDone = true; try { if (sg.onEnd) sg.onEnd(); } catch (e) { console.warn('saga end', e); } if (sg.chap && !sg.chapAwarded) awardChapter(sg); };
-    CineStage.playHere({ actors, beats: sb, col, info, onEnd: fin }).then(ok => { if (!ok && !CN && !sg.cinDone) { try { if (!startCN(sg, beats, col, 0)) fin(); } catch (e) { fin(); } } }).catch(() => fin());
+  const stageOn = () => !!(window.CineStage && CineStage.on() && window.CineScript);
+  function stagePlay(sg) {
+    if (!stageOn() || sg.noStage) return false;
+    const A = sg.arch || {};
+    const opt = { ge: A.boon && FX_TXT[A.boon] ? (sg.envoy ? `✦ 月之线索 +1（${clues() + 1}/${D.NEED}）· ${FX_TXT[A.boon][0]}` : '✦ ' + FX_TXT[A.boon][0] + ' · 持续 2 趟') : '', be: A.bane && FX_TXT[A.bane] ? '✧ ' + FX_TXT[A.bane][0] + (A.bane === 'hate' || A.bane === 'plunder' ? '' : ' · 持续 2 趟') : '', head: sg.envoy ? `月之线索 ${clues()}/${D.NEED}` : '' };
+    let sp = null; try { sp = CineScript.region(sg, opt); } catch (e) { console.warn('CineScript.region', e); }
+    if (!sp) return false;
+    let ended = false;
+    const fin = () => { if (ended) return; ended = true; sg.cinDone = true; try { if (sg.onEnd) sg.onEnd(); } catch (e) { console.warn('saga end', e); } if (sg.chap && !sg.chapAwarded) awardChapter(sg); if (sg.hLate) { sg.hLate = false; setTimeout(() => { try { if (window.Hunters2 && Worlds.active) Hunters2.ambush(sg.hunterId); } catch (e) { } }, 1200); } };
+    CineStage.playHere({ actors: sp.actors, beats: sp.beats, col: sp.col, onEnd: fin }).then(ok => { if (!ok && !ended && !CN) { sg.noStage = true; let r = false; try { r = play(sg); } catch (e) { } if (!r) fin(); } }).catch(() => fin());
     return true;
   }
   // R57 nem_story：通用短片播放器（宿敌插曲 / 人物起源），复用本电影的字幕/名牌/黑边/相机接管；beats 格式同 castBeats（castFo 必填），可加 card:{a,b,c} 标题卡
@@ -611,6 +611,7 @@ ${rwHTML(sg, win)}<div class="go"><button data-sgok>收下结算 ▶</button></d
     if (!sg.readyAt && W.B && !W.busy) sg.readyAt = performance.now();
     if (window.NemStory && NemStory.hold()) { sg.readyAt = performance.now(); track(W); return; } // R57 nem_story：宿敌插曲先播，地区电影等它
     let hold = false;
+    if (sg.hunterId && !sg.hReady && !sg.shown && stageOn()) { sg.hReady = true; sg.hLate = true; } // R59t：摄影棚模式下猎手不先登场（否则进图就能看见电影里的人），电影放完再伏击
     if (sg.hunterId && !sg.hReady && !sg.shown && !W.busy && W.B) { // 猎手入场伏击：先让她出现在场上，再开电影介绍她
       if (!sg.hAt) { sg.hAt = performance.now(); try { Hunters2.ambush(sg.hunterId); } catch (e) { sg.hReady = true; } }
       if ((window.Hunters2 && Hunters2.cur()) || performance.now() - sg.hAt > 9000) { sg.hReady = true; sg.hAt2 = performance.now(); } else hold = true;

@@ -4413,3 +4413,23 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 同时修复协作者 `js/mods_i18n.js` 的 SyntaxError(`ui_wheel` 与 `san` 之间的字面 `\n`)。
 - 内容边界不变：材料为骨/筋/尸蜡/发/灰/铁，无血腥堆砌；几何为程序化原语(灯用 Poly Haven 资源若可用)，可换成用户模型。
 - 测试：`tools/test/rig.html`（`?props=1` 载入真 props.js）。
+
+## R59t（cine_stage v2：多场景分镜 + 转场；进图看不到电影角色）
+- 用户反馈：进图就能看见电影里的人；电影“太土”，要多样台词、场景特写、描写镜头、转场。
+- `js/cinestage.js` 重写 v2（MOD 仍是 cine_stage）：
+  - 多场景 `scene:{key,cap,sub,cast}`：A=玩家面前，其余在地图里自动找背后有地标的空地（≥9m）。
+  - 新镜头 `est`（建立镜头，背景推镜）、`entr`（走入）、`hand`（手部特写）、`back`、`feet`。
+  - 拍字段 `act`（指定动作）、`walk`（走入）。
+  - 转场 `tr:dip|dissolve|flash|cut`，配地点字幕 `.loc`（左下），名牌 `.lt` 移到右下。
+  - `hook(renderer)`：有电影就画电影；saga/nemstory 电影待播、且进图 14s 内则画黑场，玩家看不到场上的人。
+- 新 `js/cinescript.js`（index.html 在 cinestage.js 前加 script）：
+  - `region(sg)`：地区电影分镜。
+    - 场景顺序：异变现场（目击者跪地 → 手部 → 对话 → 另一人走入 → 过肩对话）→ 她所在地（建立 → 背影 → 仰拍 + 讨伐名牌 → 眼部）→ [猎手：外围走入] → 溶接回现场（消息传来、钩子、闪白、赌注）→ 讨伐卡。
+    - 演员是按种子生成、不在场上的女人；目标用 `node.sagaH`（与地图里遇到的一致）。
+  - `nem(spec, ev)`：宿敌插曲加场景、动作、手部插入、走入；按变强方面配不同动作（blade/vow 带刀）。开场 4 猎手各自一个场景。
+- `js/saga.js`：
+  - 旧 `stagePlay(sg,beats,col)` 换成 `stagePlay(sg)`（调用 CineScript）。
+  - `play()` 开头先尝试，失败时 `sg.noStage` 回退旧播放器。
+  - 摄影棚模式下不再预留猎手（`hReady/hLate`），电影结束 1.2s 后调用 `Hunters2.ambush`。
+- `js/worlds.js`：渲染处由 `CineStage.active&&draw` 改为 `CineStage.hook`。`js/nemstory.js`：播放前调用 `CineScript.nem`。
+- 测试：`tools/test/cine.html` 新增 `startCine('region')`（假 sg）和 `skipTo(bi)`。只在测试台验证过 14 拍分镜，真实地图尚未实机验证。

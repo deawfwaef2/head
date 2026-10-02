@@ -293,7 +293,7 @@ window.NemStory = (() => {
     if (!st || st.ev !== ev) { if (spec) dropRigs(spec.rigs); return; }
     if (!spec || !spec.beats.length) { abort(); return; }
     if (st.stage) { // R59：摄影棚播放（变强卡/名牌/标题卡都在摄影棚 UI 里）
-      st.phase = 'play'; const s0 = st;
+      st.phase = 'play'; const s0 = st; if (window.CineScript) { try { CineScript.nem(spec, ev); } catch (e) { console.warn('CineScript.nem', e); } }
       CineStage.playHere({ actors: spec.rigs, beats: spec.beats, col: spec.col, onEnd: () => { if (st === s0) abort(); } }).then(ok => { if (!ok && st === s0) abort(); }).catch(e => { console.warn('NemStory stage', e); if (st === s0) abort(); });
       return;
     }
