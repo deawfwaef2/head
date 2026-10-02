@@ -3,12 +3,14 @@
 用法: PYTHONPATH=~/.cache/pylib python3 tools/hub/hubpipe.py ids.txt [outdir=/tmp/vrm_out]
 ids.txt 每行: <character_id> <model_id>   输出: outdir/models/VH_<id6>.js, outdir/big/body/VH_<id6>.js, outdir/manifest.jsonl
 下载走用户本人登录的会话 + 页面上的「按使用条件使用」确认（只用于已核对授权全允许的模型）。"""
-import sys, os, re, json, time, subprocess, urllib.request
+import sys, os, re, json, time, subprocess, urllib.request, tempfile
 from playwright.sync_api import sync_playwright
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ids = [l.split() for l in open(sys.argv[1]) if l.strip()]
-OUT = sys.argv[2] if len(sys.argv) > 2 else '/tmp/vrm_out'
-os.makedirs(OUT + '/models', exist_ok=True); os.makedirs(OUT + '/big/body', exist_ok=True); os.makedirs('/tmp/vrm', exist_ok=True)
+LOCAL = os.environ.get('HUB_LOCAL') == '1'  # 用户自己的电脑：有头浏览器、用户亲手登录（验证码只由用户点）、跨平台路径
+OUT = sys.argv[2] if len(sys.argv) > 2 else (os.path.join(ROOT, 'vrm_out') if LOCAL else '/tmp/vrm_out')
+TMP = os.path.join(tempfile.gettempdir(), 'vrm_in')
+os.makedirs(OUT + '/models', exist_ok=True); os.makedirs(OUT + '/big/body', exist_ok=True); os.makedirs(TMP, exist_ok=True)
 done = set()
 if os.path.exists(OUT + '/manifest.jsonl'): done = {json.loads(l)['mid'] for l in open(OUT + '/manifest.jsonl')}
 def info(mid):
@@ -22,13 +24,25 @@ def lic_ok(d):
     u = m.get('otherPermissionUrl') or m.get('otherLicenseUrl') or ''; lic = m.get('licenseName') or ''
     return m.get('violentUssageName') == 'Allow' and (lic.startswith('CC0') or lic.startswith('CC_BY') or ('redistribution=allow' in u and 'modification=allow' in u)) and 'allowed_to_use_user=everyone' in (u or 'allowed_to_use_user=everyone')
 def run(cmd):
-    r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, env=dict(os.environ, PYTHONPATH='/home/user/.cache/pylib'))
+    r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, env=dict(os.environ, PYTHONPATH=os.environ.get('PYTHONPATH', '/home/user/.cache/pylib')))
     return r.returncode, (r.stdout + r.stderr)[-300:]
 with sync_playwright() as p:
-    b = p.chromium.launch(); c = b.new_context(storage_state='/home/user/pxstate2.json', locale='en-US', viewport={'width': 1100, 'height': 1000}, accept_downloads=True)
+    if LOCAL:
+        c = p.chromium.launch_persistent_context(os.path.join(os.path.expanduser('~'), '.vroid_hub_profile'), headless=False, locale='en-US', viewport={'width': 1100, 'height': 900}, accept_downloads=True); b = c
+        pg0 = c.pages[0] if c.pages else c.new_page(); pg0.goto('https://hub.vroid.com/en')
+        print('>>> 请在弹出的浏览器里自己登录 VRoid Hub（Sign in with pixiv ID → 邮箱/密码/验证码都由你操作）。登录好后脚本自动继续。', flush=True)
+        for _ in range(900):  # 最多等 30 分钟
+            try:
+                r = c.request.get('https://hub.vroid.com/api/account', headers={'X-Api-Version': '11'})
+                if r.status == 200 and '"id"' in r.text(): break
+            except Exception: pass
+            time.sleep(2)
+        print('>>> 已登录，开始下载', flush=True); pg0.close()
+    else:
+        b = p.chromium.launch(); c = b.new_context(storage_state='/home/user/pxstate2.json', locale='en-US', viewport={'width': 1100, 'height': 1000}, accept_downloads=True)
     for cid, mid in ids:
         if mid in done: continue
-        fid = 'VH_' + mid[-6:]; src = '/tmp/vrm/%s.vrm' % mid; t0 = time.time()
+        fid = 'VH_' + mid[-6:]; src = os.path.join(TMP, '%s.vrm' % mid); t0 = time.time()
         try:
             d = info(mid)
             if not lic_ok(d): print('LICENSE-SKIP', mid, flush=True); open(OUT + '/manifest.jsonl', 'a').write(json.dumps(dict(mid=mid, skip='license')) + '\n'); continue
@@ -42,10 +56,10 @@ with sync_playwright() as p:
                 dl.value.save_as(src); pg.close()
             credit = '%s (VRoid Hub; 暴力/改造/再分发 允许)' % author
             hp = '%s/models/%s.js' % (OUT, fid); bp = '%s/big/body/%s.js' % (OUT, fid)
-            rc, o = run(['python3', 'tools/vrm2head.py', src, fid, name, credit, '--out', hp]); 
+            rc, o = run([sys.executable, 'tools/vrm2head.py', src, fid, name, credit, '--out', hp]); 
             if rc: raise Exception('head: ' + o)
-            run(['python3', 'tools/glbsimp.py', hp]); run(['python3', 'tools/glbpack.py', hp])
-            rc, o = run(['python3', 'tools/vrm2body.py', src, fid, name, credit, '--tex', '768', '--out', bp])
+            run([sys.executable, 'tools/glbsimp.py', hp]); run([sys.executable, 'tools/glbpack.py', hp])
+            rc, o = run([sys.executable, 'tools/vrm2body.py', src, fid, name, credit, '--tex', '768', '--out', bp])
             if rc: raise Exception('body: ' + o)
             m = dict(mid=mid, cid=cid, file=fid, name=name, author=author, hearts=d['heart_count'], tags=[t['name'] for t in d.get('tags', [])][:6], head_kb=os.path.getsize(hp) // 1024, body_kb=os.path.getsize(bp) // 1024, sec=int(time.time() - t0))
             open(OUT + '/manifest.jsonl', 'a').write(json.dumps(m, ensure_ascii=False) + '\n'); print('OK', fid, name, m['head_kb'], m['body_kb'], m['sec'], flush=True)

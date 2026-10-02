@@ -17,7 +17,7 @@ ok = [m for m in ok if m['file'] not in EXIST and not BAD_TAG.search(' '.join(m[
 env = dict(os.environ, PYTHONPATH='/home/user/.cache/pylib', PLAYWRIGHT_BROWSERS_PATH='/home/user/.cache/pw', VW='1200', VH='520')
 stats = {}
 os.makedirs('/tmp/vhsheets', exist_ok=True)
-for k in range(0, len(ok), 8):
+for k in (range(0, len(ok), 8) if not os.environ.get('NOSTATS') else []):
     ch = ok[k:k + 8]; names = [m['file'] for m in ch]
     steps = '[["wait",3],["eval","(async()=>{for(let i=0;i<80&&!window.__ready;i++)await new Promise(r=>setTimeout(r,1000));return 1})()",90],["shot","/tmp/vhsheets/s%d.png"]]' % (k // 8)
     open('/tmp/vhsteps.json', 'w').write(steps)
@@ -40,7 +40,9 @@ for k in range(0, len(ok), 8):
         S = sum(colorsys.rgb_to_hsv(*(v / 255 for v in c))[1] for c in q) / len(q)
         H = sorted(colorsys.rgb_to_hsv(*(v / 255 for v in c))[0] for c in q)[len(q) // 2]
         stats[m['file']] = (L, S, H)
-json.dump(stats, open('/tmp/vhstats.json', 'w'))
+if os.environ.get('NOSTATS'): stats = {m['file']: (0.5, 0.3, 0) for m in ok}  # 不渲染：只按标签分身份
+import tempfile
+json.dump(stats, open(os.path.join(tempfile.gettempdir(), 'vhstats.json'), 'w'))
 
 def pick(m):
     t = ' '.join(m['tags'] + [m['name']]); L, S, H = stats.get(m['file'], (0.5, 0.3, 0))
@@ -69,5 +71,5 @@ new = {m['file']: {'n': m['name'], 'a': m['author'], 'ids': OVR.get(m['file']) o
 pack = dict(EXIST); pack.update(new)
 js = '// R53 VRoid Hub 身体登记（tools/hub/mkpack.py 生成；每条授权在 hub.vroid.com 页面核对：允许暴力表现 / 改造 / 再分发）。\n// VH_PACK[文件名] = {n: 模型名, a: 作者, ids: 适配的身份}；身体本体在 big/body/<文件名>.js（按名字加载），由 js/foe.js vhExt 并入身份候选，MOD vh_bodies 可关。\nwindow.VH_PACK = ' + json.dumps(pack, ensure_ascii=False, indent=0).replace('\n', '') + ';\n'
 open('js/vroid_pack.js', 'w').write(js)
-open('/tmp/vh_credits.md', 'w').write('\n'.join('- `%s` %s — %s (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/%s/models/%s' % (m['file'], m['name'], m['author'], m['cid'], m['mid']) for m in ok if m['file'] in new) + '\n')
+open(os.path.join(tempfile.gettempdir(), 'vh_credits.md'), 'w', encoding='utf-8').write('\n'.join('- `%s` %s — %s (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/%s/models/%s' % (m['file'], m['name'], m['author'], m['cid'], m['mid']) for m in ok if m['file'] in new) + '\n')
 print(len(pack), 'registered')
