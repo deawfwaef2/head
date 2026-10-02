@@ -18,7 +18,7 @@ window.NemStory = (() => {
   const AFN = { iron: '铁壁', regen: '再生', relentless: '连斩', leech: '噬血' };
   const ASP = {
     blade: { nm: '新武器', ic: '⚔', col: '#ffb070', max: 3, eff: () => '伤害 +12%' },
-    armor: { nm: '新护甲', ic: '🛡', col: '#9fc8ff', max: 3, eff: () => '生命 +18%' },
+    armor: { nm: '新护甲', ic: '🛡', col: '#9fc8ff', max: 3, eff: () => '生命 +18% · 防御 +8%' },
     skill: { nm: '新招式', ic: '🌀', col: '#c8a0ff', eff: e => `学会「${SKN[e.sk] || '新招'}」` },
     study: { nm: '研究你的打法', ic: '📜', col: '#e8dca0', max: 2, eff: () => '更会预判、格挡你的攻击' },
     swift: { nm: '轻装特训', ic: '💨', col: '#b0f0d0', max: 2, eff: () => '移动速度 +10%' },
@@ -60,10 +60,40 @@ window.NemStory = (() => {
   }
   function allyH(a) { const h = RPG.foe(G().S, locOf(a.lk) || curLoc(), a.seed, new Set(), new Set()); h.c = Object.assign({}, h.c, { name: a.n }); return h; }
 
+  // ---- 当前强化（数值 + 机制），宿敌档案里直接显示 ----
+  const P0 = () => ({ blade: 0, armor: 0, swift: 0, study: 0, vow: 0, skill: [], bless: [], ally: [] });
+  const hateOf = () => { try { return window.Hunters2 && Hunters2.SS ? Hunters2.SS().hate || 0 : 0; } catch (e) { return 0; } };
+  function stat(key) { // 相对基础值的倍率；def = 减伤比例
+    const p = (on() && S().p[key]) || P0(), h = hateOf();
+    return { p, hp: (1 + Math.min(3.5, h / 40)) * Math.pow(1.18, p.armor), dmg: (1 + Math.min(1.8, h / 55)) * Math.pow(1.12, p.blade) * (p.vow ? 1.08 : 1), spd: (1 + Math.min(0.25, h / 400)) * Math.pow(1.1, p.swift), def: Math.min(0.45, 1 - (1 - Math.min(0.25, h / 300)) * Math.pow(0.92, p.armor)) };
+  }
+  const SKT = { leap: '腾空扑向你，落点有红圈', charge: '直线冲撞，走廊提示', breaker: '打穿你的格挡', whirl: '近身旋风斩，范围很大' };
+  function mech(key) {
+    const rows = [], p = (on() && S().p[key]) || P0(), A = (window.FoeAI2 && FoeAI2.AFF) || {}, hid = key.startsWith('h:') ? key.slice(2) : null, d = hid && window.Hunters2 && Hunters2.BY[hid], h = hateOf();
+    const addA = (k, src) => { const a = A[k]; if (a && !rows.some(r => r.k === 'a' + k)) rows.push({ k: 'a' + k, ic: a.ic, n: a.n, d: a.tip, col: a.col, src }); };
+    if (d) { d.aff.forEach(k => addA(k, '本命词缀')); try { if (Hunters2.SS().L[hid].esc >= 2) addA('frenzy', '多次逃脱'); } catch (e) { } }
+    p.bless.forEach(k => addA(k, '祝福'));
+    const sk = new Set([...(d ? d.sk : []), ...p.skill]); if (d && h >= 30) { sk.add('leap'); sk.add('charge'); } if (d && h >= 60) { sk.add('breaker'); sk.add('whirl'); }
+    sk.forEach(k => { if (SKN[k]) rows.push({ k: 's' + k, ic: '🌀', n: SKN[k], d: SKT[k], col: '#c8a0ff', src: p.skill.includes(k) ? '剧情学会' : (d && d.sk.includes(k) ? '本命招式' : '仇恨觉醒') }); });
+    if (p.vow) rows.push({ k: 'vow', ic: '🔥', n: '复仇誓言', d: '血量降到 16% 才会撤退，伤害 +8%', col: '#ff8a7a', src: '剧情' });
+    if (p.study) rows.push({ k: 'study', ic: '📜', n: '读招', d: '更会预判并格挡你的攻击' + (p.study > 1 ? '（已两级）' : ''), col: '#e8dca0', src: '剧情' });
+    if (p.ally.length) rows.push({ k: 'ally', ic: '👥', n: '同伴', d: '出场时带着「' + p.ally.slice(-2).map(a => a.n).join('」「') + '」', col: '#a8e0ff', src: '剧情' });
+    return rows;
+  }
+  function buffHTML(key) {
+    try {
+      const s = stat(key), pc = v => '+' + Math.round((v - 1) * 100) + '%', M = mech(key), e2 = esc;
+      const nums = [['❤', '生命', pc(s.hp), '#ff8a8a'], ['⚔', '伤害', pc(s.dmg), '#ffb070'], ['🛡', '防御', '+' + Math.round(s.def * 100) + '%', '#9fc8ff'], ['💨', '移速', pc(s.spd), '#b0f0d0']];
+      const src = ['blade:武器', 'armor:护甲', 'swift:特训', 'study:研究', 'vow:誓言'].map(x => { const [k, n] = x.split(':'); return s.p[k] ? `${n}×${s.p[k]}` : ''; }).filter(Boolean);
+      return `<div class="nsbuf" style="margin:6px 0 4px;padding:7px 9px;background:rgba(255,255,255,.045);border-left:2px solid #ffb070"><div style="font-size:11.5px;letter-spacing:.2em;color:#ffb070;margin-bottom:4px">⚡ 当前强化${src.length ? ' · 剧情 ' + src.join(' ') : ''}</div><div style="display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12.5px">${nums.map(n => `<span style="color:${n[3]}">${n[0]} ${n[1]} <b>${n[2]}</b></span>`).join('')}</div>${M.length ? `<div style="margin-top:5px">${M.map(r => `<div style="font-size:12px;line-height:1.55;color:#d8ccb8"><b style="color:${r.col}">${r.ic} ${e2(r.n)}</b> <span style="color:#8a7e6e">· ${e2(r.src)}</span> — ${e2(r.d)}</div>`).join('')}</div>` : '<div style="margin-top:4px;font-size:12px;color:#8a7e6e">暂无特殊机制（继续放倒人会觉醒）</div>'}</div>`;
+    } catch (e) { return ''; }
+  }
+
   // ---- 出场时套用 ----
   function aff(key) { if (!on()) return []; const p = S().p[key]; return p ? p.bless.slice() : []; }
   function apply(fo, key, C, pos) {
-    if (!on() || !fo) return; const p = S().p[key]; if (!p) return;
+    if (!fo) return; const sd = stat(key).def; if (sd > 0) fo.defMul = 1 - sd; // 防御：仇恨 + 新护甲，foe.js 命中时按此减伤
+    if (!on()) return; const p = S().p[key]; if (!p) return;
     if (p.blade) fo.dmgMul = (fo.dmgMul || 1) * Math.pow(1.12, p.blade);
     if (p.vow) { fo.dmgMul = (fo.dmgMul || 1) * 1.08; fo.nsVow = 1; }
     if (p.armor) fo.maxHp = fo.hp = Math.round(fo.maxHp * Math.pow(1.18, p.armor));
@@ -230,6 +260,7 @@ window.NemStory = (() => {
   function ready() {
     const W = window.Worlds && Worlds.active && Worlds._W; if (!W || !W.B || W.busy || W.dead || !W.graph) return false;
     const nd = W.graph.nodes[W.cur]; if (!nd || nd.eliteArena || nd.huntArena || W.graph.arena) return false;
+    if (!(nd.home || nd.stone)) return false; // 只在能回洞的地图（洞口/魂门）播：大战之后满地尸体时不再突然加载电影卡顿
     if (window.Elites && Elites.E) return false; if (W.mapKey && W.mapKey === lastMap) return false;
     return !(window.Saga && Saga.cine) && !(window.Arrival2 && Arrival2.isOpen());
   }
@@ -458,9 +489,10 @@ window.NemStory = (() => {
       if (st || !on() || !G() || !G().S || !S().q.length) return false;
       const W = window.Worlds && Worlds.active && Worlds._W; if (!W || !W.B || W.dead || !W.graph) return false;
       const nd = W.graph.nodes[W.cur]; if (!nd || nd.eliteArena || nd.huntArena || W.graph.arena) return false;
+      if (!(nd.home || nd.stone)) return false;
       if (window.Elites && Elites.E) return false; if (window.Saga && Saga.cine) return false; if (window.Arrival2 && Arrival2.isOpen()) return false;
       return W.B !== W.__nsB || !(W.mapKey && W.mapKey === lastMap);
     } catch (e) { return false; }
   }
-  return { on, hold, apply, aff, S, ASP, grow, queue, pending, report, get busy() { return !!st; }, _dbg: { start, pickEvent, poll } };
+  return { on, hold, apply, aff, S, ASP, grow, queue, pending, report, buffHTML, stat, get busy() { return !!st; }, _dbg: { start, pickEvent, poll } };
 })();

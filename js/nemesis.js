@@ -66,7 +66,7 @@ window.Nemesis = (() => {
     const card = (ic, nm, sub, lv, lines, col) => `<div style="padding:12px 14px;background:linear-gradient(160deg,#2a1414e8,#0e0808f0);border:1px solid ${col}66;border-left:3px solid ${col}"><div style="font:800 17px 'Noto Serif SC',serif;color:${col}">${ic} ${e2(nm)} <span style="font:600 12px sans-serif;color:#e8d8c0">${lv ? `Lv.${lv}${lv - pl >= 4 ? ' · <b style="color:#ff7a6a">危险</b>' : ''}` : ''}</span></div><div style="font-size:12px;color:#c8b8a8;margin:2px 0 6px">${e2(sub)}</div>${lines.map(l => `<div style="font-size:13px;color:#eadcc4;line-height:1.6">${l}</div>`).join('')}</div>`;
     const cs = [card('🌙', '塞勒涅之影', '月之巫女的分身', pl + 6, ['宿敌逼近满了就可能从雾里走出来。', '她在场时门会封锁 90 秒；她残血会撤退，8 秒内追上还能斩首。'], '#c8b8ff')];
     for (const x of ex) { const c = (x.h && x.h.c) || {}, grow = Math.floor(((s.play || 0) - (x.at || 0)) / 300), tr = (c.traits || []).slice(0, 3).join(' · ');
-      cs.push(card('🩸', x.n, [c.title, tr].filter(Boolean).join(' · ') || '从你手里逃掉的人', x.lv + grow, [`为什么记住你：她从你手里活着逃走了。`, `离上次见面又变强了 <b>${grow}</b> 级（每过 5 分钟 +1）。`, `阶位：${x.t >= 3 ? '精英' : x.t >= 2 ? '老兵' : '战士'}。打败她 = 她从名单里消失。`], '#ff8a7a')); }
+      cs.push(card('🩸', x.n, [c.title, tr].filter(Boolean).join(' · ') || '从你手里逃掉的人', x.lv + grow, [`为什么记住你：她从你手里活着逃走了。`, `离上次见面又变强了 <b>${grow}</b> 级（每过 5 分钟 +1）。`, `阶位：${x.t >= 3 ? '精英' : x.t >= 2 ? '老兵' : '战士'}。打败她 = 她从名单里消失。`, window.NemStory && NemStory.buffHTML ? NemStory.buffHTML('x:' + x.n) : ''], '#ff8a7a')); }
     return `<div style="margin-top:16px"><div style="font:800 18px 'Noto Serif SC',serif;color:#ff9a8a;letter-spacing:.2em;margin-bottom:4px">🩸 宿敌档案</div><div style="font-size:12.5px;color:#b8a890;margin-bottom:8px">宿敌逼近 <b style="color:#ffb0a0">${Math.round(s.p || 0)}%</b> · 老兵以上的敌人从你手里逃掉就会变成宿敌（最多 6 人）。${ex.length ? '' : '目前还没有人记住你的脸。'}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">${cs.join('')}</div></div>`;
   }
   async function clone() {
@@ -110,7 +110,7 @@ window.Nemesis = (() => {
   }
   function tick() {
     if (!G() || !G().S) return; const s = S(), w = W(), dt = 1;
-    if (G().playing) { s.play += dt; if (onN() && window.Hunters2 && Hunters2.SS) { const H2 = Hunters2.SS(), stp = Hunters2.HATE_STEP || 15, b0 = Math.floor(H2.hate / stp); H2.hate += stp / 480 * dt * (window.Diff ? Diff.nem() : 1); /* 每 8 分钟 +1 级，改成每秒连续积累（条可见） */ if (Math.floor(H2.hate / stp) > b0) { s.grow = s.play; try { G().toast(window.NemStory && NemStory.on() ? '🩸 宿敌们在你看不见的地方又变强了——下次出猎时，你会看到发生了什么' : '🩸 宿敌们在你看不见的地方又变强了（猎手全体 +1 级）', '#ff9a8a', 2.8); } catch (e) { } } } }
+    if (G().playing) { s.play += dt; if (onN() && window.Hunters2 && Hunters2.SS) { const H2 = Hunters2.SS(), stp = Hunters2.HATE_STEP || 15, b0 = Math.floor(H2.hate / stp); H2.hate += stp / 480 * dt * (window.Diff ? Diff.nem() : 1); /* 每 8 分钟 +1 级，改成每秒连续积累（条可见） */ if (Math.floor(H2.hate / stp) > b0) { s.grow = s.play; try { G().toast(window.NemStory && NemStory.on() ? '🩸 宿敌们在你看不见的地方又变强了——走回洞口（或魂门）时，你会看到发生了什么' : '🩸 宿敌们在你看不见的地方又变强了（猎手全体 +1 级）', '#ff9a8a', 2.8); } catch (e) { } } } }
     if (w !== wasW) { // 出发 / 回洞
       if (w && !wasW) { plan = onN() ? { first: s.p >= 100 || Math.random() * 100 < s.p, next: performance.now() / 1000 + 240 + Math.random() * 180, enteredAt: 0 } : null; s.p = 0; if (onR()) { s.act = s.buff || null; s.buff = null; } }
       if (!w && wasW) { s.act = null; plan = null; }

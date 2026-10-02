@@ -4525,3 +4525,14 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 宿敌强度：`hunters2.js spawn` 基础血量 ×1.5，再乘 `1.5×(1+min(3.5,仇恨/40))`（血）与 `1+min(1.8,仇恨/55)`（伤）、移速最高 +25%、仇恨 ≥30/60 加技能池、技能冷却缩短；`odds()` 同步；`nemesis.js extraStrike` 同样按仇恨缩放，基础血 1.8→3.2。仇恨值本身随时间连续上涨（R63e）。
 - 首级悬浮：`game.js yieldLine(h)`：准星指向首级时显示 `🔮 ≈ N /回合结算`（回合制）和 `🌀 SAN ≈ x/秒`（挂在建筑上才产）。
 - 未验证：BOSS 登场/倒下卡和血条只用假 DOM 看过样式（本地无 big/ 无法真打）；难度倍率、掉落封顶只做了语法检查。
+
+## R65（剧情/宿敌/搜刮 反馈六项）
+
+- 剧情表情：`cinestage.js act()` 把演员表情里的 happy 压到 0.1（加一点 relaxed）、ee/aa 封顶，不再出现大笑脸型。
+- 跳过剧情：Esc 跳过时 `stop(false, true)` 收集尚未播出的 `boost` 卡（变强卡 / 情报卡 / 这段时间），`CineStage.summary()` 在屏幕右侧列出「已跳过剧情 · 以下内容已生效」14 秒。
+- 剧情只在能回洞的地图播：`nemstory.js ready()/pending()` 要求 `nd.home || nd.stone`（洞口 / 魂门），野外大战后不再突然搭模型卡顿；提示语改为“走回洞口（或魂门）时”。
+- 宿敌强化可见：`NemStory.stat(key)`（生命/伤害/防御/移速倍率）、`mech(key)`（词缀、技能、誓言、读招、同伴，带来源）、`buffHTML(key)`；显示在 U 猎手档案每张猎手卡和宿敌档案的额外宿敌卡里。
+- 防御：新增 `fo.defMul`（`NemStory.apply` 设置：仇恨 /300 最多 25% + 新护甲每级 ×0.92，封顶 45% 减伤），`foe.js` 命中处按它减伤；护甲方面效果文案改为「生命 +18% · 防御 +8%」。
+- 进区域大窗口：`arrival2.js` 等待条件加入 `NemStory.busy/hold`、`CineStage.active/grace`，上限 40s→180s；弹出后 0.7s 内忽略关闭键（避免翻/跳过电影的按键把它刚弹出就关掉）。
+- 搜刮选择：`worlds.js` 的 `W.interNear` 改为距离 + 朝向评分（身后额外惩罚），范围略放大；`interMark()` 在当前目标脚下画一圈金环。
+- 注意：`replace_string_in_file` 的原始参数里不要写 `\uXXXX`/`\n`（会原样写进文件，曾把调用吞进注释）；中文直接写。

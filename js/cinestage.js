@@ -191,6 +191,7 @@ void main(){
     if (a.exT <= 0 && a.f.hb && a.f.hb.setExpression) {
       a.exT = 1 / 30; const ex = Object.assign({}, (a.h.look && a.h.look.ex) || {});
       if (a.emo) for (const kk in a.emo) ex[kk] = Math.max(ex[kk] || 0, a.emo[kk]);
+      if (ex.happy > 0.15) { ex.relaxed = Math.max(ex.relaxed || 0, 0.25); ex.happy = 0.1; } ex.ee = Math.min(ex.ee || 0, 0.08); ex.aa = Math.min(ex.aa || 0, 0.12); // 剧情里不要大笑（脸型形变会变得很怪）：只留淡淡的神态
       ex.blink = Math.max(ex.blink || 0, bl); if (aa) ex.aa = aa; if (oh) ex.oh = oh;
       try { a.f.hb.setExpression(ex); } catch (e) { }
     }
@@ -665,8 +666,9 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
     renderer.setClearColor(cc, ca);
     return true;
   }
-  function stop(natural) {
+  function stop(natural, skipped) {
     if (!A) return; const a0 = A; A = null; graceT = performance.now() + 2200;
+    let sumList = null; if (skipped && a0.beats) sumList = a0.beats.slice(Math.max(0, a0.bi)).filter(b => b.boost && !b.bOn).map(b => b.boost);
     window.__skipMenuUntil = performance.now() + 1500;
     el.blk.classList.remove('off'); hideAll();
     setTimeout(() => { if (!A && root && !veilShown) root.className = ''; }, 380);
@@ -676,13 +678,25 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
     dropActors(a0.acts);
     try { G() && G().setUI && G().setUI(false); G() && G().lockPointer && G().lockPointer(); } catch (e) { }
     try { a0.o.onEnd && a0.o.onEnd(!!natural); } catch (e) { console.warn('cine end', e); }
+    if (sumList && sumList.length) { try { showSummary(sumList); } catch (e) { console.warn('cine summary', e); } }
+  }
+  // 跳过剧情后：把没看到的「变强卡 / 情报卡」直接列出来
+  let sumEl = null, sumTm = 0;
+  function showSummary(list) {
+    if (!sumEl || !sumEl.isConnected) {
+      const st = document.createElement('style'); st.textContent = `#csSum{position:fixed;right:4vw;top:50%;transform:translate(24px,-50%);opacity:0;transition:opacity .5s,transform .6s cubic-bezier(.2,.9,.3,1);z-index:140;width:min(400px,86vw);max-height:84vh;overflow:hidden;padding:16px 20px 14px;border-radius:12px;background:linear-gradient(160deg,rgba(24,16,22,.94),rgba(10,8,14,.96));border:1px solid rgba(255,176,112,.5);box-shadow:0 18px 50px rgba(0,0,0,.6);color:#f2e8dc;font-family:system-ui,'PingFang SC',sans-serif;pointer-events:none}#csSum.on{opacity:1;transform:translate(0,-50%)}#csSum .h{font-size:12px;letter-spacing:.3em;color:#ffb070;margin-bottom:8px}#csSum .t{margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08)}#csSum .t:first-of-type{margin-top:0;padding-top:0;border:0}#csSum .k{font-size:11px;letter-spacing:.35em;color:var(--nc,#ffb070)}#csSum .n{font-size:20px;font-weight:900;margin:2px 0}#csSum .lv{font-size:13px;color:#cdbfae}#csSum .lv b{color:#fff}#csSum .r{display:flex;gap:10px;margin:6px 0;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.05)}#csSum .r i{font-style:normal;font-size:19px;width:24px;text-align:center}#csSum .r .a{font-size:14px;font-weight:800}#csSum .r .e{font-size:12.5px;color:#d8ccb8;margin-top:1px}#csSum .f{font-size:12px;color:#a89c8c;margin-top:4px}`; document.head.appendChild(st);
+      sumEl = document.createElement('div'); sumEl.id = 'csSum'; document.body.appendChild(sumEl);
+    }
+    sumEl.innerHTML = `<div class="h">⏭ 已跳过剧情 · 以下内容已生效</div>` + list.slice(0, 3).map(B => `<div class="t" style="--nc:${esc(B.col || '#ffb070')}"><div class="k">${esc(B.k)}</div><div class="n">${esc(B.n)}</div>${B.lv ? `<div class="lv">${B.lv}</div>` : ''}${(B.rows || []).slice(0, 6).map(r => `<div class="r"><i>${r.ic}</i><div><div class="a" style="color:${esc(r.col || '#fff')}">${esc(r.a)}</div><div class="e">${esc(r.e)}</div></div></div>`).join('')}${B.f ? `<div class="f">${esc(B.f)}</div>` : ''}</div>`).join('');
+    sumEl.classList.remove('on'); void sumEl.offsetWidth; setTimeout(() => sumEl && sumEl.classList.add('on'), 60);
+    clearTimeout(sumTm); sumTm = setTimeout(() => { if (sumEl) sumEl.classList.remove('on'); }, 14000);
   }
   addEventListener('keydown', e => {
     if (!A) { if (veilOn() && !/^F\d+$/.test(e.code)) { e.preventDefault(); e.stopImmediatePropagation(); } return; }
     if (/^F\d+$/.test(e.code)) return;
     e.preventDefault(); e.stopImmediatePropagation(); if (e.repeat) return;
     if (A.phase !== 'play') return;
-    if (e.code === 'Escape') return stop(false);
+    if (e.code === 'Escape') return stop(false, true);
     if (['Space', 'Enter', 'NumpadEnter', 'KeyE'].includes(e.code)) next();
   }, true);
   addEventListener('keyup', e => { if (A || veilOn()) e.stopImmediatePropagation(); }, true);
@@ -736,5 +750,5 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
   }
   function playHere(o) { const w = worldHere(); if (!w) return Promise.resolve(false); o.world = w; o.hide = w.hide; return play(o); }
 
-  return { on, play, playHere, draw, hook, next, stop: () => stop(false), get active() { return !!A; }, get playing() { return !!A && A.phase === 'play'; }, get hold() { return !!A || veilOn(); }, get grace() { return !!A || veilOn() || performance.now() < graceT; }, _A: () => A, _stage: stage, SHOT };
+  return { on, play, playHere, draw, hook, next, summary: showSummary, stop: () => stop(false), get active() { return !!A; }, get playing() { return !!A && A.phase === 'play'; }, get hold() { return !!A || veilOn(); }, get grace() { return !!A || veilOn() || performance.now() < graceT; }, _A: () => A, _stage: stage, SHOT };
 })();

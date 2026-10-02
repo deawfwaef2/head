@@ -1049,6 +1049,14 @@ window.Worlds = (() => {
 
   // ================= 每帧（由 game.js 主循环调用）=================
   const fw = new V3(), rt = new V3(), want = new V3(), tmp = new V3();
+  // E 当前会搜的那个：脚下亮一圈（尸体成堆时看得出选中了谁）
+  function interMark(B, it, now) {
+    let m = B.__imk;
+    if (!m) { const g = new THREE.RingGeometry(0.34, 0.46, 32).rotateX(-Math.PI / 2); m = B.__imk = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xffd060, transparent: true, opacity: 0.85, depthWrite: false, depthTest: false, fog: false })); m.renderOrder = 9; m.visible = false; B.sc.add(m); }
+    if (!it || window.CineStage && CineStage.hold) { m.visible = false; return; }
+    let y = W.pos.y; try { y = B.H(it.x, it.z); } catch (e) { }
+    m.position.set(it.x, y + 0.06, it.z); const s = 1 + Math.sin(performance.now() * 0.008) * 0.12; m.scale.set(s, 1, s); m.visible = true;
+  }
   function frame(dt, now) {
     if (!W || !W.B) { if (W && G.post && G.post.on && W.B) G.post.render(W.B.sc, G.camera); return; }
     if (W.shWait) return; // 着色器异步编译期间不渲染（加载画面盖着），否则主线程会被同步编译卡死
@@ -1096,7 +1104,8 @@ window.Worlds = (() => {
     // 门：靠近提示
     W.doorNear = null; for (const d of B.doors) { const dd = Math.hypot(W.pos.x - d.x, W.pos.z - d.z); if (dd < 2.6) W.doorNear = d; if (dd < 12 && d.to >= 0) prefetchNode(d.to); d.label.visible = Math.hypot(cam.position.x - d.x, cam.position.z - d.z) < 34;
       if (d.nat && !d.home && dd < 1.6 && !W.busy && CORR() && (W.vel.x * Math.cos(d.a) + W.vel.z * Math.sin(d.a)) > 1.2 && !inFight() && !SEAL()) { travel(d.to, W.cur); break; } } // R54e：顺着山口走出去就上路（不用按 E）；R54l：战斗中（含宿敌）不会自动穿门
-    W.interNear = null; { let bd = 9; for (const it of B.inter) { const dd = Math.hypot(W.pos.x - it.x, W.pos.z - it.z); if (!it.done && dd < (it.corpse ? 2.3 : 1.9) && dd < bd) { bd = dd; W.interNear = it; } } }
+    W.interNear = null; { let bs = 99; const yw = G.player.yaw, fx = -Math.sin(yw), fz = -Math.cos(yw); for (const it of B.inter) { if (it.done) continue; const ox = it.x - W.pos.x, oz = it.z - W.pos.z, dd = Math.hypot(ox, oz); if (dd >= (it.corpse ? 2.6 : 2.0)) continue; const cs = dd > 0.05 ? (ox * fx + oz * fz) / dd : 1, sc = dd + (1 - cs) * 1.1 + (cs < 0 ? 1.2 : 0); if (sc < bs) { bs = sc; W.interNear = it; } } } // 尸堆里按「对准的那个」选（距离 + 朝向偏差），不再只看最近
+    interMark(B, W.interNear, now);
     if (window.Sack) try { Sack.frame(dt); } catch (e) { console.warn(e); }
     // 猎物 / 霸主
     if (!FZ) { try { if (W.foes) { Foe.update(dt, now); if (W.boss) W.boss.sayT -= dt; } else { updatePrey(dt, now); if (W.boss) updateBoss(dt, now); } } catch (e) { console.warn('foes', e); }

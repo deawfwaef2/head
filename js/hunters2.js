@@ -235,7 +235,7 @@ window.Hunters2 = (() => {
       return `<div class="r3-card${dead ? ' dead' : ''}" style="--c:${d.col}"><div class="r3-top"><div class="r3-pt">${d.ic}</div><div class="r3-nm"><div class="tt">${esc(d.t)}</div><div class="n">${esc(d.n)}${dead ? '<em>☠ 已斩杀</em>' : ''}</div></div><div class="r3-tag">Lv.${lv}</div></div>
 <div class="r3-st"><div><div class="k">她的战力</div><div class="v">${pw}</div></div><div><div class="k">你的战力</div><div class="v">${mp}</div></div><div><div class="k">差距</div><div class="v" style="color:${gap > 0 ? '#ff8a7a' : '#9fe89f'}">${gap > 0 ? '她强 ' + gap : '你强 ' + (-gap)}</div></div></div>
 ${dead ? '' : `<div class="r3-odds" style="--oc:${oc(o.p)}"><div class="row"><span>预估胜率 <b>${Math.round(o.p * 100)}%</b></span><span>你约 ${o.my} 刀砍倒她 · 她约 ${o.her} 下打倒你</span></div><div class="r3-meter"><i style="width:${Math.round(o.p * 100)}%"></i></div></div>`}
-<div class="r3-bio">${esc(d.bio)}</div><div class="r3-lore">⚔ ${esc(d.style)}</div>
+<div class="r3-bio">${esc(d.bio)}</div><div class="r3-lore">⚔ ${esc(d.style)}</div>${dead || !window.NemStory || !NemStory.buffHTML ? '' : NemStory.buffHTML('h:' + d.id)}
 <div class="r3-meta" style="margin-bottom:4px">${d.aff.concat(L.esc >= 2 ? ['frenzy'] : []).map(aff).join('')}</div>
 <div class="r3-meta"><span>等级 = 基础 ${d.base} + 仇恨 ${Math.floor(s.hate / HATE_STEP)} + 逃脱 ${L.esc}</span><span>遭遇 ${L.meet} 次</span>${L.wd ? `<span>撤退 ${L.wd} 次</span>` : ''}</div></div>`; }).join('');
     return `<div class="r3-sub">四名被选中的<b>正义女主角</b>。你砍的人越多，她们越强；「猎手感应」满了，她们就会<b>穿越到你所在的地图</b>（洞穴和洞口不会）。</div>${top}<div class="r3-grid">${cards}</div>
