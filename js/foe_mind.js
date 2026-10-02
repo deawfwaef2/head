@@ -89,7 +89,7 @@ window.FoeMind = (() => {
     if (!on() || fo.dead || fo.stag > 0 || fo.atk || fo.sk) return null;
     const m = mindOf(fo), iq = iqOf(fo), F = window.Foe, ux = dx / Math.max(0.1, d), uz = dz / Math.max(0.1, d);
     m.backBudget = Math.min(1.4, m.backBudget + dt * 0.45);
-    const tok = () => F.tokenOK && F.tokenOK(fo);
+    const tok = () => F.tokenOK && F.tokenOK(fo); const BR = !!(window.Brain && Brain.on()); // R55f：总导演开启时不再“打完拉开 / 你乱挥就后撤 / 横向预判”（很像乱走不打主角）
     // 假动作后的真刀
     if (fo.mFollow) { if (fo.cd <= 0.14 && d < 3.0 && tok()) { fo.punish = true; F.attack(fo, d); return { turnTo: face, spd: 0 }; } if (fo.cd < -0.6) fo.mFollow = false; }
     // 排队的连招
@@ -97,14 +97,14 @@ window.FoeMind = (() => {
     if (q) { q.ttl -= dt; if (q.ttl <= 0 || d > 5.2) fo.mnext = null;
       else if (fo.cd <= q.wait && tok() && (d < 3.2 || q.gap)) { fo.mnext = null; if (q.quick) fo.rdNext = 'quick'; if (q.brk) fo.rdNext = 'brk'; F.attack(fo, d, q.clip || undefined); return { turnTo: face, spd: 0 }; } }
     // 打完后拉开（打了就跑）
-    if (fo.kiteT > 0) { fo.kiteT -= dt; if (d < 4.6) { fo.rv = { x: -ux * 2.7, z: -uz * 2.7 }; return { turnTo: face, spd: 0 }; } }
+    if (fo.kiteT > 0) { fo.kiteT -= dt; if (d < 4.6 && !BR) { fo.rv = { x: -ux * 2.7, z: -uz * 2.7 }; return { turnTo: face, spd: 0 }; } }
     // 反击型：你在够不着的距离乱挥 → 后撤到够不着，等你收刀（foe_ai2 的“挥空反击”会接上）
     const sw = ctx.playerSwinging ? ctx.playerSwinging() : false;
-    if (sw && d < 3.0 && d > 1.2 && m.cnt > 0.3 && iq > 0.5 && m.backBudget > 0 && fo.state === 'chase' && (H.spam > 0.35 || m.cnt > 0.7)) {
+    if (!BR && sw && d < 3.0 && d > 1.2 && m.cnt > 0.3 && iq > 0.5 && m.backBudget > 0 && fo.state === 'chase' && (H.spam > 0.35 || m.cnt > 0.7)) {
       m.backBudget -= dt; fo.rv = { x: -ux * 3.4, z: -uz * 3.4 }; return { turnTo: face, spd: 0 };
     }
     // 突进型：你总往一个方向绕 → 横向预判（抄你的前路）
-    if (Math.abs(H.circle) > 0.45 && d > 2.4 && d < 6.5 && m.rush > 0.45 && iq > 0.55 && fo.cd > 0.3) {
+    if (!BR && Math.abs(H.circle) > 0.45 && d > 2.4 && d < 6.5 && m.rush > 0.45 && iq > 0.55 && fo.cd > 0.3) {
       const s = H.circle > 0 ? 1 : -1; fo.rv = { x: -uz * s * 2.2, z: ux * s * 2.2 }; return { turnTo: face, spd: 1.6 };
     }
     return null;

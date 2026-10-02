@@ -2086,3 +2086,13 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - **技能特效**：`skillfx.js` 新增 `SPEC[技能id]`：37 个技能每个有自己的 3D 特效（旋风斩多层水平刃环、突刺残影光带、剑气飞行新月、百刃随机斩闪、万剑归宗 5 脉冲+落剑光柱、震地裂纹+尘土、魂盾双层球壳、毒雾球、战吼 4 重环、魂弹/魂焰飞行光球带尾迹、连锁闪电折线、魂陨延迟爆炸、勾魂索锁链、同命咒连线、血井、百鬼夜行 6 魂球环绕等）。通用六门派分支仅在没有 SPEC 时才用。助手：`orb/beam/bolt/dust/embers/spiral/later`。
 - **气泡**：`r54n.js` 新增 `reactAllies`：同伴倒下/被斩首时，26m 内最近 4 人依次（间隔 ~0.5s）冒气泡 + 惨叫/痛呼（斩首用专门台词 `L_DECAP`，勇敢的人喊 `L_COVER`）；战斗聊天间隔 4~7s → 2.2~4s，另有杀意连斩时的恐惧台词、玩家血低时的“压上去”台词、被打时同伴“撑住”。
 - 验证方式（浏览器约 1fps，软渲染）：Playwright 里 `Worlds.start` → `Worlds._debug.goto(4,3)` → 手动循环 `Foe.update(1/30, now)` 采样；`SkillFX.cast(id)` 全部 37 个无报错。
+
+## R55f 用户反馈（原话要点，长期有效）
+战斗 AI 还是非常弱智：莫名其妙乱走不打主角、莫名其妙卡住不动、手感很差。建议大师级研究现有机制——是不是各种 MOD 相互独立运算——整合做个新的，把老的统合、该关的关掉。
+- **研究结论（实测）**：敌人行为由十几层各自独立运算（foe.js 基础追击 → FoeAI2 技能/战术 → FoeMind 读招 → FoeRoles 1/2/3 职业 → Feel54 读招闪避 → Persona 手势 → Locomo/Stance 表现层），每层都能在同一帧起手攻击、写 `fo.rv`、播动画，互相不知道对方做了什么。
+- **真 BUG（已修，foe.js）**：AI2 层（FoeAI2.tick）起手攻击后返回 null → 职业层紧接着 `f.play('Walk_Loop')`，Locomo 拦截后把攻击动作淡出 → `A.act.time` 永远不走 → `fo.atk` 永不结束 → 敌人站着不动几十秒（台架实测一个决斗者 8s~40s 全程“ATK”）。修法：①AI2/职业分支条件改为 `(tick() || fo.atk)`，起手后改走 `atkStep`；②看门狗：`f.cur !== atk.clip` 超过 0.4s 就放弃这一招。修后 40s 内攻击次数：决斗者 2→11、重甲卫 3→7、投弹手 1→10。
+- **新增 `js/brain.js`（MOD `foe_brain`，默认开）= 战斗总导演**：不替换旧层，而在其上统一调度——①每 0.35s 选【进攻者】（最近、冷却短、刚出过手的排后面 → 轮流上），攻击令牌只给她（`Foe.tokenOK` → `Brain.token`；全场出手间隔 1.1s→0.7s；≥3 个近战或有霸主时允许 2 人同时）；②全场 >3.2s 没人出手 → 点名最近的人冲上去；③看门狗：交战中 d>2.6m 站着不动 >1.6s → 清掉 mnext/kiteT/detour，`freeT=2.5`（跳过职业层走基础追击）并推她朝你走；④远程/辅助职业（ranged/mage/healer/bomber/netter/trapper/wispcaller）>9s 没任何出手 → `freeT=6` 改走近战（疗愈者没同伴不再永远发呆）；⑤`Brain.pf`：包抄站位用的“玩家朝向”改为 0.45rad/s 慢速跟随（以前你一转视角全场重新找站位 = 乱走）；⑥攻击后摇 -0.9s（`foe.js` atkStep 收招 cd）。
+- **关掉/门控的旧逻辑（Brain 开启时）**：`foe_mind.js` 的“打完拉开 / 你乱挥就后撤 / 横向预判”（`mindTick` 里 `BR` 判断）；`persona.js` 交战中不再点头/摇头/抱臂（`gesture` 会让她站定 1.1~1.6s）。其余层（技能、职业招式、读招闪避、受击反应）保持。**关 `foe_brain` = 完全回到旧行为。**
+- **台架**：`tools/test/aibench.js`（在真实游戏页里手动步进 `Foe.update`，`__bench(role, secs, {extra, extraRole, circle, kite})` / `__benchAll(secs)`；指标 atks/hits/near/avgD/maxStuck/maxAtkSec）。用法见文件头。注意：台架里切 MOD 请直接写 `localStorage.soulhead_mods`，别用 `Mods.set`（会持久化关掉 `foe_brain` 影响后续测试）。
+- **实测（Brain 开，玩家站桩/绕圈）**：3 个决斗者 40s 共 24 次起手（轮流，无人 0 次）；4 人混编绕圈玩家全员都在 2.2m 内出手；17 种职业无卡死（maxAtkSec ≤ 4s）。
+- 未做 / 下一步想法：投掷手/术士在你贴脸时的风筝逻辑仍各自实现；第一批职业（brute/skirm/guard/assassin/berserk/ranged）台架里 `__forceRole` 不生效（foe_roles.js 没读它），没单独测。

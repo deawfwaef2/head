@@ -406,6 +406,7 @@ window.Foe = (() => {
     if (window.FaceFill) try { FaceFill.world(); } catch (e) { foeErr(e); } // 第二十四轮：野外用更高的面部补光下限
     if (!CTX) return; const ctx = CTX, P = ctx.player;
     CLK += dt; try { if (window.FoeRoles) FoeRoles.update(dt, ctx); if (window.FoeAI2) FoeAI2.update(dt, ctx); } catch (e) { foeErr(e); } /* R34：敌人强化（词缀/技能/区域强度） */
+    if (window.Brain) try { Brain.update(dt, ctx); } catch (e) { foeErr(e); } // R55f 总导演
     if (window.Steps) try { Steps.foes(FOES, dt); } catch (e) { foeErr(e); } // 第二十四轮：敌人脚步（用上一帧到这一帧的位移）
     if (slowT > 0) { slowT -= dt; dt *= slowK; if (slowT <= 0) slowK = 1; } // 击杀慢动作：只作用于敌人/尸体/头/血，玩家照常
     const SMART = !window.Mods || Mods.on('foe_smart'), DOORESC = !window.Mods || Mods.on('foe_door_escape');
@@ -426,10 +427,11 @@ window.Foe = (() => {
       if (fo.seen && d > (SMART ? 34 : 26)) { fo.seen = false; fo.state = 'idle'; }
       let spd = 0, turnTo = null, rr = null;
       let strafe = 0, goal = null;
+      if (fo.atk && !fo.duel && fo.atk.act) { const A0 = fo.atk; if (f.cur !== A0.clip) { A0.lost = (A0.lost || 0) + dt; if (A0.lost > 0.4) { fo.atk = null; fo.cd = Math.max(fo.cd, 0.5); } } else A0.lost = 0; } // R55f 看门狗：攻击动画被别的层顶掉超过 0.4 秒就放弃这一招，不再卡死
       if (fo.atk) { const r = atkStep(fo, dt, d, face); turnTo = r.turnTo; spd = r.spd; } // 攻击：定格蓄力 → 慢起手 → 快出手（按实测命中帧判定）
       else if (fo.stag > 0) { /* 受击硬直 */ }
-      else if (window.FoeAI2 && fo.seen && fo.state === 'chase' && (rr = FoeAI2.tick(fo, dt, d, face, dx, dz, P, ctx))) { turnTo = rr.turnTo; spd = rr.spd || 0; } // R34：额外技能 / 战术层（先于职业）
-      else if (fo.role && fo.seen && fo.state === 'chase' && window.FoeRoles && (rr = FoeRoles.tick(fo, dt, d, face, dx, dz, P, ctx))) { turnTo = rr.turnTo; spd = rr.spd || 0; } // 第二十二轮（续 9）：职业接管移动
+      else if (window.FoeAI2 && fo.seen && fo.state === 'chase' && ((rr = FoeAI2.tick(fo, dt, d, face, dx, dz, P, ctx)) || fo.atk)) { if (rr) { turnTo = rr.turnTo; spd = rr.spd || 0; } else { const r = atkStep(fo, dt, d, face); turnTo = r.turnTo; spd = r.spd; } } // R34 技能/战术层（先于职业）；R55f：AI2 层起手后返回 null 时，后面的层不能再覆盖动画（否则攻击动画被 Walk_Loop 顶掉，fo.atk 永不结束 = 站着不动）
+      else if (fo.role && fo.seen && fo.state === 'chase' && !(fo.freeT > 0) && window.FoeRoles && ((rr = FoeRoles.tick(fo, dt, d, face, dx, dz, P, ctx)) || fo.atk)) { if (rr) { turnTo = rr.turnTo; spd = rr.spd || 0; } else { const r = atkStep(fo, dt, d, face); turnTo = r.turnTo; spd = r.spd; } } // 第二十二轮（续 9）：职业接管移动
       else if (fo.block > 0) { turnTo = face; }
       else if (!SMART && fo.state === 'chase') {
         // 第十九轮：对峙距离 + 攻击令牌 + 平滑移动（旧版贴在 1.3m 绕圈游走、随时换向 = 用户说的“在你附近闪烁”、太快）
@@ -483,7 +485,7 @@ window.Foe = (() => {
         }
         else { // 包抄：每个敌人占玩家周围不同的角度槽，不再全挤在正面；到位后站定观察/小幅游走
           turnTo = face; let k = 0, n = 0; for (const o of FOES) { if (o.dead || o.state !== 'chase' || !o.seen) continue; if (o === fo) k = n; n++; }
-          const pf = Math.atan2(-Math.sin(ctx.player.yaw), -Math.cos(ctx.player.yaw)); // 玩家面朝方向（世界角）
+          const pf = (window.Brain && Brain.on() && Brain.pf != null) ? Brain.pf : Math.atan2(-Math.sin(ctx.player.yaw), -Math.cos(ctx.player.yaw)); // 玩家面朝方向（世界角）；R55f 总导演开启时用慢速跟随的角度（以前你一转视角全场都重新找站位 = 乱走）
           const off = n <= 1 ? 0 : (k - (n - 1) / 2) * Math.min(1.1, 3.4 / n) * 1.25 + (fo.iq > 0.7 && n > 1 ? 0.25 : 0);
           const sa = pf + off, gx = P.pos.x + Math.sin(sa) * hold, gz = P.pos.z + Math.cos(sa) * hold, ex = gx - fo.pos.x, ez = gz - fo.pos.z, ed = Math.hypot(ex, ez);
           if (ed > 0.6) { // 走向自己的槽位：身体朝玩家，横着/倒着走过去
@@ -628,7 +630,7 @@ window.Foe = (() => {
   // 第十九轮：攻击令牌 —— 同一时间最多 1 人出手（有霸主时 2 人），两次出手之间至少隔 0.6s；霸主总能出手
   let lastAtkAt = -9, CLK = 0;
   const FAIR = () => !window.Mods || Mods.on('fair_fight') !== false;
-  function tokenOK(fo) { if (fo.boss) return true; if (CLK - lastAtkAt < (FAIR() ? 1.1 : 0.6)) return false;
+  function tokenOK(fo) { if (fo.boss) return true; if (window.Brain && Brain.on()) return Brain.token(fo, CLK - lastAtkAt); /* R55f 总导演：只有进攻者拿令牌 */ if (CLK - lastAtkAt < (FAIR() ? 1.1 : 0.6)) return false;
     let n = 0, boss = false; for (const o of FOES) { if (o.dead) continue; if (o.boss) boss = true; if (o !== fo && (o.atk || o.sk)) n++; } return n < (boss ? 2 : 1); }
   function attack(fo, d, force) {
     if (fo.duel && window.FoeDuel && FoeDuel.attack(fo, d, force)) { lastAtkAt = CLK; return; } // R54 foe_duel：不播攻击动画，程序化举刀到来刀一侧
@@ -676,7 +678,7 @@ window.Foe = (() => {
         else if (fo.sayT <= 0 && Math.random() < 0.3) talk(fo, '……躲开了？'); }
     }
     act.timeScale = sc;
-    if (!A.hits[A.hi] && (ct >= A.end - 1e-3 || ct >= act.getClip().duration - 1e-3)) { fo.atk = null; fo.cd = (fo.boss ? (fo.rage ? 1.0 : 1.5) : 1.15) + Math.random() * (fo.boss ? Math.max(0.6, 2.4 - fo.iq) : Math.max(0.5, 1.6 - fo.iq)) + (FAIR() ? 0.7 : 0); if (PRESS() && !A.ranged && !A.landed && d < 3.2 && fo.iq > 0.45 && (fo.chain | 0) < (FAIR() ? 1 : 2)) { fo.cd = (FAIR() ? 0.9 : 0.3) + Math.random() * 0.3; fo.chain = (fo.chain | 0) + 1; } else fo.chain = 0; /* R43：落空后你还在附近就立刻补一刀（最多连 2 次） */ fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); if (fo.role && window.FoeRoles) FoeRoles.after(fo); if (window.FoeAI2) FoeAI2.after(fo); }
+    if (!A.hits[A.hi] && (ct >= A.end - 1e-3 || ct >= act.getClip().duration - 1e-3)) { fo.atk = null; fo.cd = (fo.boss ? (fo.rage ? 1.0 : 1.5) : 1.15) + Math.random() * (fo.boss ? Math.max(0.6, 2.4 - fo.iq) : Math.max(0.5, 1.6 - fo.iq)) + (window.Brain && Brain.on() ? -0.9 : FAIR() ? 0.7 : 0); if (PRESS() && !A.ranged && !A.landed && d < 3.2 && fo.iq > 0.45 && (fo.chain | 0) < (FAIR() ? 1 : 2)) { fo.cd = (FAIR() ? 0.9 : 0.3) + Math.random() * 0.3; fo.chain = (fo.chain | 0) + 1; } else fo.chain = 0; /* R43：落空后你还在附近就立刻补一刀（最多连 2 次） */ fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); if (fo.role && window.FoeRoles) FoeRoles.after(fo); if (window.FoeAI2) FoeAI2.after(fo); }
     return { turnTo, spd };
   }
   // 给 HUD：正在蓄力/出手的敌人 → 来刀方向 + 进度（1 = 命中那一刻）

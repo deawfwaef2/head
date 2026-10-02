@@ -125,6 +125,7 @@ window.Persona = (() => {
   // ---------------- 对峙姿态 ----------------
   function gesture(fo) {
     if (!on() || !fo.per || fo.atk || fo.gestT > 0) return; const G_ = fo.per.P.gest; if (!G_.length) return;
+    if (window.Brain && Brain.on() && fo.seen && fo.state === 'chase') return; // R55f：交战中不再停下来点头/摇头/抱臂（站着不动 1.1~1.6 秒）
     const clip = G_[Math.floor(Math.random() * G_.length)]; if (!fo.f.clips[clip]) return;
     fo.gestClip = clip; fo.gestT = /Loop/.test(clip) ? 1.6 : 1.1; fo.f.play(clip, { fade: 0.2, once: !/Loop/.test(clip), restart: true });
   }
