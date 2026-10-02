@@ -9,6 +9,7 @@ window.CineScript = (() => {
   const LOC = k => (window.Lore && Lore.LOCS.find(l => l.k === k)) || (window.Lore && Lore.LOCS[0]) || { n: k, k };
   const L = (t, w, col, it, who) => ({ t, w: w || '', col: col || '', it: !!it, who: who || null });
   const hasW = n => !!(window.Assets && Assets.has && Assets.has(n));
+  const M = (ic, t, fx, col) => ({ ic, t, fx, col }); // 每一幕的意义：这一幕讲什么 + 对游戏造成的影响
   const KATANA = 'antique_katana_01';
   function clipOf(id) {
     id = id || '';
@@ -74,15 +75,17 @@ window.CineScript = (() => {
     const sA = { key: 'A', cap: c.src || Lc.n, sub: `${Lc.n} · ${c.sky || ''}`, cast: [W, V] };
     const sB = { key: 'B', cap: c.place || '远处', sub: '同 一 时 刻', cast: [T] };
     const beats = [];
+    const ge = (opt && opt.ge) || '', be = (opt && opt.be) || '';
+    const mTest = M('🗣', '当地人的证词指向成因', [`异变与「${T.nm}」有关`, '击败她才能让这里恢复原样'], Tcol);
     // —— 第一场：异变现场 ——
-    beats.push({ scene: sA, shot: 'est', castFo: W, act: [[W, kneel]], card: { a: sg.vis <= 1 ? '初 访' : `第 ${sg.vis} 次 踏 入`, b: Lc.n, c: c.sky || '' }, lines: [nar(pick(A.sign || KNEEL))], min: 3.6, tag: (A.nm ? '异变 · ' + A.nm : '') });
+    beats.push({ mean: M('🌀', A.nm ? `异变「${A.nm}」的现场` : '这片土地出了问题', [be ? '本地区异变带来：' + be : '本地区出现了异变', '异变持续期间对你不利，击败成因即可解除'], '#ffe0a8'), scene: sA, shot: 'est', castFo: W, act: [[W, kneel]], card: { a: sg.vis <= 1 ? '初 访' : `第 ${sg.vis} 次 踏 入`, b: Lc.n, c: c.sky || '' }, lines: [nar(pick(A.sign || KNEEL))], min: 3.6, tag: (A.nm ? '异变 · ' + A.nm : '') });
     if (r() < 0.4) beats.push({ shot: 'hand', castFo: W, lines: [nar(pick(KNEEL))], react: false });
     beats.push({ shot: 'mcu', castFo: W, act: [[W, 'Idle_Loop']], cc: cardW, lines: [sp(W, pick(sg.prev ? W_PREV.concat(W_OPEN) : W_OPEN))] });
     beats.push({ shot: 'mcu', castFo: V, walk: { who: V, d: 2.8 }, cc: cardV, lines: [sp(V, pick(V_REPLY))] });
-    if (r() < 0.65) { beats.push({ shot: 'ots', castFo: W, lines: [sp(W, pick(W_2))] }); beats.push({ shot: 'ots', castFo: V, lines: [sp(V, pick(V_2))] }); }
-    else beats.push({ shot: 'two', castFo: W, lines: [sp(W, pick(W_2)), sp(V, pick(V_2))] });
+    if (r() < 0.65) { beats.push({ shot: 'ots', castFo: W, mean: mTest, lines: [sp(W, pick(W_2))] }); beats.push({ shot: 'ots', castFo: V, lines: [sp(V, pick(V_2))] }); }
+    else beats.push({ shot: 'two', castFo: W, mean: mTest, lines: [sp(W, pick(W_2)), sp(V, pick(V_2))] });
     // —— 第二场：她 ——
-    beats.push({ scene: sB, shot: 'est', castFo: T, lines: [nar(pick(A.cause || TDESC))], min: 3.2 });
+    beats.push({ mean: M('🎯', sg.envoy ? '月之使者现身' : '讨伐目标登场：' + T.nm, [(sg.T.title ? '「' + sg.T.title + '」' : '') + T.nm + ' 就在这片地图里', ge ? '斩下她的首级：' + ge : '斩下她的首级，异变就会解除'], Tcol), scene: sB, shot: 'est', castFo: T, lines: [nar(pick(A.cause || TDESC))], min: 3.2 });
     if (r() < 0.5) beats.push({ shot: 'back', castFo: T, lines: [nar(pick(TDESC))] });
     beats.push({ shot: 'low', castFo: T, cc: cardT, lines: [sp(T, pick(((sg.envoy ? D().ELINE : D().TLINE) || {}).meet || T_MONO))] });
     if (r() < 0.6) beats.push({ shot: 'ecu', castFo: T, lines: [sp(T, pick(T_MONO))], tr: 'cut' });
@@ -90,12 +93,12 @@ window.CineScript = (() => {
     if (Hn) {
       const sH = { key: 'C', cap: Lc.n + ' · 外围', sub: '同 一 时 刻', cast: [Hn] }, d = Hn.d;
       let lv = ''; try { lv = 'Lv.' + Hunters2.lvOf(Hn.id); } catch (e) { }
-      beats.push({ scene: sH, shot: 'est', castFo: Hn, lines: [nar('与此同时，有人踩着你的脚印，走进了' + Lc.n + '。')], min: 3.6 });
+      beats.push({ mean: M(d.ic || '⚔', `猎手 ${d.n} 已盯上你`, [`${d.n} ${lv}：战斗中她可能穿越过来插手`, '她在场时所有的门都会封锁，打倒她或撑到她撤退'], Hn.col), scene: sH, shot: 'est', castFo: Hn, lines: [nar('与此同时，有人踩着你的脚印，走进了' + Lc.n + '。')], min: 3.6 });
       beats.push({ shot: 'low', castFo: Hn, walk: { who: Hn, d: 3.2, clip: 'Walk_Formal_Loop' }, cc: { k: '猎 手', n: d.n, t: d.t || '', ch: [(d.ic || '⚔') + ' ' + lv].filter(Boolean), col: Hn.col }, lines: [sp(Hn, pick(HUNT))] });
       beats.push({ shot: 'ecu', castFo: Hn, lines: [sp(Hn, pick(HUNT2))] });
     }
     // —— 第三场：回到异变现场，消息传来 ——
-    beats.push({ scene: Object.assign({}, sA, { cap: '', sub: '' }), tr: 'dissolve', shot: 'two', castFo: W, lines: [sp(V, pick(NEWS)), sp(W, pick(W_FEAR))] });
+    beats.push({ mean: M('🔔', '你的到来传开了', [be ? '异变副作用正在生效：' + be : '异变还在扩散', '时间越久，此地越难收拾'], '#ffb0a0'), scene: Object.assign({}, sA, { cap: '', sub: '' }), tr: 'dissolve', shot: 'two', castFo: W, lines: [sp(V, pick(NEWS)), sp(W, pick(W_FEAR))] });
     beats.push({ shot: 'mcu', castFo: W, lines: [sp(W, pick(W_HOOK))] });
     { // 情报卡：这场电影真正要交代的事
       const lvH = Hn ? (() => { try { return ' Lv.' + Hunters2.lvOf(Hn.id); } catch (e) { return ''; } })() : '';
@@ -105,7 +108,7 @@ window.CineScript = (() => {
       beats.push({ shot: 'mcu', castFo: T, boost: { k: '情 报', n: Lc.n, col: REG.col || '#e7c27a', rows, f: '击败她，才能让这里恢复原样' }, lines: [], min: 4.2 });
     }
     beats.push({ shot: 'two', castFo: W, tr: 'flash', stake: { good: f(pk(A.good || ['{L}会恢复原样。'])), bad: f(pk(A.bad || ['{L}会更糟。'])), ge: opt && opt.ge || '', be: opt && opt.be || '', head: opt && opt.head || '' }, lines: [] });
-    beats.push({ scene: Object.assign({}, sB, { cap: '', sub: '' }), shot: 'est', castFo: T, card: { a: '讨 伐', b: T.nm, c: sg.T.title ? `「${sg.T.title}」` : '' }, lines: [L(f(pick(FIN)), '我', '#fff', true)], min: 3.4 });
+    beats.push({ mean: M('⚔', '接下讨伐', ['地图里会出现她；左侧「异变」追踪卡指引方向', ge ? '击败她：' + ge : '击败她，这里恢复原样'], Tcol), scene: Object.assign({}, sB, { cap: '', sub: '' }), shot: 'est', castFo: T, card: { a: '讨 伐', b: T.nm, c: sg.T.title ? `「${sg.T.title}」` : '' }, lines: [L(f(pick(FIN)), '我', '#fff', true)], min: 3.4 });
     try { localStorage.setItem('cs_recent', JSON.stringify(RECENT)); } catch (e) { }
     return { actors, beats, col: (REG.col || '#e7c27a'), hunter: !!Hn };
   }
@@ -118,7 +121,7 @@ window.CineScript = (() => {
     const B = spec.beats; if (!B || !B.length) return spec;
     const acts = spec.rigs || [];
     if (ev && ev.why === 'intro') return nemIntro(spec);
-    const her = (B[1] && B[1].castFo) || B[0].castFo, other = acts.find(a => a !== her) || null;
+    const her = B[0].castFo || (B[1] && B[1].castFo), other = acts.find(a => a !== her) || null;
     const aa = ASP_ACT[ev && ev.a] || null;
     if (aa && aa.wpn && hasW(KATANA)) her.wpn = KATANA;
     const out = [], origin = ev && ev.why === 'origin';
@@ -155,7 +158,7 @@ window.CineScript = (() => {
       const id = idOf(b);
       if (id && b.lines.length >= 2) {
         const fo = b.castFo, ha = HACT[id] || {}; if (ha.wpn && hasW(KATANA)) fo.wpn = KATANA;
-        out.push({ scene: { key: 'H' + id, cast: [fo], cap: HPLACE[id] || '', sub: '' }, tr: 'dip', shot: id === 'gwen' ? 'hand' : 'back', castFo: fo, act: ha.clip ? [[fo, ha.clip]] : [], lines: [b.lines[0]], react: false });
+        out.push({ scene: { key: 'H' + id, cast: [fo], cap: HPLACE[id] || '', sub: '' }, tr: 'dip', shot: id === 'gwen' ? 'hand' : 'back', castFo: fo, act: ha.clip ? [[fo, ha.clip]] : [], lines: [b.lines[0]], react: false, mean: b.mean });
         out.push(Object.assign({}, b, { shot: id === 'gwen' || id === 'aerin' ? 'low' : 'mcu', lines: b.lines.slice(1) }));
         return;
       }

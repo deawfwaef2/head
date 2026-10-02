@@ -212,6 +212,23 @@ window.NemStory = (() => {
   };
   const XHELP = ['{N}，你的伤还没好透。', '……你又要去找它？', '至少，把这个带上。', '外面的人都在说，你是唯一一个从它手里活下来的。'];
   const XPLACE = ['{reg} · 一间漏雨的小屋', '{reg}外 · 河边的磨坊', '{reg} · 修道院的病房', '{reg} · 篝火旁', '{reg} · 废弃的瞭望塔'];
+  // 随机素材：开场旁白 / 逃脱之后 / 追问与回答 / 多次成长
+  const TIMEP = ['三天后的黄昏', '一场夜雨之后', '黎明前最冷的一刻', '大雪封路的第二天', '篝火快要熄灭的时候', '月亮刚升起来的时候'];
+  const OPENN = ['{pl}。{sn}已经三天没怎么合眼了，桌上摊着的，是你的悬赏单。', '消息传到这里的时候，{sn}正在擦拭{wpn}。她没有抬头，只问了一句：它又去了哪儿？', '{heads}颗首级。{sn}把这个数字，一笔一笔刻在了{wpn}上。', '传闻说，你最近出现在{reg}。{sn}把地图上那个点，圈了又圈。', '没有人知道{sn}此刻在想什么。只有{wpn}的刃口，映着一点不肯熄灭的光。', '{reg}的方向，刮来一阵带着血腥味的风。{sn}闭上眼，想起了那个晚上。', '窗外在下雨。{sn}听着雨声，把你的每一次出手，在脑子里重放了一遍。'];
+  const ESCN = ['伤口还没愈合。{sn}每走一步，都能想起那一刀。', '{sn}逃出来的那天，{wpn}断了一截。她把断口磨平，留着。', '逃走是耻辱，也是教训。{sn}两样都记下了。'];
+  const ESCL = ['……那一刀，离我的脖子只有一寸。', '我听见它在笑。我会让它闭嘴。', '我逃了。这一次，我记住了它的每一个起手式。', '别说我是被打败的。我只是还没准备好。'];
+  const FOLLOW = {
+    blade: ['这把刀……你打算用它做什么？', '你的手在抖。是兴奋，还是害怕？'],
+    armor: ['它的刀会从哪儿来？你想过吗？', '护甲救不了你两次。'],
+    skill: ['……再来一次。我数着呢。', '这一招，你是从哪儿学的？'],
+    study: ['你确定，你看到的规律不是巧合？', '别看得太久。它也在看你。'],
+    swift: ['你已经跑了一整夜了，歇一歇。', '再快，也得有力气挥刀。'],
+    bless: ['……你确定要接受它？', '祝福是有代价的。你知道吧。'],
+    vow: ['这条路回不了头。', '你会后悔的。——不，我知道你不会。'],
+    ally: ['谁带头？', '我们这几个人，够吗？']
+  };
+  const RESOLVE = ['我已经想好了。', '没有退路了。', '不用担心我。', '它不会再有第二次机会。', '我数过了，这是第几次。', '我只需要一次机会。', '该做的准备，都做完了。'];
+  const MOREN = ['这不是第一次变化。她把每一次，都一笔一笔记在了纸上。', '一次又一次。她已经不是当初那个站在你面前的人了。'];
 
   function deeds() {
     let heads = 0, n = 0, reg = '这片土地';
@@ -248,10 +265,45 @@ window.NemStory = (() => {
   const lastK = () => S().lastK || lastReg();
   function grow(key, why, lv0, lv1) {
     const s = S(), old = s.q.find(e => e.k === key && e.why !== 'origin' && e.why !== 'intro');
-    if (old) { old.lv1 = lv1; const ev2 = { why }; rollAspect(key, ev2); (old.more = old.more || []).push(ev2); return; } // 同一人攒了多次：合并成一段，变强卡列出全部
+    if (old) { old.lv1 = lv1; const ev2 = { why }; rollAspect(key, ev2); (old.more = old.more || []).push(ev2); notifyQ({ k: key, why, a: ev2.a }); return; } // 同一人攒了多次：合并成一段，变强卡列出全部
     const ev = { k: key, why, lv0, lv1, t: Date.now(), lk: lastK() }; rollAspect(key, ev); queue(ev);
   }
-  function queue(ev) { const q = S().q; q.push(ev); while (q.length > 8) { const i = q.findIndex(e => e.why !== 'intro' && e.why !== 'origin'); q.splice(i < 0 ? 0 : i, 1); } }
+  function queue(ev) { const q = S().q; q.push(ev); while (q.length > 8) { const i = q.findIndex(e => e.why !== 'intro' && e.why !== 'origin'); q.splice(i < 0 ? 0 : i, 1); } notifyQ(ev); }
+  function titleOf(ev) { if (ev.why === 'intro') return '序章 · 四名猎手接下悬赏'; if (ev.why === 'origin') return `${nameOf(ev.k)} · 从你刀下逃生`; return `${nameOf(ev.k)} 变强${ev.a && ASP[ev.a] ? ' · ' + ASP[ev.a].nm : ''}`; }
+  function notifyQ(ev) { // 宿敌升级排入新剧情时提示
+    try { if (ev.why === 'intro' || !G().playing) return; G().toast(`🎬 新剧情已排入：${titleOf(ev)}　· 共 ${S().q.length} 段待播，下次进入地点时播放`, '#ffb070', 3.8); } catch (e) { }
+  }
+  function preview() { // 进图黑场时给玩家看的“将要播放”序列
+    try {
+      const arr = S().q.slice(), out = []; let ev = st && st.ev, side = [];
+      if (!ev) { let i = arr.findIndex(e => e.why === 'intro'); if (i < 0) i = arr.findIndex(e => e.why === 'origin'); if (i < 0) i = 0; ev = arr.splice(i, 1)[0]; if (ev && ev.why !== 'intro' && ev.why !== 'origin') side = arr.filter(e => e.why !== 'intro' && e.why !== 'origin').slice(0, 3); }
+      if (!ev) return out;
+      out.push(`宿敌插曲 · ${titleOf(ev)}${side.length ? '（同一时间：' + side.map(e => nameOf(e.k)).join('、') + '）' : ''}`);
+      const rest = arr.length - side.length; if (rest > 0) out.push(`之后还有 ${rest} 段，将在后续地点播放`);
+      return out;
+    } catch (e) { return []; }
+  }
+  function episodeOf(ev, spec) {
+    const cast = (spec.rigs || []).map(r => ({ n: r.nm || (r.h && r.h.c && r.h.c.name) || '', t: r.role || r.title || '', col: r.col || '' })).filter(c => c.n);
+    const kind = ev.why === 'intro' ? '序 章' : ev.why === 'origin' ? '宿 敌 · 起 源' : '宿 敌 插 曲'; let sub = '';
+    if (ev.lv0 != null && ev.lv1 != null) sub = `Lv.${ev.lv0} → Lv.${ev.lv1}`;
+    if (ev.a && ASP[ev.a]) sub += (sub ? ' · ' : '') + ASP[ev.a].ic + ' ' + ASP[ev.a].nm + '：' + ASP[ev.a].eff(ev);
+    if (ev.why === 'origin') sub = '她从你手里活着逃走，成为新的宿敌';
+    if (ev.why === 'intro') sub = '主线开端 · 悬赏的背后另有其人';
+    const rest = S().q.length; return { kind, title: titleOf(ev), sub, cast, col: spec.col, note: rest ? `之后还有 ${rest} 段` : '' };
+  }
+  // 在安全的时候把将要登场的身体先读进内存（一次一个，避免卡顿）
+  const warmed = new Set(); let warmBusy = false;
+  async function prewarm() {
+    if (warmBusy || !window.Foe || !Foe.template) return; const W = window.Worlds && Worlds.active && Worlds._W; if (!W || !W.B) return;
+    try { if ((window.Foe.foes || []).some(f => !f.dead && f.seen && (f.state === 'chase' || f.atk))) return; } catch (e) { }
+    const names = []; try {
+      const used = new Set(); for (const ev of S().q.slice(0, 2)) { let h = null; if (ev.k.startsWith('h:') && window.Hunters2) h = Hunters2.recFor(ev.k.slice(2), curLoc()); else if (ev.k.startsWith('x:')) { const x = ((window.Nemesis && Nemesis.S && Nemesis.S().extra) || []).find(e => e.n === ev.k.slice(2)); if (x) h = JSON.parse(JSON.stringify(x.h)); }
+        if (!h) continue; if (window.IdLook) IdLook.apply(h); let b = Foe.bodyFor(h, mul(((h.look.seed || 7) * 2654435761) >>> 0), false, used); used.add(b); if (window.CC0) b = CC0.body(b, h.look.seed || 0); names.push(b); }
+    } catch (e) { return; }
+    const nm = names.find(n => !warmed.has(n)); if (!nm) return; warmed.add(nm); warmBusy = true;
+    try { await Foe.loadAnim(); await Foe.template(nm); } catch (e) { } warmBusy = false;
+  }
 
   // ================= 播放 =================
   let st = null; // {key, phase:'build'|'play', rigs:[], t0}
@@ -260,7 +312,6 @@ window.NemStory = (() => {
   function ready() {
     const W = window.Worlds && Worlds.active && Worlds._W; if (!W || !W.B || W.busy || W.dead || !W.graph) return false;
     const nd = W.graph.nodes[W.cur]; if (!nd || nd.eliteArena || nd.huntArena || W.graph.arena) return false;
-    if (!(nd.home || nd.stone)) return false; // 只在能回洞的地图（洞口/魂门）播：大战之后满地尸体时不再突然加载电影卡顿
     if (window.Elites && Elites.E) return false; if (W.mapKey && W.mapKey === lastMap) return false;
     return !(window.Saga && Saga.cine) && !(window.Arrival2 && Arrival2.isOpen());
   }
@@ -276,7 +327,7 @@ window.NemStory = (() => {
     const W = window.Worlds && Worlds.active && Worlds._W;
     if (st) { if (st.phase === 'build' && performance.now() - st.t0 > 60000) { console.warn('NemStory: build timeout'); const ev = st.ev; abort(); if (ev && (ev.tries = (ev.tries || 0) + 1) < 2) S().q.unshift(ev); } return; } // 慢机器第一次搭模型可能很久：超时就留到下一张地图再播（最多重试 1 次）
     if (!W) { lastMap = null; return; }
-    if (!on() || !S().q.length || !ready()) return;
+    if (!on() || !S().q.length || !ready()) { if (on() && S().q.length && !st) prewarm(); return; }
     W.mapKey = W.mapKey || ('m' + Math.random()); lastMap = W.mapKey;
     const pk = pickEvent(); if (!pk.ev) return; try { G().save(); } catch (e) { }
     start(pk.ev, pk.side);
@@ -326,7 +377,8 @@ window.NemStory = (() => {
     if (!spec || !spec.beats.length) { abort(); return; }
     if (st.stage) { // R59：摄影棚播放（变强卡/名牌/标题卡都在摄影棚 UI 里）
       st.phase = 'play'; const s0 = st; if (window.CineScript) { try { CineScript.nem(spec, ev); } catch (e) { console.warn('CineScript.nem', e); } }
-      CineStage.playHere({ actors: spec.rigs, beats: spec.beats, col: spec.col, onEnd: () => { if (st === s0) abort(); } }).then(ok => { if (!ok && st === s0) abort(); }).catch(e => { console.warn('NemStory stage', e); if (st === s0) abort(); });
+      let epi = null; try { epi = episodeOf(ev, spec); } catch (e) { }
+      CineStage.playHere({ actors: spec.rigs, beats: spec.beats, col: spec.col, episode: epi, onEnd: () => { if (st === s0) abort(); } }).then(ok => { if (!ok && st === s0) abort(); }).catch(e => { console.warn('NemStory stage', e); if (st === s0) abort(); });
       return;
     }
     st.rigs = spec.rigs; st.phase = 'play'; animLast = 0; animRaf = requestAnimationFrame(animLoop);
@@ -343,6 +395,12 @@ window.NemStory = (() => {
     beats[beats.length - 1].cut = false;
   }
   const L = (t, w, col, it) => ({ t, w: w || '', col: col || '', it: !!it });
+  const M = (ic, t, fx, col) => ({ ic, t, fx, col }); // 每一幕的意义：这一幕讲什么 + 对游戏造成的影响
+  function aspFx(e) {
+    const a = ASP[e.a]; if (!a) return [];
+    const d = { blade: '她的伤害 +12%（最多叠 3 次）', armor: '她的生命 +18%、受到的伤害 -8%（最多叠 3 次）', study: '她更会预判并格挡你的攻击（最多叠 2 次）', swift: '她的移动速度 +10%（最多叠 2 次）', vow: '她要血量降到 16% 才会撤退，伤害 +8%——更难让她逃走', skill: `她学会了「${SKN[e.sk] || '新招'}」：${SKT[e.sk] || ''}`, bless: `她获得词缀「${AFN[e.af] || ''}」：${((window.FoeAI2 && FoeAI2.AFF[e.af]) || {}).tip || ''}`, ally: `她下次出场会带着「${e.ally ? e.ally.n : '同伴'}」一起来——你要同时应付两个人` }[e.a];
+    return [`${a.ic} ${a.nm}：${d}`, '下次在战斗中遇到她就会生效'];
+  }
 
   // ---- 变强卡（挂在 #sgRoot 里） ----
   let bx = null;
@@ -377,24 +435,31 @@ window.NemStory = (() => {
     const cx = Object.assign({}, c, { sn: X.sn, wpn: X.wpn, k: 2 + (P('h:' + id).blade || 1) });
     const f = t => fill(t, cx);
     const pA = V(2.4, -0.5), pB = V(2.6, 0.75);
-    const her = await rig(hH, pA, face(pA, pB) + 0.35, X.clip, used); st.rigs.push(her);
+    const her = await rig(hH, pA, face(pA, pB) + 0.35, X.clip, used); st.rigs.push(her); her.role = '宿敌 · ' + d.t; her.col = d.col;
     let other, oName, oCol, oTitle;
     if (a === 'ally' && ev.ally) { const h2 = allyH(ev.ally); other = await rig(h2, pB, face(pB, pA) - 0.35, 'Idle_Talking_Loop', used); oName = ev.ally.n; oCol = '#a8e0ff'; oTitle = ev.ally.t; cx.an = ev.ally.n; cx.at = ev.ally.t; }
     else { const h2 = RPG.foe(G().S, loc, (Math.imul(id.length * 97 + id.charCodeAt(0), 2654435761) ^ 0x3e17) >>> 0, new Set(), new Set()); h2.c = Object.assign({}, h2.c, { name: X.mentor.n }); other = await rig(h2, pB, face(pB, pA) - 0.35, 'Idle_Talking_Loop', used); oName = X.mentor.n; oCol = X.mentor.col; oTitle = X.mentor.t; }
-    st.rigs.push(other); her.pair = other; other.pair = her;
-    const nm = d.n, col = d.col, place = f(X.place[a] || X.home);
+    st.rigs.push(other); her.pair = other; other.pair = her; other.role = (a === 'ally' ? '新同伴 · ' : '导师 · ') + oTitle; other.col = oCol;
+    const nm = d.n, col = d.col, place = f(X.place[a] || X.home); cx.pl = place;
     const card = { k: '宿 敌', n: nm, t: d.t, ch: [`Lv.${ev.lv0} → Lv.${ev.lv1}`, ASP[a].ic + ' ' + ASP[a].nm], col };
     const ocard = { k: a === 'ally' ? '新 同 伴' : '身 边 的 人', n: oName, t: oTitle, ch: [a === 'ally' ? '👥 和' + X.sn + '结盟' : '与' + X.sn + '同行'], col: oCol };
-    const whyT = ev.why === 'esc' ? `——${X.sn}从你手里逃走后的第 ${2 + Math.floor(Math.random() * 5)} 天` : rnd(['——你在洞里数首级的时候', `——你离开${c.reg}的那个晚上`, '——没人看见的地方']);
+    const whyT = ev.why === 'esc' ? `——${X.sn}从你手里逃走后的第 ${2 + Math.floor(Math.random() * 5)} 天` : rnd(['——你在洞里数首级的时候', `——你离开${c.reg}的那个晚上`, '——没人看见的地方'].concat(TIMEP.map(t => '——' + t)));
     const beats = [];
-    beats.push({ shot: 'cLow', castFo: her, card: { a: '此 刻 · 在 别 处', b: place, c: whyT }, tag: '宿 敌 · ' + nm, lines: [], min: 3.6 });
-    beats.push({ shot: 'cFace', castFo: her, cc: card, lines: [L(f(rnd(X.react)), nm, col)], min: 3.2 });
+    const fxA = aspFx(ev), stt = stat(ev.k), P = v => '+' + Math.round((v - 1) * 100) + '%';
+    beats.push({ mean: M('🌒', '你不在的时候，宿敌也在行动', [ev.why === 'esc' ? `逃脱成长：${nm} 从你手里逃走，永久 +1 级（Lv.${ev.lv0} → Lv.${ev.lv1}）` : `仇恨累积升级：${nm} Lv.${ev.lv0} → Lv.${ev.lv1}。你每放倒 1 人 +1 仇恨、斩首 +0.5，每 15 点全体猎手 +1 级`, '每次升级都会真的改写她的属性，下面几幕会告诉你具体是什么'], col), shot: rnd(['cLow', 'cLow', 'cEyes']), castFo: her, card: { a: '此 刻 · 在 别 处', b: place, c: whyT }, tag: '宿 敌 · ' + nm, lines: [L(f(rnd(ev.why === 'esc' ? ESCN : OPENN)), '', '#e8dcc6', true)], min: 4.2 });
+    beats.push({ shot: 'cFace', castFo: her, cc: card, mean: M('👁', '她在追踪你的战绩', [`你的击杀和斩首被她记下：当前仇恨 ${Math.floor(hateOf())}`, `仇恨决定她的基础强度：生命 ${P(stt.hp)} · 伤害 ${P(stt.dmg)} · 防御 +${Math.round(stt.def * 100)}% · 移速 ${P(stt.spd)}`], col), lines: [L(f(rnd(X.react)), nm, col)], min: 3.2 });
+    if (ev.why === 'esc') beats.push({ shot: rnd(['cEyes', 'cFace']), castFo: her, mean: M('💨', '逃脱的教训', ['她残血逃走后永久 +1 级，已经生效', '下次你必须在她逼跑前一口气打完'], '#ff9a8a'), lines: [L(f(rnd(ESCL)), nm, col)], min: 3 });
     const conv = [];
     if (a === 'ally') { conv.push(L(f(rnd(ALLYSAY)), oName, oCol)); conv.push(L(f(rnd(X.say.ally.concat(ALLYHI))), X.sn, col)); }
     else { conv.push(L(f(rnd(MENT[a])), oName, oCol)); conv.push(L(f(rnd(X.say[a])), X.sn, col)); }
-    beats.push({ shot: 'cOS', castFo: other, cc: ocard, lines: [conv[0]] });
+    beats.push({ shot: 'cOS', castFo: other, cc: ocard, mean: M(ASP[a].ic, a === 'ally' ? `新的同伴：${oName}` : `${oName} 给她指明了变强的方向`, fxA, ASP[a].col), lines: [conv[0]] });
     beats.push({ shot: 'cOS', castFo: her, cc: card, cc2: 1, lines: [conv[1]] });
-    beats.push({ shot: 'cHand', castFo: her, lines: [L(f(rnd(HAND[a])), '', '#e8dcc6', true)] });
+    if (Math.random() < 0.7) { // 随机再来一轮对话：追问 + 回答
+      beats.push({ shot: rnd(['cOS', 'cFace']), castFo: other, mean: M('⚖', '这个选择不会被收回', ['这项强化已经写进她的属性', ...fxA.slice(0, 1)], ASP[a].col), lines: [L(f(rnd(FOLLOW[a])), oName, oCol)] });
+      beats.push({ shot: rnd(['cFace', 'cEyes', 'cOS']), castFo: her, lines: [L(f(rnd(RESOLVE)), nm, col)] });
+    }
+    if (ev.more && ev.more.length) beats.push({ shot: 'cEyes', castFo: her, mean: M('📈', '不止变强一次', [ev.more.map(m => ASP[m.a].ic + ' ' + ASP[m.a].nm + '：' + ASP[m.a].eff(m)).join('；'), '上面几项都已叠加到她身上'], '#ffd890'), lines: [L(f(rnd(HAND[rnd(ev.more).a] || HAND.blade)), '', '#e8dcc6', true), L(f(rnd(MOREN)), '', '#e8dcc6', true)], min: 4 });
+    if (Math.random() < 0.85) beats.push({ shot: 'cHand', castFo: her, mean: M(ASP[a].ic, `她在为「${ASP[a].nm}」做准备`, fxA, ASP[a].col), lines: [L(f(rnd(HAND[a])), '', '#e8dcc6', true)] });
     const rows = [row(ev)].concat((ev.more || []).map(row));
     beats.push({ shot: 'cTwo', castFo: her, lines: [L(f(rnd(X.end)), nm, col)], min: 4.6, boost: { k: '宿 敌 变 强', n: nm, col, lv: `Lv.${ev.lv0} → <b>Lv.${ev.lv1}</b>`, rows, f: '下次遇到她时生效' + (a === 'ally' ? '：她不会一个人来' : '') } });
     if (side && side.length) beats.push(montage(her, side));
@@ -420,26 +485,27 @@ window.NemStory = (() => {
     const idn = (window.Lore && Lore.ID && Lore.ID[cc.id] && Lore.ID[cc.id].n) || cc.idN || cc.title || '旅人';
     const cx = Object.assign({}, c, { N: n }), f = t => fill(t, cx), col = '#ffb0a0';
     const pA = V(2.4, -0.5), pB = V(2.6, 0.75);
-    const her = await rig(hX, pA, face(pA, pB) + 0.35, 'Idle_Loop', used); st.rigs.push(her);
+    const her = await rig(hX, pA, face(pA, pB) + 0.35, 'Idle_Loop', used); st.rigs.push(her); her.role = '宿敌 · ' + idn; her.col = col;
     let other, oName, oTitle, oCol = '#d8d0c0';
     if (ev.a === 'ally' && ev.ally) { other = await rig(allyH(ev.ally), pB, face(pB, pA) - 0.35, 'Idle_Talking_Loop', used); oName = ev.ally.n; oTitle = ev.ally.t; oCol = '#a8e0ff'; cx.an = oName; cx.at = oTitle; }
     else { const h2 = RPG.foe(G().S, loc, (Math.random() * 4294967296) >>> 0, new Set(), new Set()); other = await rig(h2, pB, face(pB, pA) - 0.35, 'Idle_Talking_Loop', used); oName = h2.c.name || '路人'; oTitle = (window.Lore && Lore.ID && Lore.ID[h2.c.id] && Lore.ID[h2.c.id].n) || h2.c.idN || '收留她的人'; }
-    st.rigs.push(other); her.pair = other; other.pair = her;
-    const place = f(rnd(XPLACE)), card = { k: ev.why === 'origin' ? '新 宿 敌' : '宿 敌', n, t: idn, ch: ev.why === 'origin' ? ['🩸 从你刀下逃生', bio.secret ? '秘密 · ' + bio.secret : '记住了你的脸'].slice(0, 2) : [`Lv.${ev.lv0} → Lv.${ev.lv1}`, ASP[ev.a].ic + ' ' + ASP[ev.a].nm], col };
+    st.rigs.push(other); her.pair = other; other.pair = her; other.role = (ev.a === 'ally' ? '新同伴 · ' : '身边的人 · ') + oTitle; other.col = oCol;
+    const place = f(rnd(XPLACE)); cx.pl = place; const card = { k: ev.why === 'origin' ? '新 宿 敌' : '宿 敌', n, t: idn, ch: ev.why === 'origin' ? ['🩸 从你刀下逃生', bio.secret ? '秘密 · ' + bio.secret : '记住了你的脸'].slice(0, 2) : [`Lv.${ev.lv0} → Lv.${ev.lv1}`, ASP[ev.a].ic + ' ' + ASP[ev.a].nm], col };
     const ocard = { k: ev.a === 'ally' ? '新 同 伴' : '身 边 的 人', n: oName, t: oTitle, ch: [ev.a === 'ally' ? '👥 和' + n + '结盟' : '收留了她'], col: oCol };
     const beats = [];
     if (ev.why === 'origin') {
-      beats.push({ shot: 'cLow', castFo: her, card: { a: '她 活 了 下 来', b: n, c: `——${c.reg}，你没能砍下的那颗头` }, tag: '宿 敌 · 起 源', lines: [L(`那场战斗结束时，${n}拖着一条伤腿，躲进了${place.replace(/^.*· /, '')}。`, '', '#e8dcc6', true)], min: 4.2 });
+      beats.push({ shot: 'cLow', castFo: her, mean: M('🩸', '她活了下来，成为新的宿敌', ['老兵以上的敌人从你手里逃走就会变成宿敌（最多 6 人）', '她会随时间和仇恨变强，并在出猎时找上门'], col), card: { a: '她 活 了 下 来', b: n, c: `——${c.reg}，你没能砍下的那颗头` }, tag: '宿 敌 · 起 源', lines: [L(`那场战斗结束时，${n}拖着一条伤腿，躲进了${place.replace(/^.*· /, '')}。`, '', '#e8dcc6', true)], min: 4.2 });
       beats.push({ shot: 'cFace', castFo: her, cc: card, lines: [L(rnd(['我看见它的脸了……我记住了。', '它的刀离我的脖子只有一寸。一寸。', '它在笑。砍人的时候，它在笑。']), n, col)], min: 3.4 });
-      beats.push({ shot: 'cOS', castFo: other, cc: ocard, lines: [L(rnd(['别出声。它可能还在附近。', '把手松开，我给你包扎……你在发抖。', '从来没有人能从它手里逃出来。你是第一个。']), oName, oCol)] });
+      beats.push({ shot: 'cOS', castFo: other, cc: ocard, mean: M('🤝', `${oName} 收留了她`, ['她会在你看不见的地方恢复、训练', '每 5 分钟 +1 级，每次变强都会有新剧情'], col), lines: [L(rnd(['别出声。它可能还在附近。', '把手松开，我给你包扎……你在发抖。', '从来没有人能从它手里逃出来。你是第一个。']), oName, oCol)] });
       beats.push({ shot: 'cOS', castFo: her, cc: card, cc2: 1, lines: [L(bio.catch ? `……${bio.catch}` : '我不会再逃了。下一次，是我去找它。', n, col)] });
-      beats.push({ shot: 'cHand', castFo: her, lines: [L(rnd([`${n}把断掉的刀柄缠上布条，一圈，又一圈。`, `${n}在墙上刻下第一道痕。她说，每一道，都是它欠她的一天。`, `${n}把你的样子画在了纸上，钉在床头。`]), '', '#e8dcc6', true)] });
+      beats.push({ shot: 'cHand', castFo: her, mean: M('🔥', '她下定了决心', ['她已经被登记到宿敌名单（U 档案可查看）', '打败她 = 她从名单里消失'], '#ff9a8a'), lines: [L(rnd([`${n}把断掉的刀柄缠上布条，一圈，又一圈。`, `${n}在墙上刻下第一道痕。她说，每一道，都是它欠她的一天。`, `${n}把你的样子画在了纸上，钉在床头。`]), '', '#e8dcc6', true)] });
       beats.push({ shot: 'cEyes', castFo: her, lines: [L('食人魔。你会后悔放我走的。', n, col)], min: 4.6, boost: { k: '新 宿 敌', n, col, rows: [{ ic: '🩸', a: '她会追猎你', e: '出猎时可能找上门来', col: '#ff9a8a' }, { ic: '📈', a: '她会成长', e: '每 5 分钟 +1 级，每次变强都会有剧情', col: '#ffd890' }], f: '斩下她的头，这段恩怨才会结束' } });
     } else {
-      beats.push({ shot: 'cLow', castFo: her, card: { a: '此 刻 · 在 别 处', b: place, c: '——她没有忘记你' }, tag: '宿 敌 · ' + n, lines: [], min: 3.4 });
-      beats.push({ shot: 'cOS', castFo: other, cc: ocard, lines: [L(f(ev.a === 'ally' ? rnd(ALLYSAY) : rnd(XHELP)), oName, oCol)] });
+      beats.push({ shot: 'cLow', castFo: her, mean: M('🌒', '宿敌在你看不见的地方变强', [`${n} Lv.${ev.lv0} → Lv.${ev.lv1}（每 5 分钟 +1 级）`, '每次升级都会真的改写她的属性'], col), card: { a: '此 刻 · 在 别 处', b: place, c: rnd(['——她没有忘记你'].concat(TIMEP.map(t => '——' + t))) }, tag: '宿 敌 · ' + n, lines: [L(rnd([`${n}把新磨的刀搁在膝头上，盯着火苗发了很久的呆。`, `${c.reg}的传闻传到这里时，${n}正在换药。`, `${n}的脸上，还留着你那一刀的疤。`]), '', '#e8dcc6', true)], min: 4 });
+      beats.push({ shot: 'cOS', castFo: other, cc: ocard, mean: M(ASP[ev.a].ic, ev.a === 'ally' ? `新的同伴：${oName}` : `${oName} 陆续帮她变强`, aspFx(ev), ASP[ev.a].col), lines: [L(f(ev.a === 'ally' ? rnd(ALLYSAY) : rnd(XHELP)), oName, oCol)] });
       beats.push({ shot: 'cFace', castFo: her, cc: card, lines: [L(f(rnd(XSAY[ev.a] || XSAY.vow)), n, col)], min: 3.4 });
-      beats.push({ shot: 'cHand', castFo: her, lines: [L(f(rnd(HAND[ev.a]).replace(/\{sn\}/g, n).replace(/\{wpn\}/g, '刀')), '', '#e8dcc6', true)] });
+      if (Math.random() < 0.65) { beats.push({ shot: rnd(['cOS', 'cFace']), castFo: other, lines: [L(f(rnd(FOLLOW[ev.a] || FOLLOW.vow)), oName, oCol)] }); beats.push({ shot: rnd(['cFace', 'cEyes']), castFo: her, lines: [L(f(rnd(RESOLVE)), n, col)] }); }
+      beats.push({ shot: 'cHand', castFo: her, mean: M(ASP[ev.a].ic, `她在为「${ASP[ev.a].nm}」做准备`, aspFx(ev), ASP[ev.a].col), lines: [L(f(rnd(HAND[ev.a]).replace(/\{sn\}/g, n).replace(/\{wpn\}/g, '刀')), '', '#e8dcc6', true)] });
       const rows = [row(ev)].concat((ev.more || []).map(row));
       beats.push({ shot: 'cTwo', castFo: her, lines: [L(rnd(['这一次，轮到我找你了。', `${c.reg}见。`, '你会认出我的。我脸上，有你留下的疤。']), n, col)], min: 4.6, boost: { k: '宿 敌 变 强', n, col, lv: `Lv.${ev.lv0} → <b>Lv.${ev.lv1}</b>`, rows, f: '下次遇到她时生效' } });
       if (side && side.length) beats.push(montage(her, side));
@@ -457,16 +523,16 @@ window.NemStory = (() => {
   async function buildIntro(V, used, c) {
     if (!window.Hunters2) return null; const loc = curLoc(), ids = ['aerin', 'nove', 'gwen', 'mia'], rigs = {};
     const ctr = V(3.4, 0), xs = [-1.6, -0.55, 0.55, 1.6];
-    const hs = ids.map(id => Hunters2.recFor(id, loc)); const got = await Promise.all(ids.map((id, i) => { const p = V(3.0 + Math.abs(xs[i]) * 0.25, xs[i]); return rig(hs[i], p, face(p, V(0, 0)) + (xs[i] < 0 ? 0.25 : -0.25), HX[id].clip, used); })); ids.forEach((id, i) => { rigs[id] = got[i]; st.rigs.push(got[i]); });
+    const hs = ids.map(id => Hunters2.recFor(id, loc)); const got = await Promise.all(ids.map((id, i) => { const p = V(3.0 + Math.abs(xs[i]) * 0.25, xs[i]); return rig(hs[i], p, face(p, V(0, 0)) + (xs[i] < 0 ? 0.25 : -0.25), HX[id].clip, used); })); ids.forEach((id, i) => { rigs[id] = got[i]; st.rigs.push(got[i]); got[i].role = '猎手 · ' + Hunters2.BY[id].t; got[i].col = Hunters2.BY[id].col; });
     rigs.aerin.pair = rigs.mia; rigs.mia.pair = rigs.aerin; rigs.nove.pair = rigs.gwen; rigs.gwen.pair = rigs.nove;
     const beats = [];
-    beats.push({ shot: 'cLow', castFo: rigs.nove, card: { a: '猎 魔 公 会', b: '第 七 号 悬 赏 · 食 人 魔', c: `罪名：在九个地区砍下 ${c.heads} 颗首级　赏金：一万枚金币` }, tag: '序 章', lines: [L('悬赏单钉上墙的那天晚上，有四个人同时伸出了手。', '', '#e8dcc6', true)], min: 5 });
+    beats.push({ shot: 'cLow', castFo: rigs.nove, card: { a: '猎 魔 公 会', b: '第 七 号 悬 赏 · 食 人 魔', c: `罪名：在九个地区砍下 ${c.heads} 颗首级　赏金：一万枚金币` }, tag: '序 章', mean: M('📜', '悬赏令发布：全国都在找你', ['四名猎手会随你的仇恨变强，并在出猎时找上门', '每次她们变强，都会有一段剧情告诉你具体强在哪里']), lines: [L('悬赏单钉上墙的那天晚上，有四个人同时伸出了手。', '', '#e8dcc6', true)], min: 5 });
     for (const id of ids) {
       const d = Hunters2.BY[id], fo = rigs[id];
-      beats.push({ shot: id === 'gwen' ? 'cLow' : 'cFace', castFo: fo, cc: { k: '猎 手', n: d.n, t: d.t, ch: [d.ic + ' Lv.' + Hunters2.lvOf(id), d.style.split(/[，。]/)[0]], col: d.col }, lines: [L(INTRO[id][1], '', '#e8dcc6', true), L(INTRO[id][0], d.n, d.col)], min: 5 });
+      beats.push({ shot: id === 'gwen' ? 'cLow' : 'cFace', castFo: fo, mean: M(d.ic, `认识猎手：${d.n}`, [`她是四名猎手之一 · 当前 Lv.${Hunters2.lvOf(id)}`, d.style.split(/[，。]/)[0], '击败全部四人是胜利条件之一'], d.col), cc: { k: '猎 手', n: d.n, t: d.t, ch: [d.ic + ' Lv.' + Hunters2.lvOf(id), d.style.split(/[，。]/)[0]], col: d.col }, lines: [L(INTRO[id][1], '', '#e8dcc6', true), L(INTRO[id][0], d.n, d.col)], min: 5 });
     }
-    beats.push({ shot: 'cTwo', castFo: rigs.aerin, lines: [L('我们没必要做朋友。', '诺薇·灰隼', Hunters2.BY.nove.col), L('只要它的头落地就行。', '艾琳·晨星', Hunters2.BY.aerin.col), L('四个人，四个理由。目标只有一个——你。', '', '#e8dcc6', true)], min: 6 });
-    beats.push({ shot: 'cHand', castFo: rigs.mia, lines: [L('没有人注意到：悬赏单的落款处，没有名字，只印着一枚银色的新月。', '', '#d8d0ff', true)], min: 4.4 });
+    beats.push({ shot: 'cTwo', castFo: rigs.aerin, mean: M('⚔', '四人四个理由，目标只有一个', ['她们都会追猎你：猎手感应满了就会穿越到你所在的地图', '在场时所有的门都会封锁'], '#ffd890'), lines: [L('我们没必要做朋友。', '诺薇·灰隼', Hunters2.BY.nove.col), L('只要它的头落地就行。', '艾琳·晨星', Hunters2.BY.aerin.col), L('四个人，四个理由。目标只有一个——你。', '', '#e8dcc6', true)], min: 6 });
+    beats.push({ shot: 'cHand', castFo: rigs.mia, mean: M('🌙', '悬赏单落款的银色新月', ['主线：集齐 7 条「月之线索」，找出是谁在背后悬赏你', '线索来自各地区的「月之使者」和章节闪回'], '#c8b8ff'), lines: [L('没有人注意到：悬赏单的落款处，没有名字，只印着一枚银色的新月。', '', '#d8d0ff', true)], min: 4.4 });
     beats.push({ shot: 'cEyes', castFo: rigs.mia, lines: [L('……这个月印，我在禁书库里见过。是「月之魔女」。', '米娅·星语', Hunters2.BY.mia.col)], min: 5, boost: { k: '主 线', n: '🌙 月之魔女', col: '#c8b8ff', rows: [{ ic: '⚔', a: '四名猎手', e: '会追猎你、会逃走、会变强——每次变强都有剧情', col: '#ffd890' }, { ic: '🌙', a: '集齐 7 条月之线索', e: '找到是谁在背后悬赏你，然后砍下她的头', col: '#c8b8ff' }], f: '在各地区斩下“月之使者”或触发闪回得到线索' } });
     return { beats, rigs: st.rigs, col: '#c8b8ff' };
   }
@@ -489,10 +555,9 @@ window.NemStory = (() => {
       if (st || !on() || !G() || !G().S || !S().q.length) return false;
       const W = window.Worlds && Worlds.active && Worlds._W; if (!W || !W.B || W.dead || !W.graph) return false;
       const nd = W.graph.nodes[W.cur]; if (!nd || nd.eliteArena || nd.huntArena || W.graph.arena) return false;
-      if (!(nd.home || nd.stone)) return false;
       if (window.Elites && Elites.E) return false; if (window.Saga && Saga.cine) return false; if (window.Arrival2 && Arrival2.isOpen()) return false;
       return W.B !== W.__nsB || !(W.mapKey && W.mapKey === lastMap);
     } catch (e) { return false; }
   }
-  return { on, hold, apply, aff, S, ASP, grow, queue, pending, report, buffHTML, stat, get busy() { return !!st; }, _dbg: { start, pickEvent, poll } };
+  return { on, hold, apply, aff, S, ASP, grow, queue, pending, report, buffHTML, stat, preview, titleOf, get busy() { return !!st; }, _dbg: { start, pickEvent, poll } };
 })();

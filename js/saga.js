@@ -342,8 +342,9 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
     let sp = null; try { sp = CineScript.region(sg, opt); } catch (e) { console.warn('CineScript.region', e); }
     if (!sp) return false;
     let ended = false;
+    let epi = null; try { const L0 = (window.Lore && Lore.LOCS.find(l => l.k === sg.k)) || {}; epi = { kind: sg.envoy ? '月 之 使 者' : '地 区 电 影', title: `${L0.n || '新的地区'} · ${A.nm ? '异变：' + A.nm : '入场'}`, sub: sg.T ? `讨伐目标：${sg.T.title ? sg.T.title + '·' : ''}${sg.T.n}` : '', cast: (sp.actors || []).map(a => ({ n: a.nm || (a.h && a.h.c && a.h.c.name) || '', t: a.title || '', col: a.col || '' })).filter(c => c.n), col: sp.col }; } catch (e) { }
     const fin = () => { if (ended) return; ended = true; sg.cinDone = true; try { if (sg.onEnd) sg.onEnd(); } catch (e) { console.warn('saga end', e); } if (sg.chap && !sg.chapAwarded) awardChapter(sg); if (sg.hLate) { sg.hLate = false; setTimeout(() => { try { if (window.Hunters2 && Worlds.active) Hunters2.ambush(sg.hunterId); } catch (e) { } }, 1200); } };
-    CineStage.playHere({ actors: sp.actors, beats: sp.beats, col: sp.col, onEnd: fin }).then(ok => { if (!ok && !ended && !CN) { sg.noStage = true; let r = false; try { r = play(sg); } catch (e) { } if (!r) fin(); } }).catch(() => fin());
+    CineStage.playHere({ actors: sp.actors, beats: sp.beats, col: sp.col, episode: epi, onEnd: fin }).then(ok => { if (!ok && !ended && !CN) { sg.noStage = true; let r = false; try { r = play(sg); } catch (e) { } if (!r) fin(); } }).catch(() => fin());
     return true;
   }
   // R57 nem_story：通用短片播放器（宿敌插曲 / 人物起源），复用本电影的字幕/名牌/黑边/相机接管；beats 格式同 castBeats（castFo 必填），可加 card:{a,b,c} 标题卡

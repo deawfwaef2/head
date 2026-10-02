@@ -102,7 +102,7 @@ void main(){
     sh.renderOrder = -10; sh.scale.set(1.0, 1, 0.8);
     const rest = new Map(); for (const n of ['neck', 'head', 'spine', 'chest', 'upperChest']) { const b = f.bones[n]; if (b) rest.set(b, b.quaternion.clone()); }
     const nm = spec.nm || (h.c && h.c.name) || '';
-    return { spec, h, f, sh, nm, col: spec.col || '#f0e6d8', title: spec.title || '', rest, idle: spec.clip || 'Idle_Loop', clip: '', ly: 0, lp: 0, tgt: new V3(), hasT: false,
+    return { spec, h, f, sh, nm, col: spec.col || '#f0e6d8', title: spec.title || spec.role || '', rest, idle: spec.clip || 'Idle_Loop', clip: '', ly: 0, lp: 0, tgt: new V3(), hasT: false,
       blinkT: 1 + Math.random() * 3, talkT: 0, nodT: 9, exT: 0, emo: spec.emo || null, seed: Math.random() * 100, home: new V3(), facing: new V3(0, 0, 1), yaw: 0, walk: null, turn: null, on: true };
   }
   function dropActors(list) {
@@ -378,8 +378,9 @@ void main(){
       const lines = (b.stake ? [] : (b.lines || [])).map(l => Object.assign({}, l, { spk: findSpk(l, X) }));
       const actL = b.act ? (b.act instanceof Map ? [...b.act] : b.act).map(([s, c]) => [actOf(s), c]).filter(x => x[0]) : [];
       out.push({ src: b, X, shot: b.stake ? 'two' : SHOT[b.shot] || b.shot || 'mcu', lines, scene, act: actL, walk: b.walk ? Object.assign({}, b.walk, { a: actOf(b.walk.who) }) : null, tr: b.tr || (scene && i ? 'dip' : 'cut'),
-        card: b.card || null, cc: b.cc && !b.cc2 ? b.cc : null, boost: b.boost || null, stake: b.stake || null, tag: b.tag || '', min: b.min || 0, react: b.react !== false });
+        card: b.card || null, cc: b.cc && !b.cc2 ? b.cc : null, boost: b.boost || null, stake: b.stake || null, tag: b.tag || '', min: b.min || 0, react: b.react !== false, mean: b.mean || null });
     });
+    let last = null; for (const o of out) { if (o.mean) last = o.mean; else if (!o.boost && !o.stake) o.mean = last; } // 没写意义的镜头沿用上一幕
     return out;
   }
 
@@ -398,10 +399,12 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
 #csRoot.in .bar{transform:none}
 #csRoot .blk{position:absolute;inset:0;background:#000;opacity:1;transition:opacity .45s}
 #csRoot .blk.off{opacity:0}
-#csRoot .sub{position:absolute;left:50%;bottom:calc(var(--bh,12vh) * .5);transform:translate(-50%,50%);width:min(1100px,86vw);text-align:center}
-#csRoot .who{font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;font-size:13px;letter-spacing:.32em;font-weight:700;margin-bottom:7px;opacity:0;transition:opacity .25s;text-shadow:0 1px 6px #000}
-#csRoot .who.on{opacity:.95}
-#csRoot .ln{font-size:clamp(17px,1.55vw,25px);line-height:1.55;letter-spacing:.04em;text-shadow:0 2px 10px rgba(0,0,0,.9);min-height:1.55em;opacity:0;transition:opacity .2s}
+#csRoot .sub{position:absolute;left:50%;bottom:calc(var(--bh,12vh) * .5);transform:translate(-50%,50%);width:min(1100px,88vw);text-align:center}
+#csRoot .sub:before{content:"";position:absolute;left:-5vw;right:-5vw;top:-16px;bottom:-12px;background:radial-gradient(ellipse at 50% 55%,rgba(0,0,0,.66),transparent 76%);z-index:-1}
+#csRoot .who{font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;font-size:clamp(15px,1.3vw,21px);letter-spacing:.22em;font-weight:800;margin-bottom:6px;opacity:0;transition:opacity .25s;text-shadow:0 1px 8px #000,0 0 3px #000}
+#csRoot .who i{font-style:normal;font-size:.72em;font-weight:600;letter-spacing:.1em;margin-left:.9em;color:#d8cdbd}
+#csRoot .who.on{opacity:1}
+#csRoot .ln{font-size:clamp(21px,2vw,32px);font-weight:600;line-height:1.5;letter-spacing:.05em;text-shadow:0 2px 12px rgba(0,0,0,.95),0 0 3px #000;min-height:1.5em;opacity:0;transition:opacity .2s}
 #csRoot .ln.on{opacity:1}#csRoot .ln.it{font-style:italic;color:#d9cdb8}
 #csRoot .ln .gh{opacity:0}
 #csRoot .lt{position:absolute;right:6vw;text-align:right;bottom:calc(var(--bh,12vh) + 5vh);opacity:0;transform:translateX(18px);transition:opacity .5s,transform .7s cubic-bezier(.2,.9,.3,1)}
@@ -422,6 +425,26 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
 #csRoot .ttl .b:after{content:"";display:block;width:min(260px,22vw);height:1px;background:linear-gradient(90deg,var(--tc,#e7c27a),transparent);margin-top:14px}
 #csRoot .tag{position:absolute;left:4vw;top:calc(var(--bh,12vh) + 2.6vh);font-family:system-ui,"PingFang SC",sans-serif;font-size:11px;letter-spacing:.42em;color:var(--tc,#e7c27a);opacity:0;transition:opacity .6s}
 #csRoot .tag.on{opacity:.85}
+#csRoot .ep{position:absolute;left:4vw;top:calc(var(--bh,12vh) + 6.4vh);max-width:min(460px,42vw);padding:10px 18px 10px 14px;border-left:3px solid var(--ec,#e7c27a);background:linear-gradient(90deg,rgba(0,0,0,.68),rgba(0,0,0,0));opacity:0;transition:opacity .6s,left .9s,top .9s,max-width .9s,padding .9s;font-family:system-ui,"PingFang SC",sans-serif}
+#csRoot .ep.on{opacity:1}
+#csRoot .ep .k{font-size:12px;letter-spacing:.4em;color:var(--ec,#e7c27a)}
+#csRoot .ep .n{font-size:19px;font-weight:900;letter-spacing:.05em;margin-top:3px;text-shadow:0 2px 10px #000;transition:font-size .9s}
+#csRoot .ep .s{font-size:13px;color:#d8cdbd;margin-top:3px;text-shadow:0 1px 6px #000}
+#csRoot .ep .c{margin-top:8px;display:flex;flex-direction:column;gap:3px}
+#csRoot .ep .c span{text-shadow:0 1px 6px #000}#csRoot .ep .c b{color:var(--cc,#f0e6d8);font-size:14px;margin-right:8px;transition:font-size .9s}#csRoot .ep .c i{font-style:normal;font-size:12px;color:#cdbfae}
+#csRoot .ep .nt{margin-top:6px;font-size:11.5px;color:#a89c8c}
+#csRoot .ep.big{left:6vw;top:calc(var(--bh,12vh) + 5vh);max-width:min(760px,72vw);padding:20px 34px 20px 24px}
+#csRoot .ep.big .n{font-size:clamp(30px,3vw,46px)}#csRoot .ep.big .s{font-size:clamp(14px,1.2vw,18px)}#csRoot .ep.big .c b{font-size:clamp(17px,1.5vw,24px)}#csRoot .ep.big .c i{font-size:clamp(13px,1.1vw,16px)}
+#csRoot .mn{position:absolute;right:4vw;top:calc(var(--bh,12vh) + 6.4vh);width:min(390px,36vw);padding:12px 16px;border-left:3px solid var(--mc,#e7c27a);background:linear-gradient(90deg,rgba(0,0,0,.72),rgba(0,0,0,.45));opacity:0;transform:translateX(18px);transition:opacity .45s,transform .6s cubic-bezier(.2,.9,.3,1);font-family:system-ui,"PingFang SC",sans-serif;text-shadow:0 1px 6px #000}
+#csRoot .mn.on{opacity:1;transform:none}
+#csRoot .mn .k{font-size:11px;letter-spacing:.4em;color:var(--mc,#e7c27a)}
+#csRoot .mn .t{font-size:clamp(15px,1.25vw,19px);font-weight:800;margin:4px 0 8px;line-height:1.4}
+#csRoot .mn .f{font-size:clamp(13px,1.05vw,15px);line-height:1.6;color:#e8dcc8}
+#csRoot .mn .f b{display:inline-block;margin-right:8px;padding:0 7px;font-size:11px;letter-spacing:.2em;background:var(--mc,#e7c27a);color:#140e0a;border-radius:2px}
+#csRoot .vq{position:absolute;left:50%;top:calc(50% + 44px);transform:translateX(-50%);text-align:center;font-family:system-ui,"PingFang SC",sans-serif;color:#e8dcc8;opacity:0;transition:opacity .4s;max-width:80vw}
+#csRoot .vq.on{opacity:1}
+#csRoot .vq .h{font-size:12px;letter-spacing:.5em;color:var(--tc,#e7c27a);margin-bottom:8px}
+#csRoot .vq .l{font-size:clamp(15px,1.3vw,20px);line-height:1.8;text-shadow:0 2px 8px #000}#csRoot .vq .l.d{font-size:13px;color:#a89c8c}
 #csRoot .bst{position:absolute;right:5vw;top:50%;transform:translate(24px,-50%);width:min(380px,30vw);opacity:0;transition:opacity .5s,transform .7s cubic-bezier(.2,.9,.3,1);padding:20px 22px;border-left:2px solid var(--nc,#ffb070);background:linear-gradient(90deg,rgba(8,6,10,.82),rgba(8,6,10,.45))}
 #csRoot .bst.on{opacity:1;transform:translate(0,-50%)}
 #csRoot .bst .k{font-family:system-ui,"PingFang SC",sans-serif;font-size:11px;letter-spacing:.45em;color:var(--nc,#ffb070)}
@@ -465,13 +488,13 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
 <div class="loc"><div class="c"></div><div class="s"></div></div>
 <div class="lt"><div class="k"></div><div class="n"></div><div class="rule"></div><div class="t"></div><div class="ch"></div></div>
 <div class="ttl"><div class="a"></div><div class="b"></div><div class="c"></div></div>
-<div class="bst"></div><div class="sh"></div>
+<div class="bst"></div><div class="sh"></div><div class="ep"></div><div class="mn"></div><div class="vq"></div>
 <div class="stk"><div class="cd g" style="--sc:#ffe28a"><div class="h">若 她 倒 下</div><div class="v"></div><div class="e"></div></div><div class="cd x" style="--sc:#ff9a8a"><div class="h">若 她 活 着</div><div class="v"></div><div class="e"></div></div></div>
 <div class="sub"><div class="who"></div><div class="ln"></div></div>
 <div class="hint"><b>空格</b>继续　<b>Esc</b>跳过</div>`;
     document.body.appendChild(root);
     const q = s => root.querySelector(s);
-    el = { fd: q('.fd'), fl: q('.fl'), blk: q('.blk'), who: q('.who'), ln: q('.ln'), lt: q('.lt'), ttl: q('.ttl'), tag: q('.tag'), loc: q('.loc'), bst: q('.bst'), stk: q('.stk'), sg: q('.cd.g'), sx: q('.cd.x'), sh: q('.sh'), prog: q('.prog'), ld: q('.ld') };
+    el = { fd: q('.fd'), fl: q('.fl'), blk: q('.blk'), who: q('.who'), ln: q('.ln'), lt: q('.lt'), ttl: q('.ttl'), tag: q('.tag'), loc: q('.loc'), bst: q('.bst'), stk: q('.stk'), sg: q('.cd.g'), sx: q('.cd.x'), sh: q('.sh'), ep: q('.ep'), mn: q('.mn'), vq: q('.vq'), prog: q('.prog'), ld: q('.ld') };
     root.addEventListener('pointerdown', () => { if (A && A.phase === 'play') next(); });
   }
   function barH() { const w = innerWidth, h = innerHeight; return Math.max(h * 0.085, (h - w / 2.39) / 2); }
@@ -489,7 +512,34 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
     el.bst.innerHTML = `<div class="k">${esc(B.k)}</div><div class="n">${esc(B.n)}</div>${B.lv ? `<div class="lv">${B.lv}</div>` : ''}` + (B.rows || []).map((r, i) => `<div class="r" style="animation-delay:${0.4 + i * 0.3}s"><i>${r.ic}</i><div><div class="a" style="color:${r.col || '#fff'}">${esc(r.a)}</div><div class="e">${esc(r.e)}</div></div></div>`).join('') + (B.f ? `<div class="f">${esc(B.f)}</div>` : '');
     el.bst.classList.remove('on'); void el.bst.offsetWidth; el.bst.classList.add('on');
   }
-  function hideAll() { if (!el.ttl) return; for (const k of ['ttl', 'lt', 'bst', 'stk', 'sg', 'sx', 'sh', 'tag', 'ln', 'who', 'loc']) el[k].classList.remove('on'); }
+  function hideAll() { if (!el.ttl) return; for (const k of ['ttl', 'lt', 'bst', 'stk', 'sg', 'sx', 'sh', 'tag', 'ln', 'who', 'loc', 'ep', 'mn', 'vq']) el[k].classList.remove('on'); el.mn._m = null; }
+  // 每一幕的意义：这一幕在讲什么 + 对游戏造成的影响
+  function showMean(m) {
+    if (!m) { el.mn.classList.remove('on'); el.mn._m = null; return; }
+    if (el.mn._m === m) return; el.mn._m = m;
+    const fx = [].concat(m.fx || []).filter(Boolean);
+    el.mn.style.setProperty('--mc', m.col || (A && A.o && A.o.col) || '#e7c27a');
+    el.mn.innerHTML = `<div class="k">🎬 这 一 幕</div><div class="t">${m.ic ? esc(m.ic) + ' ' : ''}${esc(m.t || '')}</div>${fx.length ? `<div class="f"><b>影响</b>${fx.map(esc).join('<br>')}</div>` : ''}`;
+    el.mn.classList.remove('on'); void el.mn.offsetWidth; setTimeout(() => { if (el.mn._m === m) el.mn.classList.add('on'); }, 350);
+  }
+  // 剧情信息牌：开场大字展示「这是什么剧情 / 登场角色是谁」，5.5 秒后缩到角落常驻
+  function showEp(E) {
+    if (!E || !el.ep) return; el.ep.style.setProperty('--ec', E.col || '#e7c27a');
+    el.ep.innerHTML = `<div class="k">${esc(E.kind || '')}</div><div class="n">${esc(E.title || '')}</div>${E.sub ? `<div class="s">${esc(E.sub)}</div>` : ''}<div class="c">${(E.cast || []).map(c => `<span style="--cc:${esc(c.col || '#f0e6d8')}"><b>${esc(c.n)}</b>${c.t ? `<i>${esc(c.t)}</i>` : ''}</span>`).join('')}</div>${E.note ? `<div class="nt">${esc(E.note)}</div>` : ''}`;
+    el.ep.classList.add('big'); void el.ep.offsetWidth; el.ep.classList.add('on'); if (A) A.epT = 0;
+  }
+  // 进图黑场时列出将要播放的电影序列
+  let vqKey = '';
+  function veilInfo() {
+    const L = []; try { if (window.NemStory && NemStory.preview) L.push(...NemStory.preview()); } catch (e) { }
+    try { const sg = window.Saga && Saga.T, W = window.Worlds && Worlds._W; if (sg && !sg.cinDone && !sg.noNode && Saga.on()) { const nd = W && W.graph && W.graph.nodes[W.cur]; L.push('地区电影 · ' + ((nd && nd.loc && nd.loc.n) || '新的地区')); } } catch (e) { }
+    return L;
+  }
+  function updateVq() {
+    const L = veilInfo(), key = L.join('|'); if (key === vqKey) return; vqKey = key;
+    if (!L.length) { el.vq.classList.remove('on'); return; }
+    el.vq.innerHTML = `<div class="h">🎬 即 将 播 放</div>` + L.map((t, i) => `<div class="l${/^之后/.test(t) ? ' d' : ''}">${/^之后/.test(t) ? '' : ['①', '②', '③', '④'][i] + ' '}${esc(t)}</div>`).join(''); el.vq.classList.add('on');
+  }
 
   // ================= 播放 =================
   const lineDur = l => clamp(0.9 + String(l.t).replace(/[“”「」—…，。？！、]/g, '').length * 0.12, 1.8, 6.2);
@@ -505,7 +555,11 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
     let ok = false; const me = A; setTimeout(() => { if (A === me && A.phase === 'build') { console.warn('CineStage: build timeout'); stop(false); } }, 45000);
     try {
       const used = new Set();
-      for (const sp of o.actors) { const a = await buildActor(sp, used); if (A !== me) { dropActors([a]); return false; } A.acts.push(a); A.byFo.set(sp, a); }
+      for (const sp of o.actors) { if (sp.body) { used.add(sp.body); continue; } try { if (window.IdLook) IdLook.apply(sp.h); const h = sp.h; sp.body = Foe.bodyFor(h, mul(((h.look.seed || 7) * 2654435761) >>> 0), !!sp.boss, used); used.add(sp.body); } catch (e) { } }
+      const built = await Promise.all(o.actors.map(sp => buildActor(sp, used).catch(e => { console.warn('CineStage actor', e); return null; }))); // 模型并行搭（身体模板有缓存 Promise，不会重复读）
+      if (A !== me) { dropActors(built.filter(Boolean)); return false; }
+      if (built.some(a => !a)) { dropActors(built.filter(Boolean)); throw new Error('actor build failed'); }
+      o.actors.forEach((sp, i) => { A.acts.push(built[i]); A.byFo.set(sp, built[i]); });
       for (const a of A.acts) { const pr = a.spec.pair; a.pair = pr ? A.byFo.get(pr) || null : null; T.sc.add(a.f.root); T.sc.add(a.sh); setClip(a, a.idle, 0); try { a.f.mixer.setTime(Math.random() * 3); } catch (e) { } }
       matchLights(A.world.sc);
       A.beats = convert(o.beats);
@@ -518,6 +572,7 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
     A.phase = 'play'; A.bi = -1; A.t = 0; A.last = now();
     el.ld.classList.remove('on'); root.classList.add('in');
     beginBeat(0, true);
+    showEp(o.episode);
     setTimeout(() => { if (A === me) el.blk.classList.add('off'); }, 150);
     return true;
   }
@@ -538,6 +593,7 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
     for (const k of ['ttl', 'stk', 'sg', 'sx', 'sh']) el[k].classList.remove('on');
     el.tag.textContent = b.tag || ''; el.tag.classList.toggle('on', !!b.tag);
     if (!b.boost) showBoost(null);
+    showMean(b.boost || b.stake ? null : b.mean);
     if (b.scene && (i > 0 || A.scene !== b.scene)) enterScene(b.scene);
     if (b.scene && b.scene.cap && !b.card) showLoc(b.scene.cap, b.scene.sub);
     // 动作 / 走位
@@ -584,14 +640,14 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
       if (a === spk) { a.talkT = A.lineD * 0.85; a.nodT = 0; if (STAND.has(a.idle) && !a.walk) setClip(a, 'Idle_Talking_Loop'); }
       else if (a.clip === 'Idle_Talking_Loop' && a.idle !== 'Idle_Talking_Loop' && !a.walk) setClip(a, a.idle, 0.8);
     }
-    el.who.textContent = l.it ? '' : (l.w || ''); el.who.style.color = l.col || '#e7c27a'; el.who.classList.toggle('on', !!l.w && !l.it);
+    el.who.innerHTML = l.it ? '' : esc(l.w || '') + (spk && spk.title && l.w ? `<i>${esc(spk.title)}</i>` : ''); el.who.style.color = l.col || '#e7c27a'; el.who.classList.toggle('on', !!l.w && !l.it);
     el.ln.classList.toggle('it', !!l.it); el.ln.style.color = l.it ? '' : '#f6efe4';
     A.chars = Array.from(String(l.t)); el.ln.innerHTML = `<span class="vis"></span><span class="gh">${esc(l.t)}</span>`; el.ln.classList.add('on');
   }
   function typeTo(n) { const v = el.ln.querySelector('.vis'), gh = el.ln.querySelector('.gh'); if (!v) return; v.textContent = A.chars.slice(0, n).join(''); gh.textContent = A.chars.slice(n).join(''); }
   function update(dt) {
     if (!A || A.phase !== 'play') return;
-    A.t += dt;
+    A.t += dt; if (A.epT != null) { A.epT += dt; if (A.epT > 5.5) { A.epT = null; el.ep.classList.remove('big'); } }
     if (A.trans) { // 黑场转场：0.45s 变黑 → 换场 → 变亮
       const tr = A.trans; tr.t += dt;
       if (tr.t >= 0.5 && !tr.done) { tr.done = true; coreBeat(tr.i); el.blk.classList.add('off'); }
@@ -722,7 +778,8 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
   function hook(renderer) {
     if (A) return draw(renderer);
     if (veilWanted()) {
-      ensureUI(); if (!veilShown) { veilShown = true; veilAt = performance.now(); root.className = 'on'; el.blk.classList.remove('off'); el.ld.classList.add('on'); hideAll(); }
+      ensureUI(); if (!veilShown) { veilShown = true; veilAt = performance.now(); root.className = 'on'; el.blk.classList.remove('off'); el.ld.classList.add('on'); hideAll(); vqKey = ''; }
+      updateVq();
       const cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha(); renderer.setRenderTarget(null); renderer.setClearColor(0, 1); renderer.clear(); renderer.setClearColor(cc, ca);
       return true;
     }
@@ -750,5 +807,5 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
   }
   function playHere(o) { const w = worldHere(); if (!w) return Promise.resolve(false); o.world = w; o.hide = w.hide; return play(o); }
 
-  return { on, play, playHere, draw, hook, next, summary: showSummary, stop: () => stop(false), get active() { return !!A; }, get playing() { return !!A && A.phase === 'play'; }, get hold() { return !!A || veilOn(); }, get grace() { return !!A || veilOn() || performance.now() < graceT; }, _A: () => A, _stage: stage, SHOT };
+  return { _ui: { ensure: () => { ensureUI(); return el; }, showMean, showEp: e => showEp(e), updateVq }, on, play, playHere, draw, hook, next, summary: showSummary, stop: () => stop(false), get active() { return !!A; }, get playing() { return !!A && A.phase === 'play'; }, get hold() { return !!A || veilOn(); }, get grace() { return !!A || veilOn() || performance.now() < graceT; }, _A: () => A, _stage: stage, SHOT };
 })();

@@ -4536,3 +4536,13 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 进区域大窗口：`arrival2.js` 等待条件加入 `NemStory.busy/hold`、`CineStage.active/grace`，上限 40s→180s；弹出后 0.7s 内忽略关闭键（避免翻/跳过电影的按键把它刚弹出就关掉）。
 - 搜刮选择：`worlds.js` 的 `W.interNear` 改为距离 + 朝向评分（身后额外惩罚），范围略放大；`interMark()` 在当前目标脚下画一圈金环。
 - 注意：`replace_string_in_file` 的原始参数里不要写 `\uXXXX`/`\n`（会原样写进文件，曾把调用吞进注释）；中文直接写。
+
+## R66（宿敌剧情：每一幕有意义 / 序列预告 / 信息清晰 / 加载更快 / 更丰富）
+
+- 撤回 R65 的“只在洞口/魂门播”：宿敌剧情仍然在进入地点（加载地图）时插播，由进图黑场盖住加载。
+- 每一幕的意义：beat 新增 `mean: {ic, t, fx, col}`（`nemstory.js` / `cinescript.js` 里的 `M()`），CineStage 右上角 `.mn` 面板显示「这一幕」+ 标题 + 「影响」（对游戏的具体影响：生命/伤害/防御/移速、词缀、技能、同伴、仇恨、胜利条件、地区异变/讨伐目标奖励等）。没写 mean 的镜头沿用上一幕；有 boost/stake 卡的镜头隐藏面板。
+- 序列预告：宿敌排入新剧情时弹提示（`notifyQ`）；nemChip 显示「待播剧情 N 段」；进图黑场显示「即将播放 ① 宿敌插曲 · … ② 地区电影 · …」（`NemStory.preview()` + CineStage `.vq`）。
+- 信息清晰：CineStage 新增 `episode`（`.ep`）：开场大字显示剧情类型/标题/变化/登场角色（名字 + 身份），5.5 秒后缩到左上角常驻；字幕更大更粗，名字旁带身份；地区电影也有 `episode`。
+- 加载更快：`CineStage.play` 并行搭演员；`NemStory.prewarm()` 在无追击时一次一个预读将登场猎手的身体模板。
+- 更丰富：开场旁白/时间点/逃脱后/追问+回答/多次成长/额外宿敌追问等随机池（`TIMEP/OPENN/ESCN/ESCL/FOLLOW/RESOLVE/MOREN`），镜头与是否有手部特写随机；`cinescript.nem()` 里的 `her` 改取 `B[0].castFo`（额外宿敌插曲原先会认错主角）。
+- 事故：用 PowerShell 5.1 `Get-Content -Raw | Set-Content` 改 UTF-8 文件会按 ANSI 读写毁掉中文，必须 `git checkout` 恢复后重做；改文件只用编辑工具。
