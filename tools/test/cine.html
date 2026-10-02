@@ -1,0 +1,64 @@
+<!doctype html><meta charset="utf-8"><title>cine harness</title><base href="/">
+<!-- R59 cine_stage 测试台：真实 foe.js / VRoid 身体 / 头 + cinestage.js，假大地图（地面 + 柱子 + 雾）当背景。tools/test/cine.py 驱动。 -->
+<body style="margin:0;background:#000;overflow:hidden"><canvas id="cv" style="position:fixed;inset:0;width:100vw;height:100vh"></canvas>
+<script>
+window.__vt = 0; performance.now = () => window.__vt * 1000;
+window.SFX = new Proxy({}, { get: (t, k) => k === 'ctx' || k === 'out' ? undefined : () => {} });
+</script>
+<script src="/lib/three.min.js"></script><script src="/lib/GLTFLoader.js"></script>
+<script src="/js/mods.js"></script><script src="/js/lore.js"></script><script src="/js/rpg.js"></script>
+<script src="/models/AvatarSample_K.js"></script><script src="/js/hair_cover.js"></script><script src="/js/cc0mode.js"></script><script src="/js/heads.js"></script><script src="/js/headwear.js"></script><script src="/js/idlook.js"></script>
+<script src="/js/combat.js"></script><script src="/assets/limb_hand_avatar.js"></script><script src="/assets/ogre_body.js"></script><script src="/js/cfx3d.js"></script><script src="/js/fpv.js"></script><script src="/js/stamina.js"></script><script src="/js/vroid_pack.js"></script><script src="/js/foe.js"></script><script src="/js/foe_roles.js"></script><script src="/js/foe_roles2.js"></script><script src="/js/foe_roles3.js"></script><script src="/js/foe_ai2.js"></script><script src="/js/foe_mind.js"></script><script src="/js/foe_abs.js"></script><script src="/js/talents_data.js"></script><script src="/js/talents.js"></script>
+<script src="/js/persona_lines.js"></script><script src="/js/persona.js"></script>
+<script src="/js/cinestage.js"></script>
+<script>
+const V3 = THREE.Vector3;
+async function setup() {
+  const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('cv'), antialias: true, stencil: true, preserveDrawingBuffer: true });
+  renderer.setSize(innerWidth, innerHeight, false); renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+  const sc = new THREE.Scene(); sc.background = new THREE.Color(0x8a9ab0); sc.fog = new THREE.Fog(0x8a9ab0, 8, 60);
+  sc.add(new THREE.HemisphereLight(0xbcd0ff, 0x4a3a2a, 0.9)); const sun = new THREE.DirectionalLight(0xffd9a8, 2.2); sun.position.set(20, 30, 10); sc.add(sun);
+  const gm = new THREE.MeshStandardMaterial({ color: 0x5d6b3a, roughness: 1 }); const fl = new THREE.Mesh(new THREE.PlaneGeometry(200, 200, 1, 1).rotateX(-Math.PI / 2), gm); sc.add(fl);
+  const rnd = (() => { let a = 5; return () => (a = (a * 16807) % 2147483647) / 2147483647; })();
+  for (let i = 0; i < 90; i++) { const r = 6 + rnd() * 40, an = rnd() * 6.28, x = Math.cos(an) * r, z = Math.sin(an) * r; const h = 3 + rnd() * 5;
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.25, h, 7), new THREE.MeshStandardMaterial({ color: 0x4a3626 })); t.position.set(x, h / 2, z); sc.add(t);
+    const c = new THREE.Mesh(new THREE.ConeGeometry(1.3 + rnd(), 3 + rnd() * 2, 8), new THREE.MeshStandardMaterial({ color: 0x2f4a2a })); c.position.set(x, h + 0.8, z); sc.add(c); }
+  for (let i = 0; i < 14; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(2 + rnd() * 3, 1.5 + rnd() * 3, 2 + rnd() * 3), new THREE.MeshStandardMaterial({ color: 0x8a7f72, roughness: 0.9 })); const an = rnd() * 6.28, r = 9 + rnd() * 20; b.position.set(Math.cos(an) * r, 0.8, Math.sin(an) * r); b.rotation.y = rnd() * 3; sc.add(b); }
+  const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 500); sc.add(camera);
+  window.G = { renderer, camera, scene: sc, S: { eq: {}, stats: {}, bosses: {} }, player: { pos: new V3(), yaw: 0, pitch: 0 }, setUI() { }, lockPointer() { }, toast() { } };
+  window.__game = G; G.HOOK = { frame: [], pre: [] };
+  await ModelHeads.init();
+  return 'ok';
+}
+const BODIES = ['Vita', 'Victoria_Rubin', 'HairSample_Female', 'Osage'];
+function mkH(seed, name, li) { const h = RPG.foe(G.S, Lore.LOCS[li || 2], seed >>> 0, new Set(), new Set()); h.c = Object.assign({}, h.c, { name }); return h; }
+function startCine(kind) {
+  const L = (t, w, col, it) => ({ t, w: w || '', col: col || '', it: !!it });
+  let actors, beats, info = {};
+  if (kind === 'intro') {
+    const nm = ['诺薇·灰隼', '艾琳·晨星', '格温·铁砧', '米娅·星语'], col = ['#9ad0ff', '#ffd27a', '#ff9a6a', '#c8b8ff'];
+    actors = nm.map((n, i) => ({ h: mkH(1000 + i * 77, n), body: BODIES[i], nm: n, col: col[i] })); actors[0].pair = actors[3]; actors[3].pair = actors[0]; actors[1].pair = actors[2]; actors[2].pair = actors[1];
+    beats = [{ shot: 'cLow', castFo: actors[0], card: { a: '猎 魔 公 会', b: '第 七 号 悬 赏 · 食 人 魔', c: '罪名：在九个地区砍下 37 颗首级　赏金：一万枚金币' }, tag: '序 章', lines: [L('悬赏单钉上墙的那天晚上，有四个人同时伸出了手。', '', '#e8dcc6', true)], min: 5 }];
+    nm.forEach((n, i) => beats.push({ shot: i === 2 ? 'cLow' : 'cFace', castFo: actors[i], cc: { k: '猎 手', n, t: '赏金追迹者', ch: ['Lv.3', '远程'], col: col[i] }, lines: [L('王国最贵的赏金追迹者。她能从一滴干掉的血里读出你走过的路。', '', '#e8dcc6', true), L('我从没失手过。它是第一个。也会是最后一个。', n, col[i])] }));
+    beats.push({ shot: 'cTwo', castFo: actors[1], lines: [L('我们没必要做朋友。', nm[0], col[0]), L('只要它的头落地就行。', nm[1], col[1]), L('四个人，四个理由。目标只有一个——你。', '', '#e8dcc6', true)] });
+    beats.push({ shot: 'cEyes', castFo: actors[3], lines: [L('……这个月印，我在禁书库里见过。是「月之魔女」。', nm[3], col[3])], boost: { k: '主 线', n: '🌙 月之魔女', col: '#c8b8ff', rows: [{ ic: '⚔', a: '四名猎手', e: '会追猎你、会逃走、会变强——每次变强都有剧情', col: '#ffd890' }, { ic: '🌙', a: '集齐 7 条月之线索', e: '找到是谁在背后悬赏你，然后砍下她的头', col: '#c8b8ff' }], f: '在各地区斩下“月之使者”或触发闪回得到线索' } });
+  } else {
+    actors = [{ h: mkH(4242, '莉瑟'), body: 'Vita', nm: '莉瑟', col: '#ffe0a8' }, { h: mkH(9191, '塔妮娅'), body: 'HairSample_Female', nm: '塔妮娅', col: '#c8e8ff' }]; actors[0].pair = actors[1]; actors[1].pair = actors[0];
+    info = { title: { a: '第 3 次 踏 入', b: '荒 原', c: '黄昏 · 风很大' }, finale: { a: '讨 伐', b: '薇塔', c: '「荒原之主」' } };
+    beats = [
+      { shot: 'cLow', castFo: actors[0], title: true, lines: [L('“又是你。上次你走的时候，井边少了三个人。”', '莉瑟 · 牧羊人', '#ffe0a8')], min: 5 },
+      { shot: 'cFace', castFo: actors[0], cc: { k: '这 片 土 地 上 的 人', n: '莉瑟', t: '牧羊人', ch: ['性格 · 倔强', '喜欢 · 羊毛', '怕 · 打雷'], col: '#ffe0a8' }, tag: '异变 · 血雾', lines: [L('“羊群三天没回圈了。雾里有东西在叫。”', '莉瑟 · 牧羊人', '#ffe0a8')] },
+      { shot: 'cOS', castFo: actors[1], cc: { k: '另 一 位', n: '塔妮娅', t: '草药师', ch: ['性格 · 冷静'], col: '#c8e8ff' }, lines: [L('“别看它。它会记住看过它的人。”', '塔妮娅', '#c8e8ff'), L('“我说真的。”', '塔妮娅', '#c8e8ff')] },
+      { shot: 'cOS', castFo: actors[0], lines: [L('“那就让它记住。我不怕。”', '莉瑟 · 牧羊人', '#ffe0a8')] },
+      { shot: 'cHand', castFo: actors[1], lines: [L('塔妮娅把一束干枯的鼠尾草塞进了门缝。', '', '#e8dcc6', true)] },
+      { shot: 'cTwo', castFo: actors[0], lines: [L('“听说北边的石阵下面，有人在点灯。”', '塔妮娅', '#c8e8ff'), L('“谁会在那种地方点灯？”', '莉瑟 · 牧羊人', '#ffe0a8')] },
+      { shot: 'cEyes', castFo: actors[0], stake: { good: '血雾散去，羊群回家。', bad: '雾会漫到下一个村子。', ge: '✦ 魂晶 +35% · 持续 2 趟', be: '✧ 敌人伤害 +12% · 持续 2 趟', head: '' }, lines: [] },
+      { shot: 'cOver', castFo: actors[1], finale: true, lines: [L('石阵。点灯的人。今晚就去。', '我', '#fff', true)] }
+    ];
+  }
+  window.__ended = null;
+  const w = { sc: G.scene, H: () => 0, ctr: new V3(0, 0, -3.2), aud: new V3(0, 0, 1), hide: () => { } };
+  return CineStage.play({ actors, beats, col: '#c8b8ff', info, world: w, onEnd: n => { window.__ended = n ? 'nat' : 'skip'; } });
+}
+function step(sec) { const n = Math.round(sec * 30); for (let i = 0; i < n; i++) { window.__vt += 1 / 30; CineStage.draw(G.renderer); } }
+</script>

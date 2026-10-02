@@ -255,6 +255,7 @@ window.NemStory = (() => {
   // ---- 临时演员 ----
   function mul(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   async function rig(h, pos, yaw, clip, used) {
+    if (st && st.stage) return { h, clip: clip || 'Idle_Loop', nm: (h.c && h.c.name) || '', stageSpec: 1 }; // R59 cine_stage：只给演员表，由摄影棚搭模型/站位
     const C = Foe.ctx && Foe.ctx(), W = Worlds._W; if (!C || !C.sc) throw new Error('no ctx');
     if (window.IdLook) { try { IdLook.apply(h); } catch (e) { } }
     const r = mul(((h.look.seed || 7) * 2654435761) >>> 0), body = Foe.bodyFor(h, r, false, used); used.add(body);
@@ -279,7 +280,7 @@ window.NemStory = (() => {
   const face = (a, b) => Math.atan2(b.x - a.x, b.z - a.z);
 
   async function start(ev, side) {
-    st = { phase: 'build', rigs: [], t0: performance.now(), ev };
+    st = { phase: 'build', rigs: [], t0: performance.now(), ev, stage: !!(window.CineStage && CineStage.on()) };
     const W = Worlds._W, P0 = W.pos, yaw = G().player.yaw, fw = { x: -Math.sin(yaw), z: -Math.cos(yaw) }, rt = { x: Math.cos(yaw), z: -Math.sin(yaw) };
     const V = (f, r) => new THREE.Vector3(P0.x + fw.x * f + rt.x * r, 0, P0.z + fw.z * f + rt.z * r);
     const used = new Set(), c = Object.assign(deeds(), {}); if (ev.lk) { const L = locOf(ev.lk); if (L) c.reg = L.n; }
@@ -291,6 +292,11 @@ window.NemStory = (() => {
     } catch (e) { console.warn('NemStory build', e); }
     if (!st || st.ev !== ev) { if (spec) dropRigs(spec.rigs); return; }
     if (!spec || !spec.beats.length) { abort(); return; }
+    if (st.stage) { // R59：摄影棚播放（变强卡/名牌/标题卡都在摄影棚 UI 里）
+      st.phase = 'play'; const s0 = st;
+      CineStage.playHere({ actors: spec.rigs, beats: spec.beats, col: spec.col, onEnd: () => { if (st === s0) abort(); } }).then(ok => { if (!ok && st === s0) abort(); }).catch(e => { console.warn('NemStory stage', e); if (st === s0) abort(); });
+      return;
+    }
     st.rigs = spec.rigs; st.phase = 'play'; animLast = 0; animRaf = requestAnimationFrame(animLoop);
     timing(spec.beats);
     const ok = window.Saga && Saga.reel && Saga.reel({ beats: spec.beats, col: spec.col, onBeat: b => boost(b), onEnd: () => { boost(null); abort(); } });

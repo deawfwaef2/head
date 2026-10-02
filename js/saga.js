@@ -327,9 +327,24 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
     ensure(); sg.shown = true;
     const L = LOC(sg.k); let beats = null;
     if (talkOn()) { try { const cast = castPick(sg); beats = talkScript(sg, cast); if (beats) { const hu = cast.filter(c => c.hunter); if (hu.length) { const cb = castBeats(hu, 1); if (cb.length) { cb[cb.length - 1].cut = true; beats.splice(1, 0, ...cb); } } } } catch (e) { console.warn('Saga talk', e); beats = null; } }
+    if (beats && stagePlay(sg, beats, D.REG[sg.k] ? D.REG[sg.k].col : '#e7c27a')) return true;
     if (!beats) beats = script(sg);
     if (!talkOn() || !beats.some(b => b.castFo)) try { const cast = castPick(sg), lv = sg.vis <= 2 ? 0 : sg.vis <= 5 ? 1 : 2, cb = castBeats(cast.slice(0, lv === 2 ? 1 : 2), lv); if (cb.length) { let ti = beats.findIndex(b => b.title); ti = ti < 0 ? 0 : ti; beats.splice(ti + 1, 0, ...cb); } } catch (e) { console.warn('Saga cast', e); }
     return startCN(sg, beats, D.REG[sg.k] ? D.REG[sg.k].col : '#e7c27a', 700);
+  }
+  // R59 cine_stage：对话剧本交给摄影棚（演员 = 在场女人的克隆，同身体同头）；失败时退回旧播放器
+  const STAGE_CN = { stage: 1, beats: [], bi: -1 };
+  function stagePlay(sg, beats, col) {
+    if (!window.CineStage || !CineStage.on() || !beats.length || !beats.every(b => b.castFo && b.castFo.f && b.castFo.h)) return false;
+    const map = new Map(), actors = [];
+    for (const b of beats) { const fo = b.castFo; if (map.has(fo)) continue; const sp = { h: fo.h, body: fo.f.bodyName, clip: /Idle/.test(fo.idleClip || '') ? fo.idleClip : 'Idle_Loop', nm: (fo.h.c && fo.h.c.name) || '', boss: !!fo.boss, src: fo }; map.set(fo, sp); actors.push(sp); }
+    for (const sp of actors) sp.pair = sp.src.pair ? map.get(sp.src.pair) || null : null;
+    const A = sg.arch || {}, L = LOC(sg.k), T0 = sg.T || {};
+    const sb = beats.map(b => { const o = Object.assign({}, b, { castFo: map.get(b.castFo) }); if (b.stake) o.stake = Object.assign({}, b.stake, { ge: A.boon && FX_TXT[A.boon] ? (sg.envoy ? `✦ 月之线索 +1（${clues() + 1}/${D.NEED}）· ${FX_TXT[A.boon][0]}` : '✦ ' + FX_TXT[A.boon][0] + ' · 持续 2 趟') : '', be: A.bane && FX_TXT[A.bane] ? '✧ ' + FX_TXT[A.bane][0] + (A.bane === 'hate' || A.bane === 'plunder' ? '' : ' · 持续 2 趟') : '' }); return o; });
+    const info = { title: { a: sg.vis <= 1 ? '初 访' : `第 ${sg.vis} 次 踏 入`, b: L.n, c: (sg.env && sg.env.sky) || '' }, finale: T0.n ? { a: '讨 伐', b: T0.n, c: T0.title ? `「${T0.title}」` : '' } : null };
+    const fin = () => { sg.cinDone = true; try { if (sg.onEnd) sg.onEnd(); } catch (e) { console.warn('saga end', e); } if (sg.chap && !sg.chapAwarded) awardChapter(sg); };
+    CineStage.playHere({ actors, beats: sb, col, info, onEnd: fin }).then(ok => { if (!ok && !CN && !sg.cinDone) { try { if (!startCN(sg, beats, col, 0)) fin(); } catch (e) { fin(); } } }).catch(() => fin());
+    return true;
   }
   // R57 nem_story：通用短片播放器（宿敌插曲 / 人物起源），复用本电影的字幕/名牌/黑边/相机接管；beats 格式同 castBeats（castFo 必填），可加 card:{a,b,c} 标题卡
   function reel(o) {
@@ -622,5 +637,5 @@ ${rwHTML(sg, win)}<div class="go"><button data-sgok>收下结算 ▶</button></d
     return `<div class="r3-goal" style="display:block;padding:14px 18px"><div style="font-size:20px;font-weight:900;color:#e8e0ff;letter-spacing:.2em">🌙 主线 · 月之魔女　${m ? '✔ 已斩杀' : cn >= D.NEED ? '· 神殿已开' : ''}</div><div style="margin:8px 0">${pips}<b style="font-size:20px;color:#fff;margin-left:8px">${cn}/${D.NEED}</b></div>${list || '<div style="font-size:15px;color:#b8a8d8">在各个地区斩下“月之使者”，或触发章节闪回，得到线索。集齐 7 条，月之魔女的神殿向你敞开。</div>'}</div>`;
   }
   const dbgBtn = null;
-  return { _talk: (sg, cast) => talkScript(sg, cast), on, cam, reel, castShot: (t, fo) => castShot(t, fo), pendingCine: () => !!CN || !!(on() && T && !T.noNode && !T.cinDone && Worlds.active && (!T.readyAt || performance.now() - T.readyAt < 15000)), get cine() { return CN; }, NEED: D.NEED, clues, giveClue, goalHTML, gen, script, play, end, next, resolve, onKill, SS, banner, showSettle, FX_TXT, _setT: v => { T = v; }, get T() { return T; }, hint: v => `🌙 月之线索 ${clues()}/${D.NEED} · 月之魔女 ${v.m ? '✔' : '✘'}` };
+  return { _talk: (sg, cast) => talkScript(sg, cast), on, cam, reel, castShot: (t, fo) => castShot(t, fo), pendingCine: () => !!CN || !!(window.CineStage && CineStage.active) || !!(on() && T && !T.noNode && !T.cinDone && Worlds.active && (!T.readyAt || performance.now() - T.readyAt < 15000)), get cine() { return CN || (window.CineStage && CineStage.active ? STAGE_CN : null); }, NEED: D.NEED, clues, giveClue, goalHTML, gen, script, play, end, next, resolve, onKill, SS, banner, showSettle, FX_TXT, _setT: v => { T = v; }, get T() { return T; }, hint: v => `🌙 月之线索 ${clues()}/${D.NEED} · 月之魔女 ${v.m ? '✔' : '✘'}` };
 })();
