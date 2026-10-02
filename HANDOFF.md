@@ -2053,3 +2053,12 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 宿敌档案：Nemesis.dossierHTML()（塞勒涅之影 + s.extra 每人名字/性格/当前等级/成长）挂在 U 猎手档案窗口底部；#nemChip 加「U 档案」提示。
 - foe.js 逃跑：fair_fight 下每 2s 检查进度，卡住就换门（fleeBan）+ 绕路，连卡 3 次且你在 7m 外就算她溜走。
 - F 回忆（recall_iw）：game.js 连点复位逻辑跳过 RecallIW.active；pre() 每帧保持 uiOpen 并解锁鼠标，不再突然变回第一人称；回忆视角 FOV 收窄 14%（头更大）。
+## R55 (残肢器官编辑器 / 战场解剖挑选 / 移除工坊断肢制作)
+用户要求：① MOD `part_editor`（默认关）= 残肢器官编辑器，只能从 MOD 面板该行展开后的按钮打开，且必须已「开启并应用」(`Mods.on`)；② 移除工坊里的断肢制作；③ 部位只来自战场上解剖尸体，用选择界面，每件都有用处，**不含头部器官**。
+- `js/organs.js`：OG 加 `cat`('limb'|'organ')；新增肢体 upperarm/forearm/thigh/calf/chest；brain/eye/tongue 标 `hid:1`（旧存档仍可摆放，不再可解剖）；`poolOf()`、`limbModel()`（**肢体占位模型=圆柱+关节球，是对“不自制模型”规则的临时例外，只为让编辑器导入真模型前不空白**）；`model()` 优先用 `PartStore.model()`，`jar:false` 时不带标本罐。
+- `js/dissect.js`（新，MOD `dissect_pick` 默认开）：`Dissect.open(L,done)` 选择界面；名额 3(+1 稀有≥2,+3 boss)；每具尸体只掷一次(`L.dpool`)，未选的丢失。`sack.js` 解剖按钮改调它。
+- `js/partstore.js`（新）：IndexedDB `soulhead_parts` + `assets/custom_parts/manifest.js` + `<id>.js`(base64)；自带 OBJ/MTL/STL 解析，glb/gltf 用 GLTFLoader；`load()` 做检查报告（面数/体积/贴图缺失/过大/NPOT/无UV）。`replaces` 覆盖内置键的模型与名称；新部位注册为 `OG['cp_<id>']`。
+- `js/partedit.js`（新）：编辑器界面（左列表/中预览+导入+报告/右表单），保存到浏览器与「保存到游戏目录」(showDirectoryPicker，需 Chromium，会校验 index.html)。
+- `js/mods.js`/`mods_i18n.js`：新增 `dissect_pick`、`part_editor`；MOD 行支持 `btn:{l,o,f}` 按钮（`data-a="mbtn"`）。
+- `js/workshop.js`：`onSever` 变空操作；body 拆解配方标 `legacy:1`（`sack.js` 仅在持有对应材料时显示）；h3/a3/a4 配方改用 bone/sinew/hide。`js/props.js`：断手/断脚/肠索不再出现在制作列表（已有的仍可摆放）。
+- 测试：`tools/test/partedit.html`（独立 harness）。FBX/.blend 不支持，需先转 glb。

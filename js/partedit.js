@@ -64,7 +64,7 @@ window.PartEdit = (() => {
     busy = true; msg('正在解析并检查……'); try { const L = await PS().load(files); D.files = files; D.raw = L.group; D.rep = L.rep; D.stats = L.stats; D.imgs = L.imgs; D.fmt = L.stats.fmt; if (!quiet && !D.name) D.name = files[0].name.replace(/\.[^.]+$/, ''); msg('检查完成：' + (L.rep.some(r => r[0] === 'err') ? '有错误，需处理后才能保存' : '可以保存')); }
     catch (e) { D.rep = [['err', '导入失败', e.message]]; D.raw = null; D.files = null; D.stats = null; D.imgs = []; msg(e.message, 1); } busy = false;
   }
-  async function onFiles(list) { if (!D) { D = blank(); cur = { id: D.id }; } const fs = []; for (const f of list) fs.push({ name: f.name, buf: await f.arrayBuffer() }); if (!fs.length) return; await ingest(fs); draw(); showModel(); }
+  async function onFiles(list) { if (!D) { D = blank(); cur = { id: D.id }; } const fs = []; for (const f of Array.from(list)) fs.push({ name: f.name, buf: await f.arrayBuffer() }); if (!fs.length) return; await ingest(fs); draw(); showModel(); }
   function msg(t, bad) { const m = root && root.querySelector('#peMsg'); if (m) { m.textContent = t; m.style.color = bad ? '#ff9a8a' : '#cfe8c8'; } }
   // ---------- 界面 ----------
   const fxText = fx => { const a = []; if (fx.st) for (const [k, v] of Object.entries(fx.st)) if (v) a.push(`${SN[k] || k} +${v}`); if (fx.au) a.push(`光环 ×${(1 + fx.au).toFixed(2)}`); if (fx.pk) a.push(`戳击 ×${(1 + fx.pk).toFixed(2)}`); if (fx.tk && fx.tk.n) a.push(`每 ${fx.tk.every}s 产出 ${TK[fx.tk.kind] || fx.tk.kind}×${fx.tk.n}`); return a.join(' · ') || '（没有任何用途——请至少设一项）'; };
@@ -114,7 +114,7 @@ ${rep && PS().recs.has(D.id) ? '<button id="peRevert" style="width:100%;margin-t
   function bind() {
     const q = s => root.querySelector(s), L = q('.L'), M = q('.Mb'), Rr = q('.Rr');
     L.onclick = e => { const del = e.target.closest('[data-del]'); if (del) { e.stopPropagation(); delPart(del.dataset.del); return; } const it = e.target.closest('.it'); if (it) pick(it.dataset.id ? { id: it.dataset.id } : { k: it.dataset.k }); if (e.target.id === 'peNew') { D = blank(); cur = { id: D.id }; draw(); showModel(); } };
-    const dz = q('#peDz'), fi = q('#peFile'); if (dz) { q('#peBrowse').onclick = () => fi.click(); fi.onchange = () => { onFiles(fi.files); fi.value = ''; }; dz.ondragover = e => { e.preventDefault(); dz.classList.add('hv'); }; dz.ondragleave = () => dz.classList.remove('hv'); dz.ondrop = e => { e.preventDefault(); dz.classList.remove('hv'); onFiles(e.dataTransfer.files); }; }
+    const dz = q('#peDz'), fi = q('#peFile'); if (dz) { q('#peBrowse').onclick = () => fi.click(); fi.onchange = () => { onFiles(Array.from(fi.files)); fi.value = ''; }; dz.ondragover = e => { e.preventDefault(); dz.classList.add('hv'); }; dz.ondragleave = () => dz.classList.remove('hv'); dz.ondrop = e => { e.preventDefault(); dz.classList.remove('hv'); onFiles(e.dataTransfer.files); }; }
     const MM = q('.M'); MM.ondragover = e => e.preventDefault(); MM.ondrop = e => { e.preventDefault(); onFiles(e.dataTransfer.files); };
     const refresh = (full) => { readForm(); if (full) showModel(); else if (D.raw) showModel(); };
     Rr.oninput = e => { if (e.target.closest('#pName')) { readForm(); return; } refresh(e.target.type === 'range'); };

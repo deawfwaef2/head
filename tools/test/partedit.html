@@ -1,0 +1,10 @@
+<!doctype html><meta charset="utf-8"><title>partedit harness</title><base href="/">
+<body style="margin:0;background:#222">
+<script src="/lib/three.min.js"></script><script src="/lib/GLTFLoader.js"></script>
+<script>
+window.Mods={on:()=>true};
+const IT={herb:{n:'草药',icon:'🌿'},dust:{n:'魂尘'}};window.Sack={IT,def(id,o){IT[id]=Object.assign({},o)},mk(id,n,x){return Object.assign({id,n},x)},itemsOf:L=>L.items||(L.items=[]),inv:()=>({stash:[],sack:{items:[]}})};
+window.G={toast(t){window.__toast=t},save(){}};
+window.Props={};
+</script>
+<script src="/js/organs.js"></script><script src="/js/partstore.js"></script><script src="/js/partedit.js"></script><script src="/js/dissect.js"></script>

@@ -33,7 +33,7 @@ window.Organs = (() => {
     forearm:  { cat: 'limb', n: '前臂', icon: '🤚', st: { agi: 1, str: 1 }, pk: 0.1, r: 3, p: 0.9, note: '细长的两根骨，握过无数次刀柄。戳击加成。' },
     thigh:    { cat: 'limb', n: '大腿', icon: '🦵', st: { con: 2 }, au: 0.05, p: 0.9, note: '全身最粗的一块肌腱与骨。体魄加成，带光环。' },
     calf:     { cat: 'limb', n: '小腿', icon: '🦶', st: { agi: 2 }, tk: { every: 55, kind: 'herb', n: 1 }, p: 0.9, note: '又直又硬的小腿骨。敏捷加成，定时出草药。' },
-    chest:    { cat: 'limb', n: '胸腔', icon: '🫁', st: { con: 2, ter: 1 }, au: 0.07, r: 3.5, p: 0.7, note: '肋骨围成的笼子，里面空了。体魄与胆魄加成，光环范围大。' }
+    chest:    { cat: 'limb', n: '胸腔', icon: '🦴', st: { con: 2, ter: 1 }, au: 0.07, r: 3.5, p: 0.7, note: '肋骨围成的笼子，里面空了。体魄与胆魄加成，光环范围大。' }
   };
   for (const k in OG) if (!OG[k].cat) OG[k].cat = 'organ';
   const BEAST = ['heart', 'lung', 'liver', 'kidney', 'stomach', 'gut', 'spleen', 'blood', 'thigh', 'calf', 'chest'];
