@@ -4455,3 +4455,14 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 重新用 63 个奇幻关键词扫 Hub（授权三项全允许），去重后按爱心数排序，只看 ≥40 爱心的 132 个角色缩略图，人工挑 34 个（剔除版权角色/裸露/男性/Q 版/现代装），下载 25 个，23 个过体型质检推上 origin，13 个登记进 `js/vroid_pack.js`（现 181 条左右）。
 - 授权全允许的模型里高人气的本就稀少（最高才 ~800 爱心）；这批多为あわ、Arcroid、巫女/炼金/精灵/酒馆风。署名见 `CREDITS.md`；id 清单 `tools/hub/ids/n1.txt`。
 - 注意：沙箱 /tmp 只有 ~1GB，gitsetup 克隆和管线同时跑会 "No space left on device"，先等 gitsetup 完成。
+
+## R63b · 音效反馈大升级（真实 CC0 录音 + 战斗分情境 + 多环境声）〔与另一位 agent 的 R63 DevLab 同号，这条是音效〕
+- 用户要求：「音效反馈做足，战斗不同音效感，各种环境音效，做完推送」。
+- **新增 MOD**：`sfx_pack`（🎧 真实音效，默认开）、`sfx_amb`（🌬️ 环境声层，默认开）。关掉 = 回到原来的合成音。注意 `Mods.on()` 读的是启动时状态，开关需重载生效。
+- **新文件**：`js/sfxpack.js`（`window.SfxPack`，运行时包住 `CombatFX.event/swing/thrust/whiff/draw/clang/hurt/enemySwing/windup/roleCue/stamina`、`SFX.play(名字)/thud/chop/squish/roar/soul/levelup/fanfare/coins/…`、`Steps.player`，在原合成音之上叠真实录音）、`sfx/pack.js`（2.4MB，≈58 个采样池 mp3 base64）、`sfx/amb.js`（1.2MB，12 条无缝循环）、`tools/build_sfxpack.py`（从 `/home/user/aud/x/` 的 CC0 源重建，源文件不入库）、`tools/sfxdemo.html`（双击试听页，92 个按钮，走游戏同一条音频链）。pack/amb 按需注入 `<script>`，file:// 可用。
+- **战斗分情境**：挥击按武器类别（blunt/blade/flail/axe/scythe/rapier，`G.S.eq.weapon` 索引 0..6）；命中按 武器×对方材质（血肉/皮甲/重甲/野兽）×力度/部位（头部加脆响，破绽加“叮”，连击音阶上行）；击杀（普通/重甲/野兽/霸主）、斩首（嘶-噗-颅落地-身倒下，配慢放特写）、断肢；格挡/弹刀/破防/重击撞盾/完美格挡/闪避；你受伤分轻重（重伤耳鸣+环境声被压低）；敌人出招按角色（野兽咬、蛮兵地面一震、霸主低吼、刺客拔刃…）；命中/格挡时对环境层 `duck`。`CombatFX.setMix(0.6)` 把合成层降到 0.6 垫底（新接口：`js/combatfx.js` 的 `dryK`）。
+- **环境**：`SfxPack.env()` 随 `Worlds._W.graph.nodes[cur].style` 切换（同 `Ambience.scene()`）；洞穴=长混响+滴水+火；草甸/森林/荒野/废墟/沼泽/要塞/王城夜/深渊/山巅各有循环层 + 随机远处事件（乌鸦/狼嚎/雷/沙沙/吱呀/钟/幽魂/碎石）；低血量心跳随血量加速。循环层总比例 `AMBK=0.36`（洞穴环境声约 −29~−31 dB RMS，“安全舒适”，不要调大）。
+- **脚步**：`Steps.player` 被包一层加真实脚步；`js/steps.js` 敌人脚步处调用 `SfxPack.foot(surf,pos,k,d)`。**装具**：`js/rigging.js` 新增 `snd()`，优先 `SfxPack.cue('nail'|'pull'|'chain'|'hook'|'ring'|'weight'|'lantern'|'bell')`，没加载时退回 `SFX.play`。**野兽**：`js/beasts.js` stub 增 `beast:e.k`（命中材质识别），`CombatFX.on` 时不再叠旧 chop/squish。
+- **改动文件**：js/sfxpack.js(新) js/combatfx.js js/mods.js js/mods_i18n.js index.html js/beasts.js js/steps.js js/rigging.js sfx/*(新) tools/build_sfxpack.py(新) tools/sfxdemo.html(新) CREDITS.md。
+- **测试**：真 AudioContext 下 92 个按钮全部点击无报错、58 池全部解码；通过 analyser 实测：洞穴环境 ≈−29 dB RMS，命中峰值 0.43–0.72，重伤峰值已压回；完整 index.html 无头加载超时（环境限制），未做整游戏内实测。**沙箱无法“听”，音色需用户试听反馈。**
+- **授权**：全部 CC0（来源列表见 CREDITS.md 与 `tools/build_sfxpack.py` 头部）；CC-BY 的 `wind-loop`(AntumDeluge) 已排除。
