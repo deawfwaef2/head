@@ -158,7 +158,7 @@ window.Autopsy = (() => {
     let k0 = 1; while (k0 < L - 1 && Math.hypot(pts[k0][0] - pts[0][0], pts[k0][1] - pts[0][1]) < 30) k0++; let k1 = L - 2; while (k1 > 0 && Math.hypot(pts[k1][0] - pts[L - 1][0], pts[k1][1] - pts[L - 1][1]) < 30) k1--;
     const t0 = tang(pts[k0], pts[0]), t1 = tang(pts[k1], pts[L - 1]), E = 5000, P = [[pts[0][0] + t0[0] * E, pts[0][1] + t0[1] * E]].concat(pts, [[pts[L - 1][0] + t1[0] * E, pts[L - 1][1] + t1[1] * E]]), sg = []; let cum = -E;
     for (let i = 0; i < P.length - 1; i++) { const a = P[i], b = P[i + 1], dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1e-6; sg.push({ ax: a[0], ay: a[1], dx, dy, l, l2: l * l, nx: -dy / l, ny: dx / l, c: cum }); cum += l; }
-    const res = { d: 0, s: 0, P };
+    const res = { d: 0, s: 0, P, len: cum - E };
     res.at = (px, py) => { let bd = 1e18, bi = 0, bt = 0; for (let i = 0; i < sg.length; i++) { const g = sg[i]; let t = ((px - g.ax) * g.dx + (py - g.ay) * g.dy) / g.l2; t = t < 0 ? 0 : t > 1 ? 1 : t; const qx = g.ax + g.dx * t - px, qy = g.ay + g.dy * t - py, d2 = qx * qx + qy * qy; if (d2 < bd) { bd = d2; bi = i; bt = t; } }
       const g = sg[bi]; let nx = g.nx, ny = g.ny; if (bt <= 0 && bi > 0) { nx += sg[bi - 1].nx; ny += sg[bi - 1].ny; } else if (bt >= 1 && bi < sg.length - 1) { nx += sg[bi + 1].nx; ny += sg[bi + 1].ny; }
       const qx = px - (g.ax + g.dx * bt), qy = py - (g.ay + g.dy * bt); res.d = (qx * nx + qy * ny >= 0 ? 1 : -1) * Math.sqrt(bd); res.s = g.c + bt * g.l; return res.d; };
@@ -169,7 +169,7 @@ window.Autopsy = (() => {
     const used = new Uint8Array(m), loops = []; const pd = (a, b) => Math.hypot(V[a * S] - V[b * S], V[a * S + 1] - V[b * S + 1], V[a * S + 2] - V[b * S + 2]);
     for (let i = 0; i < m; i++) { if (used[i]) continue; used[i] = 1; const chain = [Q.segs[2 * i]]; let cur = Q.segs[2 * i + 1], closed = false, guard = 0;
       while (guard++ < 200000) { if (cur === chain[0]) { closed = true; break; } chain.push(cur); const L = start.get(cur); let nx = -1; if (L) for (const j of L) if (!used[j]) { nx = j; break; } if (nx < 0) break; used[nx] = 1; cur = Q.segs[2 * nx + 1]; }
-      if (chain.length >= 3 && (closed || pd(chain[0], cur) < 0.3)) loops.push(chain); }
+      if (chain.length >= 3 && (closed || pd(chain[0], cur) < (Q.tol || 0.3))) loops.push(chain); }
     if (!loops.length) return;
     const L2 = loops.map(l => { const pts = l.map(i => { const q = tool.proj(V[i * S], V[i * S + 1], V[i * S + 2]); return new T.Vector2(q[0], q[1]); }); let ar = 0; for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; ar += a.x * b.y - b.x * a.y; } return { l, pts, ar: Math.abs(ar / 2) }; }).filter(x => x.ar > 1e-8).sort((a, b) => b.ar - a.ar);
     const inside = (pt, poly) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const a = poly[i], b = poly[j]; if ((a.y > pt.y) !== (b.y > pt.y) && pt.x < (b.x - a.x) * (pt.y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; };
@@ -179,6 +179,7 @@ window.Autopsy = (() => {
     for (const x of L2) { if (x.depth % 2 === 1) continue; const contour = x.pts, holes = x.holes.map(h => h.pts), all = x.l.concat(...x.holes.map(h => h.l));
       const all2 = contour.concat(...holes); let tris; try { tris = T.ShapeUtils.triangulateShape(contour, holes); } catch (e) { continue; } const base = V.length / S;
       let u0 = 1e18, u1 = -1e18, w0 = 1e18, w1 = -1e18; for (const q of contour) { if (q.x < u0) u0 = q.x; if (q.x > u1) u1 = q.x; if (q.y < w0) w0 = q.y; if (q.y > w1) w1 = q.y; } const cu = (u0 + u1) / 2, cw = (w0 + w1) / 2, hu = Math.max((u1 - u0) / 2, 1e-6), hw = Math.max((w1 - w0) / 2, 1e-6);
+      if (Q.cmap) all.forEach((vi, qi) => Q.cmap.push(base + qi, vi));
       all.forEach((vi, qi) => { const nn = tool.nrm(V[vi * S], V[vi * S + 1], V[vi * S + 2]); V.push(V[vi * S], V[vi * S + 1], V[vi * S + 2], nn[0] * sign, nn[1] * sign, nn[2] * sign, 1, 1, 1, 1, 1, 1, 0, 0, -1, (all2[qi].x - cu) / hu, (all2[qi].y - cw) / hw, reg(vi)); });
       for (const t of tris) { const a = (base + t[0]) * S, b = (base + t[1]) * S, c = (base + t[2]) * S; const ux = V[b] - V[a], uy = V[b + 1] - V[a + 1], uz = V[b + 2] - V[a + 2], vx = V[c] - V[a], vy = V[c + 1] - V[a + 1], vz = V[c + 2] - V[a + 2];
         const d = (uy * vz - uz * vy) * V[a + 3] + (uz * vx - ux * vz) * V[a + 4] + (ux * vy - uy * vx) * V[a + 5]; if (d >= 0) Q.I.push(base + t[0], base + t[1], base + t[2]); else Q.I.push(base + t[0], base + t[2], base + t[1]); } }
@@ -196,25 +197,70 @@ window.Autopsy = (() => {
     const comps = [];
     sets.forEach((s, si) => { const nv = s.V.length / S, par = new Int32Array(nv).map((_, i) => i), find = x => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
       for (let t = 0; t < s.I.length; t += 3) { const a = find(s.I[t]), b = find(s.I[t + 1]), c = find(s.I[t + 2]); par[b] = a; par[find(c)] = find(a); }
+      if (s.cmap) for (let i = 0; i < s.cmap.length; i += 2) par[find(s.cmap[i])] = find(s.cmap[i + 1]);
+      if (s.ties) for (let i = 0; i < s.ties.length; i += 2) par[find(s.ties[i])] = find(s.ties[i + 1]);
       const m = new Map(); for (let t = 0; t < s.I.length; t += 3) { const r = find(s.I[t]); let c = m.get(r); if (!c) { c = { si, tris: [], bb: new T.Box3() }; m.set(r, c); comps.push(c); } c.tris.push(t); for (let k = 0; k < 3; k++) { const v = s.I[t + k] * S; c.bb.expandByPoint(new V3(s.V[v], s.V[v + 1], s.V[v + 2])); } } });
     const par = comps.map((_, i) => i), find = x => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
-    for (let i = 0; i < comps.length; i++) { const a = comps[i].bb.clone().expandByScalar(0.012); for (let j = i + 1; j < comps.length; j++) if (a.intersectsBox(comps[j].bb)) par[find(j)] = find(i); }
+    const ovl = (a, b) => { let v = 1, va = 1, vb = 1; for (const k of ['x', 'y', 'z']) { const ea = Math.max(a.max[k] - a.min[k], 0.01), eb = Math.max(b.max[k] - b.min[k], 0.01), ov = Math.min(a.max[k], b.max[k]) - Math.max(a.min[k], b.min[k]) + 0.01; if (ov <= 0) return 0; v *= ov; va *= ea; vb *= eb; } return v / Math.min(va, vb); };
+    for (let i = 0; i < comps.length; i++) for (let j = i + 1; j < comps.length; j++) if (comps[i].si !== comps[j].si && ovl(comps[i].bb, comps[j].bb) >= 0.5) par[find(j)] = find(i);
     const gs = new Map(); comps.forEach((c, i) => { const r = find(i); if (!gs.has(r)) gs.set(r, []); gs.get(r).push(c); });
     const out = []; for (const g of gs.values()) { const per = new Map(); let nt = 0; for (const c of g) { if (!per.has(c.si)) per.set(c.si, []); per.get(c.si).push(...c.tris); nt += c.tris.length; }
       if (nt < 30) continue; const ns = []; for (const [si, tris] of per) { const s = sets[si], remap = new Map(), V = [], I = []; for (const t of tris) for (let k = 0; k < 3; k++) { const x = s.I[t + k]; let m = remap.get(x); if (m === undefined) { m = V.length / S; remap.set(x, m); for (let q = 0; q < S; q++) V.push(s.V[x * S + q]); } I.push(m); } ns.push({ V, I, skin: s.skin, cap: s.cap, cloth: s.cloth, nm: s.nm, map: s.map, at: s.at }); }
       const bb = bbOf(ns), sz = bb.getSize(new V3()); if (Math.max(sz.x, sz.y, sz.z) < 0.012) continue; out.push({ sets: ns, bb, pts: [], bones: [] }); }
     return out;
   }
-  function cutPart(part, tool) { // → [partsFront, partsBack] 或 null
-    const bF = [], bB = [], discs = []; for (const b of part.bones || []) { const da = tool.fn(b.a[0], b.a[1], b.a[2]), db = tool.fn(b.b[0], b.b[1], b.b[2]);
-      if (da >= 0 && db >= 0) bF.push(b); else if (da < 0 && db < 0) bB.push(b); else { const t = da / (da - db), m = [b.a[0] + (b.b[0] - b.a[0]) * t, b.a[1] + (b.b[1] - b.a[1]) * t, b.a[2] + (b.b[2] - b.a[2]) * t]; if (da >= 0) { bF.push({ a: b.a, b: m, r: b.r }); bB.push({ a: m, b: b.b, r: b.r }); } else { bB.push({ a: b.a, b: m, r: b.r }); bF.push({ a: m, b: b.b, r: b.r }); } discs.push({ p: m, r: b.r }); } }
-    const side = [[], []], dDone = [false, false]; for (const s of part.sets) { const r = sliceSet(s, tool.fn); for (let k = 0; k < 2; k++) if (r[k].I.length >= 9) { if (s.cap && r[k].segs.length) addCaps(r[k], tool, k === 0 ? -1 : 1); if (s.cap === 1 && !dDone[k] && discs.length) { dDone[k] = true; addDiscs(r[k], discs, tool, k === 0 ? -1 : 1); } side[k].push(compact(r[k], s)); } }
-    if (!side[0].length || !side[1].length) return null;
-    const res = [0, 1].map(k => { const ps = components(side[k]); for (const p of ps) { for (const s of p.sets) if (s.cap !== undefined) calcNormalsKeepCap(s); } return ps; });
-    if (!res[0].length || !res[1].length) return null;
-    for (const pt of part.pts) { const k = tool.fn(pt.p[0], pt.p[1], pt.p[2]) >= 0 ? 0 : 1, q = new V3(...pt.p); let best = res[k][0], bd = 1e9; for (const p of res[k]) { const dd = p.bb.distanceToPoint(q); if (dd < bd) { bd = dd; best = p; } } best.pts.push(pt); }
-    [bF, bB].forEach((L, k) => { for (const b of L) { const q = new V3((b.a[0] + b.b[0]) / 2, (b.a[1] + b.b[1]) / 2, (b.a[2] + b.b[2]) / 2); let best = res[k][0], bd = 1e9; for (const p of res[k]) { const dd = p.bb.distanceToPoint(q); if (dd < bd) { bd = dd; best = p; } } best.bones.push(b); } });
-    return res;
+  // 刀路切割：切面 = 从相机穿过你划的线的所有射线，但只在线“真正划过”的范围内生效——
+  // 线的某一端落在身体上＝刀在那里收住（不会把整具身体顺着方向全切开）；某一端划出了身体＝切穿。
+  // 切口没把身体完全切断时，就只是一道切口（裂缝），身体仍是一块。
+  function sliceSlit(set, tool, rng, gap) {
+    const V0 = set.V, I0 = set.I, nv = V0.length / S, dist = new Float32Array(nv);
+    for (let i = 0; i < nv; i++) dist[i] = tool.fn(V0[i * S], V0[i * S + 1], V0[i * S + 2]);
+    const V = V0.slice(), I = [], segsF = [], segsB = [], cache = new Map(); let cuts = 0;
+    const cutE = (a, b) => { const key = a < b ? a * nv + b : b * nv + a; if (cache.has(key)) return cache.get(key); let r = null;
+      if ((dist[a] >= 0) !== (dist[b] >= 0)) { const t = dist[a] / (dist[a] - dist[b]), row = []; for (let k = 0; k < S; k++) row.push(V0[a * S + k] + (V0[b * S + k] - V0[a * S + k]) * t); row[S - 1] = V0[a * S + S - 1];
+        const sv = tool.sAt(row[0], row[1], row[2]); if (sv >= rng[0] && sv <= rng[1]) { const l = Math.hypot(row[3], row[4], row[5]) || 1; row[3] /= l; row[4] /= l; row[5] /= l; const nn = tool.nrm(row[0], row[1], row[2]); r = [V.length / S, V.length / S + 1]; const f = row.slice(), bk = row.slice(); for (let k = 0; k < 3; k++) { f[k] += nn[k] * gap; bk[k] -= nn[k] * gap; } for (const v of f) V.push(v); for (const v of bk) V.push(v); cuts++; } }
+      cache.set(key, r); return r; };
+    for (let t = 0; t < I0.length; t += 3) {
+      const a = I0[t], b = I0[t + 1], c = I0[t + 2], ea = cutE(a, b), eb = cutE(b, c), ec = cutE(c, a), n = (ea ? 1 : 0) + (eb ? 1 : 0) + (ec ? 1 : 0);
+      if (!n) { I.push(a, b, c); continue; }
+      if (n === 1) { let u, v, w, e; if (ea) { u = a; v = b; w = c; e = ea; } else if (eb) { u = b; v = c; w = a; e = eb; } else { u = c; v = a; w = b; e = ec; } I.push(u, e[dist[u] >= 0 ? 0 : 1], w, e[dist[v] >= 0 ? 0 : 1], v, w); continue; }
+      let p0, p1, p2, e01, e20; if (ea && ec) { p0 = a; p1 = b; p2 = c; e01 = ea; e20 = ec; } else if (ea && eb) { p0 = b; p1 = c; p2 = a; e01 = eb; e20 = ea; } else { p0 = c; p1 = a; p2 = b; e01 = ec; e20 = eb; }
+      const lf = dist[p0] >= 0, s0 = lf ? 0 : 1, o0 = 1 - s0;
+      I.push(p0, e01[s0], e20[s0], e01[o0], p1, p2, e01[o0], p2, e20[o0]);
+      if (lf) { segsF.push(e01[0], e20[0]); segsB.push(e20[1], e01[1]); } else { segsB.push(e01[1], e20[1]); segsF.push(e20[0], e01[0]); }
+    }
+    return { V, I, segsF, segsB, cuts };
+  }
+  // 原网格里互相挨着的“孤岛”（比如手和手臂是两块不连通的网格）：各取一对最近的顶点当作“绑在一起”，
+  // 这样切开之后，手会跟着它连着的那一截走，而不是另成一块
+  function islandTies(s) {
+    const V = s.V, I = s.I, nv = V.length / S, par = new Int32Array(nv).map((_, i) => i), find = x => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+    for (let t = 0; t < I.length; t += 3) { const a = find(I[t]), b = find(I[t + 1]), c = find(I[t + 2]); par[b] = a; par[find(c)] = find(a); }
+    const seen = new Uint8Array(nv), isl = new Map(); for (let t = 0; t < I.length; t++) { const v = I[t]; if (seen[v]) continue; seen[v] = 1; const r = find(v); let o = isl.get(r); if (!o) { o = { vs: [], bb: new T.Box3() }; isl.set(r, o); } o.vs.push(v); o.bb.expandByPoint(new V3(V[v * S], V[v * S + 1], V[v * S + 2])); }
+    const L = [...isl.values()].filter(o => o.vs.length >= 12), ties = [];
+    for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { if (!L[i].bb.clone().expandByScalar(0.012).intersectsBox(L[j].bb)) continue; const A = L[i].vs, B = L[j].vs, sa = Math.max(1, Math.floor(A.length / 300)), sb = Math.max(1, Math.floor(B.length / 300)); let bd = 1e18, ba = -1, bb = -1;
+      for (let x = 0; x < A.length; x += sa) for (let y = 0; y < B.length; y += sb) { const p = A[x] * S, q = B[y] * S, d = (V[p] - V[q]) ** 2 + (V[p + 1] - V[q + 1]) ** 2 + (V[p + 2] - V[q + 2]) ** 2; if (d < bd) { bd = d; ba = A[x]; bb = B[y]; } }
+      if (ba >= 0) ties.push(ba, bb); }
+    return ties;
+  }
+  function cutPart(part, tool, gap) { // → 新的块列表（一刀没切到任何东西就返回 null）；没切断时返回 1 块（带切口）
+    const rng = tool.rng || [-Infinity, Infinity], comb = []; let cuts = 0;
+    for (const s of part.sets) { const r = sliceSlit(s, tool, rng, gap || 0.0025); cuts += r.cuts; const set = { V: r.V, I: r.I, skin: s.skin, cap: s.cap, cloth: s.cloth, nm: s.nm, map: s.map, at: s.at, cmap: [], ties: islandTies(s) };
+      if (s.cap && r.segsF.length) { addCaps({ V: r.V, I: r.I, segs: r.segsF, cmap: set.cmap, tol: 0.6 }, tool, -1); addCaps({ V: r.V, I: r.I, segs: r.segsB, cmap: set.cmap, tol: 0.6 }, tool, 1); }
+      comb.push(set); }
+    if (!cuts) return null;
+    const pieces = components(comb); if (!pieces.length) return null; if (pieces.length < 2 && !gap) return cutPart(part, tool, 0.008); // 没切断＝一道切口：把口子撑开一点，看得见
+    const ownerOf = q => { let bi = 0, bd = 1e18; pieces.forEach((p, k) => { for (const s of p.sets) { const V = s.V; for (let i = 0; i < V.length; i += S) { const d = (V[i] - q[0]) ** 2 + (V[i + 1] - q[1]) ** 2 + (V[i + 2] - q[2]) ** 2; if (d < bd) { bd = d; bi = k; } } } }); return bi; };
+    for (const pt of part.pts) pieces[ownerOf(pt.p)].pts.push(pt);
+    for (const b of part.bones || []) { const da = tool.fn(b.a[0], b.a[1], b.a[2]), db = tool.fn(b.b[0], b.b[1], b.b[2]); let m = null;
+      if ((da >= 0) !== (db >= 0)) { const t = da / (da - db); m = [b.a[0] + (b.b[0] - b.a[0]) * t, b.a[1] + (b.b[1] - b.a[1]) * t, b.a[2] + (b.b[2] - b.a[2]) * t]; const sv = tool.sAt(m[0], m[1], m[2]); if (!(sv >= rng[0] && sv <= rng[1])) m = null; }
+      if (!m) { pieces[ownerOf([(b.a[0] + b.b[0]) / 2, (b.a[1] + b.b[1]) / 2, (b.a[2] + b.b[2]) / 2])].bones.push(b); continue; }
+      const oa = ownerOf([(b.a[0] + m[0]) / 2, (b.a[1] + m[1]) / 2, (b.a[2] + m[2]) / 2]), ob = ownerOf([(b.b[0] + m[0]) / 2, (b.b[1] + m[1]) / 2, (b.b[2] + m[2]) / 2]);
+      if (oa === ob) { pieces[oa].bones.push(b); continue; }
+      pieces[oa].bones.push({ a: b.a, b: m, r: b.r }); pieces[ob].bones.push({ a: m, b: b.b, r: b.r });
+      [[oa, da >= 0 ? -1 : 1], [ob, da >= 0 ? 1 : -1]].forEach(([k, sg]) => { const sk = pieces[k].sets.find(x => x.cap === 1) || pieces[k].sets[0]; addDiscs(sk, [{ p: m, r: b.r }], tool, sg); }); }
+    for (const p of pieces) { p.bb = bbOf(p.sets); }
+    return pieces;
   }
   // 换素衣：布料层只留“躯干到大腿根”那一段，颜色换成亚麻色（不会脱成裸体）。深拷贝，以免污染撤销用的旧块
   function linenize(part) {
@@ -285,10 +331,10 @@ if ( vTw < -0.5 ) {
     const fo = L.fo, f = fo.f; let B = L.apBake; // 只烘一次、词条只掷一次
     if (!B) { let root; try { root = Foe.cloneSkinned(f.root); B = bake(root); } catch (e) { console.warn('autopsy bake', e); B = null; } if (!B) { window.G && G.toast && G.toast('这具尸体没法放上解剖台', '#e88', 2); if (window.Dissect) Dissect.open(L, done); return; } const c = fo.h && fo.h.c, rar = c ? c.rar | 0 : 0; B.pts = rollAffixes(B.BN, rar, !!(fo.boss || fo.isBoss)); L.apBake = B; }
     const c = fo.h && fo.h.c, own = c ? c.name : (L.name || '无名者').replace(/的尸体$/, ''), race = c ? (c.raceN || c.race) : '', rar = c ? c.rar | 0 : 0;
-    const root = document.createElement('div'); root.id = 'apRoot'; root.innerHTML = `<canvas id="apCv"></canvas><svg id="apLn"><polyline id="apLx" fill="none" stroke="#ffe9a8" stroke-opacity=".6" stroke-width="2.5" stroke-dasharray="2 10" stroke-linecap="round" display="none"/><polyline id="apL" fill="none" stroke="#ffe9a8" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 6px #ff9a40)" display="none"/></svg>
+    const root = document.createElement('div'); root.id = 'apRoot'; root.innerHTML = `<canvas id="apCv"></canvas><svg id="apLn"><circle id="apT0" r="11" fill="rgba(255,210,120,.18)" stroke="#ffd27a" stroke-width="3" display="none"/><circle id="apT1" r="11" fill="rgba(255,210,120,.18)" stroke="#ffd27a" stroke-width="3" display="none"/><polyline id="apLx" fill="none" stroke="#ffe9a8" stroke-opacity=".6" stroke-width="2.5" stroke-dasharray="2 10" stroke-linecap="round" display="none"/><polyline id="apL" fill="none" stroke="#ffe9a8" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 6px #ff9a40)" display="none"/></svg>
 <div class="hd"><h1>🔪 解剖台</h1><p>尸体：<b>${esc(own)}</b>　${esc(race || '')} · ${(window.Organs && Organs.RN[rar]) || ''}</p></div>
-<div class="tools"><div class="tl on" data-tool="cut"><i>🔪</i><span>切割</span><small>1 · 拖线</small></div><div class="tl" data-tool="move"><i>🤲</i><span>举起</span><small>2 · 抓住拖</small></div><div class="tl" data-tool="rot"><i>🔄</i><span>旋转</span><small>3 · 拖动</small></div><div class="tl off" data-tool="pose"><i>🧍</i><span>摆姿势</span><small>4 · 拖关节</small></div><div class="tl on" data-act="xray"><i>👁</i><span>词条探查</span><small>V</small></div><div class="tl ${B.hasCloth ? '' : 'off'}" data-act="cloth"><i>👕</i><span>衣着</span><small id="apCl">原衣</small></div><div class="tl" data-act="undo"><i>↩</i><span>撤销</span><small>Ctrl+Z</small></div></div>
-<div id="apKn"><svg viewBox="0 0 130 44" width="130" height="44"><path d="M4 22 L28 16 L28 28 Z" fill="#6a4a2a"/><rect x="20" y="15" width="40" height="14" rx="5" fill="#4a3018" stroke="#2a1a0c" stroke-width="2"/><path d="M60 14 L112 12 Q124 18 126 22 Q124 26 112 32 L60 30 Z" fill="#e6edf5" stroke="#ffffff" stroke-width="1.5"/><path d="M62 17 L114 16" stroke="#9fb0c4" stroke-width="2"/></svg></div><div id="apPb"><button class="bt go" data-pb="lock">🔒 固定姿势</button><button class="bt" data-pb="reset">↺ 回到原姿势</button></div><div class="pn" id="apPn"></div><div class="tt" id="apTt"></div><div class="toast" id="apTs"></div>
+<div class="tools"><div class="tl on" data-tool="cut"><i>🔪</i><span>切割</span><small>1 · 拖线</small></div><div class="tl" data-tool="move"><i>🤲</i><span>举起</span><small>2 · 抓住拖</small></div><div class="tl" data-tool="rot"><i>🔄</i><span>旋转</span><small>3 · 拖动</small></div><div class="tl off" data-act="rag"><i>🧍</i><span>布娃娃</span><small id="apRg">关 · 4</small></div><div class="tl on" data-act="xray"><i>👁</i><span>词条探查</span><small>V</small></div><div class="tl ${B.hasCloth ? '' : 'off'}" data-act="cloth"><i>👕</i><span>衣着</span><small id="apCl">原衣</small></div><div class="tl" data-act="undo"><i>↩</i><span>撤销</span><small>Ctrl+Z</small></div></div>
+<div id="apKn"><svg viewBox="0 0 130 44" width="130" height="44"><path d="M4 22 L28 16 L28 28 Z" fill="#6a4a2a"/><rect x="20" y="15" width="40" height="14" rx="5" fill="#4a3018" stroke="#2a1a0c" stroke-width="2"/><path d="M60 14 L112 12 Q124 18 126 22 Q124 26 112 32 L60 30 Z" fill="#e6edf5" stroke="#ffffff" stroke-width="1.5"/><path d="M62 17 L114 16" stroke="#9fb0c4" stroke-width="2"/></svg></div><div id="apPb"><button class="bt go" data-pb="lock">🔓 解除布娃娃</button><button class="bt" data-pb="reset">↺ 回到原姿势</button></div><div class="pn" id="apPn"></div><div class="tt" id="apTt"></div><div class="toast" id="apTs"></div>
 <div class="intro">在身体上<b style="color:#ffd27a">拖出一条线或曲线</b>，沿线切开。右键拖动＝转视角，滚轮＝缩放。<br>切下的块有重量：用<b style="color:#ffd27a">🤲举起</b>抓住拖走，松手会掉下去。发光的小点是<b style="color:#ffd27a">词条</b>。</div>
 <div class="ft"><div class="tip" id="apTip"></div><button class="bt" id="apX">放弃</button><button class="bt go" id="apGo" disabled>完成</button></div>`;
     document.body.appendChild(root);
@@ -372,38 +418,39 @@ if ( vTw < -0.5 ) {
     const ray = new T.Raycaster(), ndc = new T.Vector2(), lineEl = root.querySelector('#apL'), tt = root.querySelector('#apTt'), tip = root.querySelector('#apTip');
     const setNdc = (x, y) => { const r = cv.getBoundingClientRect(); ndc.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, cam); return ray; };
     const allMeshes = () => st.pieces.flatMap(p => p.meshes), pickPiece = (x, y) => { cam.updateMatrixWorld(); st.pieces.forEach(p => p.obj.updateMatrixWorld(true)); const h = setNdc(x, y).intersectObjects(allMeshes(), false)[0]; return h ? { p: h.object.userData.piece, pt: h.point } : null; };
-    const hints = { cut: '🔪 按住左键在身体上划线——可以拐弯、可以随时改方向；金点是落在身体上的刀路，虚线是刀会继续延伸的路径。松手，刀就沿线切过去（切面穿透视线方向；转视角再切＝另一个角度）。', move: '🤲 抓住一块拖动＝举起它（有重量、会晃），松手就掉落；别把它摔出台子。', rot: '🔄 拖动一块来旋转它，松手后会按物理落回台面。', pose: '🧍 抓住身上的关节（青色亮点）拖动：手脚会被牵着走，躯干是一整块，膝和肘只能往正确的方向弯。摆好点「固定姿势」，之后再切、再带走，姿势都会留着。' };
+    const hints = { cut: '🔪 按住左键划线，可以拐弯。线的一头落在身体上＝刀在那里收住（圈圈标出）；划出身体边缘＝切穿（虚线是切穿的延伸）。只切你划过的地方，不会把整具身体全切开。', move: '🤲 抓住一块拖动＝举起它（有重量、会晃），松手就掉落；别把它摔出台子。', rot: '🔄 拖动一块来旋转它，松手后会按物理落回台面。', pose: '🧍 布娃娃开着：抓住关节点（青色亮点）拖动，身体会像真人一样被牵着走，松手就摔下去；膝和肘只能往正确方向弯。点「解除布娃娃」，身体保持当前姿势变回整块。' };
     const toast = (t) => { const e = root.querySelector('#apTs'); e.textContent = t; e.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => e.style.display = 'none', 2200); };
-    function setTool(t) { if (st.tool === 'pose' && t !== 'pose') endPose(true); if (t === 'pose' && !startPose()) return; st.tool = t; root.querySelector('#apPb').style.display = t === 'pose' ? 'flex' : 'none'; root.querySelectorAll('[data-tool]').forEach(e => e.classList.toggle('on', e.dataset.tool === t)); tip.textContent = hints[t]; }
-    function curveTool(path, p) {
+    function setTool(t) { if (t === 'rot' && rd) { toast('布娃娃开着——先点「解除布娃娃」才能整体旋转'); return; } st.tool = t; root.querySelectorAll('[data-tool]').forEach(e => e.classList.toggle('on', e.dataset.tool === t)); tip.textContent = rd && t === 'move' ? hints.pose : hints[t]; }
+    function curveTool(path, p, hs, he) {
       const cu = makeCurve(path); if (!cu) return null; cam.updateMatrixWorld(); p.obj.updateMatrixWorld(true);
       const e = new T.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).multiply(p.obj.matrixWorld).elements, rc = cv.getBoundingClientRect(); let sw = 1;
       const fn = (x, y, z) => { let cw = e[3] * x + e[7] * y + e[11] * z + e[15]; if (Math.abs(cw) < 1e-5) cw = 1e-5; sw = cw; const iw = 1 / cw; return cu.at(rc.left + ((e[0] * x + e[4] * y + e[8] * z + e[12]) * iw + 1) / 2 * rc.width, rc.top + (1 - (e[1] * x + e[5] * y + e[9] * z + e[13]) * iw) / 2 * rc.height); };
-      return { fn, proj: (x, y, z) => { fn(x, y, z); return [cu.s, sw * 400]; }, nrm: (x, y, z) => { const g = 0.004, a = fn(x + g, y, z) - fn(x - g, y, z), b = fn(x, y + g, z) - fn(x, y - g, z), c = fn(x, y, z + g) - fn(x, y, z - g), l = Math.hypot(a, b, c); return l > 1e-9 ? [a / l, b / l, c / l] : [0, 1, 0]; } };
+      return { fn, rng: [hs ? -4 : -Infinity, he ? cu.len + 4 : Infinity], sAt: (x, y, z) => { fn(x, y, z); return cu.s; }, proj: (x, y, z) => { fn(x, y, z); return [cu.s, sw * 400]; }, nrm: (x, y, z) => { const g = 0.004, a = fn(x + g, y, z) - fn(x - g, y, z), b = fn(x, y + g, z) - fn(x, y - g, z), c = fn(x, y, z + g) - fn(x, y, z - g), l = Math.hypot(a, b, c); return l > 1e-9 ? [a / l, b / l, c / l] : [0, 1, 0]; } };
     }
     function doCut(x1, y1, x2, y2) { doCutPath([[x1, y1], [x2, y2]]); }
     function doCutPath(path) {
-      if (!path || path.length < 2) return; if (rd) { endPose(true); setTool('cut'); } const A = path[0], Z = path[path.length - 1], chord = Math.hypot(Z[0] - A[0], Z[1] - A[1]); if (chord < 24) return;
+      if (!path || path.length < 2) return; if (rd) endPose(true); const A = path[0], Z = path[path.length - 1], chord = Math.hypot(Z[0] - A[0], Z[1] - A[1]); if (chord < 24) return;
       let dev = 0; for (const q of path) dev = Math.max(dev, Math.abs((q[0] - A[0]) * (Z[1] - A[1]) - (q[1] - A[1]) * (Z[0] - A[0])) / chord); const curved = path.length > 3 && dev > Math.max(10, chord * 0.05);
-      cam.updateMatrixWorld(); const o = cam.position.clone(), d1 = setNdc(A[0], A[1]).ray.direction.clone(), d2 = setNdc(Z[0], Z[1]).ray.direction.clone(), n = new V3().crossVectors(d1, d2).normalize(); if (!curved && (!isFinite(n.x) || n.lengthSq() < 0.5)) return; const d = -n.dot(o);
+      cam.updateMatrixWorld(); const o = cam.position.clone(), d1 = setNdc(A[0], A[1]).ray.direction.clone(), d2 = setNdc(Z[0], Z[1]).ray.direction.clone(), n = new V3().crossVectors(d1, d2).normalize(); if (!curved && (!isFinite(n.x) || n.lengthSq() < 0.5)) return;
       const hit = new Set(); st.pieces.forEach(p => p.obj.updateMatrixWorld(true)); const N = 30; for (let k = 0; k <= N; k++) { const f = k / N * (path.length - 1), a = Math.floor(f), b = Math.min(path.length - 1, a + 1), t = f - a, x = path[a][0] + (path[b][0] - path[a][0]) * t, y = path[a][1] + (path[b][1] - path[a][1]) * t, h = setNdc(x, y).intersectObjects(allMeshes(), false)[0]; if (h) hit.add(h.object.userData.piece); }
       if (!hit.size) { toast('这一刀没碰到身体——从身体上划过去'); return; }
-      const jobs = []; for (const p of hit) { let tool; if (curved) tool = curveTool(path, p); else { const qi = p.obj.quaternion.clone().invert(); tool = planeTool(n.clone().applyQuaternion(qi), d + n.dot(p.obj.position)); } if (!tool) continue; const r = cutPart(p.part, tool); if (r) jobs.push({ p, r }); }
+      const hs = !!setNdc(A[0], A[1]).intersectObjects(allMeshes(), false)[0], he = !!setNdc(Z[0], Z[1]).intersectObjects(allMeshes(), false)[0];
+      const jobs = []; for (const p of hit) { const tool = curveTool(path, p, hs, he); if (!tool) continue; const r = cutPart(p.part, tool); if (r) jobs.push({ p, r }); }
       if (!jobs.length) { toast('没切开——线要完整穿过一块'); return; }
-      snap(); for (const j of jobs) { const p = j.p, q = p.obj.quaternion.clone(), pos = p.obj.position.clone(), nw = []; removePiece(p); [0, 1].forEach(k => j.r[k].forEach(part => { const np = addPiece(part, pos, q); np.take = false; wake(np); nw.push(np); }));
-        for (const a of nw) { for (const b of nw) if (a !== b) a.rb.ign.add(b.id); const dv = a.obj.position.clone().sub(pos); dv.y = 0; if (dv.length() < 0.02) dv.set(n.x, 0, n.z); if (dv.lengthSq() < 1e-6) dv.set(1, 0, 0); a.rb.v.copy(dv.normalize().multiplyScalar(0.32)); } }
-      AT.chop(); ui(); toast(`✂ ${curved ? '沿曲线' : ''}切开了：现在有 ${st.pieces.length} 块`);
+      const before = st.pieces.length; snap(); for (const j of jobs) { const p = j.p, q = p.obj.quaternion.clone(), pos = p.obj.position.clone(), nw = []; removePiece(p); j.r.forEach(part => { const np = addPiece(part, pos, q); np.take = false; wake(np); nw.push(np); });
+        for (const a of nw) { if (nw.length < 2) break; for (const b of nw) if (a !== b) a.rb.ign.add(b.id); const dv = a.obj.position.clone().sub(pos); dv.y = 0; if (dv.length() < 0.02) dv.set(n.x, 0, n.z); if (dv.lengthSq() < 1e-6) dv.set(1, 0, 0); a.rb.v.copy(dv.normalize().multiplyScalar(0.32)); } }
+      AT.chop(); ui(); toast(st.pieces.length === before ? '✂ 切了一道口子，但没切断——线要划出身体边缘才会切穿' : `✂ ${curved ? '沿曲线' : ''}切开了：现在有 ${st.pieces.length} 块`);
     }
     // ---- 划线预览（落在身体表面的光点）+ 刀的动画 ----
     const guide = new T.Group(); sc.add(guide); const gMat = new T.SpriteMaterial({ map: haloTex, color: 0xffd27a, transparent: true, depthTest: false, depthWrite: false, blending: T.AdditiveBlending });
     const addGuide = pt => { if (guide.children.length > 220) return; const sp = new T.Sprite(gMat); sp.position.copy(pt); sp.scale.set(0.05, 0.05, 1); sp.renderOrder = 18; guide.add(sp); };
-    const clearGuide = () => { while (guide.children.length) guide.remove(guide.children[0]); };
+    const clearGuide = () => { while (guide.children.length) guide.remove(guide.children[0]); ['apT0', 'apT1'].forEach(id => root.querySelector('#' + id).setAttribute('display', 'none')); };
     const extEl = root.querySelector('#apLx'), knEl = root.querySelector('#apKn');
-    function denseExt(path) { const cu = makeCurve(path); if (!cu) return []; const rc = cv.getBoundingClientRect(), P = cu.P, out = [];
-      for (let i = 0; i < P.length - 1; i++) { const a = P[i], b = P[i + 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.ceil(l / 10)); for (let j = 0; j < n; j++) { const x = a[0] + (b[0] - a[0]) * j / n, y = a[1] + (b[1] - a[1]) * j / n; if (x > rc.left - 60 && x < rc.right + 60 && y > rc.top - 60 && y < rc.bottom + 60) out.push([x, y]); } }
+    function denseExt(path, hs, he) { const cu = makeCurve(path); if (!cu) return []; const rc = cv.getBoundingClientRect(), P = cu.P, out = [];
+      for (let i = hs ? 1 : 0; i < P.length - (he ? 2 : 1); i++) { const a = P[i], b = P[i + 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.ceil(l / 10)); for (let j = 0; j < n; j++) { const x = a[0] + (b[0] - a[0]) * j / n, y = a[1] + (b[1] - a[1]) * j / n; if (x > rc.left - 60 && x < rc.right + 60 && y > rc.top - 60 && y < rc.bottom + 60) out.push([x, y]); } }
       return out; }
     function runKnife(path, after) { // 刀沿着你划的线（含两端延长）切过去，动画结束时才真正切开
-      const pts = denseExt(path); if (pts.length < 4) { after(); return; } st.busy = true; extEl.setAttribute('display', 'none'); knEl.style.display = 'block';
+      const pts = denseExt(path, !!pickPiece(path[0][0], path[0][1]), !!pickPiece(path[path.length - 1][0], path[path.length - 1][1])); if (pts.length < 4) { after(); return; } st.busy = true; extEl.setAttribute('display', 'none'); knEl.style.display = 'block';
       const total = pts.length, dur = clamp(total * 10 / 1500, 0.5, 1.2) * 1000, t0 = performance.now();
       const step = now => { if (!UI) return; const f = Math.min(1, (now - t0) / dur), e = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2, i = Math.min(total - 1, Math.floor(e * (total - 1)));
         lineEl.setAttribute('points', pts.slice(0, i + 1).map(q => q[0] + ',' + q[1]).join(' ')); lineEl.setAttribute('display', 'block');
@@ -412,18 +459,19 @@ if ( vTw < -0.5 ) {
       requestAnimationFrame(step); }
     cv.addEventListener('contextmenu', e => e.preventDefault());
     cv.addEventListener('pointerdown', e => { if (st.busy) return; cv.setPointerCapture(e.pointerId); const rb = e.button === 2 || e.button === 1; st.drag = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, rb, shift: e.shiftKey, moved: false, path: [[e.clientX, e.clientY]] };
-      if (!rb && st.tool === 'pose') { poseDown(e); return; }
+      if (!rb && st.tool === 'cut') st.drag.hs = !!pickPiece(e.clientX, e.clientY);
+      if (!rb && rd && st.tool === 'move') { poseDown(e); return; }
       if (!rb && st.tool !== 'cut') { const h = pickPiece(e.clientX, e.clientY); if (h) { const p = h.p; st.drag.piece = p; st.sel = p; ui(); wake(p);
         if (st.tool === 'move') { p.obj.updateMatrixWorld(true); const fw = new V3(); cam.getWorldDirection(fw); st.drag.pl = new T.Plane().setFromNormalAndCoplanarPoint(fw, h.pt); p.held = { a: p.obj.worldToLocal(h.pt.clone()), t: h.pt.clone() }; toast('🤲 抓住了「' + p.name + '」——拖动＝举起，松手＝掉落'); } else p.rb.frozen = true; } } });
     cv.addEventListener('pointermove', e => { const D = st.drag; if (!D) { hover(e); return; } const dx = e.clientX - D.lx, dy = e.clientY - D.ly; D.lx = e.clientX; D.ly = e.clientY; if (Math.hypot(e.clientX - D.x, e.clientY - D.y) > 5) D.moved = true;
       if (D.rb) { if (D.shift) { const k = st.dist * 0.0014, r = new V3().setFromMatrixColumn(cam.matrixWorld, 0); st.tx -= r.x * dx * k; st.tz -= r.z * dx * k; st.ty = clamp(st.ty + dy * k, -0.2, 1); } else { st.yaw -= dx * 0.008; st.pit = clamp(st.pit + dy * 0.006, 0.05, 1.5); } return; }
       if (D.pg) { poseMove(e); return; }
       if (st.tool === 'cut') { const l = D.path[D.path.length - 1]; if (Math.hypot(e.clientX - l[0], e.clientY - l[1]) >= 4) D.path.push([e.clientX, e.clientY]); lineEl.setAttribute('points', D.path.map(q => q[0] + ',' + q[1]).join(' ') + ' ' + e.clientX + ',' + e.clientY); lineEl.setAttribute('display', D.moved ? 'block' : 'none');
-        if (D.moved) { const now = performance.now(); if (now - (st.gt || 0) > 70) { st.gt = now; const h = pickPiece(e.clientX, e.clientY); if (h) addGuide(h.pt); const dd = denseExt(D.path.concat([[e.clientX, e.clientY]])); extEl.setAttribute('points', dd.map(q => q[0] + ',' + q[1]).join(' ')); extEl.setAttribute('display', 'block'); } } }
+        if (D.moved) { const now = performance.now(); if (now - (st.gt || 0) > 70) { st.gt = now; const h = pickPiece(e.clientX, e.clientY); if (h) addGuide(h.pt); D.he = !!h; const t0 = root.querySelector('#apT0'), t1 = root.querySelector('#apT1'); t0.setAttribute('cx', D.x); t0.setAttribute('cy', D.y); t0.setAttribute('display', D.hs ? 'block' : 'none'); t1.setAttribute('cx', e.clientX); t1.setAttribute('cy', e.clientY); t1.setAttribute('display', D.he ? 'block' : 'none'); const dd = denseExt(D.path.concat([[e.clientX, e.clientY]]), D.hs, D.he); extEl.setAttribute('points', dd.map(q => q[0] + ',' + q[1]).join(' ')); extEl.setAttribute('display', 'block'); } } }
       else if (D.piece) { const p = D.piece; if (st.tool === 'move') { const hp = new V3(); if (setNdc(e.clientX, e.clientY).ray.intersectPlane(D.pl, hp)) { hp.y = clamp(hp.y, -1.2, 2.4); if (p.held) p.held.t.copy(hp); wake(p); } } else { const r = new V3().setFromMatrixColumn(cam.matrixWorld, 0); p.obj.rotateOnWorldAxis(new V3(0, 1, 0), dx * 0.01); p.obj.rotateOnWorldAxis(r, dy * 0.01); } } });
     const endDrag = e => { const D = st.drag; st.drag = null; if (!D) return; if (D.rb) { lineEl.setAttribute('display', 'none'); return; } if (D.pg) { poseUp(); return; } if (!(st.tool === 'cut' && D.moved)) lineEl.setAttribute('display', 'none');
       if (D.piece) { const p = D.piece; if (p.held) { p.held = null; wake(p); } if (p.rb.frozen) { p.rb.frozen = false; wake(p); } if (!D.moved) { st.sel = p; ui(); } return; }
-      if (st.tool === 'cut') { if (D.moved && Math.hypot(e.clientX - D.x, e.clientY - D.y) > 24) { D.path.push([e.clientX, e.clientY]); const pth = D.path.slice(); runKnife(pth, () => doCutPath(pth)); } else { clearGuide(); extEl.setAttribute('display', 'none'); lineEl.setAttribute('display', 'none'); const h = pickPiece(e.clientX, e.clientY); st.sel = h ? h.p : null; ui(); } }
+      if (st.tool === 'cut') { if (D.moved && Math.hypot(e.clientX - D.x, e.clientY - D.y) > 24) { D.path.push([e.clientX, e.clientY]); const pth = D.path.slice(); if (rd) endPose(true); runKnife(pth, () => doCutPath(pth)); } else { clearGuide(); extEl.setAttribute('display', 'none'); lineEl.setAttribute('display', 'none'); const h = pickPiece(e.clientX, e.clientY); st.sel = h ? h.p : null; ui(); } }
       else if (!D.moved) { const h = pickPiece(e.clientX, e.clientY); st.sel = h ? h.p : null; ui(); } };
     cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
     cv.addEventListener('wheel', e => { e.preventDefault(); st.dist = clamp(st.dist * (1 + Math.sign(e.deltaY) * 0.1), 0.8, 7); }, { passive: false });
@@ -434,17 +482,17 @@ if ( vTw < -0.5 ) {
     function ui() { const pn = root.querySelector('#apPn'), tk = st.pieces.filter(p => p.take).length;
       let cells = 0; st.pieces.forEach(p => { if (p.take) { const z = p.part.bb.getSize(new V3()), c = cellsOf([z.x, z.y, z.z]); cells += c[0] * c[1]; } }); let bag = ''; try { const u = window.Sack && Sack.usage && Sack.usage(); if (u) { const free = u[1] - u[0]; bag = `<div class="bagn ${cells > free ? 'bad' : ''}">🎒 麻袋空位 <b>${free}</b> 格 · 已选占 <b>${cells}</b> 格</div>`; } } catch (e) { }
       pn.innerHTML = `<h2>🧩 切下的块 · ${st.pieces.length}</h2>${bag}` + st.pieces.map(p => { const sz = p.part.bb.getSize(new V3()); const mx = Math.round(Math.max(sz.x, sz.y, sz.z) * 100), cl = cellsOf([sz.x, sz.y, sz.z]); return `<div class="pc ${st.sel === p ? 'sel' : ''} ${p.take ? 'tk' : ''}" data-p="${p.id}"><div class="t"><b>${esc(p.name)}</b><small>长 ${mx} cm</small></div><div class="gdw"><span class="gd" style="grid-template-columns:repeat(${cl[0]},15px)">${'<i></i>'.repeat(cl[0] * cl[1])}</span><b>占 ${cl[0]}×${cl[1]} 格</b></div>${p.part.pts.length ? `<div class="ch">${chips(p)}</div>` : '<div class="no">没有词条（可炼化成魂尘）</div>'}<button data-take="${p.id}">${p.take ? '✓ 已选取走' : '取走这块'}</button></div>`; }).join('');
-      const g = root.querySelector('#apGo'); g.disabled = !tk; g.textContent = tk ? `完成 · 取走 ${tk} 块` : '完成'; st.pieces.forEach(p => { p.mats.forEach(m => m.emissive.setHex(p === st.sel ? 0x4a2a10 : p.take ? 0x2a1a08 : 0)); }); const pt = root.querySelector('[data-tool=pose]'); if (pt) pt.classList.toggle('off', !canPose()); }
-    root.addEventListener('click', e => { const pb = e.target.closest('[data-pb]'); if (pb) { if (pb.dataset.pb === 'lock') { endPose(true); setTool('cut'); } else rdReset(); return; } const t = e.target.closest('[data-tool]'); if (t) { setTool(t.dataset.tool); return; } const a = e.target.closest('[data-act]'); if (a) { act(a.dataset.act, a); return; }
+      const g = root.querySelector('#apGo'); g.disabled = !tk; g.textContent = tk ? `完成 · 取走 ${tk} 块` : '完成'; st.pieces.forEach(p => { p.mats.forEach(m => m.emissive.setHex(p === st.sel ? 0x4a2a10 : p.take ? 0x2a1a08 : 0)); }); const pt = root.querySelector('[data-act=rag]'); if (pt) pt.classList.toggle('off', !canPose() && !rd); }
+    root.addEventListener('click', e => { const pb = e.target.closest('[data-pb]'); if (pb) { if (pb.dataset.pb === 'lock') endPose(true); else rdReset(); return; } const t = e.target.closest('[data-tool]'); if (t) { setTool(t.dataset.tool); return; } const a = e.target.closest('[data-act]'); if (a) { act(a.dataset.act, a); return; }
       const tk = e.target.closest('[data-take]'); if (tk) { const p = st.pieces.find(x => x.id == tk.dataset.take); if (p) { if (!p.take && st.pieces.filter(x => x.take).length >= 8) { toast('最多一次带走 8 块'); return; } p.take = !p.take; ui(); } return; }
       const pc = e.target.closest('[data-p]'); if (pc) { st.sel = st.pieces.find(x => x.id == pc.dataset.p) || null; ui(); return; }
       if (e.target.id === 'apX') close(); else if (e.target.id === 'apGo') finish(); });
-    function act(k, el) { if (k === 'xray') { st.xray = !st.xray; el.classList.toggle('on', st.xray); applyXray(); } else if (k === 'undo') { if (rd) { endPose(false); setTool('cut'); toast('放弃了这次摆姿势'); return; } if (st.hist.length) restore(st.hist.pop()); else toast('没有可撤销的'); }
-      else if (k === 'cloth') { if (rd) { endPose(true); setTool('cut'); } if (!B.hasCloth) { toast('这具身体没有可换的衣服（衣服画在贴图上，或没有成形的衣物）'); return; }
+    function act(k, el) { if (k === 'rag') { if (rd) endPose(true); else if (startPose()) setTool('move'); return; } if (k === 'xray') { st.xray = !st.xray; el.classList.toggle('on', st.xray); applyXray(); } else if (k === 'undo') { if (rd) { endPose(false); toast('放弃了这次摆姿势'); return; } if (st.hist.length) restore(st.hist.pop()); else toast('没有可撤销的'); }
+      else if (k === 'cloth') { if (rd) endPose(true); if (!B.hasCloth) { toast('这具身体没有可换的衣服（衣服画在贴图上，或没有成形的衣物）'); return; }
         if (st.linen) { const top = st.hist[st.hist.length - 1]; if (top && top.lin) restore(st.hist.pop()); else toast('换衣之后又切过——用 Ctrl+Z 逐步撤销可以穿回原衣'); return; }
         snap(true); const old = st.pieces.slice(); for (const p of old) { const np = linenize(p.part), pos = p.obj.position.clone(), q = p.obj.quaternion.clone(), tk = p.take, was = p.rb.sleep; removePiece(p); const n = addPiece(np, pos, q); n.take = tk; n.rb.sleep = was; }
         st.linen = true; root.querySelector('#apCl').textContent = '素衣'; ui(); toast('👕 换上了素麻衣（只保留躯干一段，不会脱光）'); } }
-    const onKey = e => { if (!UI) return; if (e.type === 'keydown') { if (e.code === 'Escape') close(); else if (e.code === 'Digit1') setTool('cut'); else if (e.code === 'Digit2') setTool('move'); else if (e.code === 'Digit3') setTool('rot'); else if (e.code === 'Digit4') setTool('pose'); else if (e.code === 'KeyV') act('xray', root.querySelector('[data-act=xray]')); else if (e.code === 'KeyZ' && (e.ctrlKey || e.metaKey)) act('undo'); else if (st.sel && (e.code === 'KeyQ' || e.code === 'KeyE')) { st.sel.obj.rotateOnWorldAxis(new V3(0, 1, 0), (e.code === 'KeyQ' ? 1 : -1) * Math.PI / 12); st.sel.obj.position.y += 0.03; wake(st.sel); } else if (st.sel && e.code === 'KeyF') { const r = new V3().setFromMatrixColumn(cam.matrixWorld, 0); st.sel.obj.rotateOnWorldAxis(r, Math.PI); st.sel.obj.position.y += 0.15; wake(st.sel); } } if (e.code !== 'F12') e.stopPropagation(); };
+    const onKey = e => { if (!UI) return; if (e.type === 'keydown') { if (e.code === 'Escape') close(); else if (e.code === 'Digit1') setTool('cut'); else if (e.code === 'Digit2') setTool('move'); else if (e.code === 'Digit3') setTool('rot'); else if (e.code === 'Digit4') act('rag', root.querySelector('[data-act=rag]')); else if (e.code === 'KeyV') act('xray', root.querySelector('[data-act=xray]')); else if (e.code === 'KeyZ' && (e.ctrlKey || e.metaKey)) act('undo'); else if (st.sel && (e.code === 'KeyQ' || e.code === 'KeyE')) { st.sel.obj.rotateOnWorldAxis(new V3(0, 1, 0), (e.code === 'KeyQ' ? 1 : -1) * Math.PI / 12); st.sel.obj.position.y += 0.03; wake(st.sel); } else if (st.sel && e.code === 'KeyF') { const r = new V3().setFromMatrixColumn(cam.matrixWorld, 0); st.sel.obj.rotateOnWorldAxis(r, Math.PI); st.sel.obj.position.y += 0.15; wake(st.sel); } } if (e.code !== 'F12') e.stopPropagation(); };
     addEventListener('keydown', onKey, true); addEventListener('keyup', onKey, true);
     // ---- 布娃娃：拖关节摆姿势（PBD 关节点 + 按原骨骼权重蒙皮），固定后把姿势写回网格 ----
     // 粒子：0 hips 1 spine 2 chest 3 upper 4 neck | 5/6 肩 7/8 髋 | 9/10 肘 11/12 腕 | 13/14 膝 15/16 踝 17/18 趾 | 19 胸前 20 胸后 21 腹前 22 腹后
@@ -490,7 +538,7 @@ if ( vTw < -0.5 ) {
       const sp = new T.Group(), spm = new T.SpriteMaterial({ map: haloTex, color: 0x12d8c4, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false }); for (let i = 0; i < 19; i++) { const s = new T.Sprite(spm); s.scale.set(0.07, 0.07, 1); s.renderOrder = 22; sp.add(s); } sc.add(sp);
       p.rb.frozen = true; p.rb.v.set(0, 0, 0); p.rb.w.set(0, 0, 0);
       rd = { p, rig, P0, X, XP, W0, W: W0.slice(), RAD, CON, PAIRS, M, Mi, off, qRest, C0, frame, cen, ptSk, boneIx, orig, sp, grab: null, moved: false, dirty: true, Pr: P0.map(() => new V3()), Rm: new Float64Array(99), Tm: new Float64Array(33), q: p.obj.quaternion.clone(), pos: p.obj.position.clone(), toW, toR, still: 0 };
-      applyXray(); rdFrame(true); toast('🧍 抓住青色的关节点拖动；摆好后点「固定姿势」'); return true;
+      applyXray(); rdFrame(true); root.querySelector('#apPb').style.display = 'flex'; root.querySelector('#apRg').textContent = '开 · 4'; root.querySelector('[data-act=rag]').classList.add('on'); toast('🧍 布娃娃开了：抓住青色关节点拖动（🤲举起也一样）'); return true;
     }
     const _d = new V3(), _e = new V3(), _F = new V3(), _m = new V3(), _o = new V3();
     function rdStep(h) {
@@ -541,7 +589,7 @@ if ( vTw < -0.5 ) {
     function poseMove(e) { if (!rd || !rd.grab) return; const hp = new V3(); if (setNdc(e.clientX, e.clientY).ray.intersectPlane(st.drag.pl, hp)) { hp.y = clamp(hp.y, 0.03, 2.2); rd.grab.t.copy(hp); } }
     function poseUp() { if (rd && rd.grab) { rd.W[rd.grab.i] = rd.W0[rd.grab.i]; rd.grab = null; } }
     function endPose(lock) {
-      if (!rd) return; const r = rd, p = r.p; rd = null; sc.remove(r.sp); r.sp.children.forEach(s => s.material = null);
+      if (!rd) return; const r = rd, p = r.p; rd = null; root.querySelector('#apPb').style.display = 'none'; root.querySelector('#apRg').textContent = '关 · 4'; root.querySelector('[data-act=rag]').classList.remove('on'); sc.remove(r.sp); r.sp.children.forEach(s => s.material = null);
       const doLock = lock && r.moved; if (doLock) { rd = r; rdFrame(true); rd = null; }
       if (!doLock) { p.meshes.forEach((m, i) => { m.geometry.dispose(); m.geometry = r.orig[i]; m.frustumCulled = true; }); p.motes.forEach(m => { }); p.rb.frozen = false;
         // 光点与骨线回到原位
@@ -549,11 +597,11 @@ if ( vTw < -0.5 ) {
       snap(); const off = r.off, sets = p.part.sets.map((s, si) => { const g = p.meshes[si].geometry, PA = g.attributes.position.array, NA = g.attributes.normal.array, V = s.V.slice(), n = V.length / S; for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) { V[i * S + k] = PA[i * 3 + k]; V[i * S + 3 + k] = NA[i * 3 + k]; } return { V, I: s.I.slice(), skin: s.skin, cap: s.cap, cloth: s.cloth, nm: s.nm, map: s.map, at: s.at, rg: s.rg }; });
       const pts = p.part.pts.map((pt, i) => ({ p: r.ptL[i].slice(), a: pt.a })), bones = (r.rig.bones0 || []).map((b, i) => { const ix = r.boneIx[i], A = r.Pr[ix[0]], B = r.Pr[ix[1]]; return { a: [A.x + off.x, A.y + off.y, A.z + off.z], b: [B.x + off.x, B.y + off.y, B.z + off.z], r: b.r }; });
       const rig = { jn: r.rig.jn, off: off.toArray(), pp: r.Pr.map(q => q.toArray()), pts0: r.rig.pts0, bones0: r.rig.bones0 }, part = { sets, pts, bones, rig, bb: bbOf(sets) };
-      const pos = p.obj.position.clone(), q = p.obj.quaternion.clone(), tk = p.take; r.p.meshes.forEach(m => m.geometry.dispose()); removePiece(p); const np = addPiece(part, pos, q); np.take = tk; st.sel = np; ui(); toast('🔒 姿势固定了：现在可以切、可以带走，姿势会保留');
+      const pos = p.obj.position.clone(), q = p.obj.quaternion.clone(), tk = p.take; r.p.meshes.forEach(m => m.geometry.dispose()); removePiece(p); const np = addPiece(part, pos, q); np.take = tk; st.sel = np; ui(); toast('🔓 布娃娃解除了：保持这个姿势，可以切、可以带走；再点「布娃娃」又能摆');
     }
     // ---- 完成：把选中的块变成物品 ----
     function finish() {
-      if (rd) { endPose(true); setTool('cut'); } const picks = st.pieces.filter(p => p.take); if (!picks.length) return; const S_ = window.Sack, Og = window.Organs; const items = S_.itemsOf ? S_.itemsOf(L) : (L.items = L.items || []); Og.defsNow && Og.defsNow(); const names = [];
+      if (rd) endPose(true); const picks = st.pieces.filter(p => p.take); if (!picks.length) return; const S_ = window.Sack, Og = window.Organs; const items = S_.itemsOf ? S_.itemsOf(L) : (L.items = L.items || []); Og.defsNow && Og.defsNow(); const names = [];
       for (const p of picks) { const rec = pack(p, false), pid = 'ap' + Date.now().toString(36) + p.id + Math.floor(Math.random() * 1e4), aff = p.part.pts.map(x => ({ id: x.a.id, m: x.a.m })), at = p.part.pts.length ? p.part.pts.reduce((s, x) => s + x.a.t, 0) / p.part.pts.length : 0;
         const og = { t: 'piece', own, race, rar, age: c ? c.age : 0, tr: c && c.traits ? c.traits.slice() : [], af: '', q: +clamp(0.4 + (at ? (at - 1) * 0.15 : -0.1) + rnd(-0.05, 0.05), 0.2, 1).toFixed(2), oid: own + '|' + (c ? c.id : 'x'), pid, nm: p.name, aff, dim: rec.dim.map(v => +v.toFixed(4)), note: `在解剖台上切下的「${p.name}」，占 ${cellsOf(rec.dim)[0]}×${cellsOf(rec.dim)[1]} 格。${aff.length ? '体内带着 ' + aff.length + ' 条词条，摆进洞里生效。' : '里面什么词条也没有，只是一块肉骨。'}` };
         store(pid, rec); const it = Og.mkItem(og); it.sz = cellsOf(rec.dim); items.push(it); names.push(p.name); }
