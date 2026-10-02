@@ -1,0 +1,45 @@
+<!doctype html><meta charset="utf-8"><title>rigging harness</title><base href="/">
+<body style="margin:0;background:#111"><canvas id="cv" width="1280" height="720"></canvas>
+<script src="/lib/three.min.js"></script>
+<script>
+// 装具（js/rigging.js）测试台：假洞穴（地面 + 圆形岩壁）、假首级、假摆件（断脚/尸块）、假 Sack；window.run(fn) 可在页面里跑脚本，window.shot() 渲染。
+window.Mods = { on: () => true };
+const T = THREE, V3 = T.Vector3;
+const renderer = new T.WebGLRenderer({ canvas: document.getElementById('cv'), preserveDrawingBuffer: true, antialias: true });
+renderer.outputEncoding = T.sRGBEncoding;
+const scene = new T.Scene(); scene.background = new T.Color('#2a2119'); scene.fog = new T.Fog('#2a2119', 8, 26);
+scene.add(new T.HemisphereLight(0xffe2c0, 0x6a5240, 1.1)); const dl = new T.DirectionalLight(0xffd8a8, 1.0); dl.position.set(3, 6, 2); scene.add(dl);
+const camera = new T.PerspectiveCamera(70, 16 / 9, 0.05, 80); camera.position.set(0, 1.45, 2.6); camera.lookAt(0, 1.4, -3);
+const caveG = new T.Group(); scene.add(caveG);
+const floor = new T.Mesh(new T.CircleGeometry(12, 48), new T.MeshStandardMaterial({ color: 0x4a4036, roughness: 1 })); floor.rotation.x = -Math.PI / 2; caveG.add(floor);
+const wall = new T.Mesh(new T.CylinderGeometry(6.5, 6.5, 8, 40, 1, true), new T.MeshStandardMaterial({ color: 0x5e564c, roughness: 1, side: T.BackSide })); wall.position.y = 4; caveG.add(wall);
+const beam = new T.Mesh(new T.BoxGeometry(5, 0.3, 0.3), new T.MeshStandardMaterial({ color: 0x3a2a1a })); beam.position.set(0, 4.1, -3.2); caveG.add(beam);
+const player = { pos: new V3(0, 0, 3.5), vel: new V3() };
+const heads = [];
+function mkHead(id, x, y, z) {
+  const g = new T.Group(), s = new T.Mesh(new T.SphereGeometry(0.13, 16, 12), new T.MeshStandardMaterial({ color: 0xe8c8b0, roughness: 0.6 })); g.add(s);
+  const nose = new T.Mesh(new T.ConeGeometry(0.03, 0.06, 6), new T.MeshStandardMaterial({ color: 0xd0a890 })); nose.rotation.x = Math.PI / 2; nose.position.z = 0.14; g.add(nose);
+  const neck = new T.Mesh(new T.CylinderGeometry(0.07, 0.06, 0.05, 8), new T.MeshStandardMaterial({ color: 0x8a0010 })); neck.position.y = -0.13; g.add(neck);
+  const hit = new T.Mesh(new T.SphereGeometry(0.14, 8, 6), new T.MeshBasicMaterial({ visible: false })); g.add(hit); g.position.set(x, y, z); scene.add(g);
+  const h = { g, hit, rec: { id, c: { name: id } }, vel: new V3(), av: new V3(), sleep: 0, mount: null, grounded: true }; hit.userData.head = h; heads.push(h); return h;
+}
+const items = [];
+function mkProp(pid, x, z, col, w, h, d) {
+  const g = new T.Group(), m = new T.Mesh(new T.BoxGeometry(w, h, d), new T.MeshStandardMaterial({ color: col, roughness: 0.7 })); m.position.y = h / 2; g.add(m);
+  const pick = new T.Mesh(new T.SphereGeometry(Math.max(w, h, d) * 0.6 + 0.05, 8, 6), new T.MeshBasicMaterial({ visible: false })); pick.position.y = h / 2; g.add(pick); g.position.set(x, 0, z); scene.add(g);
+  const it = { p: { t: 'mfoot', x, y: 0, z, ry: 0, s: 1, sl: 1, rid: pid }, d: { n: '断脚' }, g, pick, ext: new V3(w, h, d), ghost: false }; items.push(it); return it;
+}
+const REALP = location.search.indexOf('props') >= 0; if (!REALP) window.Props = { items, P: {}, auraMul: () => 1, mode: null }; // ?props=1：加载真正的 js/props.js（测制作页 / 放置委托）
+const inv = {};
+const IT = {}; for (const k of ['iron', 'sinew', 'bone', 'ash', 'phal', 'wax', 'hide']) IT[k] = { n: k, icon: '·' };
+window.Sack = { IT, def(id, o) { IT[id] = o; }, inv: () => ({ stash: [], sack: { items: [] } }), have: id => inv[id] || 0, take(id, n) { inv[id] = (inv[id] || 0) - n; }, mk: (id, n) => ({ id, n }), stashAdd(o) { inv[o.id] = (inv[o.id] || 0) + o.n; } };
+const trig = [];
+window.G = { scene, camera, heads, builds: [], player, playing: true, uiOpen: false, held: null, cine: null, S: {}, HOOK: { frame: [], e: [], tip: [], click: [], pre: [] }, cave: { R: 6.5, H: 8, floorAt: () => 0, pillars: [], group: caveG },
+  toast(t) { window.__toast = t; }, floatText(t) { window.__float = t; }, burst() { }, trigger(h, s, m) { trig.push([h.rec.id, s, m]); }, save() { }, lookHit: () => null };
+window.__trig = trig; window.__inv = inv;
+window.shot = (n) => { renderer.render(scene, camera); renderer.render(scene, camera); };
+window.simN = (n, dt) => { scene.updateMatrixWorld(true); for (let i = 0; i < n; i++) { for (const f of G.HOOK.frame) f(dt || 1 / 60, i / 60); } };
+window.mk = { head: mkHead, prop: mkProp };
+</script>
+<script>if (location.search.indexOf("props") >= 0) document.write('<script src="/js/props.js"><\/script>');</script>
+<script src="/js/rigging.js"></script>

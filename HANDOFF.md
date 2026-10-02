@@ -4403,3 +4403,13 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - **Hub 外框（`js/hub.js`）**：转盘开启时左侧列表隐藏（`body.hubwheel`，`--hubW:0`）；顶部出现页面标题头（分组 ❖ 页名 + 上一页 / 下一页），底部键位提示条（Tab 按住转盘 / `[` `]` 切页 / Esc 返回，`step()`），`.modal` 顶底加纹章、入场扫光；页面打开时隐藏 `#nemChip/#spchip/#sanChip`。`Hub` 新增导出 `GROUPS / avail / curLang / last`。
 - **关于“大师级”**：这一步做了转盘和统一外框；各页面内部（总览 / 背包 / 天赋 / 建造 / 收藏等）的版式还是 UI3A 原样，没有逐页重做——它们是几十个模块各自的 DOM，需要逐页设计（栅格、层级、数据可视化、品质配色、动效）。下一步建议先挑 2~3 个最常用的页（总览、建造、首级收藏）做样板，再套到别的页。
 - 测试：Playwright 用合成事件验证了 轻点开 / 关、按住出转盘、鼠标选页、松手进入、已开页时按住不动＝保持、Esc 取消。**没在真实指针锁定 + 真实键盘下测过**（headless 里 Tab 按键没触发，合成事件可以）。
+
+## R62 洞穴绳索/钉钩系统 (rigging MOD, def ON)
+- 新文件 `js/rigging.js` (`window.Rig`)：钉(nail)可钉入岩壁/头/摆件/肉块(piece)，E 拔出退还；挂钩(hook)、锁链(chain)、三叉铁环(ring)、秤砣(weight)、招魂铜铃(bell)、吊灯(lantern)。链=PBD 质点链(substep, `cmax=0.25` + 每点 6m/s 速度上限，别再调小 cmax：会让长链卡死)。
+- 头/摆件被链/钩挂住后变成 Rig 驱动的刚体(组件锚定到钉才会悬空；没锚的整体拖地)，拾取头/摆件会自动解链(`Props.grab`→`Rig.releaseProp`)。
+- 摆件制作在工坊“摆件”页(`js/props.js` 的 `RIGS` 表)；放置委托给 `Rig.startPlace`。两击放链：先点端口，再点另一端，滚轮调长度，右键取消。
+- 小幅连锁产出加成：`Rig.mul(pos)`（挂着的东西越多越高，上限小），由 `Props.auraMul` 乘入；铜铃被撞/摆动超过阈值触发 `G.trigger(h,'rig',mult)` 共鸣。
+- 存档 `G.S.rig`(parts/nid/bq)，beforeunload 与 addPart 时 persistBodies。
+- 同时修复协作者 `js/mods_i18n.js` 的 SyntaxError(`ui_wheel` 与 `san` 之间的字面 `\n`)。
+- 内容边界不变：材料为骨/筋/尸蜡/发/灰/铁，无血腥堆砌；几何为程序化原语(灯用 Poly Haven 资源若可用)，可换成用户模型。
+- 测试：`tools/test/rig.html`（`?props=1` 载入真 props.js）。

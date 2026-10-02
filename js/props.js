@@ -56,6 +56,24 @@ window.Props = (() => {
     garland: { n: '宝石串链', icon: '📿', rar: 3, cord: true, col: '#c9a24a', pend: { model: 'Gems', size: 0.14, gap: 0.3 }, aura: { r: 1.5, m: 1.1 }, stat: { soul: 2 }, need: { gem: 1, sinew: 2, fang: 2 }, coin: 260,
       desc: '血玉和兽牙串成的链子。<b>两侧 1.5 米内产出 ×1.1，魂力 +2</b>。' }
   };
+  // ---- R62 装具（逻辑在 js/rigging.js，这里只登记配方 / 说明，复用「道具」页签的制作与背包「放置到洞里」）
+  const RIGS = {
+    nail: { n: '铁钉', icon: '📌', rar: 1, rig: 1, out: 4, need: { iron: 1 }, coin: 40, eff: ['一次制作 4 颗。可钉进岩壁、地面、首级、摆件里；E 拔出（收回）', '钉在岩壁/地面 = 固定点；钉在首级/摆件上 = 它身上多一个挂点'],
+      desc: '粗黑的铁钉。钉在哪里，哪里就成了能吊起东西的固定点。' },
+    chain: { n: '锁链', icon: '🔗', rar: 2, rig: 1, need: { iron: 3, sinew: 1 }, coin: 90, eff: ['最长 8 米，有重量、会垂、会晃；滚轮调长短（短了会把两端拉近）', '能连接：钉子、铁环、挂钩、首级、摆件。连锁段数越多，相连首级产出越高（最多 +18%）'],
+      desc: '一整盘黑铁链。肉块、头颅、断脚……都能拴在一起。' },
+    hook: { n: '挂钩', icon: '🪝', rar: 2, rig: 1, need: { iron: 2, bone: 1 }, coin: 70, eff: ['0.3 米的铁钩：上端挂在钉子/铁环上，下端钩住首级或摆件，会把它提上来', '被吊离地面的首级：产出 +5%（需锚定在钉子上）'],
+      desc: '弯成 J 形的铁钩，钩尖磨得发亮。' },
+    ring: { n: '三叉铁环', icon: '⭕', rar: 2, rig: 1, need: { iron: 2 }, coin: 60, eff: ['链与链的分叉点：可以同时接多根锁链/挂钩（例：一颗头 → 铁环 → 两只脚）', '落在地上也行，之后用链子把它吊起来'],
+      desc: '一只带三个耳的铁环，什么都能往上拴。' },
+    weight: { n: '秤砣', icon: '⚓', rar: 2, rig: 1, need: { iron: 4, ash: 1 }, coin: 100, eff: ['沉甸甸的铁砣：把链子坠直、拉紧，还能当配重把轻的东西吊起来', '连锁组里有秤砣：相连首级产出 +4%'],
+      desc: '黑铁铸的砣，比看上去重得多。' },
+    bell: { n: '招魂铜铃', icon: '🔔', rar: 3, rig: 1, need: { iron: 2, phal: 2, wax: 1 }, coin: 160, eff: ['挂着晃：被撞或摆动得够快就会“响”', '连锁共鸣：响一次，同一连锁组里最多 4 颗首级各触发一次产出 ×1.25（9 秒冷却，需锚定）'],
+      desc: '铃舌是一节指骨。碰一下，整条链上的头都会应声。' },
+    lantern: { n: '吊灯', icon: '🏮', rar: 2, rig: 1, need: { iron: 1, wax: 3, hide: 1 }, coin: 180, eff: ['挂在钉子或链子上，被碰到会来回荡（Poly Haven CC0 灯笼）', '连锁组里每盏吊灯：相连首级产出 +4%（最多 2 盏）'],
+      desc: '一盏冷蓝火的小灯，影子会跟着它晃。' }
+  };
+  Object.assign(P, RIGS);
   const KEYS = Object.keys(P), LEG = { mhand: 1, mfoot: 1, gut: 1 }; // R55: 这三件改走战场解剖，不再出现在制作列表
   P.og = { n: '器官标本', icon: '🫀', rar: 2, size: 0.36, organ: true, need: {}, coin: 0, desc: '' };
 
@@ -139,7 +157,7 @@ window.Props = (() => {
     let d = P[p.t]; if (!d) return null; if (p.t === 'og') { if (!p.og) return null; d = orgD(p, 1); }
     const it = { p, d, g: new THREE.Group(), ghost: !!ghost, tm: Math.random() * 10, pend: [] }; layout(it); it.g.userData.propIt = it; if (it.pick) it.pick.userData.propIt = it; pg.add(it.g); items.push(it); markDirty(); return it;
   }
-  function remove(it) { const i = items.indexOf(it); if (i >= 0) items.splice(i, 1); pg.remove(it.g); disposeKids(it.g); markDirty(); }
+  function remove(it) { try { window.Rig && Rig.releaseProp && Rig.releaseProp(it); } catch (e) { } const i = items.indexOf(it); if (i >= 0) items.splice(i, 1); pg.remove(it.g); disposeKids(it.g); markDirty(); }
   function rebuildAll() { for (const it of items) layout(it); }
   function load() {
     for (const it of items.slice()) remove(it);
@@ -162,12 +180,12 @@ window.Props = (() => {
     for (const it of items) { if (it.ghost) continue; const e = it.d[key]; if (!e) continue; if ((cnt[ckey(it)] || 0) >= PER) continue; if (within(it, pos, e.r)) { cnt[ckey(it)] = (cnt[ckey(it)] || 0) + 1; m *= e.m; } }
     return Math.min(m, 3);
   }
-  const auraMul = pos => mulOf('aura', pos), pokeMul = pos => mulOf('poke', pos);
+  const auraMul = pos => mulOf('aura', pos) * (window.Rig && Rig.mul ? Rig.mul(pos) : 1), pokeMul = pos => mulOf('poke', pos);
   const RM = () => !!(window.Loop && Loop.rOn && Loop.rOn()), SCAP = () => !(window.Mods && Mods.on && Mods.on('build_stat_cap') === false);
   function roundMul(pos) { let c = 1; for (const it of items) { if (it.ghost || !it.d.chimeR || !it.p.a) continue; if (segDist(pos, new V3(...it.p.a), new V3(...it.p.b)) < it.d.chimeR * (it.p.th || 1)) { c = 1.2; break; } } return Math.min(2, auraMul(pos) * (1 + (pokeMul(pos) - 1) * 0.5) * c); }
   const STN = { str: '力量', con: '体魄', agi: '敏捷', ter: '凶威', soul: '魂力' };
   function effTxt(d) {
-    const o = [], Sk = window.Sack;
+    const o = [], Sk = window.Sack; if (d.eff) return d.eff.slice();
     if (d.aura) o.push(RM() ? `回洞结算时，${d.cord ? '线两侧' : '半径'} ${d.aura.r} 米内的首级 ×${d.aura.m}` : `${d.cord ? '线两侧' : '半径'} ${d.aura.r} 米内首级产出 ×${d.aura.m}`);
     if (d.poke) o.push(RM() ? `回洞结算时，半径 ${d.poke.r} 米内的首级 ×${(1 + (d.poke.m - 1) / 2).toFixed(2)}` : `半径 ${d.poke.r} 米内亲手戳的收益 ×${d.poke.m}`);
     if (d.chimeR) o.push(RM() ? `回洞结算时，线两侧 ${d.chimeR} 米内的首级 ×1.2` : `每 25 秒敲响：两侧 ${d.chimeR} 米内首级各产出 ×1.5`);
@@ -263,7 +281,7 @@ window.Props = (() => {
   function takeOne(id) { const f = findIn(id); if (!f) return false; const [L, o] = f; o.n--; if (o.n <= 0) L.splice(L.indexOf(o), 1); return true; }
   function closeUI() { try { if (window.UI && UI.close) UI.close(true); } catch (e) { } if (G.uiOpen && G.setUIOpen) G.setUIOpen(false); }
   function startPlace(t, item) {
-    const d = P[t]; if (!d || !window.Sack) return; if (mode) cancel(true);
+    const d = P[t]; if (!d || !window.Sack) return; if (d.rig) { if (window.Rig && Rig.startPlace) Rig.startPlace(t); return; } if (mode) cancel(true);
     if (t === 'og' && !(item && item.og && findU(item.u))) { G.toast('这件器官不在背包里。', '#f88'); return; }
     if (inWild()) { G.toast('回洞里才能布置道具。', '#f88'); return; }
     if (t !== 'og' && !findIn('pr_' + t)) { G.toast('没有这件道具——先在「🧷 道具」页签里制作。', '#f88'); return; }
@@ -278,7 +296,7 @@ window.Props = (() => {
     G.toast(`摆放 <b>${d.n}</b>：${d.cord ? '左键定第一个端点，再看向别处点第二下' : '准星指哪摆哪，滚轮旋转'}，右键取消`, '#cfb8ff', 3.4);
   }
   function grab(hit) {
-    if (mode) return; const it = hit.it, d = it.d, p = it.p; if (!it) return;
+    if (mode) return; const it = hit.it, d = it.d, p = it.p; if (!it) return; try { window.Rig && Rig.releaseProp && Rig.releaseProp(it); } catch (e) { }
     mode = { k: 'carry', it, o: JSON.parse(JSON.stringify(p)), lift: 0, yaw: p.ry || 0 };
     if (d.cord) { const a = new V3(...p.a), b = new V3(...p.b); mode.grab = hit.pt.distanceTo(a) < 0.45 ? 'a' : hit.pt.distanceTo(b) < 0.45 ? 'b' : 'all'; }
     G.toast(`拿起 <b>${d.n}</b>`, '#cfb8ff', 1.4);
@@ -354,8 +372,8 @@ window.Props = (() => {
       const k = b.dataset.pcraft, d = P[k], Sk = window.Sack, S = G.S;
       for (const i in d.need) if (Sk.have(i) < d.need[i]) { window.SFX && SFX.deny && SFX.deny(); G.toast('材料不足', '#f88'); return; }
       if (S.coins < d.coin) { window.SFX && SFX.deny && SFX.deny(); G.toast('魂晶不足', '#f88'); return; }
-      S.coins -= d.coin; for (const i in d.need) Sk.take(i, d.need[i]); Sk.stashAdd(Sk.mk('pr_' + k, 1)); window.SFX && SFX.play && SFX.play('wood', 0.5, 0.9);
-      G.toast(`🧷 制作完成：${d.icon} <b>${d.n}</b>（在本页点「放置」）`, '#cfb8ff', 2.4); G.save && G.save(); rerender();
+      S.coins -= d.coin; for (const i in d.need) Sk.take(i, d.need[i]); Sk.stashAdd(Sk.mk('pr_' + k, d.out || 1)); window.SFX && SFX.play && SFX.play('wood', 0.5, 0.9);
+      G.toast(`🧷 制作完成：${d.icon} <b>${d.n}</b>${d.out > 1 ? ' ×' + d.out : ''}（在本页点「放置」）`, '#cfb8ff', 2.4); G.save && G.save(); rerender();
     });
     panel.querySelectorAll('[data-pplace]').forEach(b => b.onclick = () => startPlace(b.dataset.pplace));
     panel.querySelectorAll('[data-precall]').forEach(b => b.onclick = () => { const Sk = window.Sack; for (const it of items.slice()) { if (it.ghost) continue; const i = S_().indexOf(it.p); if (i >= 0) S_().splice(i, 1); Sk.stashAdd(it.p.t === 'og' ? Organs.mkItem(it.p.og) : Sk.mk('pr_' + it.p.t, 1)); remove(it); } G.toast('道具已全部收回储物箱。', '#cfb8ff', 2); G.save && G.save(); rerender(); });
