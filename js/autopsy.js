@@ -109,8 +109,8 @@ window.Autopsy = (() => {
       const sb = new T.Box3(), ab = new T.Box3(), tp = new V3(); for (const q of sets) for (let i = 0; i < q.V.length; i += S) { tp.set(q.V[i], q.V[i + 1], q.V[i + 2]); ab.expandByPoint(tp); if (!q.cloth) sb.expandByPoint(tp); }
       const sbs = sb.getSize(new V3()), abs = ab.getSize(new V3()); // 去掉衣服后，皮肤层必须仍是完整的人形（否则四肢画在衣服层里，去衣就会缺胳膊少腿）
       hasLin = n3 >= 300 && (y1 - y0) >= 0.2 * HH && !sb.isEmpty() && sbs.y >= 0.92 * abs.y && sbs.x >= 0.8 * abs.x;
-      // 衣服删空后露出的是模型自带的人体层：躯干到大腿根这一段直接涂成绷带（不另外生成网格，不遮挡视野）
-      if (hasLin) for (const s of sets) if (s.skin && s.cap !== 2) { const V = s.V; for (let i = 0; i < V.length; i += S) { const y = V[i + 1], code = V[i + S - 1] | 0; if ((code === 0 || code === 18 || code === 19 || code === 20) && y >= hem && y <= top) BASE_STYLES[0].paint(V, i); } } }
+      // 衣服删空后露出的是模型自带的人体层：把它躯干到大腿根这段标记为“遮罩范围”（reg+32，和衣服层同一套约定），运行时从这些三角面拷出一层贴身的绷带遮罩网格
+      if (hasLin) for (const s of sets) if (s.skin && s.cap !== 2) { const V = s.V; for (let i = 0; i < V.length; i += S) { const y = V[i + 1], code = V[i + S - 1] | 0; if ((code === 0 || code === 18 || code === 19 || code === 20) && y >= hem && y <= top) V[i + S - 1] = code + 32; } } }
     const BONES = [['hips', 'spine', 0.032], ['spine', 'chest', 0.03], ['chest', 'upperChest', 0.028], ['upperChest', 'neck', 0.022], ['leftUpperArm', 'leftLowerArm', 0.014], ['leftLowerArm', 'leftHand', 0.011], ['rightUpperArm', 'rightLowerArm', 0.014], ['rightLowerArm', 'rightHand', 0.011], ['leftUpperLeg', 'leftLowerLeg', 0.026], ['leftLowerLeg', 'leftFoot', 0.019], ['rightUpperLeg', 'rightLowerLeg', 0.026], ['rightLowerLeg', 'rightFoot', 0.019], ['leftFoot', 'leftToes', 0.011], ['rightFoot', 'rightToes', 0.011], ['upperChest', 'leftUpperArm', 0.012], ['upperChest', 'rightUpperArm', 0.012], ['hips', 'leftUpperLeg', 0.02], ['hips', 'rightUpperLeg', 0.02]];
     const bones = BONES.filter(b => BN[b[0]] && BN[b[1]]).map(b => ({ a: BN[b[0]].slice(), b: BN[b[1]].slice(), r: b[2] }));
     return { sets, BN, bones, height: HH, hasCloth: hasLin, rig: rigOk(BN) };
@@ -166,8 +166,16 @@ window.Autopsy = (() => {
       const qx = px - (g.ax + g.dx * bt), qy = py - (g.ay + g.dy * bt); res.d = (qx * nx + qy * ny >= 0 ? 1 : -1) * Math.sqrt(bd); res.s = g.c + bt * g.l; return res.d; };
     return res;
   }
+  // glTF/VRM 网格在 UV 接缝、法线分裂处是重复顶点：同一个切点被左右两个三角形各算一遍，线段链在接缝处断开 → 截面拼不成圈、“切了没断面”。按位置把线段端点焦到同一个顶点再拼圈
+  function weldSegs(Q) {
+    const V = Q.V, sg = Q.segs, rep = new Map(), grid = new Map(), C = 1e-4, key = (i, j, k) => i + ',' + j + ',' + k;
+    const canon = v => { const r0 = rep.get(v); if (r0 !== undefined) return r0; const x = V[v * S], y = V[v * S + 1], z = V[v * S + 2], ci = Math.floor(x / C), cj = Math.floor(y / C), ck = Math.floor(z / C);
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) { const L = grid.get(key(ci + a, cj + b, ck + c)); if (L) for (const u of L) { const dx = V[u * S] - x, dy = V[u * S + 1] - y, dz = V[u * S + 2] - z; if (dx * dx + dy * dy + dz * dz < C * C) { rep.set(v, u); return u; } } }
+      const k = key(ci, cj, ck); let L = grid.get(k); if (!L) grid.set(k, L = []); L.push(v); rep.set(v, v); return v; };
+    const out = []; for (let i = 0; i < sg.length; i += 2) { const a = canon(sg[i]), b = canon(sg[i + 1]); if (a !== b) out.push(a, b); } return out;
+  }
   function addCaps(Q, tool, sign) {
-    const m = Q.segs.length / 2; if (!m) return; const V = Q.V, start = new Map(); for (let i = 0; i < m; i++) { const s = Q.segs[2 * i]; if (!start.has(s)) start.set(s, []); start.get(s).push(i); }
+    Q.segs = weldSegs(Q); const m = Q.segs.length / 2; if (!m) return; const V = Q.V, start = new Map(); for (let i = 0; i < m; i++) { const s = Q.segs[2 * i]; if (!start.has(s)) start.set(s, []); start.get(s).push(i); }
     const used = new Uint8Array(m), loops = []; const pd = (a, b) => Math.hypot(V[a * S] - V[b * S], V[a * S + 1] - V[b * S + 1], V[a * S + 2] - V[b * S + 2]);
     for (let i = 0; i < m; i++) { if (used[i]) continue; used[i] = 1; const chain = [Q.segs[2 * i]]; let cur = Q.segs[2 * i + 1], closed = false, guard = 0;
       while (guard++ < 200000) { if (cur === chain[0]) { closed = true; break; } chain.push(cur); const L = start.get(cur); let nx = -1; if (L) for (const j of L) if (!used[j]) { nx = j; break; } if (nx < 0) break; used[nx] = 1; cur = Q.segs[2 * nx + 1]; }
@@ -179,15 +187,16 @@ window.Autopsy = (() => {
     for (const x of L2) if (x.depth % 2 === 1 && x.par >= 0) L2[x.par].holes.push(x);
     const reg = i => V[i * S + S - 1];
     for (const x of L2) { if (x.depth % 2 === 1) continue; const contour = x.pts, holes = x.holes.map(h => h.pts), all = x.l.concat(...x.holes.map(h => h.l));
-      const all2 = contour.concat(...holes); let tris; try { tris = T.ShapeUtils.triangulateShape(contour, holes); } catch (e) { continue; } const base = V.length / S;
+      const all2 = contour.concat(...holes); let tris, fan = false; try { tris = T.ShapeUtils.triangulateShape(contour, holes); } catch (e) { tris = null; } if (!tris || !tris.length) { fan = true; tris = []; for (let i = 0; i < contour.length; i++) tris.push([all.length, i, (i + 1) % contour.length]); } const base = V.length / S; // 多边形自相交时三角剖分会失败：改用中心扇形，宁可粗糙也要有断面
       let u0 = 1e18, u1 = -1e18, w0 = 1e18, w1 = -1e18; for (const q of contour) { if (q.x < u0) u0 = q.x; if (q.x > u1) u1 = q.x; if (q.y < w0) w0 = q.y; if (q.y > w1) w1 = q.y; } const cu = (u0 + u1) / 2, cw = (w0 + w1) / 2, hu = Math.max((u1 - u0) / 2, 1e-6), hw = Math.max((w1 - w0) / 2, 1e-6);
       if (Q.cmap) all.forEach((vi, qi) => Q.cmap.push(base + qi, vi));
       all.forEach((vi, qi) => { const nn = tool.nrm(V[vi * S], V[vi * S + 1], V[vi * S + 2]); V.push(V[vi * S], V[vi * S + 1], V[vi * S + 2], nn[0] * sign, nn[1] * sign, nn[2] * sign, 1, 1, 1, 1, 1, 1, 0, 0, -1, (all2[qi].x - cu) / hu, (all2[qi].y - cw) / hw, reg(vi)); });
+      if (fan) { let cx = 0, cy = 0, cz = 0; for (const vi of x.l) { cx += V[vi * S]; cy += V[vi * S + 1]; cz += V[vi * S + 2]; } cx /= x.l.length; cy /= x.l.length; cz /= x.l.length; const nn = tool.nrm(cx, cy, cz); V.push(cx, cy, cz, nn[0] * sign, nn[1] * sign, nn[2] * sign, 1, 1, 1, 1, 1, 1, 0, 0, -1, 0, 0, reg(x.l[0])); }
       for (const t of tris) { const a = (base + t[0]) * S, b = (base + t[1]) * S, c = (base + t[2]) * S; const ux = V[b] - V[a], uy = V[b + 1] - V[a + 1], uz = V[b + 2] - V[a + 2], vx = V[c] - V[a], vy = V[c + 1] - V[a + 1], vz = V[c + 2] - V[a + 2];
         const d = (uy * vz - uz * vy) * V[a + 3] + (uz * vx - ux * vz) * V[a + 4] + (ux * vy - uy * vx) * V[a + 5]; if (d >= 0) Q.I.push(base + t[0], base + t[1], base + t[2]); else Q.I.push(base + t[0], base + t[2], base + t[1]); } }
   }
   function loopsOf(Q) {
-    const m = Q.segs.length / 2; if (!m) return []; const V = Q.V, start = new Map(); for (let i = 0; i < m; i++) { const s = Q.segs[2 * i]; if (!start.has(s)) start.set(s, []); start.get(s).push(i); }
+    Q.segs = weldSegs(Q); const m = Q.segs.length / 2; if (!m) return []; const V = Q.V, start = new Map(); for (let i = 0; i < m; i++) { const s = Q.segs[2 * i]; if (!start.has(s)) start.set(s, []); start.get(s).push(i); }
     const used = new Uint8Array(m), loops = [], pd = (a, b) => Math.hypot(V[a * S] - V[b * S], V[a * S + 1] - V[b * S + 1], V[a * S + 2] - V[b * S + 2]);
     for (let i = 0; i < m; i++) { if (used[i]) continue; used[i] = 1; const chain = [Q.segs[2 * i]]; let cur = Q.segs[2 * i + 1], closed = false, guard = 0;
       while (guard++ < 200000) { if (cur === chain[0]) { closed = true; break; } chain.push(cur); const L = start.get(cur); let nx = -1; if (L) for (const j of L) if (!used[j]) { nx = j; break; } if (nx < 0) break; used[nx] = 1; cur = Q.segs[2 * nx + 1]; }
@@ -296,13 +305,19 @@ window.Autopsy = (() => {
     { id: 'slot3', name: '样式三', icon: '🪢', empty: true }];
   let baseIdx = 0; try { baseIdx = Math.max(0, Math.min(2, +localStorage.getItem('autopsy_base') || 0)); } catch (e) { }
   const bandPaint = (V, o) => { const st = BASE_STYLES[baseIdx]; if (st.paint) st.paint(V, o); else { V[o + 6] = V[o + 9]; V[o + 7] = V[o + 10]; V[o + 8] = V[o + 11]; V[o + 14] = 0; } };
-  function bandSet(s) {
-    const remap = new Map(), V = [], I = [], rP = [], rN = [], rS = [];
-    for (let t = 0; t < s.I.length; t += 3) { const a = s.I[t], b = s.I[t + 1], c = s.I[t + 2]; if (s.V[a * S + S - 1] < 32 || s.V[b * S + S - 1] < 32 || s.V[c * S + S - 1] < 32) continue;
-      for (const x of [a, b, c]) { let m = remap.get(x); if (m === undefined) { m = V.length / S; remap.set(x, m); for (let q = 0; q < S; q++) V.push(s.V[x * S + q]); const o = m * S; V[o + 6] = V[o + 9]; V[o + 7] = V[o + 10]; V[o + 8] = V[o + 11]; V[o + 14] = 0; bandPaint(V, o); if (s.rg) { for (let k = 0; k < 3; k++) { rP.push(s.rg.P[x * 3 + k]); rN.push(s.rg.N[x * 3 + k]); } for (let k = 0; k < 4; k++) rS.push(s.rg.sk[x * 4 + k]); } } I.push(m); } }
-    if (I.length < 9) return null;
-    return { V, I, skin: false, cap: 0, cloth: true, nm: s.nm + '·素衣', map: null, at: 0, bandOf: wdKey(s), rg: s.rg ? { P: Float32Array.from(rP), N: Float32Array.from(rN), sk: Float32Array.from(rS) } : undefined };
+  // 遮罩网格：从模型自带人体层（皮肤层）的“遮罩范围”三角面拷一层，沿法线外推 3mm，贴身缠绷带——不是照衣服形状拷的，所以不会鼓出一坨
+  function skinBand(sets) {
+    const out = [], off = 0.003, P = BASE_STYLES[baseIdx].paint ? BASE_STYLES[baseIdx] : BASE_STYLES[0];
+    for (const s of sets) {
+      if (!s.skin || s.cap === 2 || s.hid || s.bandOf) continue; const remap = new Map(), V = [], I = [], rP = [], rN = [], rS = [];
+      for (let t = 0; t < s.I.length; t += 3) { const a = s.I[t], b = s.I[t + 1], c = s.I[t + 2]; if (s.V[a * S + S - 1] < 32 || s.V[b * S + S - 1] < 32 || s.V[c * S + S - 1] < 32) continue;
+        for (const x of [a, b, c]) { let m = remap.get(x); if (m === undefined) { m = V.length / S; remap.set(x, m); for (let q = 0; q < S; q++) V.push(s.V[x * S + q]); const o = m * S; V[o] += V[o + 3] * off; V[o + 1] += V[o + 4] * off; V[o + 2] += V[o + 5] * off; V[o + 14] = 0; P.paint(V, o);
+          if (s.rg) { for (let k = 0; k < 3; k++) { rP.push(s.rg.P[x * 3 + k] + s.rg.N[x * 3 + k] * off); rN.push(s.rg.N[x * 3 + k]); } for (let k = 0; k < 4; k++) rS.push(s.rg.sk[x * 4 + k]); } } I.push(m); } }
+      if (I.length >= 9) out.push({ V, I, skin: false, cap: 0, cloth: true, nm: s.nm + '·遮罩', map: null, at: 0, bandOf: '底衬', rg: s.rg ? { P: Float32Array.from(rP), N: Float32Array.from(rN), sk: Float32Array.from(rS) } : undefined });
+    }
+    return out;
   }
+  const ensureBand = sets => { if (!sets.some(q => q.bandOf === '底衬')) for (const b of skinBand(sets)) sets.push(b); };
   const WD = [['Shoes', '鞋', '👟'], ['Onepiece', '连衣裙', '👗'], ['Dress', '连衣裙', '👗'], ['Tops', '上衣', '👚'], ['Bottoms', '下装', '🩳'], ['Skirt', '裙子', '👗'], ['Pants', '裤子', '👖'], ['Legwear', '袜', '🧦'], ['Socks', '袜', '🧦'], ['Glove', '手套', '🧤'], ['Coat', '外套', '🧥'], ['Cape', '披风', '🧣'], ['Accessory', '饰品', '💍']];
   const wdKey = s => { const nm = String(s.nm || ''); for (const w of WD) if (nm.includes('_' + w[0])) return w[1]; return '衣物'; };
   const wdIcon = k => { for (const w of WD) if (w[1] === k) return w[2]; return '👕'; };
@@ -568,7 +583,7 @@ if ( vTw < -2.5 ) {
       snap(); const np = { sets, pts: p.part.pts.map(x => ({ p: x.p.slice(), a: x.a })), bones: (p.part.bones || []).map(b => ({ a: b.a.slice(), b: b.b.slice(), r: b.r })), rig: keepRig ? cloneRig(p.part.rig) : null, bb: bbOf(sets) };
       const pos = p.obj.position.clone(), q = p.obj.quaternion.clone(), tk = p.take, was = p.rb.sleep; removePiece(p); const n = addPiece(np, pos, q); n.take = tk; n.rb.sleep = was; ui(); if (reselect && sets[si]) edSelect(n, si, tri); return n;
     }
-    const wearBand = () => { }; // 删衣服不再自动生成底衬（用户嫌挡视野）
+    const wearBand = (sets, si) => { const q = sets[si]; if (q.cloth && !q.bandOf && !q.hid && !st.linen) ensureBand(sets); }; // 删 / 挪衣服网格时补上贴身的遮罩网格（只生成一次）
     function edDye(hex) {
       const E = st.ed.sel; if (!E) { toast('先点选一块网格'); return; } if (hex) st.ed.color = hex; const c = new T.Color(st.ed.color), flat = st.ed.mode === 'flat';
       edEdit(E, sets => { const q = sets[E.si]; for (const v of E.vs) { const o = v * S; if (q.V[o + 14] < 0 && q.V[o + 14] > -2.5) continue; if (q.V[o + 14] < -2.5) q.V[o + 14] = 0; q.V[o + 6] = c.r; q.V[o + 7] = c.g; q.V[o + 8] = c.b; q.V[o + 9] = c.r; q.V[o + 10] = c.g; q.V[o + 11] = c.b; if (flat) q.V[o + 14] = 0; } }, true, true);
@@ -602,7 +617,7 @@ if ( vTw < -2.5 ) {
       el.innerHTML = '<div class="wt">👗 衣橱</div>' + gs.map(g => { const off = g.hid === g.n; return `<button class="gm${off ? ' off' : ''}" data-gm="${g.k}"><i>${wdIcon(g.k)}</i><span>${g.k}</span><b>${off ? '已脱' : '穿着'}</b></button>`; }).join('') + `<div class="bs"><button class="ar" data-bs="-1">◀</button><span><i>${BASE_STYLES[baseIdx].icon}</i> ${BASE_STYLES[baseIdx].name}${BASE_STYLES[baseIdx].empty ? ' · 待添加' : ''}<em>${BASE_STYLES.map((_, k) => k === baseIdx ? '●' : '○').join(' ')}</em></span><button class="ar" data-bs="1">▶</button></div><div class="wt2">底衬样式</div><button class="bt" data-wd="lin">👕 全部换素衣</button><div class="wf">🛡 躯干的素麻底衬不会脱</div>`;
     }
     function restyleBase() {
-      for (const p of st.pieces.slice()) { let ch = false; for (const q of p.part.sets) { const sk = q.skin && !q.bandOf && !!BASE_STYLES[baseIdx].paint; if (!(q.bandOf || (st.linen && q.cloth) || sk)) continue; let any = !sk; const V = q.V; for (let i = 0; i < V.length; i += S) { if (sk && !(V[i + 14] < -2.5)) continue; if (V[i + 14] < 0 && V[i + 14] > -2.5) continue; bandPaint(V, i); any = true; } if (!any) continue; ch = true; delete q._g; }
+      for (const p of st.pieces.slice()) { let ch = false; for (const q of p.part.sets) { if (!(q.bandOf || (st.linen && q.cloth))) continue; ch = true; const V = q.V; for (let i = 0; i < V.length; i += S) { if (V[i + 14] < 0 && V[i + 14] > -2.5) continue; bandPaint(V, i); } delete q._g; }
         if (ch) { const pos = p.obj.position.clone(), qq = p.obj.quaternion.clone(), tk = p.take, was = p.rb.sleep; removePiece(p); const n = addPiece(p.part, pos, qq); n.take = tk; n.rb.sleep = was; } }
       ui();
     }
@@ -613,9 +628,9 @@ if ( vTw < -2.5 ) {
       const g = wdGroups().find(x => x.k === key); if (!g) return; const hiding = g.hid < g.n; snap(); let changed = 0;
       for (const p of st.pieces.slice()) { const sets = []; let ch = false;
         for (const s of p.part.sets) { const cp = { V: s.V.slice(), I: s.I.slice(), skin: s.skin, cap: s.cap, cloth: s.cloth, nm: s.nm, map: s.map, at: s.at, rg: s.rg, hid: s.hid, bandOf: s.bandOf };
-          if (s.bandOf === key && !hiding) { ch = true; continue; }
           if (s.cloth && !s.bandOf && wdKey(s) === key && !!s.hid !== hiding) { ch = true; cp.hid = hiding; sets.push(cp); continue; }
           sets.push(cp); }
+        if (ch) { if (hiding) ensureBand(sets); else if (!sets.some(q => q.hid && q.cloth && !q.bandOf)) for (let i = sets.length - 1; i >= 0; i--) if (sets[i].bandOf === '底衬') sets.splice(i, 1); }
         if (!ch) continue; changed++; const np = { sets, pts: p.part.pts.map(x => ({ p: x.p.slice(), a: x.a })), bones: (p.part.bones || []).map(b => ({ a: b.a.slice(), b: b.b.slice(), r: b.r })), rig: cloneRig(p.part.rig), bb: bbOf(sets) };
         const pos = p.obj.position.clone(), q = p.obj.quaternion.clone(), tk = p.take, was = p.rb.sleep; removePiece(p); const n = addPiece(np, pos, q); n.take = tk; n.rb.sleep = was; }
       if (!changed) { st.hist.pop(); return; } ui(); toast(hiding ? `${wdIcon(key)} 脱下了${key}（只是隐藏，再点一次穿回）` : `${wdIcon(key)} 穿回了${key}`);
