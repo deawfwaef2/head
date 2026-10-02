@@ -4327,3 +4327,8 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 新工具 ⭕圈选（键 5）：在身体上按住左键画圈（自动封口）→ 标记（金色圈+点）留在身上，可转视角；底部条选深度 浅3/中6/深10cm（从最外层皮肤算起，衣服鼓出来也没关系）→「🥄 刨下这块」把圈内那一块切成独立块，身体上留坑。
 - 实现：`setMark/regionTool/doCarve`（autopsy.js）；`cutPart` 的 region 模式（SDF=min(多边形距离, 底面距离)，缝宽 0.0003，不切骨盘，仅皮肤层生成侧壁+底面 `addRegionCaps`，`loopsOf` 抽出环链）；`components(sets,tool)` 在 region 下按“在圈内/外”投票，避免包围盒重叠把小块并回身体。
 - Autopsy.ui 新增 `mark(path)`、`carve()`；测试 `/home/user/work/t19.js`。已知：布料层的圈内碎片可能单独成一小块“碎块”。
+
+## R58e（解剖台：衣橱，逐件隐藏衣服）
+- 用户：衣服本来是单独模型，试试直接隐藏/删除来实现更衣。→ 「衣着」按钮改为打开衣橱面板：按类别（鞋/连衣裙/上衣/下装/袜…，按 set.nm 里的 _Shoes/_Onepiece/_Tops 等识别）逐件隐藏/穿回；隐藏＝对应 set 标 `hid:true`（mesh 不可见、不可拾取、不进 bbOf/hull/pack），可再点穿回，也可 Ctrl+Z。
+- **底线不变：不裸体。** 脱掉一件时会生成该件的 `bandSet`（只留躯干到大腿根的素麻色底衬，`bandOf=类别`），穿回时删掉。面板另有「全部换素衣」（原来的整套素衣流程，`st.wdForce`）。仅当 `B.hasCloth`（皮肤层是完整人形）才可用。
+- `hid/bandOf` 已穿过 cutPart/components/摆姿锁定。测试 t20.js（t13 的素衣一步改为点 `[data-wd=lin]`）。
