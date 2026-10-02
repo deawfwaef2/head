@@ -1,3 +1,4 @@
+// R55：已移除「砍断肢体→麻袋→工坊拆解」整条线（onSever 现为空操作；肢体改走战场「🔪 解剖」选取，见 dissect.js）。旧存档里已有的断肢材料与 body 配方仅在持有时才显示（legacy）。
 // R54 MOD workshop_plus（默认开）：🔨 工坊扩充。
 //   · 配方从 12 个扩到 ~45 个：药品 / 料理 / 战斗增益（伤害·防御·疾行·再生·魂能）/ 护具·饰品（头盔、护甲、护符）/ 材料转化 / 肢体拆解。
 //   · 砍断的上臂 / 下臂 / 大腿 / 小腿，腰斩得到的残胸，会收进麻袋成为材料（在工坊「拆解 · 肢体」里拆成骨、筋、皮）。
@@ -44,12 +45,12 @@ window.Workshop = (() => {
     { out: 'c3', n: 1, need: { gem: 2, dust: 12, wax: 2 }, coin: 1500, g: 'gear' },
     { out: 'h1', n: 1, need: { bone: 4, horn: 1, sinew: 1 }, coin: 80, g: 'gear' },
     { out: 'h2', n: 1, need: { iron: 8, cloth: 2, hide: 1 }, coin: 400, g: 'gear' },
-    { out: 'h3', n: 1, need: { horn: 4, iron: 6, dust: 6, ua: 1 }, coin: 1800, g: 'gear' },
+    { out: 'h3', n: 1, need: { horn: 4, iron: 6, dust: 6, bone: 4 }, coin: 1800, g: 'gear' },
     { out: 'h4', n: 1, need: { bone: 12, horn: 6, dust: 20, gem: 3 }, coin: 8000, g: 'gear' },
     { out: 'a1', n: 1, need: { hide: 6, sinew: 2 }, coin: 100, g: 'gear' },
     { out: 'a2', n: 1, need: { iron: 10, cloth: 4, sinew: 4 }, coin: 500, g: 'gear' },
-    { out: 'a3', n: 1, need: { iron: 18, hide: 6, th: 2 }, coin: 2500, g: 'gear' },
-    { out: 'a4', n: 1, need: { dust: 30, iron: 20, gem: 4, torso: 1 }, coin: 9000, g: 'gear' },
+    { out: 'a3', n: 1, need: { iron: 18, hide: 6, sinew: 4 }, coin: 2500, g: 'gear' },
+    { out: 'a4', n: 1, need: { dust: 30, iron: 20, gem: 4, hide: 6 }, coin: 9000, g: 'gear' },
     // 材料转化
     { out: 'dust', n: 1, need: { bone: 4 }, coin: 10, g: 'conv' },
     { out: 'dust', n: 2, need: { ash: 3, herb: 1 }, coin: 12, g: 'conv' },
@@ -59,12 +60,12 @@ window.Workshop = (() => {
     { out: 'dust', n: 5, need: { gem: 1 }, coin: 0, g: 'conv' },
     { out: 'iron', n: 2, need: { bone: 2, wood: 2 }, coin: 20, g: 'conv' },
     // 拆解·肢体
-    { out: 'bone', n: 3, need: { ua: 1 }, coin: 0, g: 'body' },
-    { out: 'phal', n: 4, need: { la: 1 }, coin: 0, g: 'body' },
-    { out: 'sinew', n: 4, need: { th: 1 }, coin: 0, g: 'body' },
-    { out: 'bone', n: 2, need: { ca: 1 }, coin: 0, g: 'body' },
-    { out: 'hide', n: 3, need: { torso: 1 }, coin: 0, g: 'body' },
-    { out: 'bone', n: 4, need: { torso: 1 }, coin: 0, g: 'body' }
+    { out: 'bone', n: 3, need: { ua: 1 }, coin: 0, g: 'body', legacy: 1 },
+    { out: 'phal', n: 4, need: { la: 1 }, coin: 0, g: 'body', legacy: 1 },
+    { out: 'sinew', n: 4, need: { th: 1 }, coin: 0, g: 'body', legacy: 1 },
+    { out: 'bone', n: 2, need: { ca: 1 }, coin: 0, g: 'body', legacy: 1 },
+    { out: 'hide', n: 3, need: { torso: 1 }, coin: 0, g: 'body', legacy: 1 },
+    { out: 'bone', n: 4, need: { torso: 1 }, coin: 0, g: 'body', legacy: 1 }
   ];
   let done = false;
   function install() {
@@ -79,12 +80,6 @@ window.Workshop = (() => {
   }
   const w = setInterval(() => { try { install(); } catch (e) { console.warn('Workshop', e); clearInterval(w); } if (done) clearInterval(w); }, 400);
   // 砍断的肢体 → 麻袋
-  function onSever(fo, t) {
-    if (!on() || !window.Sack || !window.G || !G.S) return; const z = fo && fo.lastSev || ''; let id = null;
-    if (t === 'halve' || z === 'spine') id = 'torso'; else { const m = /(UpperArm|LowerArm|UpperLeg|LowerLeg)/.exec(z); if (m) id = PART[m[1]]; }
-    if (!id || !Sack.IT[id]) return; if (id !== 'torso' && Math.random() > 0.8) return;
-    const I = Sack.inv(), o = Sack.mk(id, 1); if (!Sack.addTo(I.sack, o)) I.pending.push(o);
-    G.toast && G.toast(`🩸 收进麻袋：${Sack.IT[id].n}（工坊里可拆解成材料）`, '#ffb090', 2.2);
-  }
+  function onSever() { /* R55: 不再自动收集断肢 */ }
   return { onSever, install, R, DEF, get done() { return done; } };
 })();

@@ -56,7 +56,7 @@ window.Props = (() => {
     garland: { n: '宝石串链', icon: '📿', rar: 3, cord: true, col: '#c9a24a', pend: { model: 'Gems', size: 0.14, gap: 0.3 }, aura: { r: 1.5, m: 1.1 }, stat: { soul: 2 }, need: { gem: 1, sinew: 2, fang: 2 }, coin: 260,
       desc: '血玉和兽牙串成的链子。<b>两侧 1.5 米内产出 ×1.1，魂力 +2</b>。' }
   };
-  const KEYS = Object.keys(P);
+  const KEYS = Object.keys(P), LEG = { mhand: 1, mfoot: 1, gut: 1 }; // R55: 这三件改走战场解剖，不再出现在制作列表
   P.og = { n: '器官标本', icon: '🫀', rar: 2, size: 0.36, organ: true, need: {}, coin: 0, desc: '' };
 
   // Sack 物品定义（脚本加载时 Sack 已就绪；没就绪则等）
@@ -344,7 +344,7 @@ window.Props = (() => {
     const mats = Object.keys(MATS).map(k => `<span>${MATS[k].icon}${MATS[k].n} <b>${have(k)}</b></span>`).join('');
     return `<div class="wk-mats"><b>🧷 摆件材料</b>${mats}<span style="margin-left:auto">洞里已摆 <b>${placed}/${MAXN}</b>${placed ? ' <button class="sk-btn" data-precall="1">全部收回</button>' : ''}</span></div>`
       + `<p class="wk-ds" style="margin:0 0 10px">材料从野外容器、尸体和野兽尸骸里翻出来。摆件没有碰撞，准星指哪摆哪；对准已摆的摆件按 <b>E</b> 拿起、拉伸、收回。${RM() ? '<b>回合制：</b>效果在每次回洞结算首级时生效。' : ''}</p><div class="wk-grid">`
-      + KEYS.map(k => { const d = P[k], okN = Object.entries(d.need).every(([i, n]) => have(i) >= n), ok = okN && S.coins >= d.coin, own = ownN(k), col = RC[d.rar] || '#ddd';
+      + KEYS.filter(k => !LEG[k]).map(k => { const d = P[k], okN = Object.entries(d.need).every(([i, n]) => have(i) >= n), ok = okN && S.coins >= d.coin, own = ownN(k), col = RC[d.rar] || '#ddd';
         return `<div class="wk-card ${ok ? 'can' : ''}" style="--rc:${col}"><div class="wk-top"><div class="wk-ic"><i>${d.icon}</i></div><div><div class="wk-nm" style="color:${col}">${esc(d.n)}${own ? ` <small style="font-size:14px;color:#cfc2a8">已有 ${own}</small>` : ''}</div><div class="wk-ds">${esc(flav(d))}</div></div></div>`
           + `<div class="wk-note">${effTxt(d).map(t => '▸ ' + esc(t)).join('<br>')}</div><div class="wk-need">${Object.entries(d.need).map(([i, n]) => need(i, n)).join('')}<span class="${S.coins >= d.coin ? 'ok' : 'no'}">🔮 ${d.coin}</span></div>`
           + `<div style="display:flex;gap:8px;margin-top:auto"><button class="sk-btn wk-go" style="flex:1" data-pcraft="${k}" ${ok ? '' : 'disabled'}>${ok ? '制作' : okN ? '魂晶不足' : '材料不足'}</button>${own ? `<button class="sk-btn wk-go" data-pplace="${k}">放置</button>` : ''}</div></div>`; }).join('') + '</div>';

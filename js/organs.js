@@ -21,16 +21,24 @@ window.Organs = (() => {
     kidney: { n: '肾', icon: '🫘', st: { ter: 2 }, p: 0.8, note: '一对，蚕豆形。' },
     stomach:{ n: '胃', icon: '🥩', st: { con: 1 }, tk: { every: 45, kind: 'herb', n: 1 }, p: 0.8, note: '袋状，会缓慢“消化”瓶里的东西，产出草药。' },
     gut:    { n: '肠', icon: '🪱', au: 0.09, r: 4, p: 0.9, note: '盘了好几圈，光环范围大。' },
-    brain:  { n: '大脑', icon: '🧠', st: { soul: 2 }, pk: 0.15, p: 1, note: '沟回细密，魂力的居所。' },
-    eye:    { n: '眼球', icon: '👁️', st: { soul: 1 }, pk: 0.2, p: 1, note: '虹膜颜色随归属者而异。它会转向你。' },
-    tongue: { n: '舌', icon: '👅', st: { agi: 1 }, pk: 0.12, p: 0.7, note: '肌肉质，舌面留着细小的纹路。' },
+    brain:  { hid: 1, n: '大脑', icon: '🧠', st: { soul: 2 }, pk: 0.15, p: 1, note: '沟回细密，魂力的居所。' },
+    eye:    { hid: 1, n: '眼球', icon: '👁️', st: { soul: 1 }, pk: 0.2, p: 1, note: '虹膜颜色随归属者而异。它会转向你。' },
+    tongue: { hid: 1, n: '舌', icon: '👅', st: { agi: 1 }, pk: 0.12, p: 0.7, note: '肌肉质，舌面留着细小的纹路。' },
     spleen: { n: '脾', icon: '🟣', tk: { every: 60, kind: 'coin', n: 30 }, p: 0.6, note: '暗紫色，像一枚扁平的果子。定时产出魂晶。' },
     gall:   { n: '胆', icon: '🟢', st: { str: 1, ter: 1 }, p: 0.5, note: '墨绿的小囊。' },
     spine:  { n: '脊椎', icon: '🦴', st: { str: 1, ter: 2, con: 1 }, p: 0.6, note: '一节一节的骨，中间是空的。' },
-    blood:  { n: '血液', icon: '🩸', au: 0.03, tk: { every: 50, kind: 'dust', n: 1 }, p: 1, note: '整具身体里放出来的血，装了满满一瓶。' }
+    blood:  { n: '血液', icon: '🩸', au: 0.03, tk: { every: 50, kind: 'dust', n: 1 }, p: 1, note: '整具身体里放出来的血，装了满满一瓶。' },
+    // R55：残肢（肢体类，战场解剖时可选）。模型：未在编辑器里替换时用占位件（见 limbModel）。
+    upperarm: { cat: 'limb', n: '上臂', icon: '💪', st: { str: 2 }, pk: 0.12, p: 0.9, note: '肱二头肌还绷着。戳击加成。' },
+    forearm:  { cat: 'limb', n: '前臂', icon: '🤚', st: { agi: 1, str: 1 }, pk: 0.1, r: 3, p: 0.9, note: '细长的两根骨，握过无数次刀柄。戳击加成。' },
+    thigh:    { cat: 'limb', n: '大腿', icon: '🦵', st: { con: 2 }, au: 0.05, p: 0.9, note: '全身最粗的一块肌腱与骨。体魄加成，带光环。' },
+    calf:     { cat: 'limb', n: '小腿', icon: '🦶', st: { agi: 2 }, tk: { every: 55, kind: 'herb', n: 1 }, p: 0.9, note: '又直又硬的小腿骨。敏捷加成，定时出草药。' },
+    chest:    { cat: 'limb', n: '胸腔', icon: '🫁', st: { con: 2, ter: 1 }, au: 0.07, r: 3.5, p: 0.7, note: '肋骨围成的笼子，里面空了。体魄与胆魄加成，光环范围大。' }
   };
-  const BEAST = ['heart', 'lung', 'liver', 'kidney', 'stomach', 'gut', 'eye', 'tongue', 'spleen', 'blood'];
-  const LIST = Object.keys(OG);
+  for (const k in OG) if (!OG[k].cat) OG[k].cat = 'organ';
+  const BEAST = ['heart', 'lung', 'liver', 'kidney', 'stomach', 'gut', 'spleen', 'blood', 'thigh', 'calf', 'chest'];
+  const LIST = Object.keys(OG); // 就地增长（编辑器新增的自定义部位会 push 进来）
+  const poolOf = (human) => (human ? LIST.slice() : BEAST.concat(LIST.filter(k => OG[k].custom && OG[k].beast))).filter(k => !OG[k].hid);
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
   const Sk = () => window.Sack, G_ = () => window.G;
 
@@ -78,7 +86,7 @@ window.Organs = (() => {
     let own, race, rar, age, tr, af;
     if (c) { own = c.name; race = c.raceN || c.race; rar = c.rar | 0; age = c.age; tr = (c.traits || []).slice(); const a = window.RPG && c.aff && c.aff[0] && RPG.AFF[c.aff[0]]; af = a ? a.n : ''; }
     else { own = L.bst || '野兽'; race = '野兽'; rar = 0; age = 0; tr = []; af = ''; }
-    const pool = c ? LIST : BEAST, got = [];
+    const pool = poolOf(!!c), got = [];
     const base = clamp(0.3 + rar * 0.08 + (boss ? 0.2 : 0), 0, 0.85);
     for (const t of pool) {
       if (!boss && Math.random() > (OG[t].p || 1) * (c ? 1 : 0.85)) continue;
@@ -150,7 +158,16 @@ window.Organs = (() => {
     }
     return g;
   }
+  // 肢体占位件：圆柱 + 关节球（只是占位；在「残肢器官编辑器」里导入自己的模型即可替换）
+  function limbModel(og) {
+    const g = new THREE.Group(), sk = M('#d9b79c', { roughness: 0.6 }), bn = M('#efe6d2', { roughness: 0.7 }), t = og.t, L = t === 'forearm' ? 0.16 : t === 'calf' ? 0.17 : 0.15, rt = t === 'thigh' ? 0.034 : t === 'chest' ? 0.05 : 0.026;
+    if (t === 'chest') { for (let i = 0; i < 5; i++) { const y = -0.06 + i * 0.03; add(g, new THREE.TorusGeometry(0.052 - Math.abs(i - 2) * 0.006, 0.0045, 6, 16), bn, 0, y, 0, 1, 1, 0.8, Math.PI / 2, 0, 0); } add(g, cyl(0.008, 0.008, 0.16), bn, 0, 0, -0.03); }
+    else { add(g, cyl(rt, rt * 0.82, L, 12), sk, 0, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2.6); add(g, sph(rt * 1.05), sk, -L * 0.34, -L * 0.2, 0); add(g, sph(rt * 0.9), bn, L * 0.34, L * 0.2, 0); }
+    return g;
+  }
   function model(og) {
+    const cm0 = window.PartStore && PartStore.model(og.t); // R55：自制/替换模型；jar:false → 不带标本罐直接展示
+    if (cm0 && cm0.userData.nojar) { const w = new THREE.Group(); cm0.scale.multiplyScalar(2.2); cm0.position.y = 0.2; w.add(cm0); w.userData.ext = new THREE.Box3().setFromObject(w).getSize(new V3()); return w; }
     const g = new THREE.Group(), blood = og.t === 'blood', rc = new THREE.Color(RC[og.rar] || '#999');
     const brass = M('#8a6a3a', { metalness: 0.7, roughness: 0.35 });
     add(g, cyl(0.12, 0.125, 0.03, 20), brass, 0, 0.015, 0);
@@ -159,7 +176,7 @@ window.Organs = (() => {
     add(g, cyl(0.115, 0.115, 0.028, 20), brass, 0, 0.335, 0); add(g, cyl(0.03, 0.03, 0.03, 10), M('#' + rc.getHexString(), { emissive: '#' + rc.getHexString(), emissiveIntensity: 0.6 }), 0, 0.36, 0);
     add(g, new THREE.BoxGeometry(0.075, 0.045, 0.004), M('#d8c9a4', { roughness: 0.9 }), 0, 0.06, 0.113);
     if (blood) { for (let i = 0; i < 9; i++) add(g, sph(0.008 + (i % 3) * 0.003, 6), M('#9a1a20', { transparent: true, opacity: 0.6 }), Math.cos(i * 2.1) * 0.05, 0.1 + i * 0.022, Math.sin(i * 2.1) * 0.05); }
-    else { const o = organ(og); o.position.y = 0.18; o.scale.setScalar(1.3); g.add(o); }
+    else { const cm = cm0; const d0 = OG[og.t] || {}; const o = cm ? cm : (d0.cat === 'limb' ? limbModel(og) : organ(og)); o.position.y = 0.18; if (!cm) o.scale.setScalar(1.3); g.add(o); }
     const bb = new THREE.Box3().setFromObject(g); g.userData.ext = bb.getSize(new V3());
     return g;
   }
@@ -174,5 +191,5 @@ window.Organs = (() => {
   }
   let ti = setInterval(() => { const G = G_(); if (!G || !G.HOOK || !Sk()) return; clearInterval(ti); defs(); G.HOOK.frame.push(tick); }, 400);
 
-  return { on, OG, LIST, RN, RC, effect, effText, name, info, tipHtml, mkItem, canDissect, dissect, menu, model, defs, grade };
+  return { on, OG, LIST, poolOf, limbModel, organPreview: (t) => organ({ t, rar: 0, iris: 200 }), defsNow: () => { defs.done = 0; defs(); }, RN, RC, effect, effText, name, info, tipHtml, mkItem, canDissect, dissect, menu, model, defs, grade };
 })();

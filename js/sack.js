@@ -372,7 +372,7 @@ window.Sack = (() => {
       const head = `<div class="wk-sub"><button class="sk-btn ${sub === 'rc' ? 'on' : ''}" data-wsub="craft">🔨 配方（药品·增益·背篓）</button>${window.Props && Props.on() ? `<button class="sk-btn ${sub === 'props' ? 'on' : ''}" data-wsub="props">🧷 摆件（洞里的 BUFF 道具）</button>` : ''}${sub === 'rc' ? `<label class="wk-only"><input type="checkbox" data-wonly ${craftOnly ? 'checked' : ''}> 只看现在能合成的</label>` : ''}</div>`;
       if (sub === 'props') body = head + Props.tabHtml();
       else {
-        const grp = RGRP.map(([nm, f, hint]) => { const rs = RECIPES.map((rc, i) => [rc, i]).filter(([rc]) => IT[rc.out] && Object.keys(rc.need).every(k => IT[k])).filter(([rc]) => f(rc)).filter(([rc]) => !craftOnly || (Object.entries(rc.need).every(([k, n]) => have(k) >= n) && S.coins >= rc.coin)); return rs.length ? `<h4 class="wk-h">${nm} <small>${hint}</small></h4><div class="wk-grid">${rs.map(([rc, i]) => recipeCard(rc, i)).join('')}</div>` : ''; }).join('');
+        const grp = RGRP.map(([nm, f, hint]) => { const rs = RECIPES.map((rc, i) => [rc, i]).filter(([rc]) => IT[rc.out] && Object.keys(rc.need).every(k => IT[k])).filter(([rc]) => !rc.legacy || Object.keys(rc.need).some(k => have(k) > 0)).filter(([rc]) => f(rc)).filter(([rc]) => !craftOnly || (Object.entries(rc.need).every(([k, n]) => have(k) >= n) && S.coins >= rc.coin)); return rs.length ? `<h4 class="wk-h">${nm} <small>${hint}</small></h4><div class="wk-grid">${rs.map(([rc, i]) => recipeCard(rc, i)).join('')}</div>` : ''; }).join('');
         body = head + `<div class="wk-mats"><b>库存材料</b> ${mats || '<span style="opacity:.6">还没有材料——去野外容器、尸体、野兽身上翻</span>'}</div>` + (grp || '<p style="color:#a99;font-size:15px">现在没有能合成的配方。取消“只看能合成”看看缺什么。</p>');
       }
     } else if (caveTab === 'books' && window.Books) {
@@ -418,7 +418,7 @@ window.Sack = (() => {
     root.querySelectorAll('[data-wonly]').forEach(b => b.onchange = () => { craftOnly = b.checked; render(); });
     root.querySelectorAll('[data-ench]').forEach(b => b.onclick = () => { const k = b.dataset.ench; if (k.indexOf('eq') === 0) enchant('eq', k.split(':')[1] || 'weapon'); else enchant(inv().stash.find(o => o.u === +k)); });
     root.querySelectorAll('[data-craft]').forEach(b => b.onclick = () => craft(RECIPES[+b.dataset.craft]));
-    const dsb = root.querySelector('[data-act="dissect"]'); if (dsb) dsb.onclick = () => { if (!near(cont)) { toast('离尸体太远了', '#ccc'); return; } Organs.dissect(cont); render(); };
+    const dsb = root.querySelector('[data-act="dissect"]'); if (dsb) dsb.onclick = () => { if (!near(cont)) { toast('离尸体太远了', '#ccc'); return; } if (window.Dissect && Dissect.on()) Dissect.open(cont, () => render()); else { Organs.dissect(cont); render(); } };
     const pour = root.querySelector('[data-act="pour"]'); if (pour) pour.onclick = () => pourWild();
     root.querySelectorAll('.sk-it').forEach(el => { el.onmousedown = (e) => itemDown(e, el); el.oncontextmenu = (e) => e.preventDefault(); });
   }
