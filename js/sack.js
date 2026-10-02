@@ -78,10 +78,11 @@ window.Sack = (() => {
     return S.inv;
   }
   // ---- 格子运算 ----
-  const dims = (o) => { const d = IT[o.id] || IT.iron; return o.r ? [d.h, d.w] : [d.w, d.h]; };
+  const base = (o) => { const d = IT[o.id] || IT.iron; return o.sz && o.sz.length === 2 ? o.sz : [d.w, d.h]; }; /* R57：个别物品（解剖块）自带占格 o.sz */
+  const dims = (o) => { const b = base(o); return o.r ? [b[1], b[0]] : [b[0], b[1]]; };
   function occ(g, skip) { const m = new Uint8Array(g.w * g.h); for (const o of g.items) { if (o === skip) continue; const [w, h] = dims(o); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (o.y + y) * g.w + o.x + x; if (i >= 0 && i < m.length) m[i] = 1; } } return m; }
-  function fits(g, o, x, y, r, skip, m) { const d = IT[o.id]; const w = r ? d.h : d.w, h = r ? d.w : d.h; if (x < 0 || y < 0 || x + w > g.w || y + h > g.h) return false; m = m || occ(g, skip); for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) if (m[(y + yy) * g.w + x + xx]) return false; return true; }
-  function spot(g, o) { const m = occ(g); for (const r of [0, 1]) { const d = IT[o.id]; if (r && d.w === d.h) continue; for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) if (fits(g, o, x, y, r, null, m)) return { x, y, r }; } return null; }
+  function fits(g, o, x, y, r, skip, m) { const d = base(o); const w = r ? d[1] : d[0], h = r ? d[0] : d[1]; if (x < 0 || y < 0 || x + w > g.w || y + h > g.h) return false; m = m || occ(g, skip); for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) if (m[(y + yy) * g.w + x + xx]) return false; return true; }
+  function spot(g, o) { const m = occ(g); for (const r of [0, 1]) { const d = base(o); if (r && d[0] === d[1]) continue; for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) if (fits(g, o, x, y, r, null, m)) return { x, y, r }; } return null; }
   function addTo(g, o, dry) { // 先叠堆再找空位；dry = 只检查
     const d = IT[o.id]; let n = o.n;
     if (d.st > 1) for (const q of g.items) if (q.id === o.id && q.n < d.st) { const k = Math.min(d.st - q.n, n); if (!dry) q.n += k; n -= k; if (!n) break; }
@@ -428,7 +429,7 @@ window.Sack = (() => {
     if (where === 'sack' && e.button === 0) { // 可能是拖动
       const g = inv().sack, grid = document.getElementById('skGrid'), r0 = grid.getBoundingClientRect(), sx = e.clientX, sy = e.clientY; let moved = false, rot = o.r || 0, gh = null;
       const mv = (ev) => { if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 6) return; if (!moved) { moved = true; el.style.opacity = 0.25; gh = el.cloneNode(true); gh.classList.add('ghost'); grid.appendChild(gh); drag = { o, rotate() { rot ^= 1; place(ev); } }; } place(ev); };
-      const cell = (ev) => { const d = IT[o.id], w = rot ? d.h : d.w, h = rot ? d.w : d.h; return [Math.round((ev.clientX - r0.left) / CELL - w / 2), Math.round((ev.clientY - r0.top) / CELL - h / 2), w, h]; };
+      const cell = (ev) => { const d = base(o), w = rot ? d[1] : d[0], h = rot ? d[0] : d[1]; return [Math.round((ev.clientX - r0.left) / CELL - w / 2), Math.round((ev.clientY - r0.top) / CELL - h / 2), w, h]; };
       let last = null; const place = (ev) => { last = ev; if (!gh) return; const [x, y, w, h] = cell(ev); gh.style.left = x * CELL + 1 + 'px'; gh.style.top = y * CELL + 1 + 'px'; gh.style.width = w * CELL - 2 + 'px'; gh.style.height = h * CELL - 2 + 'px'; gh.classList.toggle('bad', !fits(g, o, x, y, rot, o)); };
       drag = null; const up = (ev) => { removeEventListener('mousemove', mv); removeEventListener('mouseup', up);
         if (moved) { const [x, y] = cell(last || ev); if (fits(g, o, x, y, rot, o)) { o.x = x; o.y = y; o.r = rot; SFX.click && SFX.click(); } drag = null; render(); } else itemMenu(o, where, ev, bi); };
