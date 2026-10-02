@@ -2110,3 +2110,10 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - Physics (inside `open()`): own rigid-body step 120 Hz — gravity, table (r 1.22) / floor (y -1.5), hull points (≤74 extreme vertices) vs table, piece-vs-piece (hull points in other piece's local AABB), friction, sleeping. 🤲 tool (key 2) grabs by a spring at the clicked point (dangling, can be thrown / dropped off the table). Fresh cut siblings ghost each other until they stop overlapping. Shadows on.
 - 素衣 (linen): now DESTRUCTIVE + undoable (hist entry has `lin`). Cloth sets keep only vertices with torso/upper-leg reg and above knee-ish hem (reg bit +32 set at bake). Never nude: `hasCloth` requires ≥300 kept tris AND the skin layer to be a complete body (Genshin single-mesh bodies and bodies whose limbs live in the cloth layer disable the toggle).
 - Inventory size: piece items carry `sz:[w,h]` (cellsOf: long edge/0.32m ≤4, 2nd edge/0.28m ≤3). `sack.js`: `base(o)` used by dims/fits/spot/cell. Panel shows a mini grid + "占 w×h 格" + bag free cells (Sack.usage).
+
+## R58a (autopsy 刀路 / 切面 / 骨骼) — js/autopsy.js only
+- User asked: knife-spot guide line, knife animation, cuts that change direction mid-way, cut face must read as "cut" not wax, bones kept ("骨骼保持" interpreted as: bones stay inside the pieces and show in the cut), ragdoll + lockable pose that survives returning to the cave.
+- Done in R58a: vertex layout S=18 (cap coords cp 15-16, reg 17; tw=-1 flesh cap, tw=-2 bone disc); cap shader (skin rim→fat→striated muscle→deep; bone discs ivory+marrow); bones tracked per part (`part.bones`), split by cuts, bone discs added at crossings, `p.boneLine` shown in xray; guide dots on the body while dragging; dashed extension preview; SVG knife animation `runKnife` then `doCutPath`; `st.busy` lock.
+- Gotcha: triangulateShape mutates its input arrays — build `all2` before calling it.
+- NOT done yet (R58b): ragdoll (PBD) + pose lock. Plan: particles at joints, distance constraints, CPU skin via H_ weights, "lock pose" writes posed verts into V and calls initRB; pose stored in the whole-body piece.
+- Never commit the user's GitHub token.
