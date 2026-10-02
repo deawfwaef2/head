@@ -310,9 +310,11 @@ window.Autopsy = (() => {
     const out = [], off = 0.003, P = BASE_STYLES[baseIdx].paint ? BASE_STYLES[baseIdx] : BASE_STYLES[0];
     for (const s of sets) {
       if (!s.skin || s.cap === 2 || s.hid || s.bandOf) continue; const remap = new Map(), V = [], I = [], rP = [], rN = [], rS = [];
+      let cx = 0, cz = 0, zn = 0; for (let i = 0; i < s.V.length; i += S) if (s.V[i + S - 1] >= 32) { cx += s.V[i]; cz += s.V[i + 2]; zn++; } if (!zn) continue; cx /= zn; cz /= zn;
+      let rad = 0; for (let i = 0; i < s.V.length; i += S) if (s.V[i + S - 1] >= 32) rad += (s.V[i] - cx) * s.V[i + 3] + (s.V[i + 2] - cz) * s.V[i + 5]; const sg = rad >= 0 ? 1 : -1; // 烘焙后法线可能朝里：按“离躯干中轴”的多数方向定外侧
       for (let t = 0; t < s.I.length; t += 3) { const a = s.I[t], b = s.I[t + 1], c = s.I[t + 2]; if (s.V[a * S + S - 1] < 32 || s.V[b * S + S - 1] < 32 || s.V[c * S + S - 1] < 32) continue;
-        for (const x of [a, b, c]) { let m = remap.get(x); if (m === undefined) { m = V.length / S; remap.set(x, m); for (let q = 0; q < S; q++) V.push(s.V[x * S + q]); const o = m * S; V[o] += V[o + 3] * off; V[o + 1] += V[o + 4] * off; V[o + 2] += V[o + 5] * off; V[o + 14] = 0; P.paint(V, o);
-          if (s.rg) { for (let k = 0; k < 3; k++) { rP.push(s.rg.P[x * 3 + k] + s.rg.N[x * 3 + k] * off); rN.push(s.rg.N[x * 3 + k]); } for (let k = 0; k < 4; k++) rS.push(s.rg.sk[x * 4 + k]); } } I.push(m); } }
+        for (const x of [a, b, c]) { let m = remap.get(x); if (m === undefined) { m = V.length / S; remap.set(x, m); for (let q = 0; q < S; q++) V.push(s.V[x * S + q]); const o = m * S; V[o] += V[o + 3] * off * sg; V[o + 1] += V[o + 4] * off * sg; V[o + 2] += V[o + 5] * off * sg; V[o + 14] = 0; P.paint(V, o);
+          if (s.rg) { for (let k = 0; k < 3; k++) { rP.push(s.rg.P[x * 3 + k] + s.rg.N[x * 3 + k] * off * sg); rN.push(s.rg.N[x * 3 + k]); } for (let k = 0; k < 4; k++) rS.push(s.rg.sk[x * 4 + k]); } } I.push(m); } }
       if (I.length >= 9) out.push({ V, I, skin: false, cap: 0, cloth: true, nm: s.nm + '·遮罩', map: null, at: 0, bandOf: '底衬', rg: s.rg ? { P: Float32Array.from(rP), N: Float32Array.from(rN), sk: Float32Array.from(rS) } : undefined });
     }
     return out;
