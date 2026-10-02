@@ -26,7 +26,7 @@ window.Foe = (() => {
       m.envMapIntensity = 0.55; if (m.map) { m.map.anisotropy = 4; m.map.encoding = THREE.sRGBEncoding; }
       if (m.transparent && m.alphaTest === 0) { m.alphaTest = 0.4; m.transparent = false; m.depthWrite = true; } // 布料半透明边缘：改成裁剪，避免排序问题
       m.userData.skin = /SKIN|肌/i.test(m.name) || (/body/i.test(m.name) && !/cloth|tops|bottom|shoe|acc/i.test(m.name));
-      if (m.name === '__CUT__') { o.visible = false; o.userData.cut = true; return; }
+      if (m.name === '__CUT__') { o.visible = false; o.userData.cut = true; if (window.ModelHeads && ModelHeads.getCut && (!window.Mods || Mods.on('cut_anatomy') !== false)) { try { if (!o.geometry.userData._cutUV) { o.geometry.userData._cutUV = 1; ModelHeads.fixCutUV(o.geometry); } o.material = ModelHeads.getCut(); } catch (e) { } } return; } // R62：身体的颈断面也用同一张解剖贴图
       // 身体改用与首级相同的卡通材质（同一条光照曲线 + 同样的柔性压缩）：否则同样的肤色，头会比身体暗 40%
       if (!window.Mods || Mods.on('foe_toon') !== false) {
         const t = new THREE.MeshToonMaterial({ map: m.map || null, color: m.color ? m.color.clone() : new THREE.Color(1, 1, 1), gradientMap: TOON_GRAD(), transparent: false, alphaTest: m.alphaTest || 0, side: m.side, name: m.name });

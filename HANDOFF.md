@@ -4466,3 +4466,17 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - **改动文件**：js/sfxpack.js(新) js/combatfx.js js/mods.js js/mods_i18n.js index.html js/beasts.js js/steps.js js/rigging.js sfx/*(新) tools/build_sfxpack.py(新) tools/sfxdemo.html(新) CREDITS.md。
 - **测试**：真 AudioContext 下 92 个按钮全部点击无报错、58 池全部解码；通过 analyser 实测：洞穴环境 ≈−29 dB RMS，命中峰值 0.43–0.72，重伤峰值已压回；完整 index.html 无头加载超时（环境限制），未做整游戏内实测。**沙箱无法“听”，音色需用户试听反馈。**
 - **授权**：全部 CC0（来源列表见 CREDITS.md 与 `tools/build_sfxpack.py` 头部）；CC-BY 的 `wind-loop`(AntumDeluge) 已排除。
+
+## R62（断面贴图重做 / 表情+面部差分 / 肌肉截面着色器）
+- 用户："斩首断面和身体断面贴图一般；人物表情更绝望狰狞，更多表情，鼻血/泪痕差分"。
+- `js/heads.js`：
+  - `cutAnatomy()` 程序化颈部解剖截面（皮、脂肪小叶、胸锁乳突肌/斜方肌肌束+筋膜、气管软骨环、食管、颈动脉/颈静脉、迷走神经、颈椎松质骨+椎管、血泊/水光），输出 diffuse + bump + roughness 三张 512 画布；`getCut()` 在 `Mods.on('cut_anatomy') !== false` 时使用，否则退回 R38 旧贴图。导出 `fixCutUV`、`getCut`。
+  - 皮肤着色器新增 `uFx` vec4（泪痕 / 鼻血 / 口血 / 淤青），按 `vHP` 头部局部坐标；缓存键 `skin7`；`look.fx` 控制，MOD `face_despair` 关闭后清零。`hb.setFx()`。
+  - `FACES` 15 种表情（绝望空洞、痛哭流涕、极度惊恐、狰狞咬牙、剧痛扭曲、哀求、癫狂惨笑、死寂空洞、怒目圆睁、抽泣、血口哀嚎、青肿木然、死不瞑目、惨笑、安详），每种含 VRM morph `ex` + 差分 `fx` + 权重 `w`；`dressFace(L)` 在 `randomLook` 末尾用头自身 seed 抽取，不扰动主随机流。
+- `js/foe.js`：身体 `__CUT__` 网格用 `fixCutUV` + `getCut()`。
+- `js/autopsy.js` `mkMat`：新片元着色器（Voronoi 肌束+筋膜、纤维条纹、脂肪大理石纹、血液沉积、湿润高光、骨小梁；断面 roughness 覆盖）。
+- `js/game.js` `cycleHeldFace()` 用 `ModelHeads.FACES` + fx；`js/play.js` 梳妆台：表情全列表、差分行、`fx:` 指令。
+- `js/mods.js` 注册 `cut_anatomy`、`face_despair`（look 类）；`js/mods_i18n.js` 修复 R61 提交里 ui_wheel 行的字面 `\n` 语法错误（导致 i18n 整体失效）。
+- 教训：写文件时 `\n` / `\uXXXX` 不能以字面转义形式进入源码，否则整段变成注释/语法错误（本轮 heads.js 因此一度整体加载失败，已修）。每次改完用 `node --check` 或页面内 fetch+`new Function` 验证。
+- 已验证：断面贴图画布目视（解剖结构清晰）；15 种脸在离屏渲染器里渲出，泪痕/血口/鼻血可见。未验证：身体断面与 autopsy 新着色器的实机效果（本地无 `big/` 身体模型），淤青位置强度。
+- 待做：UI 逐页大改（总览/建造/首级收藏）、多敌人战斗性能优化。

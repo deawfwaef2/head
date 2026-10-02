@@ -404,8 +404,55 @@ window.ModelHeads = (() => {
     for (let i = 0; i < p.count; i++) { uv[i * 2] = 0.5 + (p.getX(i) - cx) / (2 * R) * 0.96; uv[i * 2 + 1] = 0.5 + (p.getZ(i) - cz) / (2 * R) * 0.96; }
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   }
+  // R62 断面重做（用户：“斩首断面贴图看上去非常一般”）：程序化的颈部解剖截面——皮 / 脂肪 / 胸锁乳突肌 + 筋膜 / 气管软骨环 / 食管 / 颈动脉 / 颈静脉 / 颈椎（松质骨 + 椎管 + 脊髓），
+  // 带凹凸（bump）和湿润高光（roughness）贴图。前 = +z（画布上方），后是脊柱。
+  function cutAnatomy() {
+    const S = 512, C = S / 2, mk = () => { const c = document.createElement('canvas'); c.width = c.height = S; return c; };
+    const cv = mk(), g = cv.getContext('2d'), bv = mk(), b = bv.getContext('2d'), rv = mk(), r = rv.getContext('2d'); let sd = 20260; const R = () => (sd = (sd * 16807) % 2147483647) / 2147483647, rr = (a, z) => a + (z - a) * R();
+    const ell = (c2, x, y, rx, ry, rot, fill) => { c2.save(); c2.translate(x, y); c2.rotate(rot || 0); c2.beginPath(); c2.ellipse(0, 0, rx, ry, 0, 0, 6.2832); c2.fillStyle = fill; c2.fill(); c2.restore(); };
+    const rad = (c2, x, y, r0, r1, stops) => { const gr = c2.createRadialGradient(x, y, r0, x, y, r1); stops.forEach(s => gr.addColorStop(s[0], s[1])); return gr; };
+    g.fillStyle = '#4a0910'; g.fillRect(0, 0, S, S); b.fillStyle = '#808080'; b.fillRect(0, 0, S, S); r.fillStyle = '#6a6a6a'; r.fillRect(0, 0, S, S);
+    // 底：由内到外 深血 → 肌肉 → 脂肪 → 皮
+    g.fillStyle = rad(g, C, C, 0, 250, [[0, '#5a0a12'], [0.45, '#8e1620'], [0.78, '#a82a30'], [0.86, '#e2c08a'], [0.93, '#ecc3a8'], [0.97, '#d8a08a'], [1, '#a8685a']]); g.beginPath(); g.arc(C, C, 250, 0, 6.2832); g.fill();
+    // 肌束：每束一组流向一致的纤维 + 苍白筋膜边
+    const bundle = (x, y, rx, ry, rot, dark) => {
+      const col = dark ? ['#6c0e18', '#8a1a22'] : ['#8c1822', '#b2323a']; g.save(); g.translate(x, y); g.rotate(rot); g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, 6.2832); g.clip();
+      g.fillStyle = rad(g, 0, 0, 0, Math.max(rx, ry), [[0, col[1]], [1, col[0]]]); g.fillRect(-rx, -ry, rx * 2, ry * 2);
+      for (let i = 0; i < Math.round(rx * ry / 22); i++) { const yy = rr(-ry, ry), xx = rr(-rx, rx); g.strokeStyle = R() < 0.5 ? 'rgba(220,90,90,.3)' : 'rgba(40,0,6,.35)'; g.lineWidth = rr(0.6, 1.6); g.beginPath(); g.moveTo(xx - rr(6, 22), yy + rr(-1, 1)); g.lineTo(xx + rr(6, 22), yy + rr(-1, 1)); g.stroke(); }
+      g.restore(); g.save(); g.translate(x, y); g.rotate(rot); g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, 6.2832); g.strokeStyle = 'rgba(240,196,186,.62)'; g.lineWidth = 2.4; g.stroke(); g.strokeStyle = 'rgba(70,6,12,.5)'; g.lineWidth = 1; g.beginPath(); g.ellipse(0, 0, rx - 2.4, ry - 2.4, 0, 0, 6.2832); g.stroke(); g.restore();
+      b.save(); b.translate(x, y); b.rotate(rot); b.fillStyle = rad(b, 0, 0, 0, Math.max(rx, ry), [[0, '#9a9a9a'], [1, '#6e6e6e']]); b.beginPath(); b.ellipse(0, 0, rx, ry, 0, 0, 6.2832); b.fill(); b.strokeStyle = '#404040'; b.lineWidth = 2.5; b.stroke(); b.restore();
+    };
+    // 环状布置的大肌群（胸锁乳突肌在两侧、斜方肌在后）
+    for (let i = 0; i < 30; i++) { const a = R() * 6.2832, d = rr(70, 200); bundle(C + Math.cos(a) * d, C + Math.sin(a) * d, rr(16, 38), rr(10, 22), a + 1.5708, d > 150); }
+    bundle(C - 128, C - 6, 46, 30, 0.3, false); bundle(C + 128, C - 6, 46, 30, -0.3, false); bundle(C - 96, C + 118, 52, 24, -0.4, true); bundle(C + 96, C + 118, 52, 24, 0.4, true);
+    // 皮下脂肪小叶
+    for (let i = 0; i < 80; i++) { const a = R() * 6.2832, d = rr(212, 232); ell(g, C + Math.cos(a) * d, C + Math.sin(a) * d, rr(5, 12), rr(3, 6), a + 1.5708, `rgba(${230 + R() * 20 | 0},${196 + R() * 20 | 0},${120 + R() * 30 | 0},.75)`); }
+    // 甲状腺叶 + 气管（软骨环 + 黑腔）+ 食管
+    ell(g, C - 46, C - 66, 24, 17, 0.3, '#a64048'); ell(g, C + 46, C - 66, 24, 17, -0.3, '#a64048'); ell(b, C - 46, C - 66, 24, 17, 0.3, '#8e8e8e'); ell(b, C + 46, C - 66, 24, 17, -0.3, '#8e8e8e');
+    ell(g, C, C - 68, 34, 29, 0, '#e9d9c8'); ell(g, C, C - 68, 30, 25, 0, '#d9b8a8'); g.fillStyle = rad(g, C, C - 68, 2, 20, [[0, '#050102'], [0.8, '#220608'], [1, '#6a1a1c']]); g.beginPath(); g.ellipse(C, C - 68, 20, 16, 0, 0, 6.2832); g.fill();
+    ell(b, C, C - 68, 34, 29, 0, '#c8c8c8'); ell(b, C, C - 68, 20, 16, 0, '#202020'); ell(r, C, C - 68, 20, 16, 0, '#242424');
+    ell(g, C, C - 22, 24, 12, 0, '#c8706e'); ell(g, C, C - 22, 15, 4, 0, '#2a0508'); ell(b, C, C - 22, 24, 12, 0, '#8a8a8a'); ell(b, C, C - 22, 15, 4, 0, '#303030');
+    // 颈动脉（亮红腔 + 淡色边）、颈静脉（暗紫色）、迷走神经（乳白点）
+    for (const s of [-1, 1]) {
+      ell(g, C + s * 82, C - 24, 19, 17, 0, '#6e5a86'); ell(g, C + s * 82, C - 24, 14, 12, 0, '#2c1230'); ell(b, C + s * 82, C - 24, 19, 17, 0, '#787878'); ell(b, C + s * 82, C - 24, 14, 12, 0, '#505050');
+      ell(g, C + s * 60, C - 38, 14, 14, 0, '#f2d5cf'); g.fillStyle = rad(g, C + s * 60, C - 38, 1, 10, [[0, '#ff3a3a'], [1, '#b2060f']]); g.beginPath(); g.arc(C + s * 60, C - 38, 10, 0, 6.2832); g.fill(); ell(b, C + s * 60, C - 38, 14, 14, 0, '#a8a8a8'); ell(b, C + s * 60, C - 38, 10, 10, 0, '#585858');
+      ell(g, C + s * 68, C - 54, 5, 5, 0, '#f4ead8'); ell(b, C + s * 68, C - 54, 5, 5, 0, '#a0a0a0'); }
+    // 颈椎：皮质骨环 + 松质骨斑点 + 椎管 + 脊髓 + 横突
+    ell(g, C - 62, C + 52, 22, 13, 0.3, '#e2d6bb'); ell(g, C + 62, C + 52, 22, 13, -0.3, '#e2d6bb'); ell(b, C - 62, C + 52, 22, 13, 0.3, '#b0b0b0'); ell(b, C + 62, C + 52, 22, 13, -0.3, '#b0b0b0');
+    ell(g, C, C + 46, 48, 36, 0, '#efe5cd'); g.fillStyle = rad(g, C, C + 46, 4, 36, [[0, '#cdb88f'], [0.7, '#e6d8b8'], [1, '#f7efdc']]); g.beginPath(); g.ellipse(C, C + 46, 41, 30, 0, 0, 6.2832); g.fill();
+    for (let i = 0; i < 260; i++) { const a = R() * 6.2832, d = Math.sqrt(R()) * 36; g.fillStyle = `rgba(${150 + R() * 40 | 0},${100 + R() * 30 | 0},${70 + R() * 30 | 0},${0.12 + R() * 0.28})`; g.beginPath(); g.arc(C + Math.cos(a) * d * 1.15, C + 46 + Math.sin(a) * d * 0.85, rr(0.8, 2.6), 0, 6.2832); g.fill(); }
+    ell(b, C, C + 46, 48, 36, 0, '#d0d0d0'); ell(b, C, C + 46, 36, 26, 0, '#9a9a9a');
+    ell(g, C, C + 92, 19, 15, 0, '#efe5cd'); ell(g, C, C + 92, 14, 11, 0, '#2a0d10'); ell(g, C, C + 92, 8, 7, 0, '#d9c4b0'); ell(b, C, C + 92, 19, 15, 0, '#c0c0c0'); ell(b, C, C + 92, 14, 11, 0, '#303030'); ell(b, C, C + 92, 8, 7, 0, '#707070');
+    // 血：血泊 / 渗出的暗红水光 / 湿润高光
+    for (let i = 0; i < 14; i++) { const x = rr(C - 150, C + 150), y = rr(C - 150, C + 150); g.fillStyle = rad(g, x, y, 0, rr(14, 34), [[0, 'rgba(60,0,4,.62)'], [1, 'rgba(60,0,4,0)']]); g.beginPath(); g.arc(x, y, 34, 0, 6.2832); g.fill(); r.fillStyle = rad(r, x, y, 0, rr(14, 34), [[0, 'rgba(10,10,10,.9)'], [1, 'rgba(10,10,10,0)']]); r.beginPath(); r.arc(x, y, 34, 0, 6.2832); r.fill(); }
+    for (let i = 0; i < 90; i++) { const x = rr(40, S - 40), y = rr(40, S - 40); if (Math.hypot(x - C, y - C) > 230) continue; g.fillStyle = 'rgba(255,170,170,.34)'; g.beginPath(); g.arc(x, y, rr(0.8, 2.4), 0, 6.2832); g.fill(); }
+    g.fillStyle = rad(g, C, C, 180, 250, [[0, 'rgba(120,0,10,0)'], [0.75, 'rgba(120,0,10,.22)'], [0.92, 'rgba(90,0,8,0)']]); g.beginPath(); g.arc(C, C, 250, 0, 6.2832); g.fill();
+    // 边缘：皮肤边缓压边、渐隐
+    const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4; const bump = new THREE.CanvasTexture(bv), rough = new THREE.CanvasTexture(rv); return { tex, bump, rough };
+  }
   function getCut() {
     if (cutMat) return cutMat;
+    if (!window.Mods || Mods.on('cut_anatomy') !== false) { try { const a = cutAnatomy(); cutMat = new THREE.MeshStandardMaterial({ map: a.tex, bumpMap: a.bump, bumpScale: 2.2, roughnessMap: a.rough, roughness: 0.95, metalness: 0.02, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1, name: '__CUT__ anatomy' }); return cutMat; } catch (e) { console.warn('cutAnatomy', e); } }
     if (window.Mods && Mods.on('head_repair') && window.Assets) {
       const t = Assets.tex('cut_wagyu');
       if (t && t.diff) {
@@ -516,12 +563,12 @@ window.ModelHeads = (() => {
   function skinMat(src, U) {
     const m = new MTM({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: src.depthWrite });
     m.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, { uMk: U.mk, uHover: U.hover, uSkin: U.skin, uSkinFix: { value: (window.Mods && Mods.on('head_repair') && src.userData ? src.userData._headGreenFix || 0 : 0) }, uPale: U.pale, uBlood: U.blood, uSpat: U.spat, uSeed: U.seed, uCutY: U.cutY, uH: U.hH, uScar: U.scar, uPaint: U.paint, uPaintC: U.paintC, uEye: U.eye });
+      Object.assign(sh.uniforms, { uMk: U.mk, uHover: U.hover, uSkin: U.skin, uSkinFix: { value: (window.Mods && Mods.on('head_repair') && src.userData ? src.userData._headGreenFix || 0 : 0) }, uPale: U.pale, uBlood: U.blood, uSpat: U.spat, uSeed: U.seed, uCutY: U.cutY, uH: U.hH, uScar: U.scar, uPaint: U.paint, uPaintC: U.paintC, uEye: U.eye, uFx: U.fx });
       injectVertex(sh, false);
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <dithering_fragment>', '\n#include <dithering_fragment>\n gl_FragColor.rgb += uHover * (0.1 + 0.6 * pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 2.2)) * vec3(1.0, 0.8, 0.5);')
         .replace('void main() {', `varying vec3 vHP; uniform float uHover; uniform vec3 uMk; uniform vec3 uSkin; uniform float uSkinFix; uniform float uPale; uniform float uBlood; uniform float uSpat; uniform float uSeed; uniform float uCutY; uniform float uH;
-          uniform vec4 uScar; uniform float uPaint; uniform vec3 uPaintC; uniform vec3 uEye; ${NOISE}
+          uniform vec4 uScar; uniform float uPaint; uniform vec3 uPaintC; uniform vec3 uEye; uniform vec4 uFx; ${NOISE}
           float segD(vec2 p, vec2 a, vec2 b){ vec2 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0); return length(pa-ba*h); }
           void main() {`)
         .replace('#include <color_fragment>', `#include <color_fragment>
@@ -539,6 +586,30 @@ window.ModelHeads = (() => {
             if (uMk.z > 0.5) { vec2 cell = floor(vHP.xy * 900.0); float hsh = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
               float inReg = smoothstep(0.022, 0.012, length(vec2(abs(vHP.x) - abs(uEye.x) * 0.9, (vHP.y - (uEye.y - 0.022)) * 1.6)));
               diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62, 0.36, 0.26), step(0.93, hsh) * inReg * 0.55); }
+            // R62 脸部差分（uFx = 泪痕 / 鼻血 / 口角血 / 淄青）：坐标都是头局部空间，和脸模自带的眼睛位置 uEye 对齐
+            if (uFx.x > 0.01) { float tl = uFx.x; float ex = abs(vHP.x) - abs(uEye.x); float dy = (uEye.y - 0.009) - vHP.y;
+              float rim = smoothstep(0.016, 0.004, length(vec2(ex * 0.9, (vHP.y - uEye.y + 0.002) * 1.5)));
+              diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.36, 0.40), rim * 0.34 * tl);
+              for (int i = 0; i < 2; i++) { float fi = float(i); float off = 0.0015 + fi * 0.0085;
+                float len = (0.028 + 0.062 * tl) * (0.75 + 0.45 * fract(sin(uSeed * 3.7 + fi * 5.3) * 437.58));
+                float wob = (vn3(vec3(vHP.y * 55.0 + fi * 9.0, uSeed, 3.0)) - 0.5) * 0.0042 + dy * 0.05;
+                float w = mix(0.0026, 0.0012, clamp(dy / len, 0.0, 1.0)); float run = step(0.0, dy) * (1.0 - smoothstep(len * 0.82, len, dy)); float ax = abs(ex - off - wob);
+                float line = smoothstep(w, w * 0.35, ax) * run; float edge = smoothstep(w * 1.9, w, ax) * (1.0 - line) * run;
+                diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.78, edge * 0.5); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.80, 0.90, 1.0), line * 0.62); } }
+            if (uFx.y > 0.01) { float nb = uFx.y; vec2 np = vec2(abs(vHP.x), vHP.y); float ny0 = uEye.y - 0.034; float dy = ny0 - np.y; float len = 0.016 + 0.07 * nb;
+              float xs = 0.0050 + (vn3(vec3(np.y * 70.0, uSeed + 11.0, 1.0)) - 0.5) * 0.0024; float wgt = vHP.x > 0.0 ? 1.0 : 0.55 + 0.45 * step(0.5, fract(uSeed * 0.31));
+              float w = mix(0.0030, 0.0016, clamp(dy / len, 0.0, 1.0)) * (0.8 + 0.5 * nb); float rv = smoothstep(w, w * 0.4, abs(np.x - xs)) * step(-0.0016, dy) * (1.0 - smoothstep(len * 0.8, len, dy));
+              float pool = smoothstep(0.0062, 0.0018, length(vec2(np.x - 0.0046, np.y - (ny0 + 0.0012)))); float bm = clamp((rv + pool) * wgt, 0.0, 1.0);
+              vec3 bc = mix(vec3(0.46, 0.02, 0.04), vec3(0.20, 0.0, 0.01), clamp(dy / len, 0.0, 1.0)); diffuseColor.rgb = mix(diffuseColor.rgb, bc, bm * 0.92);
+              diffuseColor.rgb += vec3(0.20, 0.10, 0.10) * rv * wgt * smoothstep(0.0012, 0.0, abs(np.x - xs + 0.0009)) * 0.5; }
+            if (uFx.z > 0.01) { float mb = uFx.z; vec2 mp = vec2(abs(vHP.x), vHP.y); vec2 cr = vec2(0.0165, uEye.y - 0.060); float dy = cr.y - mp.y; float len = 0.02 + 0.07 * mb;
+              float wob = (vn3(vec3(mp.y * 60.0, uSeed + 5.0, 2.0)) - 0.5) * 0.004 + dy * 0.18; float rv = smoothstep(0.0032, 0.0012, abs(mp.x - cr.x - wob)) * step(-0.002, dy) * (1.0 - smoothstep(len * 0.8, len, dy));
+              float pool = smoothstep(0.0075, 0.002, length((mp - cr) * vec2(1.0, 1.6))); float wgt = vHP.x > 0.0 ? 1.0 : 0.6 + 0.4 * step(0.5, fract(uSeed * 0.53));
+              diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.38, 0.02, 0.04), clamp((rv + pool * 0.8) * wgt, 0.0, 1.0) * 0.9); }
+            if (uFx.w > 0.01) { float br = uFx.w; float sd = fract(uSeed * 0.77) > 0.5 ? 1.0 : -1.0; vec2 c1 = vec2(sd * abs(uEye.x) * 1.05, uEye.y - 0.004); float n1 = vn3(vec3(vHP.xy * 120.0, uSeed));
+              float m = smoothstep(0.024, 0.006, length((vHP.xy - c1) * vec2(1.0, 1.25))) * (0.7 + 0.5 * n1); vec3 bk = mix(vec3(0.42, 0.24, 0.46), vec3(0.58, 0.40, 0.22), smoothstep(0.3, 0.9, n1));
+              diffuseColor.rgb = mix(diffuseColor.rgb, bk, clamp(m, 0.0, 1.0) * 0.6 * br);
+              float gz = smoothstep(0.012, 0.002, length(vHP.xy - vec2(-sd * abs(uEye.x) * 0.8, uEye.y - 0.03))) * (vn3(vec3(vHP.xy * 260.0, uSeed + 2.0)) > 0.5 ? 1.0 : 0.5); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.6, 0.12, 0.12), gz * 0.5 * br); }
           }
           // 战纹
           if (uPaint > 0.5 && front) {
@@ -567,7 +638,7 @@ window.ModelHeads = (() => {
           vec3 blood = mix(vec3(0.20, 0.0, 0.01), vec3(0.42, 0.02, 0.03), sp);
           diffuseColor.rgb = mix(diffuseColor.rgb, blood, bm * 0.88);`);
     };
-    m.customProgramCacheKey = () => 'skin6';
+    m.customProgramCacheKey = () => 'skin7';
     return FaceFill.wrap(m, 1.0);
   }
 
@@ -721,6 +792,30 @@ window.ModelHeads = (() => {
   const qcBad = (i) => !!(T[i] && QC_BAD.includes(T[i].meta.file) && window.Mods && Mods.on('head_qc'));
   const OK = (i) => !!T[i] && !qcBad(i) && (!window.CC0 || CC0.okHead(T[i].meta.file)); // R38 CC0 模式：只用 CC0 模型
   const okList = () => { const a = T.map((t, i) => i).filter(OK); return a.length ? a : T.map((t, i) => i); };
+  // R62 表情库（用户：“人物表情应该更绝望狰狞感，更多表情，还有鼻血泪痕表情差分”）。ex = VRM 表情形变权重（张嘴幅度仍会在 setExpression 里被压到安全范围）；fx = [泪痕, 鼻血, 口角血, 淄青]（皮肤着色器 uFx）；w = 随机权重
+  const FACES = [
+    { k: 'despair', n: '绝望空洞', ex: { sad: 0.95, blink: 0.4, aa: 0.15 }, fx: [0.8, 0, 0, 0], w: 4 },
+    { k: 'weep', n: '痛哭流涕', ex: { sad: 1, blink: 0.65, ee: 0.25 }, fx: [1, 0.3, 0, 0], w: 3 },
+    { k: 'terror', n: '极度惊恐', ex: { surprised: 0.9, oh: 0.35, sad: 0.3 }, fx: [0.5, 0, 0, 0], w: 3 },
+    { k: 'snarl', n: '狰狞咬牙', ex: { angry: 1, ee: 0.7, ih: 0.5, blink: 0.25 }, fx: [0, 0, 0.6, 0.4], w: 3 },
+    { k: 'agony', n: '剧痛扭曲', ex: { angry: 0.7, sad: 0.7, ee: 0.5, blink: 0.55 }, fx: [0.6, 0, 0.5, 0], w: 3 },
+    { k: 'beg', n: '哀求', ex: { sad: 0.85, surprised: 0.25, aa: 0.1 }, fx: [0.7, 0, 0, 0], w: 2 },
+    { k: 'mad', n: '癫狂惨笑', ex: { happy: 0.9, angry: 0.55, ee: 0.5 }, fx: [0.3, 0.6, 0, 0], w: 1.5 },
+    { k: 'blank', n: '死寂空洞', ex: { blink: 0.5, aa: 0.12 }, fx: [0.25, 0, 0, 0], w: 2 },
+    { k: 'glare', n: '怒目圆睁', ex: { angry: 0.9, surprised: 0.4 }, fx: [0, 0.8, 0, 0], w: 2 },
+    { k: 'sob', n: '抽泣', ex: { sad: 0.8, blink: 0.8, aa: 0.25 }, fx: [0.9, 0, 0, 0], w: 2 },
+    { k: 'bloodmouth', n: '血口哀嚎', ex: { sad: 0.6, surprised: 0.5, aa: 0.5 }, fx: [0.3, 0, 1, 0], w: 2 },
+    { k: 'bruised', n: '青肿木然', ex: { blink: 0.55, sad: 0.3 }, fx: [0, 0.5, 0, 1], w: 2 },
+    { k: 'stare', n: '死不瞧目', ex: { surprised: 0.6, blink: 0 }, fx: [0.4, 0.3, 0, 0], w: 2 },
+    { k: 'wry', n: '惨笑', ex: { happy: 0.35, sad: 0.8, blink: 0.5 }, fx: [0.8, 0, 0.3, 0], w: 1.5 },
+    { k: 'calm', n: '安详', ex: { relaxed: 0.7, blink: 0.9 }, fx: [0, 0, 0, 0], w: 0.6 }
+  ];
+  function dressFace(L) { // 用头自己的 seed 抽，不动主随机流
+    let s2 = ((L.seed || 1) * 7919 + 31337) % 2147483647 || 1; const r = () => (s2 = (s2 * 16807) % 2147483647) / 2147483647;
+    const tot = FACES.reduce((a, f) => a + f.w, 0); let x = r() * tot, F = FACES[0]; for (const f of FACES) { if ((x -= f.w) <= 0) { F = f; break; } }
+    const ex = {}; for (const k in F.ex) ex[k] = +Math.min(1, F.ex[k] * (0.88 + r() * 0.24)).toFixed(2);
+    L.ex = ex; L.exT = F.n; L.fx = F.fx.map(v => v ? +Math.min(1, v * (0.75 + r() * 0.5)).toFixed(2) : 0);
+  }
   function randomLook(r, race = {}, rarity = 0) {
     let faceIdx = race.faces ? Math.max(0, idxOf(pick(r, race.faces))) : tierFace(r(), rarity); // 第二十五轮 MOD tier_look：按魂阶加权挑脸模
     for (let k = 0; k < 12 && qcBad(faceIdx); k++) faceIdx = tierFace(r(), rarity);
@@ -789,6 +884,7 @@ window.ModelHeads = (() => {
     }
     if (window.Mods && (Mods.on('hair_mix2') || Mods.on('acc_mix'))) mixLook(LOOK, faceIdx, grp, rarity);
     if (window.Mods && Mods.on('tier_look')) tierLook(LOOK, race, rarity, grp);
+    if (!window.Mods || Mods.on('face_despair') !== false) dressFace(LOOK);
     return resolve(LOOK); // R38 CC0 / 拼图混搭
   }
   function mixLook(L, fi, grp, rarity) {
@@ -850,7 +946,7 @@ window.ModelHeads = (() => {
       sway: { value: new V3() }, hTop: { value: top * 0.55 }, hLen: { value: Math.max(0.08, top * 0.55 - hairT.hairMinY) },
       ec1: { value: new THREE.Color(look.ec1) }, ec2: { value: new THREE.Color(look.ec2) }, dull: { value: look.glowEye ? 0.08 : 0.45 }, glow: { value: look.glowEye ? 0.9 : 0 }, shiny: { value: look.shiny || 0 },
       skin: { value: new V3(sk.r / baseSkin.r, sk.g / baseSkin.g, sk.b / baseSkin.b).multiply(look.skinMul ? new V3(...look.skinMul) : new V3(1, 1, 1)) }, pale: { value: look.pale },
-      blood: { value: look.blood }, spat: { value: look.spat }, seed: { value: look.seed }, ph: { value: ((look.seed || 0) * 7.13) % 6.283 }, hover: { value: 0 }, mk: { value: new THREE.Vector3(...((look.mk && (!window.Mods || Mods.on('makeup'))) ? look.mk : [0, 0, 0])) },
+      blood: { value: look.blood }, spat: { value: look.spat }, seed: { value: look.seed }, ph: { value: ((look.seed || 0) * 7.13) % 6.283 }, hover: { value: 0 }, mk: { value: new THREE.Vector3(...((look.mk && (!window.Mods || Mods.on('makeup'))) ? look.mk : [0, 0, 0])) }, fx: { value: new THREE.Vector4(...((look.fx && (!window.Mods || Mods.on('face_despair') !== false)) ? look.fx : [0, 0, 0, 0])) },
       cutY: { value: faceMeta.bottom }, hH: { value: (faceMeta.skullTop || 0.1) - faceMeta.bottom },
       scar: { value: look.scar ? new THREE.Vector4(...look.scar) : new THREE.Vector4(-10, 0, 0, 0) },
       paint: { value: look.paint }, paintC: { value: new THREE.Color(look.paintC) },
@@ -1332,12 +1428,13 @@ window.ModelHeads = (() => {
       group: g, U, radius, meta: F.meta, hl: hlMeshes, presets,
       setSway(v) { U.sway.value.copy(v); },
       setExpression,
+      setFx(a) { const f = U.fx.value; if (a && a.length >= 4) f.set(a[0], a[1], a[2], a[3]); else f.set(0, 0, 0, 0); },
       dispose() { own.forEach(m => m.dispose()); disposables.forEach(m => m.dispose()); }
     };
   }
 
   return {
-    MTM, init, create, randomLook, HAIR, EYE, SKIN, faceSkin, tick(t) { GT.value = t; },
+    MTM, init, create, randomLook, FACES, getCut, fixCutUV, HAIR, EYE, SKIN, faceSkin, tick(t) { GT.value = t; },
     // R29 body_match：这个头实际显示的发色（mmd 发型用贴图平均色，其他用染发色），给 foe.js 挑配色协调的身体
     hairColor(look) { try { look = resolve(look); const H = T[idxOf(look.h || look.f)]; if (H && H.meta.grp === 'mmd') { const c = hairAvgCol(H); if (c) return c.clone().convertLinearToSRGB(); } return new THREE.Color(look.hc1 || '#333333'); } catch (e) { return null; } },
     get ready() { return ready; },

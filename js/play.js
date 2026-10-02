@@ -404,6 +404,8 @@ window.Play = (() => {
   }
   addEventListener('keydown', e => { if (modal && !e.repeat && (e.code === 'Escape' || e.code === 'KeyE')) { e.stopPropagation(); e.preventDefault(); closeModal(); } }, true);
   const FACES = [['安眠', { blink: 1, relaxed: 0.3 }], ['微笑', { happy: 0.75, blink: 0.1 }], ['惊讶', { surprised: 0.85, oh: 0.45 }], ['委屈', { sad: 0.85, blink: 0.2 }], ['生气', { angry: 0.85 }], ['失焦', { blink: 0.05, surprised: 0.35 }], ['半阖', { blink: 0.55, aa: 0.12 }], ['吐舌', { happy: 0.5, aa: 0.35 }]];
+  const FACE_ALL = () => FACES.map(([n, ex]) => ({ n, ex, fx: [0, 0, 0, 0] })).concat((ModelHeads.FACES || []).map(f => ({ n: f.n, ex: f.ex, fx: f.fx })));
+  const FX_N = ['泪痕', '鼻血', '口角血', '淄青'], FX_L = [0, 0.5, 0.8, 1];
   const HW_KEYS = ['ribbon', 'twinbows', 'hairpins', 'star', 'kanzashi', 'bells', 'feather', 'maid', 'bunny', 'flowercrown', 'goggles', 'thorncrown', 'beret', 'minihat'];
   const HW_ICON = { ribbon: '🎀', twinbows: '🎀', hairpins: '📎', star: '⭐', kanzashi: '🌸', bells: '🔔', feather: '🪶', maid: '🤍', bunny: '🐰', flowercrown: '💐', goggles: '🥽', thorncrown: '👑', beret: '🎨', minihat: '🎩' };
   function dressCost(h) { return 60 * (h.rec.c.rar + 1); }
@@ -417,7 +419,8 @@ window.Play = (() => {
       <h3>🎀 头饰（最多 2 件，帽子与发箍互斥）</h3><div class="prow">${HW_KEYS.map(k => `<button class="pbtn ${has(k) ? 'on' : ''}" data-a="hw:${k}">${HW_ICON[k]} ${HeadWear.N[k]}</button>`).join('')}
         <button class="pbtn" data-a="hwcol">🎨 换配色</button><button class="pbtn" data-a="hwnone">🚫 摘掉全部</button></div>
       <h3>💇 染发</h3><div class="prow">${H.map(([n, c], i) => `<div class="sw" title="${n}" style="background:${c}" data-a="hair:${i}"></div>`).join('')}</div>
-      <h3>😶 表情</h3><div class="prow">${FACES.map(([n], i) => `<button class="pbtn ${look.exT === n ? 'on' : ''}" data-a="face:${i}">${n}</button>`).join('')}</div>
+      <h3>😶 表情</h3><div class="prow">${FACE_ALL().map((f, i) => `<button class="pbtn ${look.exT === f.n ? 'on' : ''}" data-a="face:${i}">${f.n}</button>`).join('')}</div>
+      <h3>🩸 脸部差分 <small style="opacity:.6;font-weight:400">（点击循环“无 / 轻 / 中 / 重”）</small></h3><div class="prow">${FX_N.map((n, i) => { const lv = FX_L.indexOf((look.fx || [])[i] || 0); return `<button class="pbtn ${lv > 0 ? 'on' : ''}" data-a="fx:${i}">${n} ${['无', '轻', '中', '重'][lv < 0 ? 2 : lv]}</button>`; }).join('')}</div>
       <h3>🌸 妆容</h3><div class="prow"><button class="pbtn ${mk[0] ? 'on' : ''}" data-a="mk:0">腮红</button><button class="pbtn ${mk[1] ? 'on' : ''}" data-a="mk:1">泪痣 ${['', '右', '左', '唇边'][mk[1]] || ''}</button><button class="pbtn ${mk[2] ? 'on' : ''}" data-a="mk:2">雀斑</button></div>`,
       (a) => {
         if (a === 'close') return closeModal();
@@ -437,7 +440,8 @@ window.Play = (() => {
         } else if (cmd === 'hwcol') { if (!(look.hw || []).length || !pay()) return; look.hw = look.hw.map(e => HeadWear.item(e.k)); }
         else if (cmd === 'hwnone') look.hw = [];
         else if (cmd === 'hair') { if (!pay()) return; const [n, c] = H[+arg]; look.hn = n; look.hc1 = c; look.hn2 = n; look.hc2 = c; if (look.hn3) look.hn3 = n; }
-        else if (cmd === 'face') { const [n, ex] = FACES[+arg]; look.ex = ex; look.exT = n; h.hb.setExpression && h.hb.setExpression(ex); SFX.click(); openDresser(h); return; }
+        else if (cmd === 'face') { const f = FACE_ALL()[+arg]; look.ex = f.ex; look.exT = f.n; look.fx = f.fx.slice(); h.hb.setExpression && h.hb.setExpression(f.ex); h.hb.setFx && h.hb.setFx(look.fx); SFX.click(); openDresser(h); return; }
+        else if (cmd === 'fx') { const a2 = (look.fx || [0, 0, 0, 0]).slice(); const i = +arg, lv = Math.max(0, FX_L.findIndex(v => v >= (a2[i] || 0))); a2[i] = FX_L[(lv + 1) % FX_L.length]; look.fx = a2; h.hb.setFx && h.hb.setFx(a2); SFX.click(); openDresser(h); return; }
         else if (cmd === 'mk') { const m = (look.mk || [0, 0, 0]).slice(); const k = +arg; m[k] = k === 1 ? (m[1] + 1) % 4 : (m[k] ? 0 : (k === 0 ? 0.75 : 1)); look.mk = m; }
         M.dressed = (M.dressed || 0) + 1; saveM();
         G.rebuildHead(h); h.hb.setExpression && h.hb.setExpression(look.ex || {});

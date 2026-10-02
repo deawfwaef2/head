@@ -384,7 +384,14 @@ window.Autopsy = (() => {
   function mkMat(map, at) { // 顶点色 × (贴图 按 tw 混合)：壳用贴图，截面用纯蜡色
     const m = new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0, side: T.DoubleSide, map: map || null, alphaTest: at || 0 });
     m.onBeforeCompile = sh => { sh.vertexShader = 'attribute vec2 cp;\nvarying vec2 vCp;\nattribute float tw;\nvarying float vTw;\n' + sh.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\nvTw = tw;\nvCp = cp;');
-      sh.fragmentShader = 'varying vec2 vCp;\nvarying float vTw;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#ifdef USE_MAP
+      sh.fragmentShader = `varying vec2 vCp;
+varying float vTw;
+float aH( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }
+vec2 aH2( vec2 p ) { return fract( sin( vec2( dot( p, vec2( 127.1, 311.7 ) ), dot( p, vec2( 269.5, 183.3 ) ) ) ) * 43758.5453 ); }
+float aN( vec2 p ) { vec2 i = floor( p ), f = fract( p ); f = f * f * ( 3.0 - 2.0 * f ); return mix( mix( aH( i ), aH( i + vec2( 1.0, 0.0 ) ), f.x ), mix( aH( i + vec2( 0.0, 1.0 ) ), aH( i + vec2( 1.0, 1.0 ) ), f.x ), f.y ); }
+float aF( vec2 p ) { return 0.5 * aN( p ) + 0.25 * aN( p * 2.03 + 7.1 ) + 0.125 * aN( p * 4.1 + 3.7 ) + 0.0625 * aN( p * 8.3 + 1.9 ); }
+vec3 aV( vec2 p ) { vec2 n = floor( p ), f = fract( p ); float d1 = 8.0, d2 = 8.0, id = 0.0; for ( int j = -1; j <= 1; j ++ ) for ( int i = -1; i <= 1; i ++ ) { vec2 g = vec2( float( i ), float( j ) ); vec2 r = g + aH2( n + g ) - f; float d = dot( r, r ); if ( d < d1 ) { d2 = d1; d1 = d; id = aH( n + g ); } else if ( d < d2 ) d2 = d; } return vec3( sqrt( d1 ), sqrt( d2 ) - sqrt( d1 ), id ); }
+` + sh.fragmentShader.replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nif ( vTw < -0.5 ) roughnessFactor = vTw < -2.5 ? 0.8 : vTw < -1.5 ? 0.5 : 0.3; // R62\uff1a\u622a\u9762\u6e7f\u6da6\u53d1\u4eae').replace('#include <map_fragment>', `#ifdef USE_MAP
 vec4 sampledDiffuseColor = texture2D( map, vUv );
 sampledDiffuseColor = mix( vec4( 1.0 ), sampledDiffuseColor, max( vTw, 0.0 ) );
 diffuseColor *= sampledDiffuseColor;
@@ -394,11 +401,20 @@ if ( vTw < -2.5 ) {
   cc = mix( cc, vec3( 0.46, 0.40, 0.30 ), smoothstep( 0.86, 0.93, f ) * ( 1.0 - smoothstep( 0.97, 1.0, f ) ) ); diffuseColor.rgb = cc;
 } else if ( vTw < -0.5 ) {
   vec2 q = vCp; float r = length( q ); vec3 cc;
-  if ( vTw < -1.5 ) { cc = mix( vec3( 0.40, 0.31, 0.22 ), vec3( 0.93, 0.89, 0.76 ), smoothstep( 0.12, 0.6, r ) ); }
-  else {
-    float fib = 0.5 + 0.5 * sin( atan( q.y, q.x ) * 26.0 + r * 11.0 );
-    vec3 skinC = vec3( 0.74, 0.60, 0.52 ), fatC = vec3( 0.90, 0.80, 0.58 ), musC = mix( vec3( 0.40, 0.15, 0.13 ), vec3( 0.58, 0.24, 0.20 ), fib * 0.8 ), deepC = vec3( 0.30, 0.11, 0.10 );
-    cc = mix( deepC, musC, smoothstep( 0.10, 0.45, r ) ); cc = mix( cc, fatC, smoothstep( 0.80, 0.86, r ) ); cc = mix( cc, skinC, smoothstep( 0.90, 0.95, r ) );
+  if ( vTw < -1.5 ) { // \u9aa8\uff1a\u76ae\u8d28\u73af + \u677e\u8d28\u9aa8\u8702\u7a9d + \u9aa8\u9ad3\u8840
+    float tr = aV( q * 9.0 ).y; float honey = smoothstep( 0.0, 0.14, tr ); float cort = smoothstep( 0.55, 0.78, r );
+    vec3 marrow = mix( vec3( 0.46, 0.08, 0.08 ), vec3( 0.66, 0.30, 0.24 ), aF( q * 12.0 ) ); vec3 bone = mix( vec3( 0.82, 0.74, 0.56 ), vec3( 0.95, 0.91, 0.80 ), aF( q * 26.0 ) );
+    cc = mix( mix( marrow, bone * 0.9, honey * 0.8 ), bone, cort ); cc = mix( cc, vec3( 0.30, 0.09, 0.08 ), smoothstep( 0.22, 0.0, r ) * 0.7 );
+  } else { // \u808c\u8089\uff1a\u7b4b\u819c\u5206\u9694\u7684\u808c\u675f + \u6bcf\u675f\u7684\u7ea4\u7ef4\u7eb9 + \u8102\u80aa\u5927\u7406\u77f3\u7eb9 + \u6e17\u8840 + \u6e7f\u6da6\u9ad8\u5149
+    vec3 v = aV( q * 5.2 + 3.0 ); float ang = v.z * 6.2832;
+    vec3 base = mix( vec3( 0.36, 0.05, 0.07 ), vec3( 0.68, 0.15, 0.15 ), v.z ); float fib = 0.5 + 0.5 * sin( dot( q, vec2( cos( ang ), sin( ang ) ) ) * 120.0 + aF( q * 22.0 ) * 5.0 );
+    base = mix( base * 0.86, base * 1.2, fib * 0.55 ); float fascia = smoothstep( 0.11, 0.02, v.y ); base = mix( base, vec3( 0.94, 0.76, 0.72 ), fascia * 0.8 );
+    float mar = smoothstep( 0.56, 0.7, aF( q * 9.0 + 11.0 ) ) * 0.5; base = mix( base, vec3( 0.96, 0.80, 0.62 ), mar * smoothstep( 0.3, 0.7, r ) );
+    float fatR = smoothstep( 0.66, 0.82, r + ( aF( q * 7.0 ) - 0.3 ) * 0.14 ); vec3 fat = mix( vec3( 0.96, 0.84, 0.58 ), vec3( 0.88, 0.68, 0.42 ), aF( q * 30.0 ) ); base = mix( base, fat, fatR );
+    base = mix( base, vec3( 0.80, 0.62, 0.54 ), smoothstep( 0.92, 0.965, r ) );
+    base = mix( base, vec3( 0.16, 0.01, 0.02 ), smoothstep( 0.34, 0.0, r ) * 0.6 + smoothstep( 0.62, 0.8, aF( q * 4.0 + 5.0 ) ) * 0.3 * ( 1.0 - fatR ) );
+    float spc = smoothstep( 0.74, 0.9, aF( q * 48.0 + 3.0 ) ); base += vec3( 0.55, 0.28, 0.24 ) * spc * 0.4 * ( 1.0 - fatR );
+    cc = base;
   }
   diffuseColor.rgb = cc;
 }`); };
