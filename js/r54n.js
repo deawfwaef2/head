@@ -57,7 +57,15 @@
   const L_HURT = ['呃啊——！', '好痛……', '可恶！', '你敢——！', '还没完！', '唔……'];
   const L_ALLY = ['姐妹——！', '不……不要！', '你会付出代价的！', '快、快围住他！', '别慌，一起上！', '他是怪物……'];
   const L_CHAT = ['包抄他！', '从后面上！', '别让他喘气！', '盯住他的刀！', '我数到三一起上！', '他累了，压上去！', '小心，他刀很快！', '左边！绕过去！'];
-  let chatT = 0;
+  let chatT = 0, streakT = 0, hpT = 0;
+  const L_DECAP = ['啊——她的头……！', '不……不可能！', '她的头被砍下来了！！', '这家伙是怪物！', '快逃！他会杀光我们！', '别过来……别过来！', '姐妹——！！'];
+  const L_COVER = ['撑住！我来了！', '别怕，围住他！', '给她报仇！', '一起上，别单打独斗！'];
+  const L_FEAR = ['他、他又杀了一个……', '别上！他太强了！', '后退后退！', '我不想死……'];
+  const L_WEAK = ['他在流血，压上去！', '他撑不了多久了！', '再来一下就够了！'];
+  function reactAllies(fo, decap) { // 同伴倒下 / 被斩首：附近所有人依次惊呼或鼓劲
+    const al = Foe.foes.filter(o => o && o !== fo && !o.dead && o.pos && Math.hypot(o.pos.x - fo.pos.x, o.pos.z - fo.pos.z) < 26).sort((a, b) => Math.hypot(a.pos.x - fo.pos.x, a.pos.z - fo.pos.z) - Math.hypot(b.pos.x - fo.pos.x, b.pos.z - fo.pos.z)).slice(0, 4);
+    al.forEach((w, i) => setTimeout(() => { if (!w || w.dead || !window.Worlds || !Worlds.active) return; w._bk = 0; w.sayT = 0; const brave = w.brave && w.state !== 'flee'; bark(w, pick(decap ? (brave && i % 2 ? L_COVER : L_DECAP) : (brave ? L_ALLY.concat(L_COVER) : L_ALLY)), decap ? '#ff9a9a' : '#ffd0c0', 800); vox(w, decap && !brave ? 'die' : 'hurt'); }, 250 + i * 520 + Math.random() * 250));
+  }
   window.Barks = {
     windup(fo, clip, A) {
       if (!A || !near(fo, 14)) return; const h = A.hits && A.hits[0]; let t, col = '#ffd27a';
@@ -77,15 +85,16 @@
     for (const fo of Foe.foes) {
       if (!fo || !fo.pos) continue;
       if (fo._hpL == null) fo._hpL = fo.hp;
-      if (fo.dead) { if (!fo._dv) { fo._dv = 1; vox(fo, 'die'); const al = Foe.foes.filter(o => o && !o.dead && o.pos && o.seen && Math.hypot(o.pos.x - fo.pos.x, o.pos.z - fo.pos.z) < 14); if (al.length && Math.random() < 0.7) { const w = pick(al); w._bk = 0; bark(w, pick(L_ALLY), '#ffd0c0', 1800); } } continue; }
-      if (fo.hp < fo._hpL - 0.5) { vox(fo, 'hurt'); if (Math.random() < 0.3 && near(fo, 12)) bark(fo, pick(L_HURT), '#ffb8a8', 1600); } fo._hpL = fo.hp;
+      if (fo.dead) { if (!fo._dv) { fo._dv = 1; vox(fo, 'die'); reactAllies(fo, !!fo.decap); } continue; }
+      if (fo.hp < fo._hpL - 0.5) { vox(fo, 'hurt'); if (Math.random() < 0.55 && near(fo, 14)) bark(fo, pick(L_HURT), '#ffb8a8', 1100); else if (Math.random() < 0.4 && now > hpT) { hpT = now + 2500; const w = Foe.foes.find(o => o && o !== fo && !o.dead && o.seen && o.pos && Math.hypot(o.pos.x - fo.pos.x, o.pos.z - fo.pos.z) < 14); if (w) bark(w, pick(L_COVER), '#ffe0b0', 1500); } } fo._hpL = fo.hp;
       if (!M('foe_barks') || !near(fo, 16)) continue;
       if (fo.state === 'flee' && !fo._bkF) { fo._bkF = 1; bark(fo, '⇠ 转身逃跑了！追上去', '#a8e0a0'); }
       else if (fo.maxHp && fo.hp > 0 && fo.hp < fo.maxHp * 0.3 && !fo._bkL) { fo._bkL = 1; bark(fo, '踉跄着……快撑不住了（可斩首）', '#ffb0b0'); }
       else if (fo.seen && !fo._bkS && fo.state === 'chase') { fo._bkS = 1; if (fo.role === 'assassin') bark(fo, '👁 她消失在你视野外——小心背后', '#c890ff'); else if (Math.random() < 0.5) bark(fo, '👁 发现你了——拔刀逼近', '#ffe0b0'); }
       if (fo.seen && fo.state === 'chase' && !fo.atk && near(fo, 12)) engaged = engaged || [], engaged.push(fo);
     }
-    if (M('foe_barks') && engaged && engaged.length >= 2 && now > chatT) { chatT = now + 4000 + Math.random() * 3000; bark(pick(engaged), pick(L_CHAT), '#f0e0c0', 2000); }
+    if (M('foe_barks') && engaged && engaged.length >= 2 && now > chatT) { chatT = now + 2200 + Math.random() * 1800; bark(pick(engaged), pick(L_CHAT), '#f0e0c0', 1500); }
+    else if (M('foe_barks') && engaged && now > chatT + 2000) { chatT = now + 3500 + Math.random() * 2500; const m = window.Momentum && Momentum.M, fo1 = pick(engaged), pl = G.S && G.st && G.st(); bark(fo1, m && m.n >= 3 ? pick(L_FEAR) : pl && G.S.hp < pl.maxHp * 0.4 ? pick(L_WEAK) : pick(L_TAUNT), '#f0e0c0', 1500); }
   }
 
   // ================= 敌情研判 =================

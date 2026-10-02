@@ -240,7 +240,7 @@ ${dead ? '' : `<div class="r3-odds" style="--oc:${oc(o.p)}"><div class="row"><sp
   }
   function toggle(v) { if (!window.R35UI) return; if (v === false) { if (R35UI.isOpen('hunt')) R35UI.close(); } else if (v === true) R35UI.open('hunt'); else R35UI.toggle('hunt'); }
   if (window.R35UI) R35UI.reg('hunt', { n: '🏹 食人魔猎手', title: '猎手档案', on, html: panelHTML });
-  addEventListener('keydown', e => { if (!on() || !window.G || !G.S) return; if (e.code === 'KeyU' && !e.repeat && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) { if (window.UI && UI.open) return; e.preventDefault(); toggle(); } }, true);
+  addEventListener('keydown', e => { if (!on() || !window.G || !G.S) return; if (e.code === 'KeyU' && !e.repeat && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) { if (window.UI && UI.open) return; if ((window.GrandUI && GrandUI.isOpen && GrandUI.isOpen()) || (window.Saga && Saga.cine) || (window.Arrival2 && Arrival2.isOpen()) || (window.DecapCam && DecapCam.active)) return; e.preventDefault(); toggle(); } }, true);
 
   wrap(); setTimeout(wrap, 0); addEventListener('load', wrap);
   setInterval(() => { try { tick(); } catch (e) { console.warn('Hunters2 tick', e); } }, 100);

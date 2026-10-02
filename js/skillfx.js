@@ -107,6 +107,63 @@ body.sfxon #tbCast{display:none!important}
     const m = new THREE.Mesh(geo('shell', () => new THREE.SphereGeometry(1, 28, 18)), amat(col, 0.16)); m.scale.setScalar(r * 0.5);
     return addM(m, life, (f, k) => { const q = 1 - Math.pow(1 - k, 2); f.m.scale.setScalar(r * (0.5 + q * 0.6)); f.m.material.opacity = 0.16 * (1 - k); }, pos);
   }
+  // ---------------- R55e 每个技能自己的 3D 特效（以前只按六个门派共用一套） ----------------
+  const later = (ms, fn) => setTimeout(() => { try { if (on() && window.Worlds && Worlds.active) { scene = sceneOf(); if (scene) fn(); } } catch (e) { } }, ms);
+  function orb(pos, vel, col, size, life, trail) {
+    const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: col, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false })); m.scale.setScalar(size); const v = vel.clone(); let tr = 0;
+    return addM(m, life, (f, k, dt) => { f.m.position.addScaledVector(v, dt); f.m.material.opacity = 1 - k * k; if (trail && (tr += dt) > 0.03) { tr = 0; spark(f.m.position.clone(), new THREE.Vector3((Math.random() - .5) * 1.2, Math.random(), (Math.random() - .5) * 1.2), col, size * 0.55, 0.35, 0); } }, pos);
+  }
+  function beam(a, b, col, w, life, op) { // 两点之间的光带
+    const d = b.clone().sub(a), len = d.length(); if (len < 0.01) return null;
+    const m = new THREE.Mesh(geo('box1', () => new THREE.BoxGeometry(1, 1, 1)), amat(col, op || 0.85)); m.scale.set(w, len, w); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+    return addM(m, life, (f, k) => { f.m.material.opacity = (op || 0.85) * (1 - k); f.m.scale.x = f.m.scale.z = w * (1 - k * 0.6); }, a.clone().add(b).multiplyScalar(0.5));
+  }
+  function bolt(a, b, col, w, life, jag) { // 折线闪电
+    const T = THREE, n = 7; let p = a.clone(); const up = new T.Vector3(0, 1, 0);
+    for (let i = 1; i <= n; i++) { const q = a.clone().lerp(b, i / n); if (i < n) q.add(new T.Vector3((Math.random() - .5) * jag, (Math.random() - .5) * jag, (Math.random() - .5) * jag)); beam(p, q, i % 2 ? col : '#ffffff', w, life, 0.9); p = q; } void up;
+  }
+  function dust(pos, n, spd, col) { for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, s = spd * (0.4 + Math.random()); spark(pos.clone(), new THREE.Vector3(Math.cos(a) * s, 0.8 + Math.random() * 2, Math.sin(a) * s), col || '#c8b89a', 0.22 + Math.random() * 0.2, 0.5 + Math.random() * 0.4, 5); } }
+  function embers(pos, n, col, h) { for (let i = 0; i < n; i++) spark(pos.clone().add(new THREE.Vector3((Math.random() - .5) * 1.6, Math.random() * 0.4, (Math.random() - .5) * 1.6)), new THREE.Vector3((Math.random() - .5) * 0.8, (h || 2.4) * (0.6 + Math.random()), (Math.random() - .5) * 0.8), i % 3 ? col : '#ffe0a0', 0.1 + Math.random() * 0.12, 0.8 + Math.random() * 0.6, -0.5); }
+  function spiral(pos, col, n, rr, h, life) { for (let i = 0; i < n; i++) { const a0 = i / n * 6.283, m = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: col, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false })); m.scale.setScalar(0.28); const cx = pos.x, cz = pos.z, y0 = pos.y; addM(m, life, (fx, k) => { const a = a0 + k * 9; fx.m.position.set(cx + Math.cos(a) * rr * (1 - k * 0.4), y0 + k * h, cz + Math.sin(a) * rr * (1 - k * 0.4)); fx.m.material.opacity = 1 - k; }, new THREE.Vector3(cx, y0, cz)); } }
+  const SPEC = {
+    b_whirl(c) { for (let i = 0; i < 3; i++) ringFx(c.chest.clone().add(new THREE.Vector3(0, -0.1 * i, 0)), i === 1 ? '#ffffff' : c.col, 0.8, 3.6, 0.3, i * 0.06); dust(c.feet, 14, 4); },
+    b_lunge(c) { for (let i = 0; i < 7; i++) { const p = c.chest.clone().addScaledVector(c.f, i * 1.1); beam(p, p.clone().addScaledVector(c.f, 1.6), i % 2 ? c.col : '#ffffff', 0.05, 0.35, 0.7); } dust(c.feet.clone().addScaledVector(c.f, 1.2), 10, 3); },
+    b_wave(c) { const ct = SOFT() ? radTex('cres', 0.68, 0.86, 0.95) : null, m = new THREE.Mesh(geo('cres', () => new THREE.RingGeometry(0.7, 1, 32, 1, 0, Math.PI)), amat(c.col, 0.9, ct)); m.rotation.set(0, c.yaw, 0); m.scale.setScalar(2.4); const v = c.f.clone().multiplyScalar(22); addM(m, 0.9, (f, k, dt) => { f.m.position.addScaledVector(v, dt); f.m.material.opacity = 0.9 * (1 - k); }, c.front.clone()); for (let i = 0; i < 10; i++) later(i * 40, () => spark(c.front.clone().addScaledVector(c.f, i * 0.9), new THREE.Vector3((Math.random() - .5) * 2, Math.random() * 1.5, (Math.random() - .5) * 2), '#ffffff', 0.16, 0.4, 0)); },
+    b_flurry(c) { for (let i = 0; i < 8; i++) later(i * 260, () => { const p = c.front.clone().addScaledVector(c.r, (Math.random() - .5) * 1.6); p.y += (Math.random() - .5) * 0.8; crescent(p, c.yaw, i === 7 ? '#ffffff' : c.col, i === 7 ? 2.6 : 1.5, 0.2, (Math.random() - .5) * 2.4); spark(p, new THREE.Vector3(0, 1, 0), '#ffffff', 0.3, 0.2, 0); }); },
+    b_ult(c) { for (let i = 0; i < 5; i++) later(i * 380, () => { ringFx(c.feet, i === 4 ? '#ffffff' : c.col, 0.6, 5.6, 0.45); for (let k = 0; k < 6; k++) { const a = Math.random() * 6.283, d = 1 + Math.random() * 4.2, p = c.feet.clone().add(new THREE.Vector3(Math.cos(a) * d, 0, Math.sin(a) * d)); pillar(p, c.col, 5, 0.35); } }); },
+    w_bash(c) { for (let i = 0; i < 3; i++) ringFx(c.front.clone().setY(c.feet.y + 0.05), i ? '#ffffff' : c.col, 0.6, 3.6, 0.3, i * 0.05); dust(c.front, 14, 5); },
+    w_will(c) { shell(c.chest, c.col, 2.2, 0.9); spiral(c.feet, c.col, 14, 1.0, 2.2, 0.9); },
+    w_quake(c) { for (let i = 0; i < 3; i++) ringFx(c.feet, i === 1 ? '#ffffff' : c.col, 0.5, 5.4, 0.55, i * 0.12); dust(c.feet, 30, 6); for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283; beam(c.feet.clone().add(new THREE.Vector3(Math.cos(a) * 0.5, 0.05, Math.sin(a) * 0.5)), c.feet.clone().add(new THREE.Vector3(Math.cos(a) * 4.8, 0.05, Math.sin(a) * 4.8)), '#ffcf8a', 0.06, 0.5, 0.55); } },
+    w_ward(c) { shell(c.chest, c.col, 2.6, 1.1); shell(c.chest, '#ffffff', 2.0, 0.6); ringFx(c.feet, c.col, 0.8, 2.8, 0.7); },
+    w_ult(c) { shell(c.chest, c.col, 4.6, 1.3); shell(c.chest, '#ffffff', 3.4, 0.9); for (let i = 0; i < 4; i++) ringFx(c.feet, c.col, 0.6, 7, 0.9, i * 0.15); for (let i = 0; i < 8; i++) { const a = i / 8 * 6.283; pillar(c.feet.clone().add(new THREE.Vector3(Math.cos(a) * 3.2, 0, Math.sin(a) * 3.2)), c.col, 5, 1.1); } },
+    s_step(c) { for (let i = 0; i < 10; i++) { const p = c.chest.clone().addScaledVector(c.f, -i * 0.5 + 1); p.y += (Math.random() - .5) * 0.8; spark(p, new THREE.Vector3((Math.random() - .5), Math.random() * 0.6, (Math.random() - .5)), c.col, 0.5, 0.55, 0); } },
+    s_blade(c) { spiral(c.feet, '#9ff08a', 12, 0.7, 1.8, 1.0); embers(c.chest, 10, '#9ff08a', 1.2); },
+    s_strike(c) { for (let i = 0; i < 6; i++) { const p = c.chest.clone().addScaledVector(c.f, 2 + Math.random() * 2).addScaledVector(c.r, (Math.random() - .5) * 2); beam(p, p.clone().add(new THREE.Vector3((Math.random() - .5) * 3, (Math.random() - .5) * 2, (Math.random() - .5) * 3)), '#ffffff', 0.04, 0.3, 0.9); } ringFx(c.feet, c.col, 0.3, 2.6, 0.4); },
+    s_cloud(c) { const p = c.feet.clone().addScaledVector(c.f, 6); shell(p.clone().setY(p.y + 0.8), '#7fd070', 4.5, 1.2); embers(p, 18, '#9ff08a', 1.4); ringFx(p, '#7fd070', 0.5, 4.5, 0.7); },
+    s_ult(c) { for (let i = 0; i < 10; i++) later(i * 120, () => { const a = Math.random() * 6.283, d = 2 + Math.random() * 3, p = c.feet.clone().add(new THREE.Vector3(Math.cos(a) * d, 1, Math.sin(a) * d)); beam(p, p.clone().add(new THREE.Vector3((Math.random() - .5) * 4, (Math.random() - .5) * 2, (Math.random() - .5) * 4)), i % 2 ? '#ffffff' : c.col, 0.05, 0.25, 0.9); ringFx(p.clone().setY(c.feet.y + 0.05), c.col, 0.2, 1.4, 0.3); }); },
+    r_roar(c) { for (let i = 0; i < 4; i++) ringFx(c.chest, c.col, 0.6, 8, 0.7, i * 0.12); dust(c.feet, 18, 6, '#c89a8a'); },
+    r_slam(c) { crescent(c.front.clone(), c.yaw, c.col, 3.4, 0.35, 1.5); crescent(c.front.clone().addScaledVector(c.f, 0.4), c.yaw, '#ffffff', 2.6, 0.3, 1.5); dust(c.feet.clone().addScaledVector(c.f, 2.4), 14, 4); },
+    r_lust(c) { embers(c.feet, 30, '#ff6a50', 3); ringFx(c.feet, c.col, 0.5, 2.6, 0.6); },
+    r_charge(c) { for (let i = 0; i < 6; i++) { const p = c.chest.clone().addScaledVector(c.f, i * 1.4); dust(p.setY(c.feet.y), 4, 2); beam(p, p.clone().addScaledVector(c.f, 1.8), c.col, 0.07, 0.4, 0.6); } },
+    r_ult(c) { embers(c.feet, 50, '#ff4030', 4); for (let i = 0; i < 3; i++) ringFx(c.feet, i ? '#ff9a6a' : c.col, 0.5, 6, 0.9, i * 0.18); pillar(c.feet.clone(), '#ff3a2a', 9, 1.2); },
+    m_bolt(c) { orb(c.chest.clone().addScaledVector(c.f, 0.8), c.f.clone().multiplyScalar(26), c.col, 0.7, 0.6, true); },
+    m_nova(c) { for (let i = 0; i < 3; i++) ringFx(c.chest, i === 1 ? '#ffffff' : c.col, 0.5, 5.6, 0.5, i * 0.08); shell(c.chest, c.col, 4.5, 0.6); },
+    m_fire(c) { orb(c.chest.clone().addScaledVector(c.f, 0.8), c.f.clone().multiplyScalar(22), '#ff9a40', 1.0, 0.7, true); embers(c.chest.clone().addScaledVector(c.f, 0.8), 8, '#ff9a40', 1.5); },
+    m_mark(c) { const p = c.chest.clone().addScaledVector(c.f, 6); ringFx(p, c.col, 2.4, 0.5, 0.7); },
+    m_chain(c) { let p = c.chest.clone().addScaledVector(c.f, 0.6); for (let i = 0; i < 5; i++) { const a = p.clone(), q = p.clone().addScaledVector(c.f, 2.2).addScaledVector(c.r, (Math.random() - .5) * 3); q.y += (Math.random() - .5) * 1.2; later(i * 70, () => bolt(a, q, c.col, 0.05, 0.3, 0.7)); p = q; } },
+    m_ult(c) { const p = c.feet.clone().addScaledVector(c.f, 8); for (let i = 0; i < 3; i++) ringFx(p, '#ff5a30', 0.6, 6.5, 1.2, i * 0.2); pillar(p, '#ff7a40', 14, 1.2); later(1200, () => { ringFx(p, '#ffffff', 0.5, 7, 0.5); embers(p, 40, '#ff7a40', 5); dust(p, 30, 7); }); },
+    h_mark(c) { const p = c.chest.clone().addScaledVector(c.f, 6); ringFx(p, c.col, 2.4, 0.5, 0.7); },
+    h_exec(c) { crescent(c.front.clone(), c.yaw, c.col, 3.0, 0.3, 1.2); crescent(c.front.clone(), c.yaw, '#ffffff', 2.2, 0.26, 1.2); },
+    h_bounty(c) { embers(c.feet, 28, '#ffd060', 3); ringFx(c.feet, c.col, 0.4, 2.4, 0.6); },
+    h_storm(c) { for (let i = 0; i < 3; i++) later(i * 300, () => { ringFx(c.chest, i === 2 ? '#ffffff' : c.col, 0.7, 4.4, 0.3); dust(c.feet, 8, 4); }); },
+    h_ult(c) { for (let i = 0; i < 3; i++) ringFx(c.feet, c.col, 0.6, 11, 1.0, i * 0.2); pillar(c.feet.clone(), c.col, 14, 1.2); embers(c.feet, 30, '#ffd060', 4); },
+    x_hook(c) { for (let i = 0; i < 8; i++) { const p = c.chest.clone().addScaledVector(c.f, i * 2); beam(p, p.clone().addScaledVector(c.f, 1.2), i % 2 ? c.col : '#ffffff', 0.05, 0.5, 0.8); } },
+    x_swap(c) { ringFx(c.feet, c.col, 0.3, 2.6, 0.5); ringFx(c.feet.clone().addScaledVector(c.f, 6), c.col, 0.3, 2.6, 0.5, 0.12); spiral(c.feet, c.col, 10, 0.8, 2, 0.8); },
+    x_puppet(c) { const p = c.chest.clone().addScaledVector(c.f, 5); for (let i = 0; i < 6; i++) beam(p.clone().add(new THREE.Vector3((Math.random() - .5) * 2, 6, (Math.random() - .5) * 2)), p.clone().add(new THREE.Vector3((Math.random() - .5) * 0.6, (Math.random() - .5), (Math.random() - .5) * 0.6)), c.col, 0.03, 1.0, 0.8); },
+    x_link(c) { const a = c.chest.clone().addScaledVector(c.f, 4).addScaledVector(c.r, -2), b = c.chest.clone().addScaledVector(c.f, 5).addScaledVector(c.r, 2); bolt(a, b, c.col, 0.04, 0.8, 0.6); ringFx(a.clone().setY(c.feet.y), c.col, 0.3, 1.4, 0.6); ringFx(b.clone().setY(c.feet.y), c.col, 0.3, 1.4, 0.6); },
+    x_well(c) { const p = c.feet.clone().addScaledVector(c.f, 6); for (let i = 0; i < 3; i++) ringFx(p, '#c01830', 3.8, 0.4, 0.9, i * 0.15); embers(p, 20, '#c01830', 2); },
+    x_ult(c) { for (let i = 0; i < 6; i++) { const a0 = i / 6 * 6.283, m = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: '#d07aff', transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false })); m.scale.setScalar(0.6); const cx = c.feet.x, cz = c.feet.z, y0 = c.feet.y + 1.1; addM(m, 1.6, (fx, k) => { const a = a0 + k * 12; fx.m.position.set(cx + Math.cos(a) * 2.2, y0 + Math.sin(k * 9 + i) * 0.3, cz + Math.sin(a) * 2.2); fx.m.material.opacity = 1 - k * k; }, new THREE.Vector3(cx, y0, cz)); } ringFx(c.feet, c.col, 0.5, 6, 0.8); }
+  };
   function fx3d(id, inf) {
     const g = G0(), cam = g.camera; if (!cam || !window.THREE) return; scene = sceneOf(); if (!scene) return;
     const T = THREE, P = (window.Worlds && Worlds.active && Worlds._W && Worlds._W.pos) || g.player.pos, feet = new T.Vector3(P.x, P.y, P.z);
@@ -118,7 +175,8 @@ body.sfxon #tbCast{display:none!important}
     for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, sp = (3 + Math.random() * 5) * (inf.ult ? 1.5 : 1); const v = r.clone().multiplyScalar(Math.cos(a) * sp).add(new T.Vector3(0, Math.sin(a) * sp * 0.8 + 1.5, 0)).addScaledVector(f, Math.random() * sp * 0.7); spark(front.clone().addScaledVector(r, (Math.random() - .5) * 0.8), v, i % 4 === 0 ? '#ffffff' : col, 0.1 + Math.random() * 0.16, 0.45 + Math.random() * 0.5, 6); }
     ringFx(feet, col, 0.4, inf.ult ? 11 : 4.6, inf.ult ? 0.9 : 0.6); ringFx(feet, '#ffffff', 0.2, inf.ult ? 7 : 3, 0.5, 0.06);
     if (!inf.dodge) pillar(feet.clone().addScaledVector(f, inf.ult ? 5 : 3.4), col, inf.ult ? 12 : 6, inf.ult ? 0.9 : 0.55); // 光柱立在前方，避免相机在柱内被糊屏
-    switch (inf.school) {
+    switch (SPEC[id] ? 'spec' : inf.school) {
+      case 'spec': SPEC[id]({ feet, f, r, chest, front, col, yaw, S }); break;
       case 'blade': case 'rage': case 'hunt':
         crescent(front.clone(), yaw, col, 2.3 * S, 0.3, -0.5 + Math.random() * 0.4); if (inf.ult || Math.random() < 0.5) crescent(front.clone().addScaledVector(f, 0.6), yaw, '#ffffff', 1.9 * S, 0.28, 0.6);
         for (let i = 0; i < 8; i++) { const v = f.clone().multiplyScalar(14 + Math.random() * 8).addScaledVector(r, (Math.random() - .5) * 5); v.y = (Math.random() - .3) * 3; spark(chest.clone().addScaledVector(r, (Math.random() - .5) * 1.4), v, '#ffffff', 0.18, 0.35, 0); } break;

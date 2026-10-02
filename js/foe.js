@@ -546,7 +546,7 @@ window.Foe = (() => {
         if (fo.flash > 0) fo.flash -= dt; let er = 0, eg = 0, eb = 0;
         const A = fo.atk, hh = A && A.hits && A.hits[A.hi];
         if (hh && A.tot > 0) { const k = Math.max(0, 1 - atkLeft(A) / A.tot); const e = 0.08 + 0.42 * k * k; if (hh.heavy) { er = e; eg = e * 0.45; } else { er = e; eg = e * 0.08; eb = e * 0.04; } }
-        if (fo.flash > 0) { er = Math.max(er, 0.55); eg = Math.max(eg, 0.04); eb = Math.max(eb, 0.02); }
+        if (fo.flash > 0) { const wk = Math.min(1, fo.flash / 0.16); er = Math.max(er, 0.5 + 0.45 * wk); eg = Math.max(eg, 0.04 + 0.5 * wk * wk); eb = Math.max(eb, 0.02 + 0.45 * wk * wk); } // R55e：挑中的瞬间白热再转红
         const key = Math.round(er * 50) * 10000 + Math.round(eg * 50) * 100 + Math.round(eb * 50);
         if (key !== fo.eKey) { fo.eKey = key; fo.flashOn = fo.flash > 0; for (const m of fo.mats) if (m.emissive) m.emissive.setRGB(er, eg, eb); }
       }
@@ -806,7 +806,7 @@ window.Foe = (() => {
     if (!(window.FoeAbs && FoeAbs.on)) { fo.nHit = (fo.nHit || 0) + 1; const cap = Math.round((fo.boss ? 12 : FT ? 4 : 6) * (fo.capK || 1)); /* R34：区域强度大时保险刀数按比例增加 */ if (fo.nHit >= cap - 2) dealt = Math.max(dealt, Math.ceil(fo.hp / (cap + 1 - Math.min(fo.nHit, cap)))); } // 第二十六轮保险（用户：永远打不死）：不管护甲/角色/回血，普通敌人第 6 刀必死、霸主第 12 刀必死
     if (WP && !info.crit && Math.random() * 100 < WP.crit) { info.crit = true; dealt = Math.round(dealt * WP.critD / 100); } // 武器暴击
     if (window.Talents) { const d2 = Talents.outDmg(fo, info, dealt, zone, brk); if (isFinite(d2)) dealt = d2; } if (window.Rogue) { const d3 = Rogue.outDmg(fo, info, dealt, zone, brk); if (isFinite(d3)) dealt = d3; } /* R54k rogue_boons */ /* R36b：霸主/精英/猎手单刀上限 = 最大血量 10%，不可能再被一击秒杀 */ if (fo.boss || fo.hunter || fo.eliteId) dealt = Math.min(dealt, Math.max(1, Math.ceil(fo.maxHp * 0.1))); // R36：属性/天赋/暴击/背刺/印记
-    const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.12; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk || !!info.crit);
+    const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.16; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk || !!info.crit);
     { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp * (WP ? WP.kb : 1)); fo.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退：0.16 秒内推完（以前是一帧内整段位移 = “瞬移”）
     ctx.event && ctx.event('hit', fo, { dealt, zone, brk, kind: info.kind, spd, charged: info.charged, crit: info.crit, skill: info.skill, spell: info.spell, proc: info.proc });
     if (!fo.seen) { fo.seen = true; fo.state = fo.brave ? 'chase' : 'flee'; if (fo.boss) ctx.bossMeet(fo); }
@@ -831,7 +831,7 @@ window.Foe = (() => {
     if ((!fo.boss || poiseBrk) && !(fo.role && window.FoeRoles && FoeRoles.hurt(fo, dealt, info, zone))) { fo.atk = null;
       if (fo.stag > 0 && (fo.f.cur === 'Hit_Knockback' || fo.f.cur === 'LayToIdle')) { /* 躺着/起身时再挨一刀：不要重播受击动作（会把人从地上瞬间拽起来） */ }
       else { fo.stag = fo.boss ? (FAIR() ? 0.32 : 0.35) : (FAIR() ? 0.42 : 0.45); fo.f.play(zone === 'head' || zone === 'neck' ? 'Hit_Head' : 'Hit_Chest', { once: true, fade: 0.06, restart: true });
-        if (FAIR() && !fo.boss && CTX && CTX.player && !fo.kb) { const P = CTX.player.pos, kx = fo.pos.x - P.x, kz = fo.pos.z - P.z, kl = Math.hypot(kx, kz) || 1; fo.kb = { x: kx / kl * 2.6, z: kz / kl * 2.6, t: 0.16 }; } } } // 普通受击只用短的 Hit_Chest/Hit_Head（Hit_Knockback 是整个倒地动作，0.55s 就被切掉 = 瞬间弹起）
+        if (FAIR() && !fo.boss && CTX && CTX.player && !fo.kb) { const P = CTX.player.pos, kx = fo.pos.x - P.x, kz = fo.pos.z - P.z, kl = Math.hypot(kx, kz) || 1; fo.kb = { x: kx / kl * 3.8 * (info.charged || info.crit ? 1.7 : 1), z: kz / kl * 3.8 * (info.charged || info.crit ? 1.7 : 1), t: 0.16 }; } } } // 普通受击只用短的 Hit_Chest/Hit_Head（Hit_Knockback 是整个倒地动作，0.55s 就被切掉 = 瞬间弹起）
     if (fo.sayT <= 0 && Math.random() < 0.5) { if (fo.boss) talk(fo, '', '#ffb0a0'); else sayP(fo, 'hurt', SAY.hit, '#ffb0a0'); } else if (!fo.boss && window.Persona) Persona.line(fo, 'pain', true); // 第二十四轮：没说话时也会痛呼
     if (!fo.boss && !fo.dead && window.Persona && fo.state === 'chase' && Persona.fleeHp(fo) && fo.hp < fo.maxHp * Persona.fleeHp(fo) && !fo.fledOnce) { fo.fledOnce = true; fo.state = 'flee'; fo.brave = false; sayP(fo, 'flee', SAY.flee); } // 胆小：挨几刀就跑向门
     if (!(window.CombatFX && CombatFX.on)) { sfx().chop && sfx().chop(); sfx().squish && sfx().squish(0.5); } // 有 combat_fx 时由 CombatFX 合成更丰富的受击音

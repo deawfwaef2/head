@@ -189,7 +189,7 @@ window.CFX3D = (() => {
     if (!on() || !ADD || !G) return; d = d || {};
     const info = cur && now() - cur.at < 0.05 ? cur.info : null;
     const P = bodyPoint(fo, d, info, new V3()), dir = swingDirW(info, new V3());
-    const thrust = info && info.kind === 'thrust', heavy = !!(d.charged || d.brk || d.crit || (info && info.charged));
+    const thrust = info && info.kind === 'thrust', heavy = !!(d.charged || d.brk || d.crit || d.skill || (info && info.charged));
     const fwd = camDir(new V3());
     if (t === 'hit') {
       const hi = d.zone === 'head' || d.zone === 'neck';

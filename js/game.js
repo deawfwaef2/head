@@ -380,7 +380,7 @@ window.startGame = function () {
   document.addEventListener('pointerlockchange', () => {
     locked = document.pointerLockElement === canvas;
     if (locked) { lockRetry = false; startPlaying(); }
-    else if (!noLock && !uiOpen && !lockRetry) { if ((window.Saga && Saga.cine) || (window.__skipMenuUntil || 0) > performance.now()) { lockFailed(); return; } playing = false; $('menu').classList.remove('hidden'); save(); }
+    else if (!noLock && !uiOpen && !lockRetry) { if (window.Saga && Saga.cine && document.hasFocus()) { try { Saga.end(); } catch (e) { } lockFailed(); return; } /* R55e：电影里按 Esc = 跳过电影（浏览器吃掉 Esc 只会解锁鼠标），不再弹主菜单 */ if ((window.Saga && Saga.cine) || (window.__skipMenuUntil || 0) > performance.now()) { lockFailed(); return; } playing = false; $('menu').classList.remove('hidden'); save(); }
   });
   document.addEventListener('pointerlockerror', () => lockFailed());
   function setUI(open) { uiOpen = open; if (open) { if (document.pointerLockElement) document.exitPointerLock(); } else if (playing && !noLock) setTimeout(() => { if (playing && !uiOpen && !document.pointerLockElement && !film) lockPointer(); }, 60); /* R37：关面板后自动尝试重新锁定（ESC 关闭时浏览器会拒绝 → 走 lockFailed 提示，点一下画面即可） */ }

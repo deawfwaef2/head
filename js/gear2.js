@@ -246,7 +246,7 @@ window.Gear2 = (() => {
   }
   function toggle(v) { if (window.Hub && Hub.on()) { if (v === false) Hub.closeAll(); else Hub.go('kit', v == null); return; } /* R42：装备并进 Tab 菜单的「装备与背包」 */ if (!window.R35UI) return; if (v === false) { if (R35UI.isOpen('gear')) R35UI.close(); } else if (v === true) R35UI.open('gear'); else R35UI.toggle('gear'); }
   if (window.R35UI) R35UI.reg('gear', { n: '💍 装备', title: '装 备', on, html: panelHTML, click: onClick, move: onMove, leave: () => showTip(null) });
-  addEventListener('keydown', e => { if (!on() || !window.G || !G.S) return; if (e.code === 'KeyZ' && !e.repeat && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) { if (window.UI && UI.open) return; e.preventDefault(); toggle(); } }, true);
+  addEventListener('keydown', e => { if (!on() || !window.G || !G.S) return; if (e.code === 'KeyZ' && !e.repeat && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) { if (window.UI && UI.open) return; if ((window.GrandUI && GrandUI.isOpen && GrandUI.isOpen()) || (window.Saga && Saga.cine) || (window.Arrival2 && Arrival2.isOpen()) || (window.DecapCam && DecapCam.active)) return; e.preventDefault(); toggle(); } }, true);
   hook(); setTimeout(hook, 0); addEventListener('load', hook);
   return { on, SL, POS, AF, UNQ, make, name, rollLoot, dropFor, equip, unequip, sum, hitMul, avgMul, hateMul, senseMul, tipBody, tipFull, dollHTML, dollClick, dollMove: onMove, dollLeave: () => showTip(null), toggle, owns: o => !!(o && o.g2), get lastCrit() { return lastCrit; }, _bust: bust };
 })();

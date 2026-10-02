@@ -2077,3 +2077,12 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - Clothes toggle swaps to linen (never nude); single-mesh Genshin bodies have no separable clothes. No head organs, no reproductive organs, no blood/gibs.
 - sack.js opens Autopsy for humanoid corpses, falls back to Dissect (R55). Harness: tools/test/autopsy.html.
 - NOTE: three build here has no `mapTexelToLinear` in map_fragment (hardware sRGB decode); the shader hack must not call it.
+
+## R55e 用户反馈（原话要点，长期有效）
+敌人打着打着就侧身不知道为什么；角色战斗打击感弱爆了、很蠢；键位冲突（跳过电影 vs 打开主菜单、第一人称 vs 回洞选择奖励之类）；技能特效太弱太少；反馈太少（同伴被斩首周围角色都应该冒气泡聊天，更频繁）。
+- **侧身根因（已修）**：`Stance.post`（npc_stance/npc_strafe）和 `Feel54.post`（hit_react）都改同一批没有动画轨道的骨头（hips/spine/chest…），互相认不出对方的改动 → 每帧偏移叠加，被打后 ~1s 内胸口朝向可偏到 180°（实测 3.14rad，修后 ≤0.58）。修法：`foe.js` 在 `mixer.update` 之前调用 `Feel54.pre` + `Stance.pre` 无条件还原上一帧叠加的偏移。**以后凡是在 mixer 之后改骨头的模块，都要在 mixer 之前还原**。另：npc_strafe 下半身最大扭转 77°→54°。
+- **打击感**：`momentum.js` 顿帧加长（普通 0.1s、重击/暴击/破绽 0.17s、击杀 0.22s、处决 0.36s，期间敌人时间 ×0.04~0.06）；`combat.js` 命中时玩家刀停留 0.045/0.07/0.09s，镜头后坐/FOV 冲击加大；`foe.js` 受击闪光改为先白热再转红（0.16s），击退 2.6→3.8（重击/暴击 ×1.7）；`feel54.js` 受击后仰/侧歪冲量 ×1.45；`cfx3d.js` 技能命中也走“重击”特效（大环 + 更多火花）。
+- **键位**：`game.js` pointerlockchange：电影中按 Esc（浏览器吃掉 Esc 只解锁鼠标）= 直接 `Saga.end()` 跳过，不弹主菜单（要求 `document.hasFocus()`，切走窗口不算）；`tutorial.js` Enter 在斩首镜头/电影/到达窗/GrandUI 开着时不再抢；`hunters2.js`（U）、`gear2.js`（Z）在这些界面开着时不再叠开。**键位规则：电影 Esc=跳过、Space/E/点击=下一幕；Enter 归当前最上层界面；主菜单只在无任何界面时由 Esc 打开。**
+- **技能特效**：`skillfx.js` 新增 `SPEC[技能id]`：37 个技能每个有自己的 3D 特效（旋风斩多层水平刃环、突刺残影光带、剑气飞行新月、百刃随机斩闪、万剑归宗 5 脉冲+落剑光柱、震地裂纹+尘土、魂盾双层球壳、毒雾球、战吼 4 重环、魂弹/魂焰飞行光球带尾迹、连锁闪电折线、魂陨延迟爆炸、勾魂索锁链、同命咒连线、血井、百鬼夜行 6 魂球环绕等）。通用六门派分支仅在没有 SPEC 时才用。助手：`orb/beam/bolt/dust/embers/spiral/later`。
+- **气泡**：`r54n.js` 新增 `reactAllies`：同伴倒下/被斩首时，26m 内最近 4 人依次（间隔 ~0.5s）冒气泡 + 惨叫/痛呼（斩首用专门台词 `L_DECAP`，勇敢的人喊 `L_COVER`）；战斗聊天间隔 4~7s → 2.2~4s，另有杀意连斩时的恐惧台词、玩家血低时的“压上去”台词、被打时同伴“撑住”。
+- 验证方式（浏览器约 1fps，软渲染）：Playwright 里 `Worlds.start` → `Worlds._debug.goto(4,3)` → 手动循环 `Foe.update(1/30, now)` 采样；`SkillFX.cast(id)` 全部 37 个无报错。

@@ -123,7 +123,7 @@ window.Tutorial = (() => {
   function onKeyDown(e) {
     const G = gd(); if (!G || !modOn()) return;
     if (e.code === 'F9') { e.preventDefault(); toggle(); return; }
-    if (e.code === 'Enter' && G.playing && !G.uiOpen && S_() && !S_().off && !S_().done && cardOn) { e.preventDefault(); e.stopImmediatePropagation(); next('skip'); }
+    if (e.code === 'Enter' && G.playing && !G.uiOpen && !(window.DecapCam && DecapCam.active) && !(window.Saga && Saga.cine) && !(window.Arrival2 && Arrival2.isOpen()) && !(window.GrandUI && GrandUI.isOpen && GrandUI.isOpen()) && S_() && !S_().off && !S_().done && cardOn) { e.preventDefault(); e.stopImmediatePropagation(); next('skip'); } // R55e：Enter 同时被教程/斩首镜头/电影用 → 有它们在场时教程不抢
   }
 
   // ---------------- 状态 ----------------

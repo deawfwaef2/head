@@ -11,7 +11,7 @@ window.Feel54 = (() => {
   // 受击冲量：p=后仰（远离玩家），r=侧倾，y=扭转
   function impulse(fo, d) {
     if (!onR() || !fo || !fo.f) return; const S = st(fo), CS = window.Combat && Combat.state, sw = CS && CS.sw;
-    let k = d && (d.charged || d.crit) ? 1 : d && d.brk ? 0.8 : 0.55; if (d && d.skill) k *= 0.8; if (fo.boss) k *= 0.5;
+    let k = d && (d.charged || d.crit) ? 1.3 : d && d.brk ? 1 : 0.8; if (d && d.skill) k *= 0.8; if (fo.boss) k *= 0.5;
     const dx = sw ? sw.dx : (Math.random() - 0.5), dy = sw ? sw.dy : -0.3, z = d && d.zone;
     S.vp += k * (z === 'head' || z === 'neck' ? 11 : 8) * (0.8 + Math.random() * 0.4);
     S.vr += -dx * k * 9; S.vy += dx * k * 7 + (Math.random() - 0.5) * 3; if (dy < -0.5) S.vp += k * 3;

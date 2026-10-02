@@ -218,7 +218,7 @@ window.Combat = (() => {
     let res = true; try { res = tg.onHit ? tg.onHit(inf) : true; } catch (e) { console.warn('onHit', e); } // 第二十六轮(i)：目标回调出错也算“这一刀已命中”，绝不每帧重复结算
     if (res === false) return false;
     w.set.add(tg.id); w.hit = true; const k = heavy ? 1 : fin ? 0.75 : 0.45, now = performance.now(); M.hitT = now;
-    S.shake = Math.max(S.shake, 0.006 + 0.014 * k); M.kick.p += 0.008 + 0.02 * k; M.kick.r += -w.dx * (0.008 + 0.018 * k); M.kick.f = Math.max(M.kick.f, 1.2 + 3 * k); w.hold = heavy ? 0.05 : fin ? 0.035 : 0.022;
+    S.shake = Math.max(S.shake, 0.006 + 0.014 * k); M.kick.p += 0.012 + 0.03 * k; M.kick.r += -w.dx * (0.01 + 0.022 * k); M.kick.f = Math.max(M.kick.f, 2 + 4 * k); w.hold = heavy ? 0.09 : fin ? 0.07 : 0.045;
     S.hv.x -= w.dx * 1.0 * k; S.hv.y -= w.dy * 0.8 * k; S.stam = Math.min(100, S.stam + 3 + 3 * k); // 命中回体力：打得越凶越不容易力竭
     if (window.CombatFX && CombatFX.kick) { try { CombatFX.kick(0.1 + 0.2 * k); } catch (e) {} }
     return true;
