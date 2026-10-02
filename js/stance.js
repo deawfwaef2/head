@@ -98,7 +98,7 @@ window.Stance = (() => {
     if (L) {
       let tgt = 0;
       if (onS() && L.active && L.s > 0.2 && L.rel != null) {
-        const maxT = 1.35 - 0.6 * smooth(1.5, 5, L.s);
+        const maxT = 0.95 - 0.35 * smooth(1.5, 5, L.s); // R55e：下半身最多转 54°（以前 77°，看着像整个人侧过去）
         tgt = clamp(L.bk ? ang(L.rel - Math.PI) : L.rel, -maxT, maxT) * smooth(0.2, 0.6, L.s);
       }
       L.tw = (L.tw || 0) + (tgt - (L.tw || 0)) * (1 - Math.exp(-9 * dt));
@@ -121,5 +121,7 @@ window.Stance = (() => {
       }
     }
   }
-  return { install, post, prof, onS, onP };
+  // R55e：mixer 之前无条件还原（没有动画轨道的骨头不会被 mixer 覆盖，且 Feel54 也会改同一批骨头，等值判断会失效）
+  function pre(fo) { const T = fo.f && fo.f._stT; if (!T) return; for (let i = T.length - 1; i >= 0; i--) { const b = T[i]; if (b._stPre) b.quaternion.copy(b._stPre); } T.length = 0; }
+  return { install, post, pre, prof, onS, onP };
 })();

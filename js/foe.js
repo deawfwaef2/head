@@ -536,6 +536,7 @@ window.Foe = (() => {
       if (fo.state === 'chase') guardAI(fo, dt, d); guardShow(fo);
       collide(fo.pos, 0.35); fo.pos.y = ctx.H(fo.pos.x, fo.pos.z) + (fo.yOff || 0); f.root.rotation.y = fo.yaw;
       if (window.Locomo) Locomo.tick(fo, dt); // R47 npc_locomo
+      if (window.Feel54 && Feel54.pre) Feel54.pre(fo); if (window.Stance && Stance.pre) Stance.pre(fo); // R55e：先还原上一帧叠加的骨骼偏移（以前两个模块互相认不出对方改过的骨头 → 偏移逐帧累积 = 打着打着身体侧过去）
       f.mixer.update(dt);
       if (window.Stance) Stance.post(fo, dt); // R51 npc_strafe / npc_stance：下肢朝移动方向+上身扭回、架势体态
       if (fo.duel && window.FoeDuel) FoeDuel.post(fo, dt);

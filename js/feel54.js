@@ -16,6 +16,7 @@ window.Feel54 = (() => {
     S.vp += k * (z === 'head' || z === 'neck' ? 11 : 8) * (0.8 + Math.random() * 0.4);
     S.vr += -dx * k * 9; S.vy += dx * k * 7 + (Math.random() - 0.5) * 3; if (dy < -0.5) S.vp += k * 3;
   }
+  function pre(fo) { const S = fo.hr; if (!S || !S.set || !S.orig) return; const B = fo.f && fo.f.bones; if (!B) return; const bones = CH.map(c => B[c[0]]).filter(Boolean); for (let i = 0; i < bones.length; i++) if (S.orig[i]) bones[i].quaternion.copy(S.orig[i]); S.set = null; } // R55e：mixer 前无条件还原
   function post(fo, dt) {
     if (!onR() || !fo.hr) return; const S = fo.hr, B = fo.f && fo.f.bones; if (!B) return;
     const bones = CH.map(c => B[c[0]]).filter(Boolean); if (!bones.length) return;
@@ -47,5 +48,5 @@ window.Feel54 = (() => {
   // 包一层 CombatFX.whiff：空挥 = 敌人抢攻的时机
   function hook() { if (window.CombatFX && CombatFX.whiff && !CombatFX.whiff.__f54) { const w0 = CombatFX.whiff; CombatFX.whiff = function () { try { whiff(); } catch (e) { } return w0.apply(this, arguments); }; CombatFX.whiff.__f54 = 1; } }
   hook(); setTimeout(hook, 3000);
-  return { post, event, frame, impulse };
+  return { post, pre, event, frame, impulse };
 })();
