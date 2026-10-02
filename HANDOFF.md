@@ -4516,3 +4516,12 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 敌人突然出现卡：`foe_lod` 对新敌人前 3 秒强制可见（先渲染/上传贴图再允许视锥隐藏）；`populate(keep)` 每个敌人 build/animate 之间让出一帧。
 - F 回忆视角头太小：`recall_iw.js` 初始 `dist -0.15`、滚轮范围 -0.28~0.14（更近 = 更大）。
 - 泪痕：`heads.js uFx.x` 重做（哭红眼周、颧骨泛红、下眼睑水线、最多 3 道泪痕：湿润变深 + 高光线 + 尽头泪珠），缓存键 skin8。
+
+## R64（掉落封顶 / 残留 UI / BOSS 界面 / 难度系统 / 宿敌仇恨强化 / 首级产出悬浮）
+- 掉落：`sack.js` 装备掉落阶位被玩家等级封顶（`tierCap = floor((lv+3)/5)+1`），武器/护甲/头盔/护符穿戴需要等级 `(阶-1)×5`（提示里显示，等级不足会弹回麻袋）；`gear2.js rollOne/dropFor` 的饰品需求不超过玩家等级+6，专属神话饰品 `req=(阶-1)×6`（以前 req=1）。根因：首个 BOSS 所在地区 lv 高 → `rollEquip(.., 1.5)`/`rollW` 给 6 阶武器、Gear2 给 req 30+ 饰品。
+- 残留 UI：`hub.js purge()`：切页/关页时隐藏 `#skTip/#g2Tip/#tbTip`；`ui63.css` 统一层级：`#guRoot/.pmodal/.unl-wrap/#mmRoot/#sgSet/#arRoot` z=135（高于 Tab rail 120 / 页头 125 / 侧栏 130），三种悬浮提示 z=150。祝福抉择弹窗在下面 = `#guRoot` z=90 < hub 120。
+- BOSS 界面：新 `js/bossui.js`（MOD `boss_ui`）：重做 `#wBoss`（称号 / 名字 / 难度台词 / 阶段刻度 / 残影 / 数值 / 低血脉冲）、登场全屏名牌、倒下「首级令」字幕；`regionquest.js` 迷你任务条在 BOSS 条显示时下移到 176px。
+- 难度：新 `js/difficulty.js`（MOD `diff_select`）：安魂 / 血月 / 黑潮 / 无光 + 自定义滑块（敌人生命 / 敌人伤害 / 宿敌成长 / 野外战利品）；开局点“开始游戏”前拦截弹出选择（`G.S.diff`），标题有「难度」按钮，Tab →「系统 → 难度」可改（hub 新页 `diff`）。倍率落点：`foe.js populate`（生命）、`worlds.js hitPlayer`（伤害）、`nemesis.js`（成长）、`G.addCoins`（野外战利品）；叙事：BOSS 登场/倒下语、宿敌来袭语（`hunters2` banner / `nemesis` toast）、`body[data-diff]` 配色（`ui63.css`）。
+- 宿敌强度：`hunters2.js spawn` 基础血量 ×1.5，再乘 `1.5×(1+min(3.5,仇恨/40))`（血）与 `1+min(1.8,仇恨/55)`（伤）、移速最高 +25%、仇恨 ≥30/60 加技能池、技能冷却缩短；`odds()` 同步；`nemesis.js extraStrike` 同样按仇恨缩放，基础血 1.8→3.2。仇恨值本身随时间连续上涨（R63e）。
+- 首级悬浮：`game.js yieldLine(h)`：准星指向首级时显示 `🔮 ≈ N /回合结算`（回合制）和 `🌀 SAN ≈ x/秒`（挂在建筑上才产）。
+- 未验证：BOSS 登场/倒下卡和血条只用假 DOM 看过样式（本地无 big/ 无法真打）；难度倍率、掉落封顶只做了语法检查。

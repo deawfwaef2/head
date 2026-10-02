@@ -35,12 +35,14 @@ window.Hunters2 = (() => {
   function myPow() { try { return G_().st().power; } catch (e) { return 50; } }
   function odds(id) { // 预估胜率：你几刀砍死她 vs 她几下打死你
     const rec = powOf(lvOf(id)); if (!window.FoeAbs) return { p: 0.5, my: 0, her: 0 };
-    const st = G_().st(), myD = 12 * FoeAbs.power() * (window.Gear2 ? Gear2.avgMul() : 1), herHp = HP0 * FoeAbs.hpK(rec) * (BY[id].aff.length ? 1.3 : 1);
+    const st = G_().st(), myD = 12 * FoeAbs.power() * (window.Gear2 ? Gear2.avgMul() : 1), herHp = HP0 * FoeAbs.hpK(rec) * (BY[id].aff.length ? 1.3 : 1) * hateHp(SS().hate);
     const herD = FoeAbs.REF(rec) * 0.12 * (1 - Math.min(0.5, (st.def || 0) / ((st.def || 0) + 300))) * (1 - ((window.Gear2 && Gear2.sum().dr) || 0) / 100), my = Math.max(1, Math.ceil(herHp / myD)), her = Math.max(1, Math.ceil(st.maxHp / Math.max(1, herD)));
     const ratio = her * 2 / my, p = Math.max(0.01, Math.min(0.99, ratio * ratio / (1 + ratio * ratio)));
     return { p, my, her, rec, hp: Math.round(herHp) };
   }
   const alive = () => D.filter(d => !SS().L[d.id].dead);
+  // R64：仇恨值越高猎手越强（血量 / 伤害 / 移速 / 技能池 / 技能冷却），并把基础血量抬高 1.5 倍（“宿敌太好杀”）
+  const hateHp = h => 1.5 * (1 + Math.min(3.5, (h || 0) / 40)) * (window.Diff ? Diff.hp() : 1), hateDmg = h => 1 + Math.min(1.8, (h || 0) / 55);
 
   // ================= 本趟状态 =================
   let T = null; // { m, t0, armedAt, k0, d0, cool, fo, id, fleeAt, spawnAt, spawning }
@@ -64,13 +66,14 @@ window.Hunters2 = (() => {
       let best = null; for (let i = 0; i < 14; i++) { const a = Math.random() * 6.283, r = 9 + Math.random() * 5; const x = P.x + Math.sin(a) * r, z = P.z + Math.cos(a) * r; if (C.edge ? C.edge(x, z)[0] > 3 : Math.hypot(x, z) < R) { best = [x, z]; break; } }
       if (!best) { const a = Math.atan2(-P.x, -P.z); best = [P.x + Math.sin(a) * 8, P.z + Math.cos(a) * 8]; }
       const pos = V3().set(best[0], 0, best[1]);
-      banner(d.ic + ' ' + d.n + ' 穿越而来', d.t + ' · Lv.' + L + ' · 战力 ' + rec, '她在的时候，所有的门都被封死了', d.col);
+      banner(d.ic + ' ' + d.n + ' 穿越而来', d.t + ' · Lv.' + L + ' · 战力 ' + rec, (window.Diff && Diff.voice('nem') ? Diff.voice('nem') + ' ' : '') + '她在的时候，所有的门都被封死了', d.col);
       try { SFX.roar && SFX.roar(0.8); } catch (e) { }
       const fr = window.__forceRole, fa = window.__forceAff; window.__forceRole = d.role; window.__forceAff = d.aff.concat(SS().L[id].esc >= 2 ? ['frenzy'] : [], window.NemStory ? NemStory.aff('h:' + id) : []); /* R57 nem_story：祝福词缀 */
       let out; try { out = await Foe.populate(C, [{ h, pos }], { keep: true }); } finally { window.__forceRole = fr; window.__forceAff = fa; }
       const fo = out && out[0]; if (!fo) { T.spawning = false; return; }
       fo.absRec = rec; fo.hunter2 = id; fo.maxHp = fo.hp = Math.round(window.FoeAbs && FoeAbs.on ? HP0 * FoeAbs.hpK(rec) * (d.aff.length ? 1.3 : 1) : HP0 + L * 14);
       fo.iq = 1.25; fo.tier = 0.95; fo.brave = true; fo.seen = true; fo.state = 'chase'; fo.cd = 1 + Math.random(); fo.dmgMul = (fo.dmgMul || 1) * 1.15; fo.spdMul = (fo.spdMul || 1) * 1.08; fo.skPool = d.sk.length ? d.sk : null; fo.skCd = 1.5; if (window.NemStory) try { NemStory.apply(fo, 'h:' + id, C, pos); } catch (e) { console.warn('NemStory apply', e); } /* R57 nem_story：剧情成长落到属性 */
+      { const hate = SS().hate || 0; fo.maxHp = fo.hp = Math.round(fo.maxHp * hateHp(hate)); fo.dmgMul = (fo.dmgMul || 1) * hateDmg(hate); fo.spdMul = (fo.spdMul || 1) * (1 + Math.min(0.25, hate / 400)); fo.hate2 = hate; fo.skCd = Math.max(0.6, 1.5 - hate / 120); const pool = new Set(fo.skPool || []); if (hate >= 30) { pool.add('leap'); pool.add('charge'); } if (hate >= 60) { pool.add('breaker'); pool.add('whirl'); } if (pool.size) fo.skPool = [...pool]; }
       if (W.foes && !W.foes.includes(fo)) W.foes.push(fo); else if (!W.foes) W.foes = [fo];
       T.m = 0; T.armedAt = 0; // R43：猎手一到场，感应条就清零（以前要等她死/逃/撤退才归零，条一直满着）
       T.fo = fo; T.id = id; T.spawnAt = performance.now(); T.fleeAt = 0; T.sayT = 2; SS().L[id].meet++;

@@ -98,13 +98,17 @@ window.Sack = (() => {
 
   // ---- 掉落 ----
   function lvOf(node) { const L = window.Lore && Lore.LOCS; const i = L ? Math.max(0, L.findIndex(l => l.k === (node.loc && node.loc.k))) : 0; return i + (node.depth || 0) * 0.15; }
+  // R64：掉落阶位被玩家等级封顶（以前第一个 BOSS 直接掉 6 阶武器 / 30+ 级饰品）；装备需要等级 = (阶-1)×5
+  const plvNow = () => { try { return (G.st && G.st().lv) || 1; } catch (e) { return 1; } };
+  const tierCap = () => Math.floor((plvNow() + 3) / 5) + 1;
+  const reqOfTier = t => t <= 1 ? 1 : (t - 1) * 5;
   const KINDS = { chest: ['宝箱', 'treasure_chest', 0.9], crate: ['木箱', 'wooden_crate_01', 0.8], barrel: ['酒桶', 'wine_barrel_01', 0.72], basket: ['藤篮', 'wicker_basket_01', 0.55], bucket: ['木桶', 'wooden_bucket_02', 0.45], rack: ['武器架', 'katana_stand_01', 1.0] };
   function rollEquip(r, lv, bonus) {
     const k = r(), slot = k < 0.5 ? 'weapon' : k < 0.68 ? 'armor' : k < 0.84 ? 'helm' : 'charm';
-    const mx = { weapon: 6, armor: 5, helm: 4, charm: 5 }[slot], t = Math.max(1, Math.min(mx, Math.floor(lv * 0.62 + r() * 1.7 + (bonus || 0))));
+    const mx = { weapon: 6, armor: 5, helm: 4, charm: 5 }[slot], t = Math.max(1, Math.min(mx, tierCap(), Math.floor(lv * 0.62 + r() * 1.7 + (bonus || 0))));
     return mk({ weapon: 'w', armor: 'a', helm: 'h', charm: 'c' }[slot] + t, 1, r() < 0.16 + lv * 0.03 ? { plus: 1 + Math.floor(r() * Math.min(4, 1 + lv * 0.5)) } : null);
   }
-  const rollW = (r, lv, b) => mk('w' + Math.max(1, Math.min(6, Math.floor(lv * 0.62 + r() * 1.6 + b))), 1, r() < 0.12 + lv * 0.03 ? { plus: 1 + Math.floor(r() * Math.min(4, 1 + lv * 0.5)) } : null);
+  const rollW = (r, lv, b) => mk('w' + Math.max(1, Math.min(6, tierCap(), Math.floor(lv * 0.62 + r() * 1.6 + b))), 1, r() < 0.12 + lv * 0.03 ? { plus: 1 + Math.floor(r() * Math.min(4, 1 + lv * 0.5)) } : null);
   function roll(kind, lv, seed, extra) {
     let s = seed >>> 0; const r = () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
     const out = [], add = (id, a, b) => out.push(mk(id, a + Math.floor(r() * (b - a + 1))));
@@ -217,6 +221,7 @@ window.Sack = (() => {
   function equip(o, putOld) { // 穿上 o；旧装备交给 putOld
     if (o.g2 && window.Gear2) return Gear2.equip(o, putOld); /* R35 gear2 饰品 */
     const S = G.S, d = IT[o.id], sl = d.slot, cur = S.eq[sl] || 0;
+    if (sl !== 'bag' && reqOfTier(d.tier) > plvNow()) { toast(`需要食人魔等级 ${reqOfTier(d.tier)}（你 Lv.${plvNow()}）`, '#ff9a7a', 2); putOld(o); return false; }
     if (cur > 0 || sl === 'weapon') { const pre = { weapon: 'w', helm: 'h', armor: 'a', charm: 'c', bag: 'b' }[sl]; if (!(sl === 'bag' && cur === 0)) putOld(mk(pre + cur, 1, sl !== 'bag' && S.eqPlus[sl] ? { plus: S.eqPlus[sl] } : null)); }
     S.eq[sl] = d.tier; if (sl !== 'bag') S.eqPlus[sl] = o.plus || 0; if (sl === 'weapon') { G.refreshWeapon && G.refreshWeapon(); }
     if (sl === 'bag') resizeSack();
@@ -395,7 +400,7 @@ window.Sack = (() => {
     else if (o.g2 && window.Gear2) body = Gear2.tipBody(o); /* R35 gear2 */
     else if (d.kind === 'equip' && window.RPG) {
       const E = RPG.EQUIP[d.slot], t = E.tiers[d.tier], c = E.tiers[G.S.eq[d.slot] || 0], K = ['atk', 'def', 'hp', 'str', 'con', 'agi', 'ter', 'soul', 'cap'], NM = { atk: '攻击', def: '防御', hp: '生命', str: '力量', con: '体魄', agi: '敏捷', ter: '凶威', soul: '魂力', cap: '背篓' };
-      body = K.filter(k => t[k] || c[k]).map(k => { const a = t[k] || 0, b = c[k] || 0, df = a - b; return `${NM[k]} <b>${a}</b> <span style="color:${df > 0 ? '#8fe88f' : df < 0 ? '#ff8f86' : '#998'}">${df > 0 ? '▲+' + df : df < 0 ? '▼' + df : '＝'}</span>`; }).join('<br>') + `<br><span style="color:#a99">${esc(t.desc || '')}</span>` + (d.slot === 'weapon' && window.WpnSpec ? WpnSpec.tip(d.tier, o.plus || 0, G.S.eq.weapon || 0, (G.S.eqPlus || {}).weapon || 0) : '');
+      body = `<span style="color:${reqOfTier(d.tier) <= plvNow() || d.slot === 'bag' ? '#9fe89f' : '#ff7a6a'}">${d.slot === 'bag' ? '' : '需要等级 ' + reqOfTier(d.tier)}</span><br>` + K.filter(k => t[k] || c[k]).map(k => { const a = t[k] || 0, b = c[k] || 0, df = a - b; return `${NM[k]} <b>${a}</b> <span style="color:${df > 0 ? '#8fe88f' : df < 0 ? '#ff8f86' : '#998'}">${df > 0 ? '▲+' + df : df < 0 ? '▼' + df : '＝'}</span>`; }).join('<br>') + `<br><span style="color:#a99">${esc(t.desc || '')}</span>` + (d.slot === 'weapon' && window.WpnSpec ? WpnSpec.tip(d.tier, o.plus || 0, G.S.eq.weapon || 0, (G.S.eqPlus || {}).weapon || 0) : '');
     } else { body = esc(d.desc || ''); const us = [...new Set(RECIPES.filter(rc => rc.need[o.id]).map(rc => IT[rc.out] ? IT[rc.out].icon + IT[rc.out].n : rc.out))]; if (us.length) body += `<br><span style="color:#9fd0a0">🔨 可合成：${esc(us.slice(0, 8).join('、'))}${us.length > 8 ? ' …' : ''}</span>`; }
     return `<div class="tn" style="color:${RARC[r]}">${d.icon || ''} ${esc(nameOf(o))}${o.n > 1 ? ' ×' + o.n : ''}</div><div class="tr" style="color:${RARC[r]}">${RARN[r]} · ${({ equip: '装备', use: '消耗品', head: '首级', organ: '人体器官', book: '典籍', prop: '摆件' })[d.kind] || '材料'}${d.st > 1 ? ' · 可堆叠 ' + d.st : ''} · ${dims(o).join('×')} 格</div><div class="tb">${body}</div>`;
   }

@@ -214,7 +214,7 @@ window.RegionQuest = (() => {
       if (!x.dead && fo.seen && W.pos && fo.pos) { const d = fo.pos.distanceTo(W.pos); if (d < 22 && d < nd) { nd = d; near = x; } }
     }
     if (near) {
-      h.mini.style.display = 'block'; h.mini.style.top = (W.dom && W.dom.boss && W.dom.boss.style.display === 'block') ? '112px' : '64px';
+      h.mini.style.display = 'block'; h.mini.style.top = (W.dom && W.dom.boss && W.dom.boss.style.display === 'block') ? (document.body.classList.contains('bossui') ? '176px' : '112px') : '64px';
       h.miniN.innerHTML = `<em>小BOSS</em>${esc(near.m.title)} · ${esc(near.m.n)}`; h.miniI.style.width = Math.max(0, near.fo.hp / near.fo.maxHp * 100) + '%';
     } else h.mini.style.display = 'none';
     // 任务

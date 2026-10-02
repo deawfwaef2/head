@@ -260,4 +260,14 @@ body.u63 #whl .bg { background: radial-gradient(ellipse at 50% 50%, rgba(14,6,8,
 /* 滚动型页面（出征准备等）：底部让出提示条高度 */
 body.u63.hubwheel #sppan .sp-in { padding-bottom: 80px; }
 
+/* 层级统一（R64）：弹出的抉择/确认永远盖在 Tab 菜单（rail 120 / 页头 125 / 侧栏 130）之上；悬浮提示再高一层；转盘 140 / 电影 9500 不变 */
+body.u63 #guRoot, body.u63 .pmodal, body.u63 .unl-wrap, body.u63 #mmRoot, body.u63 #sgSet, body.u63 #arRoot { z-index: 135 !important; }
+body.u63 #skTip, body.u63 #g2Tip, body.u63 #tbTip { z-index: 150 !important; }
+
+/* 难度色调（R64）：difficulty.js 把 body[data-diff] 设成 calm / blood / black / void / custom */
+body.u63[data-diff="calm"] { --k-gold: #f2d6a0; --k-gold-hi: #fff4d8; --k-gold-lo: #9a7a4a; --k-blood: #b8602a; }
+body.u63[data-diff="black"] { --k-gold: #a9cfe8; --k-gold-hi: #e6f4ff; --k-gold-lo: #46688a; --k-blood: #2a6aa8; --k-soul: #8fd0ff; --k-text: #dfe8ee; --k-dim: #8fa0ae; }
+body.u63[data-diff="void"] { --k-gold: #ff8a7a; --k-gold-hi: #ffd8d0; --k-gold-lo: #8a2a2a; --k-blood: #ff2a2a; --k-soul: #ff9aa0; --k-text: #f0d8d4; --k-dim: #a88884; }
+body.u63[data-diff="black"] #vign { box-shadow: inset 0 0 160px rgba(20,60,110,.35); }
+body.u63[data-diff="void"] #vign { box-shadow: inset 0 0 180px rgba(120,0,10,.45); }
 /* @@END */

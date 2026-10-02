@@ -70,7 +70,9 @@ window.Gear2 = (() => {
   const name = o => { const g = o.g2; if (!g) return ''; if (g.un) return g.un; return (g.pre || '') + SL[g.s].nm[g.t - 1] + (g.suf || ''); };
   const fmt = (k, v) => { const a = AF[k]; return `${a[0]} ${a[4] === -1 ? '-' : '+'}${v}${a[3] || ''}`; };
   function rollRar(r, lv, bonus) { const u = r() - (bonus || 0) * 0.12; return u < 0.006 + lv * 0.006 ? 4 : u < 0.04 + lv * 0.018 ? 3 : u < 0.14 + lv * 0.03 ? 2 : u < 0.4 + lv * 0.04 ? 1 : 0; }
-  function rollOne(r, lv, bonus) { const ks = Object.keys(SL), s = ks[Math.floor(r() * ks.length)], t = Math.floor(lv * 0.62 + r() * 1.7 + (bonus || 0)) + 1; return make(s, t, rollRar(r, lv, bonus)); }
+  function rollOne(r, lv, bonus) { const ks = Object.keys(SL), s = ks[Math.floor(r() * ks.length)], t = Math.floor(lv * 0.62 + r() * 1.7 + (bonus || 0)) + 1, rar = rollRar(r, lv, bonus); return make(s, clampT(t, rar), rar); }
+  const plv0 = () => { try { return G.st().lv || 1; } catch (e) { return 1; } };
+  function clampT(t, rar) { const lim = plv0() + 6; while (t > 1 && Math.max(1, (t - 1) * 7 + rar * 2 - 4) > lim) t--; return t; } // R64：掉落需要等级不超过玩家等级+6
   function rollLoot(r, kind, lv, extra) {
     if (!on()) return null; const out = [];
     const p = { chest: 0.4, rack: 0.12, crate: 0.1, barrel: 0.04, basket: 0.05, bucket: 0.04 }[kind];
@@ -84,8 +86,8 @@ window.Gear2 = (() => {
   }
   function dropFor(rec, rar, pos, id) {
     if (!on()) return ''; let o;
-    if (id && UNQ[id]) { const u = UNQ[id]; o = make(u[0], id === 'moon' ? 6 : Math.min(6, 2 + Math.round(Math.log(rec / 60) / Math.log(2.2))), 5, u[2]); o.g2.un = u[1]; o.g2.lore = u[3]; o.g2.req = 1; }
-    else { const lv = Math.min(9, Math.log(Math.max(40, rec) / 40) / Math.log(1.45)); o = rollOne(Math.random, lv, 1.5); if ((o.g2.rar | 0) < (rar | 0)) { const n = make(o.g2.s, o.g2.t, rar); o = n; } }
+    if (id && UNQ[id]) { const u = UNQ[id]; o = make(u[0], id === 'moon' ? 6 : Math.min(6, 2 + Math.round(Math.log(rec / 60) / Math.log(2.2))), 5, u[2]); o.g2.un = u[1]; o.g2.lore = u[3]; o.g2.req = Math.max(1, (o.g2.t - 1) * 6); }
+    else { const lv = Math.min(9, Math.log(Math.max(40, rec) / 40) / Math.log(1.45)); o = rollOne(Math.random, lv, 1.5); if ((o.g2.rar | 0) < (rar | 0)) { const n = make(o.g2.s, clampT(o.g2.t, rar), rar); o = n; } }
     const w = give(o); try { G.toast(`${SL[o.g2.s].ic} 获得【${RARN[o.g2.rar]}】${name(o)}${w === 'stash' ? '（送回洞里储物箱）' : '（在麻袋里）'}`, RARC[o.g2.rar], 3); } catch (e) { }
     return name(o);
   }

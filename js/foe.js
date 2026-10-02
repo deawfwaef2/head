@@ -358,6 +358,7 @@ window.Foe = (() => {
       if (window.FoeAI2) FoeAI2.init(fo, r, it, ctx); // R34：区域强度缩放 + 词缀
       if (window.Persona) Persona.apply(fo, r); // 第二十四轮：人设（在职业之后：标题里带职业名）
       if (window.Living) try { Living.foe(fo, it); } catch (e) { console.warn('Living.foe', e); } // R54g：等级/阶位
+      if (window.Diff && Diff.hp() !== 1) { fo.maxHp = fo.hp = Math.max(1, Math.round(fo.maxHp * Diff.hp())); } // R64 难度：敌人生命
       FOES.push(fo); out.push(fo);
     }
     if (!keep) evict(used, 5); prewarm(ctx, keep); { const seenB = new Set(); for (const fo of FOES) if (!seenB.has(fo.f.bodyName)) { seenB.add(fo.f.bodyName); sevWarm(fo); } }

@@ -87,14 +87,17 @@ window.Nemesis = (() => {
     s.extra.push({ n: nm, h: JSON.parse(JSON.stringify(fo.h)), lv: (fo.lvl || plv()) + 1, t: Math.max(1, fo.tier || 1), at: s.play });
     try { G().toast(`👁 ${nm} 记住了你的脸——她成了你的新宿敌，会变强并找上门来`, '#ffb0a0', 3.4); } catch (e) { }
   }
+  // R64：宿敌强度随仇恨值上升（仇恨 = 你放倒/斩首的人越多越高；也随时间连续涨）
+  const hateNow = () => { try { return (window.Hunters2 && Hunters2.SS && Hunters2.SS().hate) || 0; } catch (e) { return 0; } };
+  const hateHp = () => (1 + Math.min(3.5, hateNow() / 40)) * (window.Diff ? Diff.hp() : 1), hateDmg = () => 1 + Math.min(1.8, hateNow() / 55);
   async function extraStrike() {
     const w = W(), s = S(), C = window.Foe && Foe.ctx(); if (!w || !C || !w.B || C.sc !== w.B.sc || !(s.extra && s.extra.length)) return false;
     const i = Math.floor(Math.random() * s.extra.length), x = s.extra[i], grow = Math.floor((s.play - x.at) / 300);
     const a = Math.random() * 6.28, pos = new THREE.Vector3(w.pos.x + Math.sin(a) * 11, 0, w.pos.z + Math.cos(a) * 11); if (w.B.lp && w.B.lp.clamp) w.B.lp.clamp(pos, 1.5); else { const r = Math.hypot(pos.x, pos.z), lim = (w.B.R || 20) - 3; if (r > lim) { pos.x *= lim / r; pos.z *= lim / r; } }
     const fa0 = window.__forceAff, naf = window.NemStory ? NemStory.aff('x:' + x.n) : []; if (naf.length) window.__forceAff = naf; let out; try { out = await Foe.populate(C, [{ h: x.h, pos }], { keep: true }); } finally { window.__forceAff = fa0; } const fo = out && out[0]; if (!fo) return false;
-    const lv = x.lv + grow, d = lv - plv(); fo.lvl = lv; fo.tier = Math.min(3, x.t + (grow >= 2 ? 1 : 0)); fo.maxHp = fo.hp = Math.round((26 + fo.rar * 16) * 1.8 * Math.max(0.8, Math.min(4, Math.pow(1.1, d)))); fo.dmgMul = Math.max(0.8, Math.min(3, Math.pow(1.07, d))) * 1.15;
+    const lv = x.lv + grow, d = lv - plv(); fo.lvl = lv; fo.tier = Math.min(3, x.t + (grow >= 2 ? 1 : 0)); fo.maxHp = fo.hp = Math.round((26 + fo.rar * 16) * 3.2 * hateHp() * Math.max(0.8, Math.min(4, Math.pow(1.1, d)))); fo.dmgMul = Math.max(0.8, Math.min(3, Math.pow(1.07, d))) * 1.15 * hateDmg();
     fo.brave = true; fo.iq = 1.25; fo.nemX = 1; fo.nemIdx = x.n; fo.seen = true; fo.state = 'chase'; fo._liv = 1; if (!w.foes) w.foes = Foe.foes; else if (!w.foes.includes(fo)) w.foes.push(fo); if (window.NemStory) try { NemStory.apply(fo, 'x:' + x.n, C, pos); } catch (e) { console.warn('NemStory apply', e); } /* R57 */
-    try { G().toast(`🩸 宿敌「${x.n}」追来了 · Lv.${lv}${grow ? `（比上次强了 ${grow} 级）` : ''}`, '#ff9a8a', 3.4); SFX.roar && SFX.roar(0.5); } catch (e) { }
+    try { G().toast(`🩸 宿敌「${x.n}」追来了 · Lv.${lv}${grow ? `（比上次强了 ${grow} 级）` : ''}${window.Diff && Diff.voice('nem') ? ' · ' + Diff.voice('nem') : ''}`, '#ff9a8a', 3.4); SFX.roar && SFX.roar(0.5); } catch (e) { }
     return true;
   }
   async function strike(reason) {
@@ -107,18 +110,18 @@ window.Nemesis = (() => {
   }
   function tick() {
     if (!G() || !G().S) return; const s = S(), w = W(), dt = 1;
-    if (G().playing) { s.play += dt; if (onN() && window.Hunters2 && Hunters2.SS) { const H2 = Hunters2.SS(), stp = Hunters2.HATE_STEP || 15, b0 = Math.floor(H2.hate / stp); H2.hate += stp / 480 * dt; /* 每 8 分钟 +1 级，改成每秒连续积累（条可见） */ if (Math.floor(H2.hate / stp) > b0) { s.grow = s.play; try { G().toast(window.NemStory && NemStory.on() ? '🩸 宿敌们在你看不见的地方又变强了——下次出猎时，你会看到发生了什么' : '🩸 宿敌们在你看不见的地方又变强了（猎手全体 +1 级）', '#ff9a8a', 2.8); } catch (e) { } } } }
+    if (G().playing) { s.play += dt; if (onN() && window.Hunters2 && Hunters2.SS) { const H2 = Hunters2.SS(), stp = Hunters2.HATE_STEP || 15, b0 = Math.floor(H2.hate / stp); H2.hate += stp / 480 * dt * (window.Diff ? Diff.nem() : 1); /* 每 8 分钟 +1 级，改成每秒连续积累（条可见） */ if (Math.floor(H2.hate / stp) > b0) { s.grow = s.play; try { G().toast(window.NemStory && NemStory.on() ? '🩸 宿敌们在你看不见的地方又变强了——下次出猎时，你会看到发生了什么' : '🩸 宿敌们在你看不见的地方又变强了（猎手全体 +1 级）', '#ff9a8a', 2.8); } catch (e) { } } } }
     if (w !== wasW) { // 出发 / 回洞
       if (w && !wasW) { plan = onN() ? { first: s.p >= 100 || Math.random() * 100 < s.p, next: performance.now() / 1000 + 240 + Math.random() * 180, enteredAt: 0 } : null; s.p = 0; if (onR()) { s.act = s.buff || null; s.buff = null; } }
       if (!w && wasW) { s.act = null; plan = null; }
       wasW = w;
     }
-    if (!w) { if (onN() && G().playing && !G().uiOpen) { s.p = Math.min(100, s.p + 100 / 300 * (LP() ? LP().nemRate() : 1)); chipUI(true); } else chipUI(!!(onN() && G().playing)); inject(); return; }
+    if (!w) { if (onN() && G().playing && !G().uiOpen) { s.p = Math.min(100, s.p + 100 / 300 * (LP() ? LP().nemRate() : 1) * (window.Diff ? Diff.nem() : 1)); chipUI(true); } else chipUI(!!(onN() && G().playing)); inject(); return; }
     { const nb = document.getElementById('nemBuff'); if (nb) nb.remove(); } /* R57 */
     const boss = LP() && LP().isBossTrip(); chipUI(onN() && !boss);
     if (!plan || !onN() || boss) return; const now = performance.now() / 1000;
     if (w.busy || !w.B || w.B.corr) { plan.enteredAt = 0; return; } if (!plan.enteredAt) plan.enteredAt = now;
-    if (LP() && G().playing && !w.dead) s.p = Math.min(100, s.p + 100 / 420 * LP().nemRate()); // R54i：出猎时逼近也在涨（满了就来），不只是洞里
+    if (LP() && G().playing && !w.dead) s.p = Math.min(100, s.p + 100 / 420 * LP().nemRate() * (window.Diff ? Diff.nem() : 1)); // R54i：出猎时逼近也在涨（满了就来），不只是洞里
     if (plan.first && now - plan.enteredAt > 6) { plan.first = false; strike('first').catch(() => { }); }
     else if (LP() && s.p >= 100 && now - plan.enteredAt > 8) { s.p = 0; strike('meter').then(ok => { if (!ok) s.p = 90; }).catch(() => { }); }
     else if (!LP() && now > plan.next && now - plan.enteredAt > 10) { plan.next = now + 240 + Math.random() * 180; strike('periodic').catch(() => { }); }

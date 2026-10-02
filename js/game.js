@@ -152,6 +152,18 @@ window.startGame = function () {
     if (rec.calm) y *= 1.5; // 通灵后安抚
     return y;
   }
+  // R64：鼠标悬停首级时显示她能产出的魂晶（回合结算）和 SAN（每秒）
+  function yieldLine(h) {
+    try {
+      const s = st(), pos = h.g.position, aura = auraMul(pos) * (window.Props ? Props.auraMul(pos) : 1) * beaconMul(h) * (h.buff && h.buff > clock.elapsedTime ? 2 : 1), base = h.yield * s.yieldMul * globalMul() * aura;
+      const mt = h.mount, d = mt && CAT[mt.type], sp = mt && window.San && San.spec ? San.spec(mt.type) : null, roundOn = window.Loop && Loop.rOn && Loop.rOn();
+      let coin = 0, why = '';
+      if (roundOn && Loop.hv) { const f = d && Loop.bf ? Loop.bf(d) : 0; coin = f ? Math.round(Loop.hv(h) * f * aura) : 0; if (!mt) why = '（挂到建筑上才结算）'; } else coin = Math.round(base * (sp ? sp.mult : 1));
+      let sanS = '';
+      if (window.San && San.live && San.live() && window.SAN_CFG && SAN_CFG.C) { const per = sp && sp.period ? Math.round(base * sp.mult * SAN_CFG.C.K) / sp.period : 0; sanS = ` · <span style="color:#8fe6ff">🌀 SAN ${per > 0 ? '≈ ' + SAN_CFG.fmt(per) + '/秒' : '0（挂到建筑上才产）'}</span>`; }
+      return `<br><small><span style="color:#ffd27a">🔮 ${coin > 0 ? '≈ ' + fmtN(coin) + (roundOn ? ' /回合结算' : ' /次') : '0'}${why}</span>${sanS}</small>`;
+    } catch (e) { return ''; }
+  }
   // 神魂 / 异色：环绕的魂光粒子
   const auraTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d'); const rg = g.createRadialGradient(16, 16, 0, 16, 16, 16); rg.addColorStop(0, 'rgba(255,255,255,1)'); rg.addColorStop(0.35, 'rgba(255,255,255,0.5)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(c); })();
   function makeAura(col, n) {
@@ -1384,7 +1396,7 @@ window.startGame = function () {
         let htip = null; for (const f of HOOK.tip) { try { htip = f(hit, held); } catch (e) {} if (htip) break; }
         if (htip) tip = htip;
         else if (held) tip = `手持「${NM(held.rec.c)}」 · <b>左键</b>把玩 · <b>滚轮</b>转向 · <b>V</b>换表情 · <b>E</b>放下/插桩 · <b>长按E</b>精确摆放 · <b>右键</b>扔 · <b>F</b>查看`;
-        else if (hit && hit.head) { const c = hit.head.rec.c; tip = `<span style="color:${RAR[c.rar].c}">【${RAR[c.rar].n}】</span>${c.shiny ? ' <span style="color:#ffe27a">✨异色</span>' : ''} <b>${NM(c)}</b>${c.title ? ` <small style="color:#e6c7a0">『${c.title}』</small>` : ''} · ${c.raceN}${c.idN}${(c.aff || []).length ? '<br><small>' + c.aff.map(k => RPG.AFF[k] ? RPG.affHTML(k, 'pill') : '').join('') + '</small>' : ''}<br><small>左键把玩 · E 拿起 · 长按E 摆放 · F 查看/回忆 · XX 碾碎</small>`; }
+        else if (hit && hit.head) { const c = hit.head.rec.c; tip = `<span style="color:${RAR[c.rar].c}">【${RAR[c.rar].n}】</span>${c.shiny ? ' <span style="color:#ffe27a">✨异色</span>' : ''} <b>${NM(c)}</b>${c.title ? ` <small style="color:#e6c7a0">『${c.title}』</small>` : ''} · ${c.raceN}${c.idN}${(c.aff || []).length ? '<br><small>' + c.aff.map(k => RPG.AFF[k] ? RPG.affHTML(k, 'pill') : '').join('') + '</small>' : ''}${yieldLine(hit.head)}<br><small>左键把玩 · E 拿起 · 长按E 摆放 · F 查看/回忆 · XX 碾碎</small>`; }
         else if (player.pos.distanceTo(cave.exitPos) < 2.6) tip = '<b>[E]</b> 离开洞窟，出去狩猎';
         else if (player.pos.distanceTo(cave.merchantPos) < 2.4) tip = '<b>[E]</b> 和地精行商斯尼克交易';
         else if (hit && hit.build) { const d = CAT[hit.build.type]; tip = `<b>${d.n}</b>` + (d.train ? ' · <b>[E]</b> 开始训练' : '') + (d.mount ? (() => { const n = hit.build.heads.length, k = hit.build.heads.filter(Boolean).length; return (k ? ' · 左键把玩 · E 取下' : '') + (k < n ? ' · 手持首级按 E 插上' : '') + (n > 1 ? ` · ${k}/${n} 位` : ''); })() : '') + ' <small>· XX 拆除</small>'; }

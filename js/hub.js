@@ -28,6 +28,7 @@ window.Hub = (() => {
     { id: 'logs', g: 'world', ic: '📜', k: 'L', n: { zh: '狩猎日志', ja: '狩猟日誌', en: 'Hunt log' }, ui: 'logs', isOpen: () => uiTab() === 'logs', open: () => UI.openMenu('logs') },
     { id: 'build', g: 'world', ic: '🔨', k: 'B', n: { zh: '建造', ja: '建築', en: 'Build' }, ui: 'build', isOpen: () => uiTab() === 'build', open: () => UI.openMenu('build'), cave: 1 },
     { id: 'keys', g: 'sys', ic: '⌨', k: 'F1', n: { zh: '按键一览', ja: 'キー一覧', en: 'Key guide' }, isOpen: () => !!(window.KeyGuide && KeyGuide.isOpen), open: () => KeyGuide.open(), close: () => KeyGuide.close(), ok: () => !!window.KeyGuide },
+    { id: 'diff', g: 'sys', ic: '⚔', k: '', n: { zh: '难度', ja: '難易度', en: 'Difficulty' }, isOpen: () => !!(window.Diff && Diff.isOpen() && window.G && G.playing), open: () => Diff.open(), close: () => Diff.close(), ok: () => !!(window.Diff && Diff.on()) },
     { id: 'mods', g: 'sys', ic: '⚙', k: 'O', n: { zh: 'MOD 设置', ja: 'MOD設定', en: 'Mods' }, isOpen: () => !!(window.Mods && Mods.isOpen), open: () => Mods.open(), close: () => Mods.close(), ok: () => !!(window.Mods && Mods.open) }
   ];
   const avail = p => (!p.cave || !wild()) && (!p.ok || p.ok());
@@ -113,7 +114,9 @@ body.hubwheel #uiroot.on .modal{animation:u-modal-in .5s var(--u-ease),hhShine 1
     document.body.appendChild(rail);
     btn = document.createElement('button'); btn.id = 'hubBtn'; btn.setAttribute('data-noi18n', ''); btn.addEventListener('click', () => toggle()); document.body.appendChild(btn);
   }
-  let sig = '';
+  let sig = '', prevCid = null;
+  // 切页/关页时清掉遗留的悬浮提示（物品信息 / 技能信息）：鼠标停在格子上时面板被关，没有 mouseleave 就会一直留在屏幕上
+  function purge() { for (const id of ['skTip', 'g2Tip', 'tbTip']) { const e = document.getElementById(id); if (e && e.style.display !== 'none') e.style.display = 'none'; } try { window.Gear2 && Gear2.dollLeave && Gear2.dollLeave(); } catch (e) { } }
   function paint(cur) {
     const L = curLang(), g = G0(), S = g && g.S, st = S && g.st ? g.st() : null;
     const key = [L, cur && cur.id, wild(), S ? Math.floor(S.coins) : 0, st ? st.lv + ':' + st.power : ''].join('|'); if (key === sig) return; sig = key;
@@ -129,7 +132,7 @@ body.hubwheel #uiroot.on .modal{animation:u-modal-in .5s var(--u-ease),hhShine 1
   function sync() {
     if (!on()) { if (rail) rail.classList.remove('on'); document.body.classList.remove('hubon', 'hub'); if (btn) btn.style.display = 'none'; return; }
     build(); document.body.classList.add('hub'); document.body.classList.toggle('hubwheel', !!(window.Wheel && Wheel.enabled()));
-    const cur = openPage(); rail.classList.toggle('on', !!cur); document.body.classList.toggle('hubon', !!cur); for (const c of [...document.body.classList]) if (c.startsWith('hubpg-') && (!cur || c !== 'hubpg-' + cur.id)) document.body.classList.remove(c); if (cur) document.body.classList.add('hubpg-' + cur.id);
+    const cur = openPage(); { const cid = cur ? cur.id : null; if (cid !== prevCid) { prevCid = cid; purge(); } } rail.classList.toggle('on', !!cur); document.body.classList.toggle('hubon', !!cur); for (const c of [...document.body.classList]) if (c.startsWith('hubpg-') && (!cur || c !== 'hubpg-' + cur.id)) document.body.classList.remove(c); if (cur) document.body.classList.add('hubpg-' + cur.id);
     if (cur) { paint(cur); if (cur.id !== 'mods' && cur.id !== 'keys') { last = cur.id; } }
     chrome(cur);
     const g = G0(), show = !cur && g && g.playing && !g.uiOpen && !(window.Worlds && Worlds._W && (Worlds._W.busy || Worlds._W.dead));
