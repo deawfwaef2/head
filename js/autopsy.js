@@ -566,7 +566,7 @@ if ( vTw < -2.5 ) {
       snap(); const np = { sets, pts: p.part.pts.map(x => ({ p: x.p.slice(), a: x.a })), bones: (p.part.bones || []).map(b => ({ a: b.a.slice(), b: b.b.slice(), r: b.r })), rig: keepRig ? cloneRig(p.part.rig) : null, bb: bbOf(sets) };
       const pos = p.obj.position.clone(), q = p.obj.quaternion.clone(), tk = p.take, was = p.rb.sleep; removePiece(p); const n = addPiece(np, pos, q); n.take = tk; n.rb.sleep = was; ui(); if (reselect && sets[si]) edSelect(n, si, tri); return n;
     }
-    const wearBand = (sets, si, tris) => { const q = sets[si]; if (!q.cloth || q.bandOf || q.hid || st.linen) return; const I = []; for (const t of tris) I.push(q.I[3 * t], q.I[3 * t + 1], q.I[3 * t + 2]); const b = bandSet(Object.assign({}, q, { I })); if (b) { b.bandOf = '编辑'; b.nm = q.nm + '·底衬'; sets.push(b); } };
+    const wearBand = () => { }; // 删衣服不再自动生成底衬（用户嫌挡视野）
     function edDye(hex) {
       const E = st.ed.sel; if (!E) { toast('先点选一块网格'); return; } if (hex) st.ed.color = hex; const c = new T.Color(st.ed.color), flat = st.ed.mode === 'flat';
       edEdit(E, sets => { const q = sets[E.si]; for (const v of E.vs) { const o = v * S; if (q.V[o + 14] < 0 && q.V[o + 14] > -2.5) continue; if (q.V[o + 14] < -2.5) q.V[o + 14] = 0; q.V[o + 6] = c.r; q.V[o + 7] = c.g; q.V[o + 8] = c.b; q.V[o + 9] = c.r; q.V[o + 10] = c.g; q.V[o + 11] = c.b; if (flat) q.V[o + 14] = 0; } }, true, true);
@@ -612,7 +612,7 @@ if ( vTw < -2.5 ) {
       for (const p of st.pieces.slice()) { const sets = []; let ch = false;
         for (const s of p.part.sets) { const cp = { V: s.V.slice(), I: s.I.slice(), skin: s.skin, cap: s.cap, cloth: s.cloth, nm: s.nm, map: s.map, at: s.at, rg: s.rg, hid: s.hid, bandOf: s.bandOf };
           if (s.bandOf === key && !hiding) { ch = true; continue; }
-          if (s.cloth && !s.bandOf && wdKey(s) === key && !!s.hid !== hiding) { ch = true; cp.hid = hiding; sets.push(cp); if (hiding) { const b = bandSet(cp); if (b) sets.push(b); } continue; }
+          if (s.cloth && !s.bandOf && wdKey(s) === key && !!s.hid !== hiding) { ch = true; cp.hid = hiding; sets.push(cp); continue; }
           sets.push(cp); }
         if (!ch) continue; changed++; const np = { sets, pts: p.part.pts.map(x => ({ p: x.p.slice(), a: x.a })), bones: (p.part.bones || []).map(b => ({ a: b.a.slice(), b: b.b.slice(), r: b.r })), rig: cloneRig(p.part.rig), bb: bbOf(sets) };
         const pos = p.obj.position.clone(), q = p.obj.quaternion.clone(), tk = p.take, was = p.rb.sleep; removePiece(p); const n = addPiece(np, pos, q); n.take = tk; n.rb.sleep = was; }
