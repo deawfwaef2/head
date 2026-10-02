@@ -80,9 +80,9 @@ window.Nemesis = (() => {
     const w = W(), s = S(), C = window.Foe && Foe.ctx(); if (!w || !C || !w.B || C.sc !== w.B.sc || !(s.extra && s.extra.length)) return false;
     const i = Math.floor(Math.random() * s.extra.length), x = s.extra[i], grow = Math.floor((s.play - x.at) / 300);
     const a = Math.random() * 6.28, pos = new THREE.Vector3(w.pos.x + Math.sin(a) * 11, 0, w.pos.z + Math.cos(a) * 11); if (w.B.lp && w.B.lp.clamp) w.B.lp.clamp(pos, 1.5); else { const r = Math.hypot(pos.x, pos.z), lim = (w.B.R || 20) - 3; if (r > lim) { pos.x *= lim / r; pos.z *= lim / r; } }
-    const out = await Foe.populate(C, [{ h: x.h, pos }], { keep: true }); const fo = out && out[0]; if (!fo) return false;
+    const fa0 = window.__forceAff, naf = window.NemStory ? NemStory.aff('x:' + x.n) : []; if (naf.length) window.__forceAff = naf; let out; try { out = await Foe.populate(C, [{ h: x.h, pos }], { keep: true }); } finally { window.__forceAff = fa0; } const fo = out && out[0]; if (!fo) return false;
     const lv = x.lv + grow, d = lv - plv(); fo.lvl = lv; fo.tier = Math.min(3, x.t + (grow >= 2 ? 1 : 0)); fo.maxHp = fo.hp = Math.round((26 + fo.rar * 16) * 1.8 * Math.max(0.8, Math.min(4, Math.pow(1.1, d)))); fo.dmgMul = Math.max(0.8, Math.min(3, Math.pow(1.07, d))) * 1.15;
-    fo.brave = true; fo.iq = 1.25; fo.nemX = 1; fo.nemIdx = x.n; fo.seen = true; fo.state = 'chase'; fo._liv = 1; if (!w.foes) w.foes = Foe.foes; else if (!w.foes.includes(fo)) w.foes.push(fo);
+    fo.brave = true; fo.iq = 1.25; fo.nemX = 1; fo.nemIdx = x.n; fo.seen = true; fo.state = 'chase'; fo._liv = 1; if (!w.foes) w.foes = Foe.foes; else if (!w.foes.includes(fo)) w.foes.push(fo); if (window.NemStory) try { NemStory.apply(fo, 'x:' + x.n, C, pos); } catch (e) { console.warn('NemStory apply', e); } /* R57 */
     try { G().toast(`🩸 宿敌「${x.n}」追来了 · Lv.${lv}${grow ? `（比上次强了 ${grow} 级）` : ''}`, '#ff9a8a', 3.4); SFX.roar && SFX.roar(0.5); } catch (e) { }
     return true;
   }
@@ -96,7 +96,7 @@ window.Nemesis = (() => {
   }
   function tick() {
     if (!G() || !G().S) return; const s = S(), w = W(), dt = 1;
-    if (G().playing) { s.play += dt; if (onN() && s.play - s.grow >= 480 && window.Hunters2 && Hunters2.SS) { s.grow = s.play; const H2 = Hunters2.SS(); H2.hate += Hunters2.HATE_STEP || 15; try { G().toast('🩸 宿敌们在你看不见的地方又变强了（猎手全体 +1 级）', '#ff9a8a', 2.8); } catch (e) { } } }
+    if (G().playing) { s.play += dt; if (onN() && s.play - s.grow >= 480 && window.Hunters2 && Hunters2.SS) { s.grow = s.play; const H2 = Hunters2.SS(); H2.hate += Hunters2.HATE_STEP || 15; try { G().toast(window.NemStory && NemStory.on() ? '🩸 宿敌们在你看不见的地方又变强了——下次出猎时，你会看到发生了什么' : '🩸 宿敌们在你看不见的地方又变强了（猎手全体 +1 级）', '#ff9a8a', 2.8); } catch (e) { } } }
     if (w !== wasW) { // 出发 / 回洞
       if (w && !wasW) { plan = onN() ? { first: s.p >= 100 || Math.random() * 100 < s.p, next: performance.now() / 1000 + 240 + Math.random() * 180, enteredAt: 0 } : null; s.p = 0; if (onR()) { s.act = s.buff || null; s.buff = null; } }
       if (!w && wasW) { s.act = null; plan = null; }

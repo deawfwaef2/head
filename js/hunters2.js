@@ -66,11 +66,11 @@ window.Hunters2 = (() => {
       const pos = V3().set(best[0], 0, best[1]);
       banner(d.ic + ' ' + d.n + ' 穿越而来', d.t + ' · Lv.' + L + ' · 战力 ' + rec, '她在的时候，所有的门都被封死了', d.col);
       try { SFX.roar && SFX.roar(0.8); } catch (e) { }
-      const fr = window.__forceRole, fa = window.__forceAff; window.__forceRole = d.role; window.__forceAff = d.aff.concat(SS().L[id].esc >= 2 ? ['frenzy'] : []);
+      const fr = window.__forceRole, fa = window.__forceAff; window.__forceRole = d.role; window.__forceAff = d.aff.concat(SS().L[id].esc >= 2 ? ['frenzy'] : [], window.NemStory ? NemStory.aff('h:' + id) : []); /* R57 nem_story：祝福词缀 */
       let out; try { out = await Foe.populate(C, [{ h, pos }], { keep: true }); } finally { window.__forceRole = fr; window.__forceAff = fa; }
       const fo = out && out[0]; if (!fo) { T.spawning = false; return; }
       fo.absRec = rec; fo.hunter2 = id; fo.maxHp = fo.hp = Math.round(window.FoeAbs && FoeAbs.on ? HP0 * FoeAbs.hpK(rec) * (d.aff.length ? 1.3 : 1) : HP0 + L * 14);
-      fo.iq = 1.25; fo.tier = 0.95; fo.brave = true; fo.seen = true; fo.state = 'chase'; fo.cd = 1 + Math.random(); fo.dmgMul = (fo.dmgMul || 1) * 1.15; fo.spdMul = (fo.spdMul || 1) * 1.08; fo.skPool = d.sk.length ? d.sk : null; fo.skCd = 1.5;
+      fo.iq = 1.25; fo.tier = 0.95; fo.brave = true; fo.seen = true; fo.state = 'chase'; fo.cd = 1 + Math.random(); fo.dmgMul = (fo.dmgMul || 1) * 1.15; fo.spdMul = (fo.spdMul || 1) * 1.08; fo.skPool = d.sk.length ? d.sk : null; fo.skCd = 1.5; if (window.NemStory) try { NemStory.apply(fo, 'h:' + id, C, pos); } catch (e) { console.warn('NemStory apply', e); } /* R57 nem_story：剧情成长落到属性 */
       if (W.foes && !W.foes.includes(fo)) W.foes.push(fo); else if (!W.foes) W.foes = [fo];
       T.m = 0; T.armedAt = 0; // R43：猎手一到场，感应条就清零（以前要等她死/逃/撤退才归零，条一直满着）
       T.fo = fo; T.id = id; T.spawnAt = performance.now(); T.fleeAt = 0; T.sayT = 2; SS().L[id].meet++;
@@ -136,7 +136,7 @@ window.Hunters2 = (() => {
         banner('☠ 猎手陨落', d.n + ' · ' + d.t, `她再也不会回来了（剩余猎手 ${alive().length}/4） · +${c}🔮 · 别忘了带走她的首级`, '#ff8a70'); try { G.save(); } catch (e) { } endEncounter();
       } else if (!fo.dead) {
         T.sayT -= dt; if (T.sayT <= 0) { T.sayT = 7 + Math.random() * 6; say(fo, d.lines[1 + Math.floor(Math.random() * (d.lines.length - 2))]); }
-        if (!T.fleeAt && fo.hp <= fo.maxHp * FLEE_AT) { T.fleeAt = now; fo.state = 'flee'; fo.brave = false; fo.spdMul = (fo.spdMul || 1) * 1.35; fo.atk = null; say(fo, d.lines[d.lines.length - 1]); try { G.toast(`⚠ ${d.n} 要逃了！${FLEE_T} 秒内打倒她，否则她会变得更强！`, '#ffd070', 2.4); } catch (e) { } }
+        if (!T.fleeAt && fo.hp <= fo.maxHp * (fo.nsVow ? 0.16 : FLEE_AT)) { T.fleeAt = now; fo.state = 'flee'; fo.brave = false; fo.spdMul = (fo.spdMul || 1) * 1.35; fo.atk = null; say(fo, d.lines[d.lines.length - 1]); try { G.toast(`⚠ ${d.n} 要逃了！${FLEE_T} 秒内打倒她，否则她会变得更强！`, '#ffd070', 2.4); } catch (e) { } }
         if (T.fleeAt) { fo.state = 'flee'; if (now - T.fleeAt > FLEE_T * 1000) { const L0 = lvOf(T.id); s.L[T.id].esc++; vanish(fo); banner('💨 ' + d.n + ' 逃走了', `Lv.${L0} → Lv.${lvOf(T.id)}（逃脱成长）`, '她会带着更强的力量回来。下次要在她逃跑前一口气打完。', d.col); try { G.save(); } catch (e) { } endEncounter(); } }
         else if (now - T.spawnAt > STAY_T * 1000) { vanish(fo); s.L[T.id].wd++; banner('…' + d.n + ' 暂时撤退了', '门的封锁解除了', '她没有变强，但她还会再来。', '#c8c8c8'); endEncounter(); }
       } else endEncounter();
@@ -244,5 +244,5 @@ ${dead ? '' : `<div class="r3-odds" style="--oc:${oc(o.p)}"><div class="row"><sp
 
   wrap(); setTimeout(wrap, 0); addEventListener('load', wrap);
   setInterval(() => { try { tick(); } catch (e) { console.warn('Hunters2 tick', e); } }, 100);
-  return { on, D, BY, SS, lvOf, powOf, odds, alive, spawn: id => spawn(id), rollOmen, ambush, cur, infamy: k => (SS().reg && SS().reg[k]) || 0, toggle, get T() { return T; }, HATE_STEP };
+  return { on, D, BY, SS, recFor, lvOf, powOf, odds, alive, spawn: id => spawn(id), rollOmen, ambush, cur, infamy: k => (SS().reg && SS().reg[k]) || 0, toggle, get T() { return T; }, HATE_STEP };
 })();

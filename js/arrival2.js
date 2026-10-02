@@ -160,7 +160,7 @@ ${el.length ? `<div>👑 可挑战的精英：${el.map(d => `<b style="color:${d
     const nd = W.graph.nodes[W.cur]; if (nd && !nd.eliteArena && !nd.huntArena) T.deep = Math.max(T.deep, nd.depth || 0);
     if (!T.shown && !W.busy && W.B) {
       T.shown = true;
-      setTimeout(() => { if (!T || (window.Elites && Elites.E) || (nd && nd.eliteArena)) return; const W2 = window.Worlds && Worlds._W; if (!W2 || W2.graph.arena || W2.graph.nodes[W2.cur].eliteArena) return; const go = () => { if (!T) return; if (window.Saga && Saga.cine) { setTimeout(go, 400); return; } open(); }; go(); }, 700); // R54m：用户最喜欢的到达大窗口回来了（剧情电影播完再弹）
+      setTimeout(() => { if (!T || (window.Elites && Elites.E) || (nd && nd.eliteArena)) return; const W2 = window.Worlds && Worlds._W; if (!W2 || W2.graph.arena || W2.graph.nodes[W2.cur].eliteArena) return; const t0 = performance.now(), go = () => { if (!T || isOpen()) return; const busy = (window.Saga && (Saga.cine || (Saga.pendingCine && Saga.pendingCine()))) || (window.NemStory && NemStory.hold()) || document.body.classList.contains('sgcine'); if (busy && performance.now() - t0 < 40000) { setTimeout(go, 400); return; } const W3 = window.Worlds && Worlds.active && Worlds._W; if (!W3 || W3.dead) return; open(); }; go(); }, 700); /* R57 修：以前只在 700ms 时检查一次 Saga.cine，地区电影（猎手伏击会推迟到 9s）晚开时窗口先弹出、被电影盖住，按空格翻电影时被“隐形”关掉 → 看起来“电影后不出开始框”；现在等电影/宿敌插曲真正播完 */ // R54m：用户最喜欢的到达大窗口回来了（剧情电影播完再弹）
     }
     for (const x of T.side) {
       if (x.done) continue; const [a, b] = SQ[x.t].prog(x.q, W);

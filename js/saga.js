@@ -158,6 +158,8 @@ window.Saga = (() => {
     switch (type) {
       case 'cEyes': return shot(u => { const { h, f, side } = live(); const d = 0.5 - u * 0.08; return [h.x + f.x * d + side.x * 0.06, h.y + 0.02, h.z + f.z * d + side.z * 0.06]; }, u => { const { h, f, side } = live(), c = [h.x + f.x * (0.5 - u * 0.08) + side.x * 0.06, 0, h.z + f.z * (0.5 - u * 0.08) + side.z * 0.06], dx = h.x - c[0], dz = h.z - c[2], d = Math.hypot(dx, dz) || 1, k = 0.11; return [h.x + dz / d * k, h.y + 0.035, h.z - dx / d * k]; }, [24, 17], 0.02 * sgn);
       case 'cHand': return shot(u => { const { h, f, side } = live(); let t = h; try { if (hs) { hs.updateWorldMatrix(true, false); t = new V(); hs.getWorldPosition(t); } else t = new V(h.x, h.y - 0.55, h.z); } catch (e) { } return [t.x + f.x * 0.85 + side.x * 0.45 * sgn * (1 - u * 0.4), t.y + 0.22, t.z + f.z * 0.85 + side.z * 0.45 * sgn * (1 - u * 0.4)]; }, u => { const { h } = live(); let t = new V(h.x, h.y - 0.55, h.z); try { if (hs) { hs.getWorldPosition(t); } } catch (e) { } return [t.x, t.y, t.z]; }, [44, 36], -0.04 * sgn);
+      case 'cTwo': if (fo.pair) { const B2 = fo.pair; return shot(u => { const a = headOf(fo), b2 = headOf(B2), m = a.clone().add(b2).multiplyScalar(0.5), dx = b2.x - a.x, dz = b2.z - a.z, dl = Math.hypot(dx, dz) || 1, nx = -dz / dl, nz = dx / dl, F = frontOf(fo), s0 = (nx * F.x + nz * F.z) >= 0 ? 1 : -1, d = 2.5 - u * 0.35, sl = (u - 0.5) * 0.5 * sgn; return [m.x + nx * d * s0 + dx / dl * sl, m.y - 0.05, m.z + nz * d * s0 + dz / dl * sl]; }, u => { const a = headOf(fo), b2 = headOf(B2); return [(a.x + b2.x) / 2, (a.y + b2.y) / 2 - 0.12, (a.z + b2.z) / 2]; }, [44, 38], 0); } /* fallthrough */
+      case 'cOS': if (fo.pair) { const B2 = fo.pair; return shot(u => { const a = headOf(B2), b2 = headOf(fo), dx = b2.x - a.x, dz = b2.z - a.z, dl = Math.hypot(dx, dz) || 1, ux = dx / dl, uz = dz / dl, k = 0.42 + u * 0.04; return [a.x - ux * 0.55 - uz * k * sgn, a.y + 0.08, a.z - uz * 0.55 + ux * k * sgn]; }, u => { const b2 = headOf(fo); return [b2.x, b2.y - 0.04, b2.z]; }, [36, 31], 0.01 * sgn); } /* fallthrough */
       case 'cLow': return shot(u => { const { h, f, side } = live(); const d = 2.3 - u * 0.5; return [fo.pos.x + f.x * d + side.x * 0.7 * sgn, fo.pos.y + 0.22, fo.pos.z + f.z * d + side.z * 0.7 * sgn]; }, u => { const { h } = live(); return [h.x, h.y - 0.35, h.z]; }, [62, 52], 0.06 * sgn);
       case 'cOver': return shot(u => { const { h, f, side } = live(); return [h.x - f.x * 0.9 + side.x * 0.5 * sgn, h.y + 0.12, h.z - f.z * 0.9 + side.z * 0.5 * sgn]; }, u => { const { h, f } = live(); return [h.x + f.x * 6, h.y - 0.1, h.z + f.z * 6]; }, [48, 40], 0.03 * sgn);
       default: { const cp = u => { const { h, f, side } = live(), d = 1.25 - u * 0.25; return [h.x + f.x * d + side.x * 0.22 * sgn, h.y + 0.05, h.z + f.z * d + side.z * 0.22 * sgn]; };
@@ -276,15 +278,25 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
     ensure(); sg.shown = true;
     const L = LOC(sg.k), beats = script(sg);
     try { const cast = castPick(sg), lv = sg.vis <= 2 ? 0 : sg.vis <= 5 ? 1 : 2, cb = castBeats(cast.slice(0, lv === 2 ? 1 : 2), lv); if (cb.length) { let ti = beats.findIndex(b => b.title); ti = ti < 0 ? 0 : ti; beats.splice(ti + 1, 0, ...cb); } } catch (e) { console.warn('Saga cast', e); }
+    return startCN(sg, beats, D.REG[sg.k] ? D.REG[sg.k].col : '#e7c27a', 700);
+  }
+  // R57 nem_story：通用短片播放器（宿敌插曲 / 人物起源），复用本电影的字幕/名牌/黑边/相机接管；beats 格式同 castBeats（castFo 必填），可加 card:{a,b,c} 标题卡
+  function reel(o) {
+    const W = window.Worlds && Worlds._W; if (!W || !W.B || CN || !o || !o.beats || !o.beats.length) return false; ensure();
+    const sg = { reel: 1, k: o.k || '', vis: 9, env: { sky: '' }, T: { n: '', title: '' }, onEnd: o.onEnd, onBeat: o.onBeat, shown: true };
+    return startCN(sg, o.beats, o.col || '#e7c27a', 450);
+  }
+  function startCN(sg, beats, col, delay) {
+    const g = G();
     CN = { sg, beats, bi: -1, t0: 0, bt: 0, shot: null, saved: [], done: false, wait: false, fov0: g.camera.fov, hid: [] };
-    root.style.setProperty('--tc', D.REG[sg.k] ? D.REG[sg.k].col : '#e7c27a'); root.classList.remove('flash');
+    root.style.setProperty('--tc', col); root.classList.remove('flash');
     const bh = Math.max(window.innerHeight * 0.085, (window.innerHeight - window.innerWidth / 2.39) / 2); root.style.setProperty('--bh', bh + 'px');
     try { g.setUI(true); } catch (e) { }
     // 隐藏 HUD / 第一人称武器
     document.body.classList.add('sgcine'); /* R49b：改用 body 类隐藏 HUD（不再改各元素的行内样式），电影结束/出错时由 tick 兜底移除 */
     try { for (const c of g.camera.children) { CN.saved.push([c, c.visible]); c.visible = false; } } catch (e) { }
     root.classList.add('on'); el.dots.innerHTML = beats.map(() => '<i></i>').join('');
-    setTimeout(() => CN && beginBeat(0), 700); CN.raf = requestAnimationFrame(loop);
+    setTimeout(() => CN && beginBeat(0), delay); CN.raf = requestAnimationFrame(loop);
     return true;
   }
   function shotFor(b) {
@@ -316,6 +328,8 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
       el.sb.querySelector('.e').textContent = '✧ ' + FX_TXT[A.bane][0] + (A.bane === 'hate' || A.bane === 'plunder' ? '' : ' · 持续 2 趟');
       el.sh.textContent = b.stake.head || ''; if (b.stake.head) el.sh.classList.add('on');
     }
+    if (b.card) { el.a.textContent = b.card.a || ''; el.b.textContent = b.card.b || ''; el.c.textContent = b.card.c || ''; setTimeout(() => CN && CN.bi === i && el.ttl.classList.add('on'), 350); setTimeout(() => CN && CN.bi === i && el.ttl.classList.remove('on'), Math.max(2600, b.dur * 1000 - 1100)); }
+    try { if (CN.sg.onBeat) CN.sg.onBeat(b, i); } catch (e) { console.warn('reel beat', e); }
     if (b.finale) { const T = CN.sg.T; el.a.textContent = '讨 伐'; el.b.textContent = T.n; el.c.textContent = `「${T.title}」`; setTimeout(() => CN && CN.bi === i && el.ttl.classList.add('on'), 1000); }
     el.txt.classList.remove('on'); el.who.classList.remove('on');
     CN.fadeOut = false;
@@ -337,14 +351,14 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
     if (t > b.dur) { if (CN.bi < CN.beats.length - 1) beginBeat(CN.bi + 1); else finishBeats(); }
   }
   function next() { if (!CN || CN.wait) { if (CN && CN.wait) end(); return; } const b = CN.beats[CN.bi]; if (!b) return; const t = (performance.now() - CN.t0) / 1000; if (t < 0.8) return; if (CN.bi >= CN.beats.length - 1) { if (t > b.dur - 0.2 || t > 3.2) finishBeats(); return; } beginBeat(CN.bi + 1); }
-  function finishBeats() { if (!CN || CN.wait) return; CN.wait = true; el.go.classList.add('on'); el.txt.classList.remove('on'); el.who.classList.remove('on'); const b = CN.beats[CN.beats.length - 1]; el.ttl.classList.add('on'); }
+  function finishBeats() { if (!CN || CN.wait) return; if (CN.sg.reel) return end(); CN.wait = true; el.go.classList.add('on'); el.txt.classList.remove('on'); el.who.classList.remove('on'); const b = CN.beats[CN.beats.length - 1]; el.ttl.classList.add('on'); }
   function end() {
     if (!CN) return; const c = CN; CN = null; cancelAnimationFrame(c.raf); window.__skipMenuUntil = performance.now() + 1500; // Esc 跳过会触发浏览器解锁鼠标，不要因此弹主菜单
     try { G().camera.fov = c.fov0; G().camera.updateProjectionMatrix(); } catch (e) { }
     root.classList.remove('on'); el.fade.style.opacity = '1';
     document.body.classList.remove('sgcine'); try { for (const [o, v] of c.saved) o.visible = v; } catch (e) { }
     try { G().setUI(false); G().lockPointer && G().lockPointer(); } catch (e) { }
-    c.sg.cinDone = true;
+    c.sg.cinDone = true; if (c.sg.onEnd) { try { c.sg.onEnd(); } catch (e) { console.warn('reel end', e); } }
     if (c.sg.chap && !c.sg.chapAwarded) awardChapter(c.sg);
   }
   addEventListener('keydown', e => {
@@ -528,12 +542,14 @@ ${rwHTML(sg, win)}<div class="go"><button data-sgok>收下结算 ▶</button></d
     if (!W || !on()) { if (trk) trk.style.display = 'none'; if (!W && T && !T.settled && !CN) { /* 非正常退出：不结算 */ } if (!W) T = null; return; }
     if (!T) return; const sg = T; if (!sg.node && !sg.noNode && W.B) pickNode(sg, W); if (sg.noNode) return;
     if (W.trip && W.stats) sg.snap = { coins: W.trip.coins || 0, kill: W.stats.kill || 0, decap: W.stats.decap || 0 };
+    if (!sg.readyAt && W.B && !W.busy) sg.readyAt = performance.now();
+    if (window.NemStory && NemStory.hold()) { track(W); return; } // R57 nem_story：宿敌插曲先播，地区电影等它
     let hold = false;
     if (sg.hunterId && !sg.hReady && !sg.shown && !W.busy && W.B) { // 猎手入场伏击：先让她出现在场上，再开电影介绍她
       if (!sg.hAt) { sg.hAt = performance.now(); try { Hunters2.ambush(sg.hunterId); } catch (e) { sg.hReady = true; } }
       if ((window.Hunters2 && Hunters2.cur()) || performance.now() - sg.hAt > 9000) { sg.hReady = true; sg.hAt2 = performance.now(); } else hold = true;
     }
-    if (!sg.shown && !hold && !W.busy && W.B && !CN) { setTimeout(() => { if (T === sg && !sg.cinDone && !CN && Worlds.active) { const nd = Worlds._W.graph.nodes[Worlds._W.cur]; if (nd && nd.eliteArena) return; try { play(sg); } catch (e) { console.warn('Saga play', e); try { end(); } catch (e2) { CN = null; document.body.classList.remove('sgcine'); } } } }, 700); sg.shown = true; }
+    if (!sg.shown && !hold && !W.busy && W.B && !CN) { setTimeout(() => { if (T === sg && !sg.cinDone && !CN && Worlds.active) { const nd = Worlds._W.graph.nodes[Worlds._W.cur]; if (nd && nd.eliteArena) { sg.cinDone = true; return; } try { play(sg); } catch (e) { console.warn('Saga play', e); try { end(); } catch (e2) { CN = null; document.body.classList.remove('sgcine'); } } } }, 700); sg.shown = true; }
     if (sg.fo && !sg.done) { if (sg.fo.dead || sg.fo.hp <= 0) onKill(sg); else if (sg.fo.escaped) { sg.esc = true; } }
     track(W);
   }
@@ -555,5 +571,5 @@ ${rwHTML(sg, win)}<div class="go"><button data-sgok>收下结算 ▶</button></d
     return `<div class="r3-goal" style="display:block;padding:14px 18px"><div style="font-size:20px;font-weight:900;color:#e8e0ff;letter-spacing:.2em">🌙 主线 · 月之魔女　${m ? '✔ 已斩杀' : cn >= D.NEED ? '· 神殿已开' : ''}</div><div style="margin:8px 0">${pips}<b style="font-size:20px;color:#fff;margin-left:8px">${cn}/${D.NEED}</b></div>${list || '<div style="font-size:15px;color:#b8a8d8">在各个地区斩下“月之使者”，或触发章节闪回，得到线索。集齐 7 条，月之魔女的神殿向你敞开。</div>'}</div>`;
   }
   const dbgBtn = null;
-  return { on, cam, get cine() { return CN; }, NEED: D.NEED, clues, giveClue, goalHTML, gen, script, play, end, next, resolve, onKill, SS, banner, showSettle, FX_TXT, _setT: v => { T = v; }, get T() { return T; }, hint: v => `🌙 月之线索 ${clues()}/${D.NEED} · 月之魔女 ${v.m ? '✔' : '✘'}` };
+  return { on, cam, reel, castShot: (t, fo) => castShot(t, fo), pendingCine: () => !!CN || !!(on() && T && !T.noNode && !T.cinDone && Worlds.active && (!T.readyAt || performance.now() - T.readyAt < 15000)), get cine() { return CN; }, NEED: D.NEED, clues, giveClue, goalHTML, gen, script, play, end, next, resolve, onKill, SS, banner, showSettle, FX_TXT, _setT: v => { T = v; }, get T() { return T; }, hint: v => `🌙 月之线索 ${clues()}/${D.NEED} · 月之魔女 ${v.m ? '✔' : '✘'}` };
 })();
