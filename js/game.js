@@ -732,9 +732,9 @@ window.startGame = function () {
     if (!held) return;
     const L = (window.ModelHeads && ModelHeads.FACES) || [];
     const base = [['半阖死寂', { blink: 0.55, aa: 0.12 }, [0, 0, 0, 0]], ['双目紧闭', { blink: 1, sad: 0.2 }, [0, 0, 0, 0]], ['颌骨松垂', { blink: 0.3, aa: 0.55, oh: 0.3 }, [0, 0, 0, 0]]];
-    const all = base.concat(L.map(f => [f.n, f.ex, f.fx])); // R62：V 键循环完整表情库（含泪痕 / 鼻血 / 口角血 / 淤青差分）
-    heldFace = (heldFace + 1) % all.length; const f = all[heldFace]; held.rec.look.ex = f[1]; held.rec.look.exT = f[0]; held.rec.look.fx = f[2].slice();
-    held.hb.setExpression && held.hb.setExpression(f[1]); held.hb.setFx && held.hb.setFx(f[2]); SFX.click(); toast(`表情：${f[0]} · 滚轮转向 · V 换表情`, '#e6c7a0', 1.6); save();
+    const all = base.concat(L.map(f => [f.n, f.ex, f.fx, f.rl || null, f.tg || 0])); // R62：V 键循环完整表情库（含泪痕 / 鼻血 / 口角血 / 淤青差分）；R68：+ 翻白眼 / 吐舌
+    heldFace = (heldFace + 1) % all.length; const f = all[heldFace]; held.rec.look.ex = f[1]; held.rec.look.exT = f[0]; held.rec.look.fx = f[2].slice(); held.rec.look.rl = f[3] || null; held.rec.look.tg = f[4] || 0;
+    held.hb.setExpression && held.hb.setExpression(f[1]); held.hb.setFx && held.hb.setFx(f[2]); held.hb.setRoll && held.hb.setRoll(...(f[3] || [0, 0])); held.hb.setTongue && held.hb.setTongue((f[4] || 0) * 0.04, 0, (f[4] || 0) * 0.3); SFX.click(); toast(`表情：${f[0]} · 滚轮转向 · V 换表情`, '#e6c7a0', 1.6); save();
   }
   function inspectLook() {
     const lh = lookHit() || {}; const h = held || lh.head || (lh.build ? nearestHead(lh.build, lh.point) : null);

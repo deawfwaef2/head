@@ -498,10 +498,10 @@ window.ModelHeads = (() => {
     THREE.ShaderLib.toon.__soft = 1;
   }
   const BRZ = (!window.Mods || Mods.on('breeze')) ? '1.0' : '0.0';
-  function injectVertex(sh, sway, neck) {
+  function injectVertex(sh, sway, neck, roll) {
     sh.vertexShader = sh.vertexShader
-      .replace('void main() {', `varying vec3 vHP;\n${sway ? 'uniform vec3 uSway; uniform float uHTop; uniform float uHLen; uniform float uT; uniform float uPh;' : ''}${neck ? 'uniform float uNeckK; uniform float uNeckB; uniform vec3 uNeckP;' : ''}\nvoid main() {`)
-      .replace('#include <morphtarget_vertex>', `#include <morphtarget_vertex>\n${neck ? 'transformed.xz = uNeckP.xz + (transformed.xz - uNeckP.xz) * mix(1.0, uNeckK, 1.0 - smoothstep(0.0, uNeckB, transformed.y - uNeckP.y));' : ''}${sway ? 'float sw = clamp((uHTop - transformed.y) / uHLen, 0.0, 1.0); sw = sw * sw * (0.4 + 0.6 * clamp(length(transformed.xz) * 12.0, 0.0, 1.0)); vec3 hs = uSway; hs.x *= 0.72; hs.z *= 0.28; hs += ' + BRZ + ' * vec3(sin(uT * 1.15 + uPh + transformed.y * 28.0) * 0.0042 + sin(uT * 2.6 + uPh * 1.7 + transformed.x * 35.0) * 0.0016, sin(uT * 1.7 + uPh) * 0.0008, cos(uT * 0.93 + uPh * 0.6 + transformed.y * 22.0) * 0.0032); transformed += hs * sw;' : ''}\nvHP = transformed;`);
+      .replace('void main() {', `varying vec3 vHP;\n${sway ? 'uniform vec3 uSway; uniform float uHTop; uniform float uHLen; uniform float uT; uniform float uPh;' : ''}${neck ? 'uniform float uNeckK; uniform float uNeckB; uniform vec3 uNeckP;' : ''}${roll ? 'uniform vec3 uRoll;' : ''}\nvoid main() {`)
+      .replace('#include <morphtarget_vertex>', `#include <morphtarget_vertex>\n${roll ? 'float _rv = transformed.x > 0.0 ? uRoll.x : uRoll.y; transformed.y += (_rv > 0.0 ? _rv : _rv * 1.7) * 0.0105;' : ''}${neck ? 'transformed.xz = uNeckP.xz + (transformed.xz - uNeckP.xz) * mix(1.0, uNeckK, 1.0 - smoothstep(0.0, uNeckB, transformed.y - uNeckP.y));' : ''}${sway ? 'float sw = clamp((uHTop - transformed.y) / uHLen, 0.0, 1.0); sw = sw * sw * (0.4 + 0.6 * clamp(length(transformed.xz) * 12.0, 0.0, 1.0)); vec3 hs = uSway; hs.x *= 0.72; hs.z *= 0.28; hs += ' + BRZ + ' * vec3(sin(uT * 1.15 + uPh + transformed.y * 28.0) * 0.0042 + sin(uT * 2.6 + uPh * 1.7 + transformed.x * 35.0) * 0.0016, sin(uT * 1.7 + uPh) * 0.0008, cos(uT * 0.93 + uPh * 0.6 + transformed.y * 22.0) * 0.0032); transformed += hs * sw;' : ''}\nvHP = transformed;`);
   }
 
   function hairMat(src, U, lum) {
@@ -544,8 +544,8 @@ window.ModelHeads = (() => {
   function irisMat(src, U, lum) {
     const m = new MTM({ map: src.map || null, gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: src.depthWrite });
     m.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, { uEC1: U.ec1, uEC2: U.ec2, uDull: U.dull, uHK: { value: 0.85 / lum }, uGlow: U.glow, uT: GT });
-      injectVertex(sh, false);
+      Object.assign(sh.uniforms, { uEC1: U.ec1, uEC2: U.ec2, uDull: U.dull, uHK: { value: 0.85 / lum }, uGlow: U.glow, uT: GT, uRoll: U.roll });
+      injectVertex(sh, false, false, true);
       sh.fragmentShader = sh.fragmentShader
         .replace('void main() {', 'varying vec3 vHP; uniform vec3 uEC1; uniform vec3 uEC2; uniform float uDull; uniform float uHK; uniform float uGlow; uniform float uT;\nvoid main() {')
         .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += irisC * uGlow * (0.8 + 0.2 * sin(uT * 2.3));')
@@ -557,7 +557,7 @@ window.ModelHeads = (() => {
           diffuseColor.rgb = mix(c, vec3(g) * 0.75, uDull) * (1.0 - uDull * 0.35);
           vec3 irisC = ec * pow(l * uHK, 1.6);`);
     };
-    m.customProgramCacheKey = () => 'iris3';
+    m.customProgramCacheKey = () => 'iris4';
     return m;
   }
   function skinMat(src, U) {
@@ -815,13 +815,21 @@ window.ModelHeads = (() => {
     { k: 'bruised', n: '青肿木然', ex: { blink: 0.55, sad: 0.3 }, fx: [0, 0.5, 0, 1], w: 2 },
     { k: 'stare', n: '死不瞧目', ex: { surprised: 0.6, blink: 0 }, fx: [0.4, 0.3, 0, 0], w: 2 },
     { k: 'wry', n: '惨笑', ex: { happy: 0.35, sad: 0.8, blink: 0.5 }, fx: [0.8, 0, 0.3, 0], w: 1.5 },
-    { k: 'calm', n: '安详', ex: { relaxed: 0.7, blink: 0.9 }, fx: [0, 0, 0, 0], w: 0.6 }
+    { k: 'calm', n: '安详', ex: { relaxed: 0.7, blink: 0.9 }, fx: [0, 0, 0, 0], w: 0.6 },
+    // R68 翻白眼 / 吐舌（rl = [右眼, 左眼] 眼珠上翻(+)/下翻(-)；tg = 舌头伸出程度）
+    { k: 'rollup', n: '双眼上翻', ex: { blink: 0.2, aa: 0.28, sad: 0.2 }, fx: [0.3, 0, 0, 0], rl: [1, 1], tg: 0.25, w: 1.6 },
+    { k: 'rollsplit', n: '一上一下翻白眼', ex: { blink: 0.15, aa: 0.3, angry: 0.15 }, fx: [0.4, 0, 0.2, 0], rl: [1, -1], tg: 0.45, w: 1.4 },
+    { k: 'rolldown', n: '眼珠下翻', ex: { blink: 0.25, aa: 0.2, sad: 0.5 }, fx: [0.6, 0, 0, 0], rl: [-1, -1], tg: 0, w: 1 },
+    { k: 'tongue', n: '舌头耸拉', ex: { blink: 0.45, aa: 0.42, sad: 0.25 }, fx: [0.2, 0, 0.5, 0], tg: 1, w: 1.5 },
+    { k: 'rolltongue', n: '翻白眼吐舌', ex: { blink: 0.1, aa: 0.45, ee: 0.15 }, fx: [0.5, 0.2, 0.4, 0], rl: [1, 1], tg: 0.85, w: 1.3 },
+    { k: 'splittongue', n: '斑视吐舌', ex: { blink: 0.1, aa: 0.4, surprised: 0.2 }, fx: [0.3, 0, 0.3, 0], rl: [-1, 1], tg: 0.7, w: 1 }
   ];
   function dressFace(L) { // 用头自己的 seed 抽，不动主随机流
     let s2 = ((L.seed || 1) * 7919 + 31337) % 2147483647 || 1; const r = () => (s2 = (s2 * 16807) % 2147483647) / 2147483647;
     const tot = FACES.reduce((a, f) => a + f.w, 0); let x = r() * tot, F = FACES[0]; for (const f of FACES) { if ((x -= f.w) <= 0) { F = f; break; } }
     const ex = {}; for (const k in F.ex) ex[k] = +Math.min(1, F.ex[k] * (0.88 + r() * 0.24)).toFixed(2);
     L.ex = ex; L.exT = F.n; L.fx = F.fx.map(v => v ? +Math.min(1, v * (0.75 + r() * 0.5)).toFixed(2) : 0);
+    L.rl = F.rl ? F.rl.map(v => +(v * (0.85 + r() * 0.15)).toFixed(2)) : null; L.tg = F.tg ? +Math.min(1, F.tg * (0.8 + r() * 0.3)).toFixed(2) : 0;
   }
   function randomLook(r, race = {}, rarity = 0) {
     let faceIdx = race.faces ? Math.max(0, idxOf(pick(r, race.faces))) : tierFace(r(), rarity); // 第二十五轮 MOD tier_look：按魂阶加权挑脸模
@@ -955,6 +963,7 @@ window.ModelHeads = (() => {
       skin: { value: new V3(sk.r / baseSkin.r, sk.g / baseSkin.g, sk.b / baseSkin.b).multiply(look.skinMul ? new V3(...look.skinMul) : new V3(1, 1, 1)) }, pale: { value: look.pale },
       blood: { value: look.blood }, spat: { value: look.spat }, seed: { value: look.seed }, ph: { value: ((look.seed || 0) * 7.13) % 6.283 }, hover: { value: 0 }, mk: { value: new THREE.Vector3(...((look.mk && (!window.Mods || Mods.on('makeup'))) ? look.mk : [0, 0, 0])) }, fx: { value: new THREE.Vector4(...((look.fx && (!window.Mods || Mods.on('face_despair') !== false)) ? look.fx : [0, 0, 0, 0])) },
       cutY: { value: faceMeta.bottom }, hH: { value: (faceMeta.skullTop || 0.1) - faceMeta.bottom },
+      roll: { value: new V3((look.rl && look.rl[0]) || 0, (look.rl && look.rl[1]) || 0, 0) },
       neckC: { value: new THREE.Color(1, 1, 1) }, neckW: { value: 0 }, neckK: { value: 1 }, neckB: { value: 0.03 }, neckP: { value: new V3((faceMeta.cut && faceMeta.cut.x) || 0, faceMeta.bottom, (faceMeta.cut && faceMeta.cut.z) || 0) }, // R67 neck_join：颈部反照率 / 半径渐变到身体颈口（foe.js build 设置，默认关）
       scar: { value: look.scar ? new THREE.Vector4(...look.scar) : new THREE.Vector4(-10, 0, 0, 0) },
       paint: { value: look.paint }, paintC: { value: new THREE.Color(look.paintC) },
@@ -1314,7 +1323,7 @@ window.ModelHeads = (() => {
   }
   function create(look, opts = {}) {
     look = resolve(look);
-    if (opts.alive && look.fx) look = Object.assign({}, look, { fx: null }); // 活人没有泪痕/血/淤青，只有被斩下的头才有
+    if (opts.alive && (look.fx || look.rl || look.tg)) look = Object.assign({}, look, { fx: null, rl: null, tg: 0 }); // 活人没有泪痕/血/淤青/翻白眼/吐舌，只有被斩下的头才有
     let fi = idxOf(look.f); if (fi < 0) fi = 0;
     let hi = idxOf(look.h); if (hi < 0) hi = fi;
     hi = coverHair(fi, hi, look); // 第二十一轮 MOD hair_cover：避免借来的头发盖不住后脑 → 后颈/后脑露洞
@@ -1387,19 +1396,31 @@ window.ModelHeads = (() => {
         const nape = new THREE.Mesh(ng, nm); nape.name = '__NAPE__'; nape.userData.kind = 'nape'; g.add(nape); }
     } catch (e) { console.warn('nape_fill', F.meta.file, e); }
     // 表情：持有时可热切换，不眨眼、不重建模型。
-    const setExpression = (ex0 = {}) => {
+    const setExpression = (ex0 = {}, free) => {
       for (const m of Object.values(byName)) if (m.morphTargetInfluences) m.morphTargetInfluences.fill(0);
-      // 限制张嘴幅度：VRoid 的 A/O/Surprised 大幅张嘴会让下巴脱离脸型
-      const ex = Object.assign({}, ex0); if (ex.surprised > 0.5) ex.surprised = 0.5;
+      // 限制张嘴幅度：VRoid 的 A/O/Surprised 大幅张嘴会让下巴脱离脸型（free = 汲魂等需要大张嘴的场景，不限）
+      const ex = Object.assign({}, ex0); if (!free && ex.surprised > 0.5) ex.surprised = 0.5;
       const MOUTH = ['aa', 'oh', 'ee', 'ih', 'ou'];
       const mSum = MOUTH.reduce((s, k) => s + (ex[k] || 0), 0) + (ex.surprised || 0) * 0.5;
-      if (mSum > 0.28) { const f = 0.28 / mSum; MOUTH.forEach(k => { if (ex[k]) ex[k] *= f; }); if (ex.surprised) ex.surprised = Math.min(ex.surprised, 0.5 * Math.max(0.4, f)); }
+      if (!free && mSum > 0.28) { const f = 0.28 / mSum; MOUTH.forEach(k => { if (ex[k]) ex[k] *= f; }); if (ex.surprised) ex.surprised = Math.min(ex.surprised, 0.5 * Math.max(0.4, f)); }
       for (const k in ex) {
         const binds = presets[k]; if (!binds) continue;
         for (const [mn, idx, wt] of binds) { const c = byName[mn]; if (c && c.morphTargetInfluences) c.morphTargetInfluences[idx] = Math.min(1, c.morphTargetInfluences[idx] + wt * ex[k]); }
       }
     };
     setExpression(look.ex || {});
+    // R68 吐舌：程序舌头（胶囊），挂在嘴部网格包围盒中心；翻白眼由 U.roll 把眸珠推到上/下眼睡后面
+    const mouthOf = () => { if (F._mouth !== undefined) return F._mouth; F._mouth = null; try { const mm = F.faceMeshes.find(x => /Mouth/i.test((SRC.get(x) || {}).name || x.name)); if (mm) { mm.geometry.computeBoundingBox(); const b = mm.geometry.boundingBox; F._mouth = { x: (b.min.x + b.max.x) / 2, y: (b.min.y + b.max.y) / 2, z: (b.min.z + b.max.z) / 2, w: b.max.x - b.min.x, h: b.max.y - b.min.y, zf: b.max.z }; } } catch (e) { } return F._mouth; };
+    let tgm = null;
+    const setTongue = (len, wag = 0, droop = 0) => {
+      const M = mouthOf(); if (!M) return;
+      if (!tgm) { const geo = new THREE.CapsuleGeometry(0.5, 1, 4, 10); geo.rotateX(Math.PI / 2); geo.translate(0, 0, 1); const mt = new MTM({ color: new THREE.Color('#d0606c'), gradientMap: grad }); if (mt.roughness != null) mt.roughness = 0.42; own.push(mt); disposablesT.push(geo);
+        tgm = new THREE.Group(); tgm.name = '__TONGUE__'; const ms = new THREE.Mesh(geo, mt); ms.name = '__TONGUE_M__'; ms.scale.set(0.0145, 0.0058, 1); ms.frustumCulled = false; tgm.add(ms); tgm.position.set(0, ((F.meta.eye && F.meta.eye[1] != null) ? F.meta.eye[1] : -0.012) - 0.0655, (F.meta.front != null ? F.meta.front : M.zf) - 0.032); g.add(tgm); }
+      tgm.visible = len > 0.002; if (!tgm.visible) return; tgm.children[0].scale.z = len / 2; tgm.rotation.set(0.2 + droop * 0.9, Math.sin(wag) * 0.22, Math.sin(wag * 0.7) * 0.08);
+    };
+    const setRoll = (a, b) => { U.roll.value.set(a || 0, b || 0, 0); };
+    const disposablesT = [];
+    if (look.tg > 0.02) setTongue(look.tg * 0.04, 0, look.tg * 0.3);
     // 第十二轮：二次元"眼睛透过刘海"——眼白/虹膜/眼线/睫毛/眉毛先写入本头专属模板值（只在被脸皮深度测试通过、真正可见处），
     // 本头的头发跳过这些像素。长刘海盖住眼睛的模型不再"白眼"。每个头用不同的 ref，别的头的头发不受影响。
     const SREF = (stencilSeq = stencilSeq % 254 + 1);
@@ -1444,9 +1465,9 @@ window.ModelHeads = (() => {
     return {
       group: g, U, radius, meta: F.meta, hl: hlMeshes, presets, stubR: stubR(F),
       setSway(v) { U.sway.value.copy(v); },
-      setExpression,
+      setExpression, setTongue, setRoll, mouth: mouthOf,
       setFx(a) { const f = U.fx.value; if (a && a.length >= 4) f.set(a[0], a[1], a[2], a[3]); else f.set(0, 0, 0, 0); },
-      dispose() { own.forEach(m => m.dispose()); disposables.forEach(m => m.dispose()); }
+      dispose() { own.forEach(m => m.dispose()); disposables.forEach(m => m.dispose()); disposablesT.forEach(m => m.dispose()); }
     };
   }
 

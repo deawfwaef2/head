@@ -404,7 +404,7 @@ window.Play = (() => {
   }
   addEventListener('keydown', e => { if (modal && !e.repeat && (e.code === 'Escape' || e.code === 'KeyE')) { e.stopPropagation(); e.preventDefault(); closeModal(); } }, true);
   const FACES = [['安眠', { blink: 1, relaxed: 0.3 }], ['微笑', { happy: 0.75, blink: 0.1 }], ['惊讶', { surprised: 0.85, oh: 0.45 }], ['委屈', { sad: 0.85, blink: 0.2 }], ['生气', { angry: 0.85 }], ['失焦', { blink: 0.05, surprised: 0.35 }], ['半阖', { blink: 0.55, aa: 0.12 }], ['吐舌', { happy: 0.5, aa: 0.35 }]];
-  const FACE_ALL = () => FACES.map(([n, ex]) => ({ n, ex, fx: [0, 0, 0, 0] })).concat((ModelHeads.FACES || []).map(f => ({ n: f.n, ex: f.ex, fx: f.fx })));
+  const FACE_ALL = () => FACES.map(([n, ex]) => ({ n, ex, fx: [0, 0, 0, 0] })).concat((ModelHeads.FACES || []).map(f => ({ n: f.n, ex: f.ex, fx: f.fx, rl: f.rl || null, tg: f.tg || 0 })));
   const FX_N = ['泪痕', '鼻血', '口角血', '淄青'], FX_L = [0, 0.5, 0.8, 1];
   const HW_KEYS = ['ribbon', 'twinbows', 'hairpins', 'star', 'kanzashi', 'bells', 'feather', 'maid', 'bunny', 'flowercrown', 'goggles', 'thorncrown', 'beret', 'minihat', 'halo', 'horns', 'dropchain', 'headchain', 'wingpin', 'crescent', 'skullpin'];
   const HW_ICON = { ribbon: '🎀', twinbows: '🎀', hairpins: '📎', star: '⭐', kanzashi: '🌸', bells: '🔔', feather: '🪶', maid: '🤍', bunny: '🐰', flowercrown: '💐', goggles: '🥽', thorncrown: '👑', beret: '🎨', minihat: '🎩', halo: '😇', horns: '😈', dropchain: '💎', headchain: '⛓', wingpin: '🪽', crescent: '🌙', skullpin: '💀' };
@@ -440,7 +440,7 @@ window.Play = (() => {
         } else if (cmd === 'hwcol') { if (!(look.hw || []).length || !pay()) return; look.hw = look.hw.map(e => HeadWear.item(e.k)); }
         else if (cmd === 'hwnone') look.hw = [];
         else if (cmd === 'hair') { if (!pay()) return; const [n, c] = H[+arg]; look.hn = n; look.hc1 = c; look.hn2 = n; look.hc2 = c; if (look.hn3) look.hn3 = n; }
-        else if (cmd === 'face') { const f = FACE_ALL()[+arg]; look.ex = f.ex; look.exT = f.n; look.fx = f.fx.slice(); h.hb.setExpression && h.hb.setExpression(f.ex); h.hb.setFx && h.hb.setFx(look.fx); SFX.click(); openDresser(h); return; }
+        else if (cmd === 'face') { const f = FACE_ALL()[+arg]; look.ex = f.ex; look.exT = f.n; look.fx = f.fx.slice(); look.rl = f.rl || null; look.tg = f.tg || 0; h.hb.setExpression && h.hb.setExpression(f.ex); h.hb.setFx && h.hb.setFx(look.fx); h.hb.setRoll && h.hb.setRoll(...(f.rl || [0, 0])); h.hb.setTongue && h.hb.setTongue((f.tg || 0) * 0.04, 0, (f.tg || 0) * 0.3); SFX.click(); openDresser(h); return; }
         else if (cmd === 'fx') { const a2 = (look.fx || [0, 0, 0, 0]).slice(); const i = +arg, lv = Math.max(0, FX_L.findIndex(v => v >= (a2[i] || 0))); a2[i] = FX_L[(lv + 1) % FX_L.length]; look.fx = a2; h.hb.setFx && h.hb.setFx(a2); SFX.click(); openDresser(h); return; }
         else if (cmd === 'mk') { const m = (look.mk || [0, 0, 0]).slice(); const k = +arg; m[k] = k === 1 ? (m[1] + 1) % 4 : (m[k] ? 0 : (k === 0 ? 0.75 : 1)); look.mk = m; }
         M.dressed = (M.dressed || 0) + 1; saveM();

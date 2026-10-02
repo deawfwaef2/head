@@ -4561,3 +4561,16 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 皮肤着色器 cache key `skin8→skin9`。
 - 未验证：真实身体（big/ 本地缺）上的颈口高度/半径是否被正确读取（`E.cut.y/r`），缩放补偿方向；Q_ / VH_ / 原神身体的肤色匹配。若仍有缝，先看 `Foe.build` 的 `ov / neckK` 数值。
 - 改文件注意：`replace_string_in_file` 原始参数里的 `\n` 会原样写进文件（mods.js 又中招一次，已修）。
+
+## R68（首级新表情：翻白眼/吐舌 + F 界面「汲魂」吸取 QTE）
+
+- 新表情（`heads.js` FACES）：`rollup`（双眼上翻）、`rollsplit`（一上一下，`rl:[右,左]`）、`rolldown`、`tongue`、`rolltongue`、`splittongue`。`dressFace` 写 `L.rl/L.tg`；虹膜顶点着色器 `injectVertex(...,roll)` 做竖向位移（下翻 ×1.7，`uRoll`，`irisMat` key `iris4`）；吐舌是 `__TONGUE__` 胶囊（`setTongue(len,wag,droop)`），`setRoll(a,b)`；`setExpression(ex0, free)`；活人头 `create()` 不带这些。`play.js/game.js` 的换脸器与 V 键同步。
+- 新模块 `js/siphon.js`（MOD `soul_siphon`）：F 界面新按钮组「汲魂」：`口汲 sipM`（木棒塞进嘴）、`颈汲 sipN`（木棒从断面插入）。每个头只能汲一次，结束（成功/失败/中止）后卡片显示「已榨干」。
+  - 仅 `age>=18` 的头可汲；恐怖/仪式化叙事，不带情色。
+  - 左手提头、右手握棒（自绘前臂从右下伸入）；棒身粗细（车削轮廓）驱动嘴/颈口张合；表情在原表情基础上平滑插值（不瞬变），翻白眼随抽动颤、舌头晃动；相机随节奏推近+晃动；每个节拍有残魂光点/魂晶飞溅与棒身脉冲。
+  - QTE 只用空格：点按、连按两下/三下、长按、狂按（mash）、环收拢时按。越往后越快越难（`unit=3.4*(1+1.2r)`，轮数 R=7+3r，容错 3/2 次），稀有度越高越难、奖励越多。
+  - 结算：完成 = 池 + 连击奖励；失败 55%（魂晶爆出一地）；中止 70%。魂晶产出保守（r3 近乎完美 ≈ 600，r4 最高 ≈ 1100–1200）。
+  - 生前记忆闪回（理想被打破 / 母亲嘱咐注意安全）与感官描写按轮次穿插。
+- 接入：`recall_iw.js`（SIP 表、按钮组、`Siphon.cardHTML`、`go()` 开始钩子、`pre()` 姿态钩子、空格/Esc/F 键）、`index.html` 载入、`mods.js` 注册。
+- 本地验证（Playwright + bot 自动完美按键）：口汲侧面、嘴张开、环 UI、结算卡；颈汲头倒置、断面朝镜头、棒从下方插入；不按键 → 失误 → 提前结束 0 魂晶。未在真实身体（big/ 缺）和真人键盘手感上验证，节奏数值需实玩调整。
+- 测试辅助 `__newHead/__startBot` 只在页面里，不在仓库中。
