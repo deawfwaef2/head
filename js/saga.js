@@ -125,7 +125,7 @@ window.Saga = (() => {
     const hu = window.Hunters2 && Hunters2.cur && Hunters2.cur(); if (hu && ok(hu)) out.push({ fo: hu, hunter: hu.hunter2 });
     if (sg.fo && ok(sg.fo) && W.cur === (sg.node && sg.node.i) && !out.some(o => o.fo === sg.fo)) out.push({ fo: sg.fo, target: 1 });
     const near = W.foes.filter(f => ok(f) && !out.some(o => o.fo === f)).map(f => [Math.hypot(f.pos.x - P.x, f.pos.z - P.z), f]).filter(a => a[0] < 50).sort((a, b) => a[0] - b[0]);
-    for (const [, f] of near) { if (out.length >= 2) break; out.push({ fo: f }); }
+    for (const [, f] of near) { if (out.length >= (talkOn() ? 3 : 2)) break; out.push({ fo: f }); }
     return out;
   }
   function castBeats(cast, lvl) {
@@ -146,6 +146,55 @@ window.Saga = (() => {
       mk(ci % 2 ? 'cOver' : 'cLow', 2.7, [L(sub2 || quote, nm, col, !!sub2)], { cc2: 1 });
     });
     if (beats.length) beats[beats.length - 1].cut = false;
+    return beats;
+  }
+  // ================= R57 saga_talk：地区电影改成「这片土地上的女人们」的特写对话（不再在出生点乱转镜头） =================
+  const talkOn = () => !window.Mods || Mods.on('saga_talk') !== false;
+  const TK = {
+    first: ['……那是什么？那么大的个子——', '别看它的眼睛！快，把孩子们带进屋！', '它腰上挂的是……首级？一、二、三……', '是那个食人魔。和悬赏单上画的一模一样。', '站住！……不，别过来，我不是那个意思——'],
+    again: ['它又来了。上次它来，{L}少了好几个人。', '把门闩上。它记得路。', '又是你。这次你想要谁的头？', '我认得那把刀。上次就是它。'],
+    won: ['上次是你……砍下了{PT}的头。之后{L}安静了好几天。', '我不知道该谢你，还是该怕你。{PT}的事……就当没发生过。'],
+    fail: ['哈，上次不是灰溜溜地走了吗？{PT}可还好好的。', '{PT}还活着。她说，你根本不敢靠近她。'],
+    hot: ['悬赏单上你的价钱，已经够买下半个{L}了。', '猎魔公会的人刚走。她们说，你一定会来。'],
+    reply: ['小声点！它听得见。', '别怕……它要的不是我们。', '你看它的刀，上面的血还没干。', '别乱动。它只砍站着不动的——不对，是乱跑的？', '……它好像在听我们说话。'],
+    hook: ['如果你真要砍头……{T}在{place}。去找她。', '你是来找{Tt}{T}的吧？……求你，别弄错人。', '{T}。她就在{place}。别说是我告诉你的。', '去{place}。那里的事，比你可怕。'],
+    hookE: ['月亮上的人派来的那个……{T}。她在{place}。', '有个自称“月之使者”的女人，这几天一直待在{place}。'],
+    fin: ['{T}，{place}。就这么定了。', '她们怕我。很好——怕我的人，不会挡路。', '首级在{place}等我。走。', '先找到{T}。剩下的，路上再说。']
+  };
+  function personOf(fo, ci) {
+    const c = fo.h.c, B = (() => { try { return (window.Overhear && Overhear.bio(c)) || {}; } catch (e) { return {}; } })(), nm = c.name || '无名';
+    const idn = (window.Lore && Lore.ID && Lore.ID[c.id] && Lore.ID[c.id].n) || c.idN || c.title || '旅人', title = c.title && c.title !== nm ? c.title : idn;
+    const AN = (window.Overhear && Overhear.AN) || {}, chips = [];
+    if (B.arche && AN[B.arche]) chips.push('性格 · ' + AN[B.arche]); if (B.like) chips.push('喜欢 · ' + B.like); if (B.fear) chips.push('怕 · ' + B.fear);
+    const col = ['#ffe0a8', '#c8e8ff', '#ffc8e0', '#d8ffc8'][ci % 4];
+    return { fo, nm, idn, B, col, card: { k: ci ? '另 一 位' : '这 片 土 地 上 的 人', n: nm, t: title, ch: chips.slice(0, 3), col } };
+  }
+  function talkScript(sg, cast) {
+    const ppl = cast.filter(ct => !ct.hunter).slice(0, 3).map((ct, i) => Object.assign(personOf(ct.fo, i), { target: ct.target })); if (!ppl.length) return null;
+    const A = sg.arch, r = sg.r, pk = sg.pk, used = new Set(), pick = arr => { const a = arr.filter(x => !used.has(x)); const v = pk(a.length ? a : arr); used.add(v); return v; };
+    const a0 = ppl.find(p => !p.target) || ppl[0], a1 = ppl.find(p => p !== a0 && !p.target) || null, tg = ppl.find(p => p.target) || null;
+    if (a1) { a0.fo.pair = a1.fo; a1.fo.pair = a0.fo; } else { a0.fo.pair = null; }
+    const c = Object.assign({}, sg.ctx, { W: a0.nm, Wr: a0.idn, PT: (sg.prev && sg.prev.T) || '她' }), f = t => fill(t, c);
+    const L = (t, w, col, it) => ({ t: f(t), w: w || '', col: col || '', it: !!it }), q = t => /^“/.test(t) ? t : '“' + t + '”';
+    const lvl = sg.vis <= 2 ? 0 : sg.vis <= 5 ? 1 : 2, beats = [];
+    let infamy = 0; try { infamy = window.Hunters2 && Hunters2.infamy ? Hunters2.infamy(sg.k) : 0; } catch (e) { }
+    const react = sg.prev ? (sg.prev.res === 'win' ? TK.won : TK.fail) : infamy >= 6 ? TK.hot : sg.vis <= 1 ? TK.first : TK.again;
+    const B2 = a1 || a0, sp = (p, t, it) => L(it ? t : q(f(t)), it ? '' : p.nm + (p === a0 ? ' · ' + p.idn : ''), it ? '#e8dcc6' : p.col, it);
+    // 1 标题：她看见你了
+    beats.push({ shot: 'cLow', castFo: a0.fo, title: true, cut: true, lines: [sp(a0, pick(react))], min: 5 });
+    beats.push({ shot: 'cFace', castFo: a0.fo, cc: a0.card, cut: true, tag: '异变 · ' + A.nm, lines: [sp(a0, pick(A.sign))] });
+    if (a1) {
+      beats.push({ shot: 'cOS', castFo: a1.fo, cc: a1.card, cut: true, lines: [sp(a1, pick(TK.reply))].concat(lvl < 2 ? [sp(a1, pick(A.sign))] : []) });
+      beats.push({ shot: 'cOS', castFo: a0.fo, cc: a0.card, cc2: 1, cut: true, lines: [sp(a0, pick(A.wit))] });
+    } else beats.push({ shot: 'cEyes', castFo: a0.fo, cc: a0.card, cc2: 1, cut: true, lines: [sp(a0, pick(A.wit))] });
+    beats.push({ shot: 'cHand', castFo: B2.fo, cut: true, lines: [sp(B2, `${B2.nm} ${actOf(B2.fo.h.c)}。`, true)].concat(lvl === 0 ? [sp(B2, pick(A.cause), true)] : []) });
+    if (tg) beats.push({ shot: 'cFace', castFo: tg.fo, cc: Object.assign({}, tg.card, { k: '目 标', ch: ['🎯 本次讨伐目标'].concat(tg.card.ch.slice(0, 2)), col: '#ffc8c8' }), cut: true, lines: [L(pick(sg.envoy ? D.ELINE.meet : D.TLINE.meet), sg.T.n + ' · ' + sg.T.title, sg.envoy ? '#d8d0ff' : '#ffc8c8')] });
+    if (a1) beats.push({ shot: 'cTwo', castFo: a0.fo, cut: true, lines: [sp(B2, pick(sg.envoy ? TK.hookE : TK.hook))].concat(r() < 0.5 ? [sp(a0, pick(TK.reply))] : []) });
+    else beats.push({ shot: 'cFace', castFo: a0.fo, cc: a0.card, cc2: 1, cut: true, lines: [sp(a0, pick(sg.envoy ? TK.hookE : TK.hook))] });
+    const cnum = clues(), stakeHead = sg.envoy ? `月之线索 ${cnum}/${D.NEED}` : '';
+    beats.push({ shot: 'cEyes', castFo: a0.fo, cut: true, stake: { good: f(pk(A.good)), bad: f(pk(A.bad)), head: stakeHead }, lines: [L('若她倒下——', '', '#ffe28a'), L('若她活着——', '', '#ff9a8a')] });
+    beats.push({ shot: a1 ? 'cOver' : 'cLow', castFo: B2.fo, finale: true, lines: [L(pick(TK.fin), '我', '#fff', true)] });
+    for (const b of beats) { let t = 0.5; for (const l of b.lines) { l.at = t; l.d = durOf(l.t) * (b.stake ? 0.9 : 1); t += l.d + 0.15; } b.dur = Math.max(b.min || 3.2, t + 0.4); if (b.stake) b.dur = lvl === 2 ? 6.5 : 8; if (b.finale) b.dur = Math.max(4.5, Math.min(b.dur, 6)); }
     return beats;
   }
   function castShot(type, fo) {
@@ -276,8 +325,10 @@ body.sgcine>*:not(canvas):not(script):not(style):not(#sgRoot):not(:has(canvas)){
   function play(sg) {
     const g = G(), W = window.Worlds && Worlds._W; if (!W || !W.B || CN) return false;
     ensure(); sg.shown = true;
-    const L = LOC(sg.k), beats = script(sg);
-    try { const cast = castPick(sg), lv = sg.vis <= 2 ? 0 : sg.vis <= 5 ? 1 : 2, cb = castBeats(cast.slice(0, lv === 2 ? 1 : 2), lv); if (cb.length) { let ti = beats.findIndex(b => b.title); ti = ti < 0 ? 0 : ti; beats.splice(ti + 1, 0, ...cb); } } catch (e) { console.warn('Saga cast', e); }
+    const L = LOC(sg.k); let beats = null;
+    if (talkOn()) { try { const cast = castPick(sg); beats = talkScript(sg, cast); if (beats) { const hu = cast.filter(c => c.hunter); if (hu.length) { const cb = castBeats(hu, 1); if (cb.length) { cb[cb.length - 1].cut = true; beats.splice(1, 0, ...cb); } } } } catch (e) { console.warn('Saga talk', e); beats = null; } }
+    if (!beats) beats = script(sg);
+    if (!talkOn() || !beats.some(b => b.castFo)) try { const cast = castPick(sg), lv = sg.vis <= 2 ? 0 : sg.vis <= 5 ? 1 : 2, cb = castBeats(cast.slice(0, lv === 2 ? 1 : 2), lv); if (cb.length) { let ti = beats.findIndex(b => b.title); ti = ti < 0 ? 0 : ti; beats.splice(ti + 1, 0, ...cb); } } catch (e) { console.warn('Saga cast', e); }
     return startCN(sg, beats, D.REG[sg.k] ? D.REG[sg.k].col : '#e7c27a', 700);
   }
   // R57 nem_story：通用短片播放器（宿敌插曲 / 人物起源），复用本电影的字幕/名牌/黑边/相机接管；beats 格式同 castBeats（castFo 必填），可加 card:{a,b,c} 标题卡

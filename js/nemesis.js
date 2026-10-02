@@ -35,12 +35,22 @@ window.Nemesis = (() => {
 #nemBuff .nb-r{display:flex;gap:8px;flex-wrap:wrap}#nemBuff button{flex:1;min-width:150px;padding:8px 10px;border-radius:3px;border:1px solid #7a3a3a;background:linear-gradient(#2a1214,#140809);color:#f0dcc8;cursor:pointer;text-align:left}
 #nemBuff button b{display:block;font-size:14px}#nemBuff button span{font-size:12px;color:#c8b098}#nemBuff button.on{border-color:#e1c07e;background:linear-gradient(#3a2414,#1a0e08)}#nemBuff button:disabled{opacity:.45;cursor:not-allowed}
 #nemBuff .nb-f{margin-top:8px;font-size:12px;color:#d8c8a8}#nemBuff .nb-l{margin-top:4px;font-size:12px;color:#9a8c78}
+#nemBuff.nb-side{position:fixed;left:16px;top:70px;z-index:130;width:min(320px,26vw);margin:0;padding:14px 16px;background:linear-gradient(160deg,rgba(34,14,16,.95),rgba(10,6,7,.95));border:1px solid #6a2a2a;border-left:3px solid #ff8a7a;border-radius:0;box-shadow:0 10px 30px #0009;font:13.5px/1.6 "Microsoft YaHei UI",sans-serif;color:#eadcc4;animation:nbIn .35s ease-out}
+@keyframes nbIn{from{opacity:0;transform:translateX(-24px)}}
+#nemBuff.nb-side .nb-h{font:700 15px "Noto Serif SC",serif;letter-spacing:.12em;color:#ffb0a0;margin-bottom:8px}
+#nemBuff.nb-side .nb-h small{display:block;font:12px sans-serif;letter-spacing:0;color:#b8a890;margin-top:2px}
+#nemBuff.nb-side .nb-r{flex-direction:column;gap:6px}
+#nemBuff.nb-side button{min-width:0;width:100%;padding:8px 10px}
+#nemBuff.nb-side button:not(:disabled):hover{border-color:#ff9a8a;background:linear-gradient(#3a1618,#1c0a0b)}
+#nemBuff.nb-side .nb-f{border-top:1px solid #ffffff14;padding-top:8px;line-height:1.7}
 #nemChip{position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:33;pointer-events:none;padding:4px 14px;font:600 13px "Microsoft YaHei UI",sans-serif;letter-spacing:.06em;color:#ffd0c0;background:linear-gradient(90deg,transparent,#1a0808d0 20%,#1a0808d0 80%,transparent);display:none}
 #nemChip i{display:inline-block;width:120px;height:4px;margin-left:8px;vertical-align:middle;background:#0008;border:1px solid #ff6a5a55}#nemChip i b{display:block;height:100%;background:linear-gradient(90deg,#a01828,#ff5a4a)}
 #nemChip.full{animation:nemP 1s infinite}@keyframes nemP{50%{color:#fff;text-shadow:0 0 10px #ff4a3a}}`; document.head.appendChild(s); }
   function inject() {
-    if (!onR()) return; const locs = document.querySelector('.rq-pick') || document.querySelector('.locs'); if (!locs || !locs.offsetParent || document.getElementById('nemBuff')) return; css();
-    const d = document.createElement('div'); d.id = 'nemBuff'; d.innerHTML = riteHTML(); locs.parentNode.insertBefore(d, locs);
+    if (!onR()) return; const locs = document.querySelector('.rq-pick') || document.querySelector('.locs'), side = !window.Mods || Mods.on('rite_panel') !== false; let d0 = document.getElementById('nemBuff');
+    if (side) { if (!locs || !locs.offsetParent || W()) { if (d0) d0.remove(); return; } if (d0) { if (d0._c !== (G().S.coins | 0)) { d0._c = G().S.coins | 0; d0.innerHTML = riteHTML(); } return; } } /* R57 rite_panel：血祭不再塞进地区选择界面，单独一张面板（左侧，和 loop.js 右侧 #lpSide 对称） */
+    else if (!locs || !locs.offsetParent || d0) return; css();
+    const d = document.createElement('div'); d.id = 'nemBuff'; d.innerHTML = riteHTML(); if (side) { d.className = 'nb-side'; d._c = G().S.coins | 0; document.body.appendChild(d); } else locs.parentNode.insertBefore(d, locs);
     d.addEventListener('click', e => { const b = e.target.closest('[data-nr]'); if (!b || b.disabled) return; e.stopPropagation(); const k = b.dataset.nr, R = RITE.find(x => x[0] === k), s = S(), c = cost();
       if ((s.buff || {})[k]) return; if ((G().S.coins | 0) < c) return; G().addCoins(-c); s.buff = Object.assign({}, s.buff || {}, { [k]: R[1] }); try { SFX.coins && SFX.coins(); G().toast(`${R[2]}：${R[3]}`, '#ffb0a0', 2); G().save && G().save(); } catch (e2) { } d.innerHTML = riteHTML(); });
   }
@@ -103,6 +113,7 @@ window.Nemesis = (() => {
       wasW = w;
     }
     if (!w) { if (onN() && G().playing && !G().uiOpen) { s.p = Math.min(100, s.p + 100 / 300 * (LP() ? LP().nemRate() : 1)); chipUI(true); } else chipUI(!!(onN() && G().playing)); inject(); return; }
+    { const nb = document.getElementById('nemBuff'); if (nb) nb.remove(); } /* R57 */
     const boss = LP() && LP().isBossTrip(); chipUI(onN() && !boss);
     if (!plan || !onN() || boss) return; const now = performance.now() / 1000;
     if (w.busy || !w.B || w.B.corr) { plan.enteredAt = 0; return; } if (!plan.enteredAt) plan.enteredAt = now;
