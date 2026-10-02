@@ -4337,3 +4337,9 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 新工具 🧩网格（键 6）：点一块网格选中（连通块＝按顶点位置焊接后的连通族；整层＝这一层材质的全部），金色高亮；按住拖动可在镜头平面内把它挪走；底部条可染色（10 色 + 取色器；叠色＝保留花纹，涂满＝纯色）、删除、取消选择。全部可 Ctrl+Z。
 - **不裸体底线保持：** 挪走/删除一个衣服连通块时，自动在原位留下该块的素麻底衬（`wearBand`，bandOf='编辑'）；底衬层、以及素衣状态下的衣服层是受保护的（不能删/挪，只能染色）。
 - 实现：`ccOf/edSelect/edEdit/edDye/edDelete/edDown/edMove/edUp`（autopsy.js）；每次编辑复制 sets 后重建块（挪动会丢 rig，染色/删除保留）。`Autopsy.ui.edit={dye,del,st}`。测试 t21.js。
+
+## R53c — VRoid Hub 第三轮（按评分/爱心数从高到低，agent: sourcing）
+- 220 个人工看图挑出的奇幻女性候选按 hearts 降序下载（另加 9 个高爱心的少女系），163 个转换成功并过体型质检推上 origin（大部分只是 `models/VH_*`+`big/body/VH_*` 文件）；18 个质检淘汰。
+- 逐张看身体拼图后只登记 92 个进 `js/vroid_pack.js`（现 168 条）：剔除裸体/泳装感、现代休闲（卫衣/牛仔/西装/校服）、幼态（身高过矮）、男性、版权角色（绫波/重音テト/古明地等）。被剔除的文件仍在 origin 但没登记（和第 1/2 轮一样），`VH_OUT` 名单见本次 commit 说明。
+- 身份由标签+外观粗分（NOSTATS，未量明度），villager/smithgirl/herbalist 等偏多；想细分可自己改 `js/vroid_pack.js` 的 `ids`。
+- 授权统一：暴力/改造/再分发全允许；署名见 `CREDITS.md`。id 清单：`tools/hub/ids/h1..h6.txt`（`<characterId> <modelId>`，h1 为最高评分）。
