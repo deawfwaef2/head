@@ -232,6 +232,7 @@ html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body
   function pre(dt, now) {
     if (S.active && S.h) { const el2 = performance.now() - (S.openAt || 0); if ((S.kM === 0 && el2 > 600) || (S.kM === 1 && el2 > 1600)) { S.kM++; const ff = faceFit(S.h); S.kT = ff.k; if (ff.hc) S.hcT = ff.hc; } const a5 = Math.min(1, (dt || 0.016) * 5); if (S.kT && Math.abs(S.kT - S.k) > 1e-3) S.k += (S.kT - S.k) * a5; if (S.hcT && S.hc) S.hc.lerp(S.hcT, a5); }
     if (!S.active || !S.h) return; const cam = G.camera, h = S.h;
+    if (!G.uiOpen && G.setUI) G.setUI(true); if (document.pointerLockElement) try { document.exitPointerLock(); } catch (e) { } // R54p：别的模块/连点复位把鼠标重新锁住 → 突然变回第一人称
     if (!h.g || !h.g.parent) { close(true); return; }
     S.openT = Math.min(1, S.openT + dt / 0.55); const oe = sm(S.openT);
     let tgt;
@@ -255,7 +256,7 @@ html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body
     const C = cur.C; S.shake *= Math.exp(-dt * 8);
     _v.set(C[0] * oe + (Math.random() - 0.5) * S.shake, C[1] * oe + (Math.random() - 0.5) * S.shake, C[2] * oe).applyQuaternion(cam.quaternion); cam.position.add(_v);
     cam.rotateX(C[3] * oe); cam.rotateY(C[4] * oe); cam.rotateZ(C[5] * oe);
-    const fov = S.fov0 + C[6] * oe; if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
+    const fov = S.fov0 * (1 - 0.14 * oe) + C[6] * oe; if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
     cam.updateMatrixWorld(true);
     // 手
     const R = ensureRig(); if (R.g.parent !== cam) cam.add(R.g);

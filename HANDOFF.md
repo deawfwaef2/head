@@ -2046,3 +2046,10 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - loop.js side()：出发面板打开时右侧 #lpSide 三张卡（章节/章节 BOSS/主线），MOD side_panels；lpHead 只留回合经济。
 - r54n.js ogre_rank：清空地点（≥2 敌）后 D~SS 评级盖章 + A 以上魂晶。
 - 新天赋流派「鬼巫」hex（talents_data + talents.js S_.x_*）：勾魂索/换魂/提线傀儡/同命咒/血井/百鬼夜行。
+
+## R54q 角色浮现 / 宿敌档案 / 任务栏放大
+- r54n.js whispers：野外每 11~19s 在屏幕左右随机位置浮出黑框字卡（.wsCard），揭示本图某角色的名字/性格/动机/正在做的事/现况；菜单、电影、到达窗、敌情卡期间不出。R54n.wsNow() 调试立即出一张。
+- hud_tidy：左列任务卡与 #tbCol 用 CSS zoom 放大（1.25 / 1.3），排版按 getBoundingClientRect 高度、top 除以 zoom。
+- 宿敌档案：Nemesis.dossierHTML()（塞勒涅之影 + s.extra 每人名字/性格/当前等级/成长）挂在 U 猎手档案窗口底部；#nemChip 加「U 档案」提示。
+- foe.js 逃跑：fair_fight 下每 2s 检查进度，卡住就换门（fleeBan）+ 绕路，连卡 3 次且你在 7m 外就算她溜走。
+- F 回忆（recall_iw）：game.js 连点复位逻辑跳过 RecallIW.active；pre() 每帧保持 uiOpen 并解锁鼠标，不再突然变回第一人称；回忆视角 FOV 收窄 14%（头更大）。

@@ -48,7 +48,16 @@ window.Nemesis = (() => {
   let wasW = null, plan = null, chip = null;
   function chipUI(show) { if (!chip) { css(); chip = document.createElement('div'); chip.id = 'nemChip'; document.body.appendChild(chip); } chip.style.display = show ? 'block' : 'none'; if (!show) return; const p = S().p; chip.classList.toggle('full', p >= 100);
     const H = window.HudTidy && HudTidy.on() && window.Hunters2 && Hunters2.on() && Hunters2.T && Hunters2.alive().length ? Hunters2.T : null, hm = H ? Math.floor(H.m || 0) : -1; // R54n：猎手感应并入宿敌条
-    chip.innerHTML = `🩸 宿敌逼近 ${Math.round(p)}%<i><b style="width:${Math.min(100, p)}%"></b></i>${hm >= 0 ? `<span style="margin-left:14px;color:${hm >= 100 ? '#ff7a6a' : '#e7c27a'}">🏹 猎手 ${hm}%${hm >= 100 ? ' · 随时会来' : ''}</span><i><b style="width:${Math.min(100, hm)}%;background:linear-gradient(90deg,#7a5a20,#e7c27a)"></b></i>` : ''}`; }
+    chip.innerHTML = `🩸 宿敌逼近 ${Math.round(p)}%<i><b style="width:${Math.min(100, p)}%"></b></i>${hm >= 0 ? `<span style="margin-left:14px;color:${hm >= 100 ? '#ff7a6a' : '#e7c27a'}">🏹 猎手 ${hm}%${hm >= 100 ? ' · 随时会来' : ''}</span><i><b style="width:${Math.min(100, hm)}%;background:linear-gradient(90deg,#7a5a20,#e7c27a)"></b></i>` : ''}<span style="margin-left:12px;font-size:11.5px;color:#c8b8a8">U 档案</span>`; }
+  // R54p：宿敌档案（并入 U 猎手档案窗口底部）
+  function dossierHTML() {
+    if (!onN()) return ''; const s = S(), ex = s.extra || [], pl = plv(), e2 = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const card = (ic, nm, sub, lv, lines, col) => `<div style="padding:12px 14px;background:linear-gradient(160deg,#2a1414e8,#0e0808f0);border:1px solid ${col}66;border-left:3px solid ${col}"><div style="font:800 17px 'Noto Serif SC',serif;color:${col}">${ic} ${e2(nm)} <span style="font:600 12px sans-serif;color:#e8d8c0">${lv ? `Lv.${lv}${lv - pl >= 4 ? ' · <b style="color:#ff7a6a">危险</b>' : ''}` : ''}</span></div><div style="font-size:12px;color:#c8b8a8;margin:2px 0 6px">${e2(sub)}</div>${lines.map(l => `<div style="font-size:13px;color:#eadcc4;line-height:1.6">${l}</div>`).join('')}</div>`;
+    const cs = [card('🌙', '塞勒涅之影', '月之巫女的分身', pl + 6, ['宿敌逼近满了就可能从雾里走出来。', '她在场时门会封锁 90 秒；她残血会撤退，8 秒内追上还能斩首。'], '#c8b8ff')];
+    for (const x of ex) { const c = (x.h && x.h.c) || {}, grow = Math.floor(((s.play || 0) - (x.at || 0)) / 300), tr = (c.traits || []).slice(0, 3).join(' · ');
+      cs.push(card('🩸', x.n, [c.title, tr].filter(Boolean).join(' · ') || '从你手里逃掉的人', x.lv + grow, [`为什么记住你：她从你手里活着逃走了。`, `离上次见面又变强了 <b>${grow}</b> 级（每过 5 分钟 +1）。`, `阶位：${x.t >= 3 ? '精英' : x.t >= 2 ? '老兵' : '战士'}。打败她 = 她从名单里消失。`], '#ff8a7a')); }
+    return `<div style="margin-top:16px"><div style="font:800 18px 'Noto Serif SC',serif;color:#ff9a8a;letter-spacing:.2em;margin-bottom:4px">🩸 宿敌档案</div><div style="font-size:12.5px;color:#b8a890;margin-bottom:8px">宿敌逼近 <b style="color:#ffb0a0">${Math.round(s.p || 0)}%</b> · 老兵以上的敌人从你手里逃掉就会变成宿敌（最多 6 人）。${ex.length ? '' : '目前还没有人记住你的脸。'}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">${cs.join('')}</div></div>`;
+  }
   async function clone() {
     const w = W(), C = window.Foe && Foe.ctx(); if (!w || !C || !w.B || C.sc !== w.B.sc) return false;
     const loc = (window.Lore && Lore.LOCS.find(l => l.k === 'peak')) || w.graph.loc; let h; try { h = RPG.foe(G().S, loc, (Math.random() * 4294967296) >>> 0, G().usedNames, G().usedSig); } catch (e) { return false; } if (!h) return false;
@@ -125,5 +134,5 @@ window.Nemesis = (() => {
     const left = Math.max(...list.map(sealLeft)); sealEl.style.display = 'block'; sealEl.textContent = `🔒 宿敌在场，门被封死 · 打倒她 / 打到她残血撤退 / ${left} 秒后你可以撤退`;
   }
   setInterval(() => { try { sealTick(); } catch (e) { } }, 250);
-  return { dmgK, hpK, spdK, heads, strike, S, addFoe, sealed, sealFoes, sealLeft, SEAL_T };
+  return { dmgK, hpK, spdK, heads, strike, S, addFoe, sealed, sealFoes, sealLeft, SEAL_T, dossierHTML };
 })();

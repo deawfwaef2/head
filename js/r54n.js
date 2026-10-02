@@ -143,8 +143,9 @@
   function tidyCss() {
     if (document.getElementById('htCss')) return; const s = document.createElement('style'); s.id = 'htCss'; s.textContent = `
 body.htidy #h2Sense{display:none!important}
-body.htidy #rqTrack,body.htidy #arTrack,body.htidy #mtTrack,body.htidy #sgTrack{left:14px!important;right:auto!important;width:300px!important;max-width:300px!important;box-sizing:border-box;transform:none!important;margin:0!important;
- background:linear-gradient(90deg,rgba(18,10,12,.86),rgba(18,10,12,.6))!important;border:0!important;border-left:3px solid #c9a46a!important;border-radius:0!important;box-shadow:0 4px 14px #0006!important;padding:8px 12px!important;font-size:13.5px!important;line-height:1.5!important;clip-path:none!important}
+body.htidy #rqTrack,body.htidy #arTrack,body.htidy #mtTrack,body.htidy #sgTrack{left:14px!important;right:auto!important;width:300px!important;max-width:300px!important;box-sizing:border-box;transform:none!important;margin:0!important;zoom:1.25;
+ background:linear-gradient(90deg,rgba(18,10,12,.9),rgba(18,10,12,.66))!important;border:0!important;border-left:3px solid #c9a46a!important;border-radius:0!important;box-shadow:0 4px 14px #0006!important;padding:8px 12px!important;line-height:1.5!important;clip-path:none!important}
+body.htidy #tbCol{zoom:1.3}
 body.htidy #arTrack{border-left-color:#8fa8c8!important}body.htidy #mtTrack{border-left-color:#b8a0ff!important}body.htidy #sgTrack{border-left-color:#ff8a6a!important}
 body.htidy #nemChip{top:6px!important;padding:5px 18px!important;font-size:13.5px!important}
 body.menuon #wRoot,body.menuon #nemChip,body.menuon #h2Hud,body.menuon #tbBar,body.menuon #hpC,body.menuon #tbCol,body.menuon #rqHud,body.menuon #arTrack,body.menuon #mtTrack,body.menuon #sgTrack,body.menuon #tut,body.menuon #hubBtn,body.menuon #mmBox,body.menuon #combatHud,body.menuon #hitHud,body.menuon #icCard,body.menuon #atkCd,body.menuon #cross{visibility:hidden!important}`; document.head.appendChild(s);
@@ -154,7 +155,7 @@ body.menuon #wRoot,body.menuon #nemChip,body.menuon #h2Hud,body.menuon #tbBar,bo
     const on = HT(), b = document.body; if (!b) return; b.classList.toggle('htidy', on); const mn = document.getElementById('menu'); b.classList.toggle('menuon', !!(on && mn && !mn.classList.contains('hidden') && getComputedStyle(mn).display !== 'none'));
     if (!on) return; tidyCss();
     const tc = document.getElementById('tbCol'); let y = tc && vis(tc) ? Math.round(tc.getBoundingClientRect().bottom) + 10 : 110;
-    for (const id of ['rqTrack', 'arTrack', 'mtTrack', 'sgTrack']) { const e = document.getElementById(id); if (!vis(e)) continue; e.style.setProperty('top', y + 'px', 'important'); e.style.setProperty('bottom', 'auto', 'important'); y += e.offsetHeight + 8; }
+    for (const id of ['rqTrack', 'arTrack', 'mtTrack', 'sgTrack']) { const e = document.getElementById(id); if (!vis(e)) continue; const z = parseFloat(getComputedStyle(e).zoom) || 1; e.style.setProperty('top', (y / z) + 'px', 'important'); e.style.setProperty('bottom', 'auto', 'important'); y += e.getBoundingClientRect().height + 8; }
   }
 
   // ================= 可破坏的小物件（MOD breakables）：走近就碎，掉不占格子的碎料，攒够自动合成材料进储物箱 =================
@@ -243,7 +244,32 @@ body.menuon #wRoot,body.menuon #nemChip,body.menuon #h2Hud,body.menuon #tbBar,bo
     try { SFX.play && SFX.play('bell', 0.6, R[1].startsWith('S') ? 0.8 : 1.2); } catch (e) { }
   }
 
-  window.R54n = { BKS, vox };
+  // ================= 角色浮现（MOD whispers）：屏幕随机位置浮出黑框字卡，揭示本图某个角色的动机 / 正在做的事 / 现况 =================
+  const MOT = { proud: ['想证明自己比所有人都强——包括你', '打算拿你的头去换领主的赏识'], cold: ['在等一个能一刀杀死你的机会', '只关心任务，不在乎谁先死'], gentle: ['想把村里的孩子平安带出去', '在替昨晚死去的邻居守夜'], timid: ['只想活过今晚', '已经后悔留在这里了'], fierce: ['听说你砍了她的姐妹，正憋着一股火', '巴不得早点和你打一场'], sharp: ['看不起这里的每一个人', '在盘算怎么让别人先去送死'], sly: ['打算趁乱捡走别人的战利品', '两边下注——谁赢她就跟谁'], cheerful: ['还以为今天只是个普通的集市日', '在想晚饭吃什么，完全没意识到危险'] };
+  const MOT_X = ['攒了半年的钱，明天就要出嫁', '偷偷藏着一封没寄出去的信', '背着一个不能说的秘密', '在找失踪的妹妹', '欠了一屁股债，正想着跑路', '发誓要亲手为师父报仇'];
+  let wsT = performance.now() + 9000, wsEl = [], wsLast = null;
+  function wsCss() { if (document.getElementById('wsCss')) return; const s = document.createElement('style'); s.id = 'wsCss'; s.textContent = '.wsCard{position:fixed;z-index:38;pointer-events:none;max-width:340px;padding:12px 16px 11px;background:rgba(6,4,4,.9);border:1px solid #d8c8a8;outline:1px solid #000;outline-offset:3px;box-shadow:0 0 0 4px rgba(0,0,0,.55),0 14px 40px #000c;color:#efe4d2;font:500 14px/1.65 "Noto Serif SC","Songti SC",serif;opacity:0;transform:translateY(8px);transition:opacity .6s,transform .6s}.wsCard.on{opacity:1;transform:none}.wsCard .n{font-weight:800;font-size:16px;color:#fff;letter-spacing:.08em}.wsCard .n small{font:600 11.5px sans-serif;color:#b8a890;margin-left:6px;letter-spacing:0}.wsCard .k{display:inline-block;min-width:3.2em;color:#c9a46a;font-size:12px;letter-spacing:.2em}.wsCard .d{color:#a89880;font-size:11.5px;margin-top:3px}body.menuon .wsCard,body.dcam .wsCard{visibility:hidden}'; document.head.appendChild(s); }
+  function wsShow(fo) {
+    wsCss(); const c = (fo.h && fo.h.c) || {}, k = (fo.per && fo.per.k) || 'cold', id = String(c.name || fo.id || ''), hh = [...id].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
+    const mot = (hh % 3 === 0 ? MOT_X[hh % MOT_X.length] : (MOT[k] || MOT.cold)[hh % 2]);
+    const hp = fo.maxHp ? fo.hp / fo.maxHp : 1, near = (() => { try { const p = Foe.ctx().player.pos; return Math.hypot(fo.pos.x - p.x, fo.pos.z - p.z); } catch (e) { return 99; } })();
+    const doing = fo.state === 'flee' ? '拼命往门口跑' : fo.atk ? '正在朝你挥刀' : fo.state === 'chase' && fo.seen ? '握紧武器朝你逼近' : fo.slot ? '待在人群里，做着手头的事' : fo.state === 'search' || fo.alert ? '四处张望，在找你' : (fo.pidle ? '在忙自己的活' : '在附近闲逛，还没发现你');
+    const cond = (hp > 0.85 ? '毫发无伤' : hp > 0.5 ? '受了些伤' : hp > 0.25 ? '伤得很重，捂着伤口' : '奄奄一息') + ' · ' + (fo.armed ? '手里握着武器' : '赤手空拳') + (near < 99 ? ` · 离你约 ${Math.round(near)} 米` : '');
+    const role = fo.boss ? '霸主' : fo.hunter2 ? '猎手' : (fo.nemX || fo.nemClone) ? '宿敌' : fo.per && fo.per.title ? fo.per.title.replace(/】.*$/, '').replace('【', '') : '';
+    const d = document.createElement('div'); d.className = 'wsCard'; d.innerHTML = `<div class="n">${esc(c.name || '无名者')}<small>${esc([role, (c.traits || []).slice(0, 2).join('、')].filter(Boolean).join(' · '))}</small></div><div><span class="k">动机</span>${esc(mot)}</div><div><span class="k">正在</span>${esc(doing)}</div><div><span class="k">现况</span>${esc(cond)}</div>`;
+    const W0 = innerWidth, H0 = innerHeight, side = Math.random() < 0.5, x = side ? W0 * (0.06 + Math.random() * 0.2) : W0 * (0.62 + Math.random() * 0.12), y = H0 * (0.16 + Math.random() * 0.48);
+    d.style.left = Math.round(x) + 'px'; d.style.top = Math.round(y) + 'px'; document.body.appendChild(d); requestAnimationFrame(() => d.classList.add('on')); wsEl.push(d);
+    setTimeout(() => { d.classList.remove('on'); setTimeout(() => d.remove(), 700); wsEl = wsEl.filter(x => x !== d); }, 7500);
+  }
+  function wsTick() {
+    if (!M('whispers') || !window.Worlds || !Worlds.active || !window.Foe || !Foe.foes) return; const W = Worlds._W, now = performance.now(); if (!W || W.busy || !W.B || now < wsT) return;
+    if ((window.Arrival2 && Arrival2.isOpen()) || (window.Saga && Saga.cine) || (window.GrandUI && GrandUI.isOpen()) || (window.DecapCam && DecapCam.active) || (window.G && G.uiOpen) || icT || document.body.classList.contains('menuon')) { wsT = now + 2000; return; }
+    let L = Foe.foes.filter(f => f && !f.dead && f.pos && f.h); if (L.length > 1) L = L.filter(f => f !== wsLast); if (!L.length) { wsT = now + 6000; return; }
+    const fo = L[Math.floor(Math.random() * L.length)]; wsLast = fo; wsT = now + 11000 + Math.random() * 8000; try { wsShow(fo); } catch (e) { console.warn('whispers', e); }
+  }
+
+  window.R54n = { BKS, vox, wsNow: () => { wsT = 0; } };
   setInterval(() => { try { bkTick(); } catch (e) { } try { rkTick(); } catch (e) { } }, 100);
+  setInterval(() => { try { wsTick(); } catch (e) { } }, 500);
   setInterval(() => { try { tidyTick(); } catch (e) { } try { intelTick(); } catch (e) { } try { barkTick(); } catch (e) { } }, 250);
 })();

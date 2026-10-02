@@ -495,9 +495,10 @@ window.Foe = (() => {
         }
       } else if (fo.state === 'flee') { // 第二十一轮：逃向最近的门——跑到门口就真的逃掉了（首级也就没了）
         const doors = DOORESC ? ctx.doors || [] : []; let tg = null, best = 1e9;
-        for (const dr of doors) { const ddx = dr.x - fo.pos.x, ddz = dr.z - fo.pos.z, dd = Math.hypot(ddx, ddz) || 1; const toward = -(ddx * dx + ddz * dz) / dd / d; const cost = dd * (1 + Math.max(0, -toward) * 1.6); if (cost < best) { best = cost; tg = dr; } }
+        for (const dr of doors) { if (dr === fo.fleeBan && doors.length > 1) continue; const ddx = dr.x - fo.pos.x, ddz = dr.z - fo.pos.z, dd = Math.hypot(ddx, ddz) || 1; const toward = -(ddx * dx + ddz * dz) / dd / d; const cost = dd * (1 + Math.max(0, -toward) * 1.6); if (cost < best) { best = cost; tg = dr; } }
         spd = 3.0 + fo.rar * 0.12 + fo.iq * 0.3; f.play('Sprint_Loop', { fade: 0.2 }); // 第二十六轮（用户：打一下人就跑、永远追不上）：逃跑速度 3.0–3.6 < 玩家疾跑 6.2，走路 3.6 也能慢慢追上；
         fo.fleeT = (fo.fleeT || 0) + dt; if (fo.fleeT > 6.5 && !(tg && Math.hypot(tg.x - fo.pos.x, tg.z - fo.pos.z) < 7)) { fo.fleeT = 0; fo.state = 'chase'; fo.brave = true; fo.retreated = true; sayP(fo, 'fight', SAY.fight); } // 跑了 6.5 秒没处可逃：困兽之斗
+        if (FAIR() && fo.state === 'flee') { const fc = fo.fleeChk || (fo.fleeChk = { t: 0, x: fo.pos.x, z: fo.pos.z, n: 0 }); fc.t += dt; if (fc.t > 2) { const mv = Math.hypot(fo.pos.x - fc.x, fo.pos.z - fc.z); if (mv < 1.2) { fc.n++; fo.fleeBan = tg; fo.fleeT = 0; fo.detour = 1.2; fo.detourYaw = fo.yaw + (Math.random() < 0.5 ? 1.7 : -1.7); if (fc.n >= 3 && d > 7 && tg) { escape(fo); continue; } } else fc.n = 0; fc.t = 0; fc.x = fo.pos.x; fc.z = fo.pos.z; } } // R54p：逃跑卡住就换门绕路，实在卡死且你不在身边就算她溜了
         if (tg) { const ddx = tg.x - fo.pos.x, ddz = tg.z - fo.pos.z, dd = Math.hypot(ddx, ddz); turnTo = Math.atan2(ddx, ddz); if (d > 3) goal = [tg.x, tg.z, 'D' + doors.indexOf(tg)];
           if (d < 3 && Math.abs(ang(Math.atan2(ddx, ddz) - face)) < 0.6) turnTo = Math.atan2(ddx, ddz) + (ang(face - Math.atan2(ddx, ddz)) > 0 ? -0.9 : 0.9); // 你挡在门前：绕开
           if (fo.flash > 0) fo.doorT = 0; // 开门时挨了一刀：被打断

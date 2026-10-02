@@ -395,6 +395,7 @@ window.startGame = function () {
   let stuckClicks = [];
   const unstick = (why) => { if (!uiOpen) return false; uiOpen = false; lockRetry = true; try { toast('🖱️ ' + (why || '界面已复位') + ' — 点一下画面锁定鼠标'); } catch (e) {} return true; };
   document.addEventListener('mousedown', e => {
+    if (window.RecallIW && RecallIW.active) return; // F 回忆里连点头不算“界面卡住”
     if (e.target === canvas && uiOpen && playing) { const n = performance.now(); stuckClicks = stuckClicks.filter(t => n - t < 2500); stuckClicks.push(n); if (stuckClicks.length >= 3) { stuckClicks = []; unstick('检测到界面卡住'); } return; }
     if (!relockNeeded()) return; const t = e.target; if (t && t.closest && t.closest('button,a,input,select,textarea,label,[data-act],[contenteditable]')) return;
     lockRetry = true; if (e.target !== canvas) { try { lockPointer(); } catch (err) {} }

@@ -236,7 +236,7 @@ ${dead ? '' : `<div class="r3-odds" style="--oc:${oc(o.p)}"><div class="row"><sp
 <div class="r3-meta" style="margin-bottom:4px">${d.aff.concat(L.esc >= 2 ? ['frenzy'] : []).map(aff).join('')}</div>
 <div class="r3-meta"><span>等级 = 基础 ${d.base} + 仇恨 ${Math.floor(s.hate / HATE_STEP)} + 逃脱 ${L.esc}</span><span>遭遇 ${L.meet} 次</span>${L.wd ? `<span>撤退 ${L.wd} 次</span>` : ''}</div></div>`; }).join('');
     return `<div class="r3-sub">四名被选中的<b>正义女主角</b>。你砍的人越多，她们越强；「猎手感应」满了，她们就会<b>穿越到你所在的地图</b>（洞穴和洞口不会）。</div>${top}<div class="r3-grid">${cards}</div>
-<div class="r3-foot">她在场时所有的门都会封锁，你无法撤离。血量掉到 30% 她会逃跑——3.2 秒内打死她才算真正斩杀，否则她会带着更高的等级回来。150 秒分不出胜负她会自行撤退。</div>`;
+<div class="r3-foot">她在场时所有的门都会封锁，你无法撤离。血量掉到 30% 她会逃跑—3.2 秒内打死她才算真正斩杀，否则她会带着更高的等级回来。150 秒分不出胜负她会自行撤退。</div>${window.Nemesis && Nemesis.dossierHTML ? Nemesis.dossierHTML() : ''}`;
   }
   function toggle(v) { if (!window.R35UI) return; if (v === false) { if (R35UI.isOpen('hunt')) R35UI.close(); } else if (v === true) R35UI.open('hunt'); else R35UI.toggle('hunt'); }
   if (window.R35UI) R35UI.reg('hunt', { n: '🏹 食人魔猎手', title: '猎手档案', on, html: panelHTML });
