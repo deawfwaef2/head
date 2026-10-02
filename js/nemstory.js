@@ -242,7 +242,7 @@ window.NemStory = (() => {
     if (!G() || !G().S) return;
     poll();
     const W = window.Worlds && Worlds.active && Worlds._W;
-    if (st) { if (st.phase === 'build' && performance.now() - st.t0 > 15000) { console.warn('NemStory: build timeout'); abort(); } return; }
+    if (st) { if (st.phase === 'build' && performance.now() - st.t0 > 60000) { console.warn('NemStory: build timeout'); const ev = st.ev; abort(); if (ev && (ev.tries = (ev.tries || 0) + 1) < 2) S().q.unshift(ev); } return; } // 慢机器第一次搭模型可能很久：超时就留到下一张地图再播（最多重试 1 次）
     if (!W) { lastMap = null; return; }
     if (!on() || !S().q.length || !ready()) return;
     W.mapKey = W.mapKey || ('m' + Math.random()); lastMap = W.mapKey;
@@ -419,7 +419,7 @@ window.NemStory = (() => {
   async function buildIntro(V, used, c) {
     if (!window.Hunters2) return null; const loc = curLoc(), ids = ['aerin', 'nove', 'gwen', 'mia'], rigs = {};
     const ctr = V(3.4, 0), xs = [-1.6, -0.55, 0.55, 1.6];
-    for (let i = 0; i < 4; i++) { const id = ids[i], p = V(3.0 + Math.abs(xs[i]) * 0.25, xs[i]); rigs[id] = await rig(Hunters2.recFor(id, loc), p, face(p, V(0, 0)) + (xs[i] < 0 ? 0.25 : -0.25), HX[id].clip, used); st.rigs.push(rigs[id]); }
+    const hs = ids.map(id => Hunters2.recFor(id, loc)); const got = await Promise.all(ids.map((id, i) => { const p = V(3.0 + Math.abs(xs[i]) * 0.25, xs[i]); return rig(hs[i], p, face(p, V(0, 0)) + (xs[i] < 0 ? 0.25 : -0.25), HX[id].clip, used); })); ids.forEach((id, i) => { rigs[id] = got[i]; st.rigs.push(got[i]); });
     rigs.aerin.pair = rigs.mia; rigs.mia.pair = rigs.aerin; rigs.nove.pair = rigs.gwen; rigs.gwen.pair = rigs.nove;
     const beats = [];
     beats.push({ shot: 'cLow', castFo: rigs.nove, card: { a: '猎 魔 公 会', b: '第 七 号 悬 赏 · 食 人 魔', c: `罪名：在九个地区砍下 ${c.heads} 颗首级　赏金：一万枚金币` }, tag: '序 章', lines: [L('悬赏单钉上墙的那天晚上，有四个人同时伸出了手。', '', '#e8dcc6', true)], min: 5 });

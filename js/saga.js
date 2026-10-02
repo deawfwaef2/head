@@ -187,7 +187,7 @@ window.Saga = (() => {
       beats.push({ shot: 'cOS', castFo: a1.fo, cc: a1.card, cut: true, lines: [sp(a1, pick(TK.reply))].concat(lvl < 2 ? [sp(a1, pick(A.sign))] : []) });
       beats.push({ shot: 'cOS', castFo: a0.fo, cc: a0.card, cc2: 1, cut: true, lines: [sp(a0, pick(A.wit))] });
     } else beats.push({ shot: 'cEyes', castFo: a0.fo, cc: a0.card, cc2: 1, cut: true, lines: [sp(a0, pick(A.wit))] });
-    beats.push({ shot: 'cHand', castFo: B2.fo, cut: true, lines: [sp(B2, `${B2.nm} ${actOf(B2.fo.h.c)}。`, true)].concat(lvl === 0 ? [sp(B2, pick(A.cause), true)] : []) });
+    beats.push({ shot: 'cHand', castFo: B2.fo, cut: true, lines: [sp(B2, `${B2.nm}${actOf(B2.fo.h.c)}。`, true)].concat(lvl === 0 ? [sp(B2, pick(A.cause), true)] : []) });
     if (tg) beats.push({ shot: 'cFace', castFo: tg.fo, cc: Object.assign({}, tg.card, { k: '目 标', ch: ['🎯 本次讨伐目标'].concat(tg.card.ch.slice(0, 2)), col: '#ffc8c8' }), cut: true, lines: [L(pick(sg.envoy ? D.ELINE.meet : D.TLINE.meet), sg.T.n + ' · ' + sg.T.title, sg.envoy ? '#d8d0ff' : '#ffc8c8')] });
     if (a1) beats.push({ shot: 'cTwo', castFo: a0.fo, cut: true, lines: [sp(B2, pick(sg.envoy ? TK.hookE : TK.hook))].concat(r() < 0.5 ? [sp(a0, pick(TK.reply))] : []) });
     else beats.push({ shot: 'cFace', castFo: a0.fo, cc: a0.card, cc2: 1, cut: true, lines: [sp(a0, pick(sg.envoy ? TK.hookE : TK.hook))] });
@@ -594,13 +594,13 @@ ${rwHTML(sg, win)}<div class="go"><button data-sgok>收下结算 ▶</button></d
     if (!T) return; const sg = T; if (!sg.node && !sg.noNode && W.B) pickNode(sg, W); if (sg.noNode) return;
     if (W.trip && W.stats) sg.snap = { coins: W.trip.coins || 0, kill: W.stats.kill || 0, decap: W.stats.decap || 0 };
     if (!sg.readyAt && W.B && !W.busy) sg.readyAt = performance.now();
-    if (window.NemStory && NemStory.hold()) { track(W); return; } // R57 nem_story：宿敌插曲先播，地区电影等它
+    if (window.NemStory && NemStory.hold()) { sg.readyAt = performance.now(); track(W); return; } // R57 nem_story：宿敌插曲先播，地区电影等它
     let hold = false;
     if (sg.hunterId && !sg.hReady && !sg.shown && !W.busy && W.B) { // 猎手入场伏击：先让她出现在场上，再开电影介绍她
       if (!sg.hAt) { sg.hAt = performance.now(); try { Hunters2.ambush(sg.hunterId); } catch (e) { sg.hReady = true; } }
       if ((window.Hunters2 && Hunters2.cur()) || performance.now() - sg.hAt > 9000) { sg.hReady = true; sg.hAt2 = performance.now(); } else hold = true;
     }
-    if (!sg.shown && !hold && !W.busy && W.B && !CN) { setTimeout(() => { if (T === sg && !sg.cinDone && !CN && Worlds.active) { const nd = Worlds._W.graph.nodes[Worlds._W.cur]; if (nd && nd.eliteArena) { sg.cinDone = true; return; } try { play(sg); } catch (e) { console.warn('Saga play', e); try { end(); } catch (e2) { CN = null; document.body.classList.remove('sgcine'); } } } }, 700); sg.shown = true; }
+    if (!sg.shown && !hold && !W.busy && W.B && !CN) { setTimeout(() => { if (T === sg && !sg.cinDone && !CN && Worlds.active) { const nd = Worlds._W.graph.nodes[Worlds._W.cur]; if ((nd && nd.eliteArena) || (window.Arrival2 && Arrival2.isOpen())) { sg.cinDone = true; return; } try { play(sg); } catch (e) { console.warn('Saga play', e); try { end(); } catch (e2) { CN = null; document.body.classList.remove('sgcine'); } } } }, 700); sg.shown = true; }
     if (sg.fo && !sg.done) { if (sg.fo.dead || sg.fo.hp <= 0) onKill(sg); else if (sg.fo.escaped) { sg.esc = true; } }
     track(W);
   }
@@ -622,5 +622,5 @@ ${rwHTML(sg, win)}<div class="go"><button data-sgok>收下结算 ▶</button></d
     return `<div class="r3-goal" style="display:block;padding:14px 18px"><div style="font-size:20px;font-weight:900;color:#e8e0ff;letter-spacing:.2em">🌙 主线 · 月之魔女　${m ? '✔ 已斩杀' : cn >= D.NEED ? '· 神殿已开' : ''}</div><div style="margin:8px 0">${pips}<b style="font-size:20px;color:#fff;margin-left:8px">${cn}/${D.NEED}</b></div>${list || '<div style="font-size:15px;color:#b8a8d8">在各个地区斩下“月之使者”，或触发章节闪回，得到线索。集齐 7 条，月之魔女的神殿向你敞开。</div>'}</div>`;
   }
   const dbgBtn = null;
-  return { on, cam, reel, castShot: (t, fo) => castShot(t, fo), pendingCine: () => !!CN || !!(on() && T && !T.noNode && !T.cinDone && Worlds.active && (!T.readyAt || performance.now() - T.readyAt < 15000)), get cine() { return CN; }, NEED: D.NEED, clues, giveClue, goalHTML, gen, script, play, end, next, resolve, onKill, SS, banner, showSettle, FX_TXT, _setT: v => { T = v; }, get T() { return T; }, hint: v => `🌙 月之线索 ${clues()}/${D.NEED} · 月之魔女 ${v.m ? '✔' : '✘'}` };
+  return { _talk: (sg, cast) => talkScript(sg, cast), on, cam, reel, castShot: (t, fo) => castShot(t, fo), pendingCine: () => !!CN || !!(on() && T && !T.noNode && !T.cinDone && Worlds.active && (!T.readyAt || performance.now() - T.readyAt < 15000)), get cine() { return CN; }, NEED: D.NEED, clues, giveClue, goalHTML, gen, script, play, end, next, resolve, onKill, SS, banner, showSettle, FX_TXT, _setT: v => { T = v; }, get T() { return T; }, hint: v => `🌙 月之线索 ${clues()}/${D.NEED} · 月之魔女 ${v.m ? '✔' : '✘'}` };
 })();

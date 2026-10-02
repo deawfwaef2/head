@@ -2132,3 +2132,19 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - Pose is persisted by the normal piece pack (IndexedDB), so a taken whole-body piece keeps its pose in the cave. Re-posing inside the cave is NOT implemented (would need a rig in Props).
 - Footprint (`sz`) follows the posed bbox. Pose geometry is a CLONE of the cached geometry (the cache is needed for undo) — never mutate `s._g`.
 - Test hooks: `Autopsy.ui.pose.{start,end,rd,grab(i,x,y,z),release,reset,skin}`; scripts were `/home/user/work/t14.js`.
+
+
+## R57s（剧情，与上面 autopsy 的 R57 无关）· 剧情与钩子（宿敌剧情 / 起源 / 地区电影改对话 / 开场文案 / 开始框 bug / 血祭面板）
+用户原话要点：缺剧情和钩子；主线是月之魔女，二次元“女主们追猎你”的感觉，随机生成；宿敌变强要先播剧情（每次加载地图），说清楚她怎么变强、强在哪（方面不同），可能带队友；开局 4 猎手和宿敌的起源；进地区别在出生点乱转镜头，改成地区里不同女人的多角度特写+对话+多样反馈；开场文本太迷幻要具体；电影后常不出开始框；血祭别放在地区 UI 里。
+- **新 MOD `nem_story`（默认开，仅中文）· 新文件 `js/nemstory.js`（window.NemStory）**
+  - 成长侦测（每 250ms poll）：猎手 `Hunters2.lvOf` 上涨（8 分钟成长 / 仇恨 / 逃走 esc → why='esc'）、额外宿敌 `Nemesis.S().extra` 每 5 分钟成长；新出现的额外宿敌 → 起源事件；首次运行 → 开篇事件（四猎手接下“第七号悬赏”，落款是月印 → 月之魔女钩子）。
+  - 每个成长事件随机一个**方面**并立刻写进 `G.S.nst.p[key]`（key = `h:aerin` / `x:名字`）：blade 伤害+12%（≤3）· armor 生命+18%（≤3）· skill 技能池加 leap/charge/breaker/whirl · study iq+0.22（≤2）· swift 速度+10%（≤2）· bless 词缀 iron/regen/relentless/leech · vow 撤退血线 0.3→0.16 且伤害+8% · ally 同伴（最多 2 人，RPG.foe 固定 seed 生成，出场时 `Foe.populate keep` 一起刷出）。
+  - 出场套用：`hunters2.js spawn()` 末尾 `NemStory.apply(fo,'h:'+id,C,pos)`、`__forceAff` concat `NemStory.aff()`；`nemesis.js extraStrike()` 同样（populate 时临时设 `__forceAff`）。`hunters2.js` 撤退判定改 `fo.nsVow ? 0.16 : FLEE_AT`；导出 `recFor`。
+  - 播放：地图就绪（W.B && !W.busy，非精英/猎场）且队列非空 → 用 `Foe.build + Foe.animate` 在玩家脚边临时搭演员（同战斗里的身体/头：`Hunters2.recFor` / `x.h` / 导师与同伴 RPG.foe），`Saga.reel()` 播放；结束移除演员。每次加载最多一段（开篇 > 起源 > 成长），其余成长事件做成“同一时间”蒙太奇卡。最后一张**变强卡**（`#sgRoot .nsb`）列出方面和效果。台词：每名猎手专属地点/导师/方面台词/对你最近行为的反应（`{reg}{n}{heads}`），额外宿敌用 Overhear.bio 口头禅/秘密。
+- **`js/saga.js`（R49 作者文件，改动尽量小）**：抽出 `startCN()`；新增 `reel(o)`（通用短片：beats 同 castBeats，可带 `card:{a,b,c}` 标题卡、`onBeat`、`onEnd`）、`castShot` 新镜头 `cTwo`（双人侧拍）/`cOS`（过肩，需 `fo.pair`）；`tick` 开头 `NemStory.hold()` 时先不播地区电影；精英房跳过时置 `sg.cinDone`；导出 `reel / castShot / pendingCine()`；`finishBeats` 对 reel 直接 end；`end()` 调 `sg.onEnd`。
+- **新 MOD `saga_talk`（默认开）**：`saga.js talkScript()` —— 地区电影改为场上 2–3 个真实在场的女人（castPick 放宽到 3 人）的硬切特写对话：标题镜头=她看见你（初访惊恐/再访戒备/上次赢了或输了/悬赏高时不同），她用自己的名字说异变，另一人接话，手部动作+起因，目标在场则目标亮相，最后有人说出目标下落，赌注卡、出发卡保留；猎手在场时插入猎手人设镜头。附近没人 → 退回旧 `script()`。
+- **开场文本**：`saga_data.js MONO` 全部改写成具体的格罗克心声（饿/首级/悬赏/魔女诅咒/斯尼克），不再“月亮在我骨头里敲了一下”。（新游戏的 `ui.js INTRO` 文本页本来就具体，没动；真正的“开篇剧情”由 nem_story 开篇短片承担。）
+- **bug：电影后不出开始框**（`js/arrival2.js`）：以前只在 700ms 时看一次 `Saga.cine`；地区电影晚开（猎手伏击最多推迟 9s）时窗口先弹出、被 `body.sgcine` 盖成透明，玩家按空格翻电影时被“隐形”关掉。现在等 `Saga.cine || Saga.pendingCine() || NemStory.hold()` 都结束（最多 40s）再开，已开不重复开。
+- **新 MOD `rite_panel`（默认开）**（`js/nemesis.js inject()`）：血祭从地区选择界面里移出来，改成左侧固定面板 `#nemBuff.nb-side`（和 loop.js 右侧 `#lpSide` 对称，z 130），地区界面关闭/出发时移除；关掉 MOD = 旧位置。
+- 其他改动：`mods.js` 3 条 MOD；`index.html` 在 nemesis.js 后加 `js/nemstory.js`；`nemesis.js` 8 分钟成长 toast 文案。
+- **测试状态（R57s）**：Node 桩测试通过（`nemstory.js` 开篇/猎手成长/多人合并蒙太奇/新宿敌起源/额外宿敌成长 → 剧本与变强卡、`apply()` 改属性；`saga.js talkScript` 初访/上次赢/上次输三种反应）。真实浏览器：开局事件入队 → 地图就绪后开始搭演员 ✔，但本沙箱 2GB 内存在出猎地图 + 额外 VRoid 身体时被 OOM，**没能截到插曲画面**；慢机器第一次搭 4 个身体约 50s（已改 60s 超时 + 下一张图重试一次 + 并行搭建）。请有 GPU 的机器实测：新存档出猎 → 开篇四猎手 → 地区女人对话电影 → 开始框。
