@@ -635,25 +635,27 @@ window.Foe = (() => {
   function attack(fo, d, force) {
     if (fo.duel && window.FoeDuel && FoeDuel.attack(fo, d, force)) { lastAtkAt = CLK; return; } // R54 foe_duel：不播攻击动画，程序化举刀到来刀一侧
     const f = fo.f, s = CTX.st(), r = Math.random();
-    let clip;
+    let clip; if (!fo._chainStep) fo.cq = null;
     if (force) clip = force;
     else if (fo.armed) {
       const elite = fo.boss || fo.rar >= 3 || fo.iq > 0.95;
       if (fo.boss) clip = r < 0.22 ? 'Sword_Heavy_Combo' : r < 0.4 ? 'Sword_Regular_Combo' : r < 0.55 ? 'Sword_Attack' : pickR(Math.random, ['Sword_Regular_A', 'Sword_Regular_B', 'Sword_Regular_C']);
       else clip = elite && r < 0.2 ? 'Sword_Regular_Combo' : elite && r < 0.32 ? 'Sword_Attack' : pickR(Math.random, ['Sword_Regular_A', 'Sword_Regular_B', 'Sword_Regular_C', 'Sword_Regular_A']);
     } else clip = pickR(Math.random, ['Punch_Jab', 'Punch_Cross', 'Melee_Hook', 'Melee_Hook']);
-    if (fo.role && window.FoeRoles) clip = FoeRoles.clip(fo, clip, d, force) || clip;
-    const c = f.clips[clip], T = ATK[clip]; if (!c || !T) return;
+    if (fo.role && window.FoeRoles && !fo._chainStep) clip = FoeRoles.clip(fo, clip, d, force) || clip;
+    if (!force && !fo._chainStep && window.Moves && Moves.on()) clip = Moves.pick(fo, d, clip) || clip; // R55g 招式库：按职业从更大的招式池里选（变体/连招）
+    const T = ATK[clip], real = (T && T.clip) || clip, c = f.clips[real]; if (!c || !T) return;
     const base = fo.boss ? (fo.rage ? 0.08 : 0.07) : 0.03 + fo.rar * 0.014 + (fo.armed ? 0.02 : 0); // 第十九轮：BOSS 每刀 10%→7%（狂暴 8%）
     const ws = fo.boss ? 0.45 : 0.46 + Math.min(0.2, fo.iq * 0.12);
     const hits = T.hits.map(([t, a, k]) => ({ t, a: a * D2R, ang: a * D2R, heavy: k === 'heavy', thrust: k === 'thrust' }));
-    const act = f.play(clip, { once: true, fade: 0.12, speed: 1, restart: true }); if (!act) return; lastAtkAt = CLK; if (CTX.windup) try { CTX.windup(fo, clip); } catch (e) {}
-    fo.atk = { clip, act, hits, hi: 0, ws, ws2: Math.min(1, ws * 1.7), end: Math.min(c.duration, T.end || c.duration), lunge: T.lunge || 0,
-      holdAt: Math.min(0.1, hits[0].t * 0.4), hold: fo.boss ? 0.3 : 0.26 - Math.min(0.1, fo.iq * 0.08), feint: !fo.boss && fo.iq > 0.8 && Math.random() < 0.14,
+    const act = f.play(real, { once: true, fade: 0.12, speed: 1, restart: true }); if (!act) return; if (T.from) act.time = T.from; lastAtkAt = CLK; if (CTX.windup) try { CTX.windup(fo, clip); } catch (e) {}
+    fo.atk = { clip: real, alias: clip, act, hits, hi: 0, ws, ws2: Math.min(1, ws * 1.7), end: Math.min(c.duration, T.end || c.duration), lunge: T.lunge || 0,
+      holdAt: (T.from || 0) + Math.min(0.1, (hits[0].t - (T.from || 0)) * 0.4), hold: fo.boss ? 0.3 : 0.26 - Math.min(0.1, fo.iq * 0.08), feint: !fo.boss && fo.iq > 0.8 && Math.random() < 0.14,
       reach: fo.armed ? 1.8 : 1.35, tot: 0, dmg: Math.max(1, Math.round(s.maxHp * base * (0.85 + Math.random() * 0.3))) };
     if (fo.role && window.FoeRoles) FoeRoles.tune(fo, fo.atk, d);
     if (window.FoeAI2) FoeAI2.tune(fo, fo.atk, d); // R34：强度缩放 / 节奏扰乱
     if (FAIR()) { const A = fo.atk; A.ws *= 0.72; A.ws2 = Math.min(0.8, A.ws * 1.4); A.hold = Math.max(0, A.hold) + 0.18; A.feint = false; } // R54n：给玩家约 1 秒反应
+    if (fo._chainStep) fo.atk.hold = Math.max(0.04, fo.atk.hold - 0.12); // 连招的后手：停顿略短
     if (window.Barks) try { Barks.windup(fo, clip, fo.atk); } catch (e) { }
     if (fo.sayT <= 0 && Math.random() < 0.25) { if (fo.boss) talk(fo, '', '#ffb0a0'); else sayP(fo, 'fight', SAY.fight, '#ffb0a0'); } else if (!fo.boss && window.Persona && Math.random() < 0.5) Persona.line(fo, 'atk', true); // 第二十四轮：出手喝声
   }
@@ -678,7 +680,8 @@ window.Foe = (() => {
         else if (fo.sayT <= 0 && Math.random() < 0.3) talk(fo, '……躲开了？'); }
     }
     act.timeScale = sc;
-    if (!A.hits[A.hi] && (ct >= A.end - 1e-3 || ct >= act.getClip().duration - 1e-3)) { fo.atk = null; fo.cd = (fo.boss ? (fo.rage ? 1.0 : 1.5) : 1.15) + Math.random() * (fo.boss ? Math.max(0.6, 2.4 - fo.iq) : Math.max(0.5, 1.6 - fo.iq)) + (window.Brain && Brain.on() ? -0.9 : FAIR() ? 0.7 : 0); if (PRESS() && !A.ranged && !A.landed && d < 3.2 && fo.iq > 0.45 && (fo.chain | 0) < (FAIR() ? 1 : 2)) { fo.cd = (FAIR() ? 0.9 : 0.3) + Math.random() * 0.3; fo.chain = (fo.chain | 0) + 1; } else fo.chain = 0; /* R43：落空后你还在附近就立刻补一刀（最多连 2 次） */ fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); if (fo.role && window.FoeRoles) FoeRoles.after(fo); if (window.FoeAI2) FoeAI2.after(fo); }
+    if (!A.hits[A.hi] && (ct >= A.end - 1e-3 || ct >= act.getClip().duration - 1e-3)) { fo.atk = null; fo.cd = (fo.boss ? (fo.rage ? 1.0 : 1.5) : 1.15) + Math.random() * (fo.boss ? Math.max(0.6, 2.4 - fo.iq) : Math.max(0.5, 1.6 - fo.iq)) + (window.Brain && Brain.on() ? -0.9 : FAIR() ? 0.7 : 0); if (PRESS() && !A.ranged && !A.landed && d < 3.2 && fo.iq > 0.45 && (fo.chain | 0) < (FAIR() ? 1 : 2)) { fo.cd = (FAIR() ? 0.9 : 0.3) + Math.random() * 0.3; fo.chain = (fo.chain | 0) + 1; } else fo.chain = 0; /* R43：落空后你还在附近就立刻补一刀（最多连 2 次） */ fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.2 }); if (fo.role && window.FoeRoles) FoeRoles.after(fo); if (window.FoeAI2) FoeAI2.after(fo);
+      if (fo.cq && fo.cq.length) { if (fo.state === 'chase' && !fo.dead && !(fo.stag > 0) && !A.ranged && d < 3.6) { const nx = fo.cq.shift(); fo._chainStep = true; try { fo.cd = 0; attack(fo, d, nx); } finally { fo._chainStep = false; } if (fo.atk) return { turnTo: face, spd: 0 }; } fo.cq = null; } } // R55g 连招
     return { turnTo, spd };
   }
   // 给 HUD：正在蓄力/出手的敌人 → 来刀方向 + 进度（1 = 命中那一刻）

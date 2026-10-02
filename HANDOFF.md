@@ -2096,3 +2096,12 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - **台架**：`tools/test/aibench.js`（在真实游戏页里手动步进 `Foe.update`，`__bench(role, secs, {extra, extraRole, circle, kite})` / `__benchAll(secs)`；指标 atks/hits/near/avgD/maxStuck/maxAtkSec）。用法见文件头。注意：台架里切 MOD 请直接写 `localStorage.soulhead_mods`，别用 `Mods.set`（会持久化关掉 `foe_brain` 影响后续测试）。
 - **实测（Brain 开，玩家站桩/绕圈）**：3 个决斗者 40s 共 24 次起手（轮流，无人 0 次）；4 人混编绕圈玩家全员都在 2.2m 内出手；17 种职业无卡死（maxAtkSec ≤ 4s）。
 - 未做 / 下一步想法：投掷手/术士在你贴脸时的风筝逻辑仍各自实现；第一批职业（brute/skirm/guard/assassin/berserk/ranged）台架里 `__forceRole` 不生效（foe_roles.js 没读它），没单独测。
+
+## R55g 用户反馈：敌人攻击动画太少了（种类）
+- **病因**：动作库里真正的攻击动作只有 Sword_Regular_A/B/C、Sword_Attack、Sword_Dash、Sword_Regular_Combo、Sword_Heavy_Combo、拳 3 种（Jab/Cross/Hook）、OverhandThrow；Shield_Dash/Shield_OneShot/Spell_Simple_Shoot 实测没有明确的出手时刻（右手/左手速度峰值都不明显），没当攻击用。而且职业 `clip()` 钦定：重甲卫永远 Sword_Attack、刺客永远 Dash、决斗者 55% Dash……
+- **做法（不新增任何动画/模型文件）**：新增 `js/moves.js`（MOD `foe_moves`，默认开，`Moves.pick(fo,d,cur)`，foe.js `attack()` 在职业选招之后调用）：
+  - 变体 `Foe.ATK` 新增 `{clip, from, hits, end}`：`Sword_Combo_AB/BC/CD`（常规连击前两刀/后三刀/末两刀，`from` = 起播偏移）、`Sword_Heavy_Open/Finish`（重剑起手/收尾）；命中时刻/角度全部沿用 ATK 里已实测的数值。`attack()` 用 `T.clip||clip` 播真实动作并设 `act.time=T.from`，`fo.atk.clip`=真实动作名、`fo.atk.alias`=招式名，holdAt 相应后移。
+  - 连招：`fo.cq` 队列，`atkStep` 收招后（state 仍是 chase、没被打硬直、d<3.6）立刻接下一招（`fo._chainStep` 跳过职业选招，后手停顿 -0.12s）。新单招起手时 `fo.cq` 清空。
+  - 每个职业一份加权招式池 `POOL`（决斗者/重甲卫/蛮兵/狂战/盾卫/战旗手/刺客/游击/BOSS/徒手/通用），精英才用多段招，不连续出同一招，远距离偏冲刺、贴脸偏短招。长枪/双刀/投弹/网/陷阱/唤灵等有自己招式的职业不动。
+- 实测：各职业池 5~11 种招式（含连招）；台架 120 秒内决斗者 57 次起手 8 次连招、重甲卫 43 次/7 次连招，无报错、无攻击卡死。
+- 注意/待办：从连击中段起播（from=0.5/0.95/1.5）有 0.12s 交叉淡入，**姿势衔接没做肉眼检查**；如果某个变体看着别扭，改 `moves.js` 的 `from` 或把它从池里去掉。真正新的动作（踢腿、旋转斩、跳劈）需要新动画资源——用户“不要自制模型”的规则，没有做。
