@@ -337,3 +337,7 @@ models/CLS_*.js，由 js/headpacks.js 按 MOD pack_voc / pack_touhou / pack_cls 
 - `VH_175329` ジトメちゃん — ヽ｜∵｜ゝ(Fantom) (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2089525207077426323/models/3376344186259175329
 - `VH_949838` Boothにて無料配布中 — 安全太郎(旧01_mit) (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2825453020096694533/models/6916943412428949838
 - `VH_340200` godess — lilone12 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/105657022597535184/models/6681477312828340200
+
+## R63b 音效包（sfx/pack.js、sfx/amb.js；构建脚本 tools/build_sfxpack.py）——全部 CC0（逐页核对）
+- Kenney（kenney.nl，CC0）：Impact Sounds、RPG Audio、Interface Sounds。
+- OpenGameArt CC0：Swishes Sound Pack（artisticdude）· 20 Sword Sound Effects 攻击与碰撞（StarNinjas）· RPG Sound Pack（artisticdude：盔甲/链甲/硬币/拔剑/法术/食人魔/巨人/幽影/粘液/野兽）· 40 wet towel on body、37 hits/punches、Ghost Monster Voice、20 Rustles of dry leaves、Metal Interactions、Dripping water loop（qubodup / Independent.nu）· 75 breaking/falling/hit、100 metal and wood、100 SFX #2、80 creature SFX（rubberduck）· Fire Crackling（AntumDeluge）· Crow caw（zeroisnotnull）· Wolf Monster Sound（caveboytup）· Heartbeat sounds（bart）· Loopable Dungeon Ambience（JaggedStone）· Dark Cavern Ambient（paul-wortmann）· Swamp Environment Audio（lokif）· Crickets Ambient Noise（wolfgang）· wind1（lukerustltd）· wind whoosh loop（sketchman3）· Different steps（tinyworlds）· Dark Ambiences（ogrebane）· Horror SFX（tinyworlds）· Sea and river wave sounds（randommind）。

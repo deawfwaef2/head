@@ -15,6 +15,7 @@ window.CombatFX = (() => {
   const modOn = () => !window.Mods || Mods.on('combat_fx');
   const GG = () => window.G || window.__game || {};
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x)), rnd = (a, b) => a + Math.random() * (b - a);
+  let dryK = 1; // R63b：SfxPack 叠真实录音时把合成层降到 0.6
   let c = null, dry = null, conv = null, lp = null, nbuf = null, lastCtx = null;
   const last = {}; // 每种音效的最小间隔（防止同一帧叠几十层）
   function gate(k, gap) { const t = performance.now(); if (last[k] && t - last[k] < gap) return false; last[k] = t; return true; }
@@ -25,7 +26,7 @@ window.CombatFX = (() => {
     if (c !== SFX.ctx || !dry) { // 首次 / AudioContext 重建
       c = SFX.ctx; lastCtx = c;
       lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 20000; lp.Q.value = 0.5; lp.connect(SFX.out);
-      dry = c.createGain(); dry.gain.value = 0.95; dry.connect(lp);
+      dry = c.createGain(); dry.gain.value = 0.95 * dryK; dry.connect(lp);
       const len = Math.floor(c.sampleRate * 1.3), ir = c.createBuffer(2, len, c.sampleRate); // 合成小型混响：指数衰减噪声
       for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6) * (i < 200 ? i / 200 : 1); }
       conv = c.createConvolver(); conv.buffer = ir; const wet = c.createGain(); wet.gain.value = 0.5; conv.connect(wet); wet.connect(lp);
@@ -243,5 +244,5 @@ window.CombatFX = (() => {
     const steps = [() => swing(1, 0, 0.8), () => swing(-1, 0, 1, true), () => thrust(), () => whiff(), () => onHit({ pos: { x: 0, y: 1, z: -2 } }, { dealt: 10, zone: 'chest' }), () => onHit({ pos: { x: 0, y: 1, z: -2 } }, { dealt: 26, zone: 'neck', charged: true }), () => clang('block'), () => clang('break'), () => onParry(), () => onDecap({ pos: { x: 0, y: 1, z: -2 } }), () => onKill({ pos: { x: 0, y: 1, z: -2 } }), () => windup({ pos: { x: 2, y: 0, z: -3 }, role: 'brute' }, 'Sword_Attack'), () => windup({ pos: { x: -2, y: 0, z: -3 } }, 'Sword_Regular_A'), () => hurt(25, null, { heavy: true }), () => onDodge(true)];
     steps.forEach((f, i) => setTimeout(() => { try { f(); } catch (e) { console.warn(e); } }, i * 900)); return steps.length;
   }
-  return { event, swing, thrust, whiff, charge, draw, stamina, windup, enemySwing, roleCue, hurt, clang, tick, demo, marker, kick, get on() { return modOn(); } };
+  return { event, swing, thrust, whiff, charge, draw, stamina, windup, enemySwing, roleCue, hurt, clang, tick, demo, marker, kick, setMix(k) { dryK = k; if (dry && c) dry.gain.setTargetAtTime(0.95 * k, c.currentTime, 0.05); }, get on() { return modOn(); } };
 })();

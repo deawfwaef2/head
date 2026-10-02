@@ -74,7 +74,7 @@ window.Beasts = (() => {
       const mixer = new THREE.AnimationMixer(root), acts = {}; M.clips.forEach(c => { acts[c.name] = mixer.clipAction(c); });
       const hpM = (window.FoeAbs && FoeAbs.on) ? FoeAbs.hpK(rec * 0.9) : 1 + Math.min(2.2, Math.sqrt(rec / 60) * 0.55); /* R35 foe_abs：野兽血量按地区绝对缩放 */
       const b = { id: 'bst' + (++IDS), e, k: e.k, T, g, model, baseY: -M.minY * s, mixer, acts, mats, pos: g.position, yaw: g.rotation.y, hp: Math.round(T.hp * hpM), maxHp: Math.round(T.hp * hpM), alive: true, state: 'idle', t: rnd(0, 2), cd: rnd(0.5, 2), stun: 0, broken: 0, flash: 0, cur: '', lookT: rnd(1, 4), tgt: null, side: rr() < 0.5 ? 1 : -1, stuck: 0, lastP: new V3(x, 0, z), provoked: false, noticed: false, hitDone: false, lootAt: 0, tint: e.tint,
-        stub: { pos: g.position, boss: null, broken: 0, stag: 0, rar: 1, h: { c: { name: T.n } }, f: { play() { } }, anchor: { pos: g.position }, dead: false, sayT: 99, atk: null, seen: true, state: 'chase', hp: 1, maxHp: 1 } };
+        stub: { pos: g.position, beast: e.k, boss: null, broken: 0, stag: 0, rar: 1, h: { c: { name: T.n } }, f: { play() { } }, anchor: { pos: g.position }, dead: false, sayT: 99, atk: null, seen: true, state: 'chase', hp: 1, maxHp: 1 } };
       play(b, 'Idle', { fade: 0 }); if (acts.Idle) acts.Idle.time = rnd(0, 2); BS.push(b);
     }
     return BS.length;
@@ -206,7 +206,7 @@ window.Beasts = (() => {
     b.hp -= dealt; b.flash = 0.12; b.provoked = true; const fp = b.pos.clone(); fp.y += b.T.h * 0.8 + (b.T.fly || 0); C.floatDmg(fp, dealt, sp > 1.2 || b.broken > 0 || !!info.crit);
     { const kv = (info.vel || new V3()).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((b.T.ai === 'charger' ? 0.1 : 0.28) * sp * (WP ? WP.kb : 1)); b.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退分 0.16 秒推完（以前一帧瞬移）
     C.event && C.event('hit', b.stub, { dealt, zone: 'body', brk: b.broken > 0 });
-    window.SFX && (SFX.chop && SFX.chop(), SFX.squish && SFX.squish(0.5)); window.Foe && Foe.spark && Foe.spark(info.point || fp, 5, 'red');
+    if (!(window.CombatFX && CombatFX.on)) window.SFX && (SFX.chop && SFX.chop(), SFX.squish && SFX.squish(0.5)); /* R63b：命中声由 CombatFX/SfxPack 按野兽材质发 */ window.Foe && Foe.spark && Foe.spark(info.point || fp, 5, 'red');
     if (b.hp <= 0) { die(b, info); return true; }
     if (b.state === 'idle' || b.state === 'flee' && b.T.ai !== 'skittish') { b.state = ({ pack: 'stalk', charger: 'paw', skittish: 'fight' })[b.T.ai] || 'chase'; b.t = 0; b.cd = 0.5; b.noticed = true; b.ring = Math.atan2(b.pos.x - C.pos().x, b.pos.z - C.pos().z); b.dir = b.side; }
     else if (b.T.ai === 'skittish' && b.state === 'flee') { b.state = 'fight'; b.t = 0; }

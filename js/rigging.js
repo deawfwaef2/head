@@ -15,6 +15,8 @@
 // 三、存档：G.S.rig = { v, nid, parts:[{id,k,...}], bq:{ 'p<pid>':[x,y,z,qx,qy,qz,qw] } }；引用 Ref：{t:'part',id,port} / {t:'head',rid,l} / {t:'prop',pid,l}（l = 相对质心的本地偏移）。
 // 四、模型：锁链环/钉/钩/环/秤砣/铜铃是最简单的几何体（和 props.js 里的牵魂线同类）；吊灯用 Poly Haven CC0 的 Lantern_01。
 window.Rig = (() => {
+  // R63b：优先用真实音效包的语义音（SfxPack.cue），没加载时退回原来的 SFX.play
+  const snd = (k, p, fb, v, r) => { if (window.SfxPack && SfxPack.ready && SfxPack.cue(k, p)) return; window.SFX && SFX.play && SFX.play(fb, v, r); };
   const on = () => !(window.Mods && Mods.on && Mods.on('rigging') === false);
   const STUB = { on, off: true, mul: () => 1, releaseProp() {}, startPlace() {}, KD: {} };
   if (!on() || !window.THREE) return STUB;
@@ -284,7 +286,7 @@ window.Rig = (() => {
   function bells(now) {
     for (const c of compInfo) { if (!c.anch || !c.bells.length || !c.heads.length) continue;
       for (const id of c.bells) { const rt = RT.get(id); if (!rt || !rt.body) continue; rt.cd = Math.max(0, (rt.cd || 0) - 0.016 * 4); if (rt.body.sp > 0.9 && rt.cd <= 0) {
-        rt.cd = 9; rt.bellT = 1; window.SFX && SFX.play && SFX.play('bell', 0.5, 1 + Math.random() * 0.2); const pos = rt.body.com.p.clone().add(new V3(0, 0.25, 0)); let n = 0;
+        rt.cd = 9; rt.bellT = 1; snd('bell', rt.body.com.p, 'bell', 0.5, 1 + Math.random() * 0.2); const pos = rt.body.com.p.clone().add(new V3(0, 0.25, 0)); let n = 0;
         for (const hid of c.heads) { const h = G.heads.find(x => x.rec && x.rec.id === hid); if (h && n < 4 && G.playing) { G.trigger && G.trigger(h, 'auto', 1.25); n++; G.burst && G.burst(h.g.position, '#9fe8d0', 5, 0.5, 0.4, -1); } }
         if (n) G.floatText && G.floatText(`🔔 连锁共鸣 ×${n}`, pos, '#9fe8d0', 16); } }
     }
@@ -354,7 +356,7 @@ window.Rig = (() => {
       if (!takeItem('nail')) { G.toast('铁钉不够了。', '#f88'); endMode(); return; }
       const d = { k: 'nail', p: a.pt.toArray(), n: a.n.toArray(), fresh: 1 };
       if (a.type === 'head' || a.type === 'prop') { const r = bodyRef(a, 1.0); d.n = a.n.clone().applyQuaternion(r.q0).toArray(); delete r.q0; d.host = r; }
-      addPart(d); window.SFX && SFX.play && SFX.play('metal', 0.7, 0.9); setTimeout(() => window.SFX && SFX.play && SFX.play('wood', 0.5, 1.3), 90); if (!haveItem('nail')) endMode(); return;
+      addPart(d); snd('nail', null, 'metal', 0.7, 0.9); if (!(window.SfxPack && SfxPack.ready)) setTimeout(() => window.SFX && SFX.play && SFX.play('wood', 0.5, 1.3), 90); if (!haveItem('nail')) endMode(); return;
     }
     if (k === 'chain' || k === 'hook') {
       if (!m.a) { const r = resolveEnd(a); if (!r) return; m.a = r; window.SFX && SFX.play && SFX.play('click', 0.5, 1.2); return; }
@@ -362,13 +364,13 @@ window.Rig = (() => {
       const r = resolveEnd(a); if (!r) { if (!m.restore) refund(k); return; }
       if (JSON.stringify(r) === JSON.stringify(m.a)) { G.toast('两端不能是同一个点。', '#f88', 1.4); if (!m.restore) refund(k); return; }
       let d; if (m.restore) { d = m.restore.d; d[m.restore.end] = r; d.len = m.len; delete d['f' + m.restore.end]; } else d = { k, a: m.a, b: r, len: k === 'chain' ? m.len : 0.3 };
-      if (m.restore) { mark(); G.save && G.save(); } else addPart(d); rebuild(); afterConnect(); window.SFX && SFX.play && SFX.play('metal', 0.6, 1); endMode(); return;
+      if (m.restore) { mark(); G.save && G.save(); } else addPart(d); rebuild(); afterConnect(); snd('chain', null, 'metal', 0.6, 1); endMode(); return;
     }
     if (!takeItem(k)) { G.toast('这件装具不够了。', '#f88'); endMode(); return; }
     const d = { k, p: a.pt.toArray() };
     if (a.type === 'port' || a.type === 'head' || a.type === 'prop' || (a.type === 'surf' && k !== 'ring' && Math.abs(a.n.y) < 0.9 && haveItem2(k))) { const r = resolveEnd(a); if (!r) { refund(k); return; } d.hang = r; } else d.p[1] += a.type === 'surf' ? 0.12 : 0;
     if (d.hang && HANG[k]) { const pt = ptWorld(d.hang); if (pt) d.p = [pt.x, pt.y - HANG[k].eye, pt.z]; }
-    addPart(d); rebuild(); afterConnect(); window.SFX && SFX.play && SFX.play(k === 'bell' ? 'bell' : 'metal', 0.5, 1); endMode();
+    addPart(d); rebuild(); afterConnect(); snd(({ bell: 'bell', weight: 'weight', lantern: 'lantern', ring: 'ring' })[k] || 'hook', null, k === 'bell' ? 'bell' : 'metal', 0.5, 1); endMode();
   }
   const haveItem2 = () => haveItem('nail');
   function afterConnect() {
@@ -394,7 +396,7 @@ window.Rig = (() => {
         }
       }
     }
-    removePart(d); rebuild(); window.SFX && SFX.play && SFX.play('metal', 0.6, 0.8); G.toast(`${KD[d.k].icon} 收回 <b>${KD[d.k].n}</b>（储物箱）`, '#cfe0f5', 1.5); return true;
+    removePart(d); rebuild(); snd('pull', null, 'metal', 0.6, 0.8); G.toast(`${KD[d.k].icon} 收回 <b>${KD[d.k].n}</b>（储物箱）`, '#cfe0f5', 1.5); return true;
   }
   function onTip(hit, held) {
     if (mode || held || !RT.size) return null; if (hit && hit.head && hit.d < 1.2) return null; const b = pickAt(); if (!b) return null; const d = b.rt.d, K = KD[d.k];

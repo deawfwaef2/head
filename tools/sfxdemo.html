@@ -1,0 +1,38 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><base href="../"><meta name="viewport" content="width=device-width,initial-scale=1"><title>音效试听 · SFX Audition (R63)</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0d0b10;color:#e9dfd0;font:17px/1.5 "PingFang SC","Microsoft YaHei",system-ui,sans-serif;padding:28px 22px 80px;max-width:1100px;margin:auto}
+h1{font-size:34px;margin:0 0 4px;letter-spacing:1px}h1 small{font-size:18px;color:#a99;font-weight:400}p.s{color:#b9a99a;margin:0 0 22px}
+h2{font-size:22px;margin:30px 0 10px;color:#ffd080;border-left:5px solid #c4572b;padding-left:12px}
+.g{display:flex;flex-wrap:wrap;gap:10px}button{font:inherit;font-size:17px;padding:11px 18px;border-radius:12px;border:1px solid #5a4638;background:linear-gradient(#2a211c,#1b1512);color:#f3e8d8;cursor:pointer;transition:.12s}
+button:hover{border-color:#ffb060;transform:translateY(-1px)}button:active{background:#6b3a1f}
+#st{position:fixed;right:18px;top:14px;background:#1b1512;border:1px solid #5a4638;border-radius:12px;padding:8px 14px;font-size:16px;z-index:9}
+</style></head><body>
+<div id="st">⏳ 加载音效包…</div>
+<h1>🎧 音效试听 <small>SFX Audition · R63</small></h1><p class="s">所有声音均为 CC0 真实录音（Kenney / OpenGameArt），原有合成音垫底。先点任意按钮激活声音；战斗按钮直接走游戏里同一条音频链。</p>
+<div id="app"></div>
+<script>
+window.G = { playing: true, uiOpen: false, S: { eq: { weapon: 2 }, hp: 100 }, st: () => ({ maxHp: 100 }), camera: { position: { x: 0, y: 1.5, z: 0 }, updateMatrixWorld() { }, matrixWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1.5, 0, 1] } } };
+</script>
+<script src="js/mods.js"></script><script src="js/sfxdata.js"></script><script src="js/sfx.js"></script><script src="js/combatfx.js"></script><script src="js/steps.js"></script><script src="js/ambience.js"></script><script src="js/sfxpack.js"></script>
+<script>
+const FO = (o) => Object.assign({ pos: { x: 1.2, y: 1.2, z: -2.5 }, id2: Math.random() }, o || {});
+const W = ['木棒', '钉头棒', '砍刀', '链锤', '巨斧', '魂镰', '刺剑'];
+const MATS = [['血肉', {}], ['重甲', { role: 'guard', armed: 1 }], ['野兽', { beast: 'wolf' }], ['霸主', { boss: 1 }]];
+const app = document.getElementById('app'); const sec = (t) => { const h = document.createElement('h2'); h.textContent = t; app.appendChild(h); const g = document.createElement('div'); g.className = 'g'; app.appendChild(g); return g; };
+const btn = (g, t, f) => { const b = document.createElement('button'); b.textContent = t; b.onclick = async () => { await SFX.init(); setTimeout(f, 30); }; g.appendChild(b); return b; };
+const P1 = { x: 1, y: 1.2, z: -1.5 };
+let g = sec('⚔ 你的武器：挥击'); W.forEach((n, i) => btn(g, n, () => { G.S.eq.weapon = i; CombatFX.swing(1, 0, 1, false); })); btn(g, '巨斧·蓄力挥', () => { G.S.eq.weapon = 4; CombatFX.swing(1, 0, 1, true); }); btn(g, '刺击', () => CombatFX.thrust()); btn(g, '空挥', () => CombatFX.whiff()); btn(g, '拔刀', () => CombatFX.draw(true)); btn(g, '收刀', () => CombatFX.draw(false));
+g = sec('🩸 命中：对方材质 × 武器'); MATS.forEach(([mn, m]) => [0, 2, 4, 6].forEach(wi => btn(g, mn + ' · ' + W[wi], () => { G.S.eq.weapon = wi; CombatFX.event('hit', FO(m), { dealt: 20, zone: 'body', kind: wi === 6 ? 'thrust' : 'slash', spd: 8 }); })));
+btn(g, '头部暴击', () => CombatFX.event('hit', FO(), { dealt: 30, zone: 'head', brk: true, spd: 10 }));
+g = sec('💀 击杀 / 斩首'); btn(g, '击杀 · 普通', () => CombatFX.event('kill', FO())); btn(g, '击杀 · 重甲', () => CombatFX.event('kill', FO({ role: 'guard', armed: 1 }))); btn(g, '击杀 · 野兽', () => CombatFX.event('kill', FO({ beast: 'wolf' }))); btn(g, '击杀 · 霸主', () => CombatFX.event('kill', FO({ boss: 1 }))); btn(g, '斩首', () => CombatFX.event('decap', FO())); btn(g, '断肢', () => CombatFX.event('sever', FO()));
+g = sec('🛡 防守'); btn(g, '格挡', () => CombatFX.clang('block', P1)); btn(g, '弹刀', () => CombatFX.clang('x', P1)); btn(g, '破防', () => CombatFX.clang('break', P1)); btn(g, '重击撞盾', () => CombatFX.clang('heavy', P1)); btn(g, '完美格挡', () => CombatFX.event('parry', FO())); btn(g, '闪避', () => CombatFX.event('dodge', FO())); btn(g, '完美闪避', () => CombatFX.event('perfectdodge', FO()));
+g = sec('🩹 你受伤 / 敌人出招'); btn(g, '轻伤', () => CombatFX.hurt(8, FO({ armed: 1 }), {})); btn(g, '重伤', () => CombatFX.hurt(45, FO({ armed: 1 }), { heavy: true })); btn(g, '体力耗尽', () => CombatFX.stamina()); btn(g, '敌人挥刀', () => CombatFX.enemySwing(FO({ armed: 1 }), {})); btn(g, '蛮兵重击', () => CombatFX.enemySwing(FO({ role: 'brute', armed: 1 }), { heavy: true })); btn(g, '霸主起手', () => CombatFX.windup(FO({ boss: 1 }), 'Sword_Attack')); btn(g, '野兽扑咬', () => CombatFX.enemySwing(FO({ beast: 'wolf' }), {})); btn(g, '狂战暴怒', () => CombatFX.roleCue(FO({ role: 'berserk' }), 'rage')); btn(g, '刺客绕背', () => CombatFX.roleCue(FO({ role: 'assassin' }), 'backstab'));
+g = sec('👣 脚步（连走 4 步）'); ['stone', 'grass', 'leaves', 'snow', 'mud', 'gravel', 'ash'].forEach(s => btn(g, s, () => { for (let i = 0; i < 4; i++) setTimeout(() => SfxPack.foot(s, null, 1.2, 0), i * 380); }));
+g = sec('🔗 装具 / 道具 / 奖励'); ['nail', 'pull', 'chain', 'hook', 'ring', 'weight', 'lantern', 'bell', 'rattle', 'stash', 'loot', 'equip', 'craft', 'door', 'magic'].forEach(c => btn(g, c, () => SfxPack.cue(c, { x: 1.2, y: 1.2, z: -2 })));
+btn(g, '升级', () => SFX.levelup()); btn(g, '大奖 fanfare', () => SFX.fanfare(3)); btn(g, '魂晶 ×5 连击', () => { for (let i = 0; i < 5; i++) setTimeout(() => SFX.soul(i, 1), i * 120); }); btn(g, '吼叫', () => SFX.roar(1));
+g = sec('🌬 环境（切换场景：循环底噪 + 远处事件 + 回音）'); const sc = ['cave', 'meadow', 'forest', 'wilds', 'ruins', 'swamp', 'fortress', 'capital', 'abyss', 'peak']; const NM = { cave: '洞穴', meadow: '草甸', forest: '森林', wilds: '荒野', ruins: '废墟', swamp: '沼泽', fortress: '要塞', capital: '王城夜', abyss: '深渊', peak: '山巅' };
+sc.forEach(s => btn(g, NM[s], () => { window.Worlds = s === 'cave' ? undefined : { active: true, _W: { graph: { nodes: [{ style: s }] }, cur: 0 } }; }));
+btn(g, '事件：乌鸦', () => SfxPack.play('crow', { pos: { x: 14, y: 6, z: -12 }, rv: .5, vol: .8 })); btn(g, '狼嚎', () => SfxPack.play('howl', { pos: { x: -22, y: 3, z: -20 }, rv: .5, vol: .9 })); btn(g, '雷声', () => SfxPack.play('thunder', { pos: { x: 20, y: 8, z: -30 }, rv: .5, lp: 2400, delay: .5 })); btn(g, '幽魂', () => SfxPack.play('ghost', { pos: { x: -8, y: 2, z: -10 }, rv: .7, lp: 3200 }));
+btn(g, '低血量心跳 开/关', () => { G.S.hp = G.S.hp < 50 ? 100 : 18; });
+const st = document.getElementById('st'); setInterval(() => { st.textContent = SfxPack.ready ? '✅ 音效包已就绪 · 场景：' + (NM[SfxPack.env()] || SfxPack.env()) : (SFX.ctx ? '⏳ 解码中…' : '👆 点任意按钮开始'); }, 500);
+</script></body></html>

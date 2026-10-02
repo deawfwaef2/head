@@ -54,6 +54,7 @@ window.Steps = (() => {
       const t = c.currentTime + 0.005, o = bus(c, Math.min(1, 1.6 / (1 + d * 0.35)) * (run ? 0.28 : 0.16) * (big ? 1.8 : 1) * (window.Mods && Mods.on('move_sfx') === false ? 1 : 2.2), -rel * 0.8);
       tn(c, o, t, 'sine', (big ? 90 : 150) * (0.9 + Math.random() * 0.2), big ? 40 : 80, big ? 0.16 : 0.07, big ? 0.5 : 0.28, 0.003); // 鞋跟
       layer(c, o, t, surf, big ? 1 : 0.55);
+      if (window.SfxPack && SfxPack.ready) SfxPack.foot(surf, fo.pos, big ? 1.6 : 1, d); // R63b：真实脚步
       if (fo.role === 'guard' || fo.role === 'brute') { for (let i = 0; i < 2; i++) tn(c, o, t + 0.02 + i * 0.03, 'triangle', 2200 + Math.random() * 1400, 2000, 0.05, 0.04, 0.002); } // 甲片叮当
     }
   }
