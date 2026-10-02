@@ -103,7 +103,9 @@ window.Mods = (() => {
     { id: 'victory2', cat: 'play', icon: '🏁', n: '新胜利条件（R35）', d: '胜利 = 任意 7 个地区霸主 + 13 名精英 + 4 名食人魔猎手 + 月之魔女。进度在「精英挑战」页签顶部。', def: true },
     { id: 'gear2', cat: 'play', icon: '💍', n: '传奇式装备（R35）', d: '新增 8 个饰品槽（项链/戒指×2/手镯×2/腰带/靴子/勋章），带 0~5 条随机词条（伤害%、暴击、减伤、回血、吸魂、魂晶、猎手仇恨…）；精英各掉一件专属神话装备。装备只能在野外找到，不能再用魂晶直接买（背篓除外）。Z 打开纸娃娃装备面板。', def: true },
     { id: 'hp_center', cat: 'ui', icon: '❤️', n: '屏幕底部正中大血条（R49d）', d: '血量与魂能放在屏幕底部正中、技能栏正上方：大号数字、掉血白色残影、低血量红光脉动与屏幕边缘泛红。左上角的小框仍保留。', def: true },
-    { id: 'workshop_plus', cat: 'play', icon: '🔨', n: '工坊扩充（R54）', d: '配方从 12 个扩到约 45 个：药品、料理、战斗增益（伤害 / 防御 / 疾行 / 再生 / 魂能）、头盔·护甲·护符打造、材料转化；砍断的上臂、下臂、大腿、小腿与腰斩的残胸会收进麻袋，可在工坊拆成骨、筋、皮。工坊文字也放大并提亮。', def: true },
+    { id: 'workshop_plus', cat: 'play', icon: '🔨', n: '工坊扩充（R54）', d: '配方从 12 个扩到约 45 个：药品、料理、战斗增益（伤害 / 防御 / 疾行 / 再生 / 魂能）、头盔·护甲·护符打造、材料转化；（R55：已移除断肢制作线，肢体改为战场解剖挑选。）工坊文字也放大并提亮。', def: true },
+    { id: 'dissect_pick', cat: 'play', icon: '🔪', n: '战场解剖·挑选部位（R55）', d: '只能在战场上解剖尸体：靠近尸体点「🔪 解剖」，弹出选择界面，在肢体（上臂、前臂、大腿、小腿、胸腔）与内脏（心、肺、肝、肾、胃、肠、脾、胆、脊椎、血液）里挑几件带走，每件都有用处（属性 / 光环 / 戳击 / 定时产出），摆进洞里的标本罐生效。头部器官（大脑、眼球、舌）不再可解剖。工坊里不再有断手、断脚、肠索的制作。', def: true, requires: ['organs'] },
+    { id: 'part_editor', cat: 'play', icon: '🦴', n: '残肢器官编辑器（R55）', d: '自己导入肢体 / 内脏的 3D 模型（.glb .gltf .obj .stl，含贴图），命名、设定用途、调整旋转大小，替换内置部位或新增自制部位；导入时自动检查模型与贴图（面数、体积、贴图缺失 / 过大 / 非 2 的幂、没有 UV）。可保存进游戏目录。默认关闭；开启并应用后，从这一项展开的按钮打开编辑器。', def: false, requires: ['organs'], btn: { l: '🦴 打开编辑器', o: 'PartEdit', f: 'open' } },
     { id: 'decap_cam', cat: 'play', icon: '🎬', n: '斩首特写·慢镜头（R49h）', d: '斩下头颅的一刻：黑边滑入 → 时间极慢地平滑变慢（约 12 倍慢放，约 6 秒）并配上音效 → 镜头不切走，只轻推近并转向飞出的头，能看清她的表情从惊愕变成绝望 → 颈口动脉式喷血（血雾 + 拉丝血线 + 落地血斑）→ 时间恢复。特写期间锁血，Enter 可跳过，周围的角色会当场出声反应（头顶气泡 + 字幕）；多敌围攻时不触发。', def: true },
     { id: 'mana_ui', cat: 'ui', icon: '🔮', n: '魂能条（R49g）', d: '屏幕底部正中、血条下方的大号蓝色魂能条：数字 + 每秒回复；已装备技能的消耗显示成刻度（数字 = 按键，够用时点亮）；命中/格挡/击杀回魂与施法耗魂会飘字；魂能不足时整条抖红并写出还差多少；低魂能红光提醒。', def: true },
     { id: 'skill_lite', cat: 'ui', icon: '🎛️', n: '简化技能栏（R49f）', d: '技能栏只有一排：闪身 / 处决 / 药水 + 你已学会的技能；去掉第二排、经验条、天赋按钮和一堆提示；左上角的角色框改成屏幕底部正中的血条。T 面板只剩「属性」和「技能」两页。', def: true },
@@ -435,7 +437,7 @@ window.Mods = (() => {
     const R = rels(m), N = i => BY[i] ? esc(nm(BY[i]).replace(/（.*?）|\(.*?\)/g, '')) + (st[i] ? '' : '<i style="opacity:.55">（关）</i>') : esc(i);
     const relH = R.n || R.grp.length ? `<div class="rel">${R.req.length ? `<b>依赖</b> ${R.req.map(N).join('、')}<br>` : ''}${R.by.length ? `<b>被依赖</b> ${R.by.map(N).join('、')}（关掉本项会连带关掉）<br>` : ''}${R.cf.length ? `<b>冲突</b> ${R.cf.map(N).join('、')}<br>` : ''}${R.grp.length ? `<b>同组单选</b> ${R.grp.map(N).join('、')}<br>` : ''}${R.soft.map(([k, t]) => `<b>相互影响</b> ${N(k)}：${esc(t)}`).join('<br>')}</div>` : '';
     return `<div class="row ${st[m.id] ? 'on' : ''} ${pd ? 'pend' : ''} ${ex ? 'ex' : ''}" data-id="${m.id}"><div class="rh" data-a="ex"><div class="ic">${m.icon}</div><div class="tx"><b>${esc(nm(m))}</b>${pd ? '<span class="tag pd">待应用</span>' : ''}${!!st[m.id] !== !!m.def && !pd ? '<span class="tag df">已改动</span>' : ''}${m.reload ? '<span class="tag nd">需重载</span>' : ''}${R.n ? `<span class="tag rl" title="与其它 MOD 有关系，展开查看">🔗${R.n}</span>` : ''}<small>${esc(brief(dm(m)))}</small></div><div class="sw ${m.group ? 'rd' : ''}" data-a="tg" title="${m.group ? '选用这个画风' : '开 / 关'}"></div></div>`
-      + `<div class="dt">${esc(dm(m))}<div class="m"><b>默认</b> ${m.def ? '开' : '关'}　<b>ID</b> ${m.id}${req.length ? `<br><b>依赖</b> ${esc(req.join('、'))}（开启时自动打开）` : ''}${cf.length ? `<br><b>冲突</b> ${esc(cf.join('、'))}（开启时自动关闭）` : ''}</div>${relH}</div></div>`;
+      + `<div class="dt">${esc(dm(m))}<div class="m"><b>默认</b> ${m.def ? '开' : '关'}　<b>ID</b> ${m.id}${req.length ? `<br><b>依赖</b> ${esc(req.join('、'))}（开启时自动打开）` : ''}${cf.length ? `<br><b>冲突</b> ${esc(cf.join('、'))}（开启时自动关闭）` : ''}</div>${relH}${m.btn ? `<div style="margin-top:10px"><button class="bt pri" data-a="mbtn" data-id="${m.id}" style="font-size:15px;padding:8px 18px;cursor:pointer">${m.btn.l}</button>${st[m.id] && bootSt[m.id] ? '' : '<span style="margin-left:10px;color:#e0a070;font-size:14px">先开启并应用这个 MOD</span>'}</div>` : ''}</div></div>`;
   }
   function listHTML() {
     const out = []; const cats = view.cat === 'all' ? CATS : [view.cat];
@@ -480,6 +482,7 @@ window.Mods = (() => {
         view.open = view.open === id ? null : id; refresh(); return; }
       const a = e.target.closest('button'); if (!a) return;
       if (a.dataset.a === 'close') close();
+      else if (a.dataset.a === 'mbtn') { const m = BY[a.dataset.id]; if (!m || !m.btn) return; if (!(window.Mods && Mods.on(m.id))) { view.note = '先开启并应用这个 MOD（改动后需要应用并重新载入）'; refresh(); return; } close(); try { window[m.btn.o][m.btn.f](); } catch (e) { console.warn(e); } }
       else if (a.dataset.a === 'def') { for (const m of LIST) st[m.id] = !!m.def; normalize(); save(); view.note = '已恢复默认设置（仍需应用并重新载入）'; refresh(); }
       else if (a.dataset.a === 'imp') { const d = decode(prompt('粘贴配置码（MOD1-…）：') || ''); if (!d) { view.note = '配置码格式不对'; refresh(); return; }
         for (const m of LIST) st[m.id] = !!m.def; for (const [id, v] of d.set) st[id] = v; normalize(); save();
