@@ -128,11 +128,11 @@ window.Foe = (() => {
   }
   // ---- 动作重定向：UAL 世界旋转增量 → 这具身体的局部旋转（每个身体模板算一次，克隆体共用 AnimationClip）----
   let animP = null;
-  function loadAnim() { return animP || (animP = new Promise((res, rej) => { if (window.UAL_ANIM) return res(); const s = document.createElement('script'); s.src = 'big/anim/ual.js'; s.onload = res; s.onerror = () => rej(new Error('anim')); document.head.appendChild(s); })); }
+  function loadAnim() { return animP || (animP = new Promise((res, rej) => { const add = (src, ok, er) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = er; document.head.appendChild(s); }; const kk = () => { if (window.KK_ANIM) return res(); add('assets/anim_kk.js', res, res); }; /* R55h KayKit CC0 近战动作包（缺失也不影响运行） */ if (window.UAL_ANIM) return kk(); add('big/anim/ual.js', kk, () => rej(new Error('anim'))); })); }
   function dec16(b64) { const b = atob(b64), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return new Int16Array(u.buffer); }
   function clipsFor(T) {
     if (T.clips) return T.clips;
-    const A = window.UAL_ANIM; if (!A) return {};
+    const PK = [window.UAL_ANIM, window.KK_ANIM].filter(Boolean); if (!PK.length) return {};
     const root = T.root; root.updateMatrixWorld(true);
     const hb = {}; root.traverse(o => { if (o.name && o.name.startsWith('H_')) hb[o.name.slice(2)] = o; });
     // 只需要人形骨骼及其祖先（前序遍历保证父在前）
@@ -141,11 +141,11 @@ window.Foe = (() => {
     const restL = new Map(), restW = new Map(), rq = new Q();
     order.forEach(o => { restL.set(o, o.quaternion.clone()); o.getWorldQuaternion(rq); restW.set(o, rq.clone()); });
     const rootW = root.getWorldQuaternion(new Q());
-    const src = new Map(); A.bones.forEach((b, i) => { if (hb[b]) src.set(hb[b], i); });
     const hips = hb.hips, hipH = hips.getWorldPosition(new V3()).y;
     const hipParentInv = new M4().copy(hips.parent.matrixWorld).invert();
-    const nb = A.bones.length, out = {}, W = new Map(), d = new Q(), w = new Q(), l = new Q(), tp = new V3();
-    for (const [name, C] of Object.entries(A.clips)) {
+    const out = {}, W = new Map(), d = new Q(), w = new Q(), l = new Q(), tp = new V3();
+    for (const A of PK) { const src = new Map(); A.bones.forEach((b, i) => { if (hb[b]) src.set(hb[b], i); }); const nb = A.bones.length; // 每个动作包有自己的骨骼列表（KayKit 没有 neck/upperChest/手指：没数据的骨骼按父骨骼跟随）
+    for (const [name0, C] of Object.entries(A.clips)) { const name = A === window.KK_ANIM ? 'KK_' + name0 : name0;
       const q = dec16(C.q), hp = dec16(C.hp), n = C.n, times = new Float32Array(n);
       for (let f = 0; f < n; f++) times[f] = f / C.fps;
       const vals = new Map(order.filter(o => src.has(o)).map(o => [o, new Float32Array(n * 4)]));
@@ -164,7 +164,7 @@ window.Foe = (() => {
       const tracks = []; for (const [o, v] of vals) tracks.push(new THREE.QuaternionKeyframeTrack(o.name + '.quaternion', times, v));
       tracks.push(new THREE.VectorKeyframeTrack(hips.name + '.position', times, hv));
       out[name] = new THREE.AnimationClip(name, C.dur, tracks);
-    }
+    } }
     return T.clips = out;
   }
   // 给一个角色装上动作播放器：f.play('Walk_Loop') / f.play('Sword_Regular_A', { once: true, fade: 0.12, speed })
@@ -656,6 +656,7 @@ window.Foe = (() => {
     if (window.FoeAI2) FoeAI2.tune(fo, fo.atk, d); // R34：强度缩放 / 节奏扰乱
     if (FAIR()) { const A = fo.atk; A.ws *= 0.72; A.ws2 = Math.min(0.8, A.ws * 1.4); A.hold = Math.max(0, A.hold) + 0.18; A.feint = false; } // R54n：给玩家约 1 秒反应
     if (fo._chainStep) fo.atk.hold = Math.max(0.04, fo.atk.hold - 0.12); // 连招的后手：停顿略短
+    if (T.wsK) { const A = fo.atk; A.ws = Math.min(1.15, A.ws * T.wsK); A.ws2 = Math.min(1, A.ws * 1.4); } // R55h：KayKit 动作本身比 UAL 慢，按各自出手帧把前摇拉回到同样的反应时间
     if (window.Barks) try { Barks.windup(fo, clip, fo.atk); } catch (e) { }
     if (fo.sayT <= 0 && Math.random() < 0.25) { if (fo.boss) talk(fo, '', '#ffb0a0'); else sayP(fo, 'fight', SAY.fight, '#ffb0a0'); } else if (!fo.boss && window.Persona && Math.random() < 0.5) Persona.line(fo, 'atk', true); // 第二十四轮：出手喝声
   }

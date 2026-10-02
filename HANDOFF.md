@@ -2117,3 +2117,11 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - Gotcha: triangulateShape mutates its input arrays — build `all2` before calling it.
 - NOT done yet (R58b): ragdoll (PBD) + pose lock. Plan: particles at joints, distance constraints, CPU skin via H_ weights, "lock pose" writes posed verts into V and calls initRB; pose stored in the whole-body piece.
 - Never commit the user's GitHub token.
+
+## R55h 用户：“你能网上多找点动作么”
+- **查证（别再重复找）**：UAL2 Standard（GitHub 镜像 Barbatos6669/elderforge、ElKlient/IDOL-Genesis 的 `UAL2_Standard.glb`，43 段）里的战斗动作我们 `KEEP` 列表已经全烘了，免费版没有更多近战；Pro/付费版才有 3~4 连击拆分。**新的 CC0 来源 = Kay Lousberg 的 KayKit Character Animations 1.1**（itch/GitHub，CC0，161 段，Rig_Medium/Rig_Large；本次用 `Rig_Medium_CombatMelee.glb`，从 GitHub 镜像 J3vb/Sanctuarys_End `assets/animations/Rig_Medium_CombatMelee.glb` 下载到 `_tools/kk/`，gitignored）。其余分包（General / MovementBasic / CombatRanged / Simulation / Tools）还没烘，**横移、后退、闪避 Dodge 在 MovementBasic 里很可能有，值得下一步烘**（UAL 免费版没有）。
+- **烘焙工具** `tools/anim_bake_kk.js`（Node，Windows 机器没有 python 也能跑）：同 `tools/anim_bake.py` 的格式（世界旋转增量 + 髋位置/髋高）；`--validate UAL2_Standard.glb <ual.js URL>` 用同一套代码重烘 UAL 两段并和现有 `big/anim/ual.js` 对比：最大旋转误差 1.1°、髋 Y 误差 0。KayKit 的 Rig_Medium 没有 neck/upperChest/肩/手指，这些骨骼不写入（`foe.js clipsFor` 对没数据的骨骼按父骨骼跟随）；髋水平位移减去第 0 帧（前冲由 ATK 的 `lunge` 负责，避免“滑出去再弹回来”）。输出 `assets/anim_kk.js`（`window.KK_ANIM`，124KB，15 段：1H 劈/斜切/横切/刺/跳劈、2H 劈/切/旋转斩/刺/Spinning、双持劈/切/刺、踢腿、拳 A）。`tools/glbprobe.js` = GLB 节点树/动画列表探测。
+- **接入**：`foe.js` `loadAnim()` 在 UAL 之后再加载 `assets/anim_kk.js`（缺失也不影响运行）；`clipsFor()` 对每个动作包用各自的骨骼列表重定向，KayKit 动作名加 `KK_` 前缀。
+- **出手时刻**：在这具身体的手/脚骨骼上实测速度峰值（角度 = atan2(-vy,-vx)，已和 UAL 条目校准：A 实测 -128°/表 -132°）。已用的 11 个 ATK 条目在 `moves.js` 的 `VAR`（`KK_Melee_*`）：劈 .63 / 跳劈 .70（lunge 3.2，heavy）/ 斜切 .38 / 横切 .23 / 刺 .37 / 2H 劈 .70（heavy）/ 2H 切 .40 / 旋转斩 .70+.85（两段）/ 2H 刺 .40 / 踢 .44 / 拳 A .40。**没用**：2H_Spinning（手速峰值不明显）、双持三个（单武器模型）、各种 Block/Idle。`wsK` = 把前摇拉回到和 UAL 差不多的反应时间（KayKit 动作本身更慢）。
+- **池子**：`moves.js POOL` 每个职业加了 KK 招（决斗者偏刺/斜切、重甲卫/蛮兵偏 2H 劈切刺、狂战加旋转斩/跳劈…，徒手加踢腿/拳 A 以及踢腿连招）；`has()` 会跳过动作包没加载时不存在的招。台架 120 秒：决斗者 52 次起手里 24 次是 KK 招、徒手 67 次里 23 次，无报错无卡死（最长 5.6s 是连招）。
+- **没做/待办**：KK 姿势只用数值检查（头高、脚/手轨迹方向）没有肉眼看（截图时被游戏本身的相机/敌人挡住）；其它分包没烘；CombatRanged 里有弓/魔法动作可给投掷手/术士用。授权记在 `CREDITS.md`。
