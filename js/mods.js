@@ -87,12 +87,12 @@ window.Mods = (() => {
     { id: 'sky_master', cat: 'look', icon: '🌤️', n: '高清天空（R52）', d: '天空照片改用双三次（Catmull-Rom）采样，放大不再发糊；太阳周围加 HDR 光晕，驱动泛光和太阳光束。', def: true, rel: { water_master: '镜面水反射的就是这张天空', lens_flare: '太阳光晕越亮，镜头鬼影越明显' } },
     { id: 'water_master', cat: 'look', icon: '💧', n: '镜面水（R52）', d: '水面菲涅尔反射：斜看像镜子一样映出天空，俯看透出水色；反射更锐利。与「水面质感」叠加。', def: true, rel: { water_fx: '在岸线渐隐/泡沫之上叠加反射' } },
     { id: 'pcss_shadows', cat: 'look', icon: '🌳', n: '真实软阴影 PCSS（R52）', d: '太阳阴影改为接触硬化软阴影：物体接地处锐利，离地越高边缘越柔（树冠的影子有真实的半影）。只作用于野外太阳。卡时优先关它。', def: true, rel: { world_master: 'world_master 把阴影图设为 4096（ultra），PCSS 在其上采样' } },
-    { id: 'lens_flare', cat: 'look', icon: '📸', n: '镜头光晕（R52）', d: '太阳、火光等强光在画面对称位置产生淡淡的带色散鬼影和光环，电影镜头感。', def: true, rel: { lowspec: '低配模式没有后处理，不生效' } },
+    { id: 'lens_flare', cat: 'look', icon: '📸', n: '镜头光晕（R52）', d: '太阳、火光等强光在画面对称位置产生淡淡的带色散鬼影和光环，电影镜头感。（R55d：用户嫌光环太耀眼，默认关）', def: false, rel: { lowspec: '低配模式没有后处理，不生效' } },
     { id: 'sharpen', cat: 'look', icon: '🔍', n: '画面锐化 CAS（R52）', d: '抗锯齿之后加一道对比度自适应锐化（AMD CAS）：贴图、草叶、发丝更清晰，平滑区域不会出白边。几乎不吃性能。', def: true, rel: { lowspec: '低配模式没有后处理，不生效' } },
     { id: 'fast_load', cat: 'look', icon: '⚡', n: '加载提速（第四十九轮）', d: '进图更快：敌人身体/动画/野兽模型与场景资源并行载入，去掉固定等待（淡出 260ms + 60ms），模型解码改同步（更快），地形外圈（玩不到的远景）每 3 格求一次高度其余插值。关掉恢复旧流程。', def: true },
     { id: 'head_natural', cat: 'look', icon: '🧒', n: '头身比更自然（第四十三轮）', d: '头整体缩小 10%：原来头约占身高 1:5.8，像大头娃娃；现在约 1:6.5。关掉恢复旧尺寸。', def: true },
     { id: 'id_look', cat: 'look', icon: '🎭', n: '身份决定发色/头饰/衣服色（第四十三轮）', d: '外观原来只看种族，修女戴兔耳、骑士扎蝴蝶结。现在按身份：发色成套（骑士银/金/棕，女巫紫/黑，修女黑/褐），头饰重配（修女=头纱，女巫=尖帽，公主=小王冠，女王=王冠，工匠/炼金=护目镜，游侠=羽毛），衣服按身份重新着色（修女黑修道服，骑士钢灰，游侠森林绿，女王深红）。霸主不变。', def: true },
-    { id: 'back_slow', cat: 'play', icon: '🐢', n: '战斗中后退变慢（第四十三轮）', d: '有敌人盯着你（14 米内、已发现你、没在逃跑）时，倒着走只有约 55% 速度；侧移和向前不变。想脱战要转身跑。敌人重击会边出手边向前逼近，不再被无限后撤躲掉。', def: true },
+    { id: 'back_slow', cat: 'play', icon: '🐢', n: '战斗中后退变慢（第四十三轮）', d: '有敌人盯着你（14 米内、已发现你、没在逃跑）时，倒着走约 88% 速度；侧移和向前不变。想脱战要转身跑。敌人重击会边出手边向前逼近，不再被无限后撤躲掉。', def: true },
     { id: 'foe_press', cat: 'play', icon: '🗡️', n: '敌人出招会逼近 / 预判（第四十三轮）', d: '敌人挥砍时，起手到出刀这段会一边朝你迈步（重击迈得更多），出刀瞬间的判定距离随前冲加长；转身按你的移动方向预判 0.25 秒；一击落空后若你还在附近，会立刻追击补刀，而不是发呆站着。', def: true },
     { id: 'head_qc', cat: 'look', icon: '🔍', n: '怪异头模屏蔽（R31）', d: '逐个目检后仍显怪异、暂不能修的头模（八云紫、黑鸟）不再随机出现，也不借给别的头当发型。已拥有的不受影响。', def: true },
     { id: 'recall_iw', cat: 'look', icon: '🤲', n: '原场景回忆（R33）', d: 'F 回忆不再开新的 3D 界面：就在洞里拉近镜头，主角双手捧着她做动作（对视/抚摸/嗅闻/贴耳/那一战 + 把玩：抛接/转圈/戳脸/拍头），首级不再变表情，每个动作有音效；信息卡与动作栏重做。', def: true },
@@ -187,7 +187,7 @@ window.Mods = (() => {
     { id: 'foe_skills2', cat: 'play', icon: '🌀', n: '高阶敌人 / BOSS 专属技能（R54l）', d: '敌人阶位越高会的技能越多：老兵〔三向飞刃、半月横扫〕→ 精英〔锁链拉拽、震地三波〕→ 冠军〔月蚀印记、嗜血战吼〕；BOSS 还有〔月光新星〕，每个地区霸主 / 每位章节 BOSS 都有自己的 3~6 个招牌技（出发面板可见）。每个技能都有地面预警 + 头顶念招名 + 第一次见到时的解法提示；战吼可以被打断。', def: true },
     { id: 'soft_glow', cat: 'look', icon: '🔆', n: '人物不再刺眼发光（R54l）', d: '泛光只给真正的高亮（火、魔法、天光），阈值 0.9→1.25、强度 0.9→0.38；人物逆光轮廓光减到 40%。关掉 = 旧的「光芒万丈」。', def: true },
     { id: 'no_freebies', cat: 'play', icon: '🪨', n: '开局不送东西（R54l）', d: '用户：付出→奖励，不要开局送东西。新存档开局 0 魂晶、不送药、不送绷带/布/草药/摆件材料；回合结算去掉「底薪」；每回合的祝福抉择要这一趟杀满 3 人或清空一个地点才给。（', def: true },
-    { id: 'whispers', cat: 'ui', icon: '🗯️', n: '角色浮现（R54p）', d: '在野外每隔 11~19 秒，屏幕左右两侧随机位置浮出一张黑框字卡，揭示本图某个角色：名字与性格、她的动机、正在做什么、现况（伤势/武器/离你多远）。', def: true },
+    { id: 'whispers', cat: 'ui', icon: '🗯️', n: '角色浮现（R54p）', d: '在野外每隔 11~19 秒，屏幕左右两侧随机位置浮出一张黑框字卡，揭示本图某个角色：名字与性格、她的动机、正在做什么、现况（伤势/武器/离你多远）。（R55d：用户嫌战斗时冒黑框字，默认关）', def: false },
     { id: 'hit_stop', cat: 'play', icon: '💢', n: '命中顿帧（R54p）', d: '砍中敌人的一瞬间她顿住一下 + 镜头震动；击杀、完美格挡、破防、完美闪避、处决的顿帧更长更重。', def: true },
     { id: 'side_panels', cat: 'ui', icon: '📑', n: '章节 / BOSS / 主线 独立面板（R54p）', d: '打开出发面板时，右侧单独挂出三张卡：第几章与进度、本章 BOSS（等级/擂台/词缀/招牌技）、主线月之魔女的线索进度。不再塞在出发面板的小角落。', def: true },
     { id: 'ogre_rank', cat: 'play', icon: '🏆', n: '食人魔评级（R54p）', d: '清空一个地点（≥ 2 个敌人）后按表现打分：D 饿肚子的幼魔 → C 学徒 → B 食人魔 → A 暴食魔 → S 魂首窟之主 → SS 噬魂魔王。斩首/处决/一刀/完美格挡/闪避/杀意加分，挨打和拖拉扣分；A 以上有魂晶奖励。', def: true },
@@ -303,6 +303,7 @@ window.Mods = (() => {
   if (st.__v < 22) { st.moon_trail = false; st.__v = 22; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R54n：用户更喜欢原来的电影任务线索
   if (st.__v < 23) { for (const m of LIST) if (m.group === 'render') st[m.id] = (m.id === 'r_illust'); st.lowspec = false; st.persona_voice = false; st.__v = 23; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R54n：默认厚涂插画风；AI 语音换成合成女声
   if (st.__v < 24) { for (const m of LIST) { if (m.group === 'render') st[m.id] = (m.id === 'r_classic'); if (m.group === 'cstyle') st[m.id] = (m.id === 'cs_paint'); } st.__v = 24; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R54p：用户说的厚涂是 R47 人物风格，画面渲染回原版
+  if (st.__v < 25) { st.whispers = false; st.lens_flare = false; st.__v = 25; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} } // R55d：用户不要战斗时冒出的黑框字卡、嫌镜头光环太耀眼
   for (const m of LIST) if (st[m.id] === undefined) st[m.id] = !!m.def;
   // 修正非法状态（互斥组恰好一个；冲突；依赖）
   function normalize() {

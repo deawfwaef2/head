@@ -521,7 +521,7 @@ window.Foe = (() => {
         if (strafe === 3 && fo.slotV) { const hd = Math.atan2(fo.slotV.x, fo.slotV.z), rel = ang(hd - face); if (Math.abs(rel) < 2.3) turnTo = face + clampA(rel, 0.95); }
         else if (strafe === 1 || strafe === -1) turnTo = face + strafe * (FAIR() ? 0.35 : 0.9); }
       if (window.Locomo && Locomo.on() && !fo.atk && !(fo.stag > 0)) Locomo.turn(fo, turnTo, dt, spd); /* R47 npc_locomo：角速度弹簧转身 */ else { fo.yawV = 0; if (turnTo != null) fo.yaw += clampA(ang(turnTo - fo.yaw), 6 * dt * (0.6 + fo.iq) * (spd > 4 ? 1.4 : 1)); }
-      if (FAIR() && fo.seen && fo.state !== 'flee' && fo.state !== 'idle' && d < 8 && !fo.sk && !(fo.stag > 0) && !(fo.gestT > 0) && !(fo.atk && fo.atk.act && fo.atk.hits[fo.atk.hi] && fo.atk.act.time >= fo.atk.hits[fo.atk.hi].t - 0.14)) { const e = ang(face - fo.yaw), lim = fo.atk ? 0.2 : 0.3; if (Math.abs(e) > lim) { fo.yaw += e - Math.sign(e) * lim; fo.yawV = 0; } } // 缠斗时始终正对你（出刀最后 0.14 秒除外，侧闪仍有效）
+      if (FAIR() && fo.seen && fo.state !== 'flee' && fo.state !== 'idle' && d < 8 && !fo.sk && !(fo.gestT > 0) && !(fo.atk && fo.atk.act && fo.atk.hits[fo.atk.hi] && fo.atk.act.time >= fo.atk.hits[fo.atk.hi].t - 0.14)) { const e = ang(face - fo.yaw), lim = fo.atk ? 0.2 : 0.3; if (Math.abs(e) > lim) { fo.yaw += e - Math.sign(e) * lim; fo.yawV = 0; } } // 缠斗时始终正对你（出刀最后 0.14 秒除外，侧闪仍有效）
       { // 第十九轮：速度带加速度（不再瞬间换向）；侧移/后退都以“面向玩家”的方向为基准
         let vx = 0, vz = 0; if (spd > 0) { vx = Math.sin(fo.yaw) * spd; vz = Math.cos(fo.yaw) * spd; }
         if (strafe === 3 && !fo.atk && fo.stag <= 0 && fo.slotV) { vx += fo.slotV.x * 1.6; vz += fo.slotV.z * 1.6; }
@@ -829,7 +829,7 @@ window.Foe = (() => {
     if (poiseBrk) fo.poise = 0;
     if ((!fo.boss || poiseBrk) && !(fo.role && window.FoeRoles && FoeRoles.hurt(fo, dealt, info, zone))) { fo.atk = null;
       if (fo.stag > 0 && (fo.f.cur === 'Hit_Knockback' || fo.f.cur === 'LayToIdle')) { /* 躺着/起身时再挨一刀：不要重播受击动作（会把人从地上瞬间拽起来） */ }
-      else { fo.stag = fo.boss ? (FAIR() ? 0.4 : 0.35) : (FAIR() ? 0.62 : 0.45); fo.f.play(zone === 'head' || zone === 'neck' ? 'Hit_Head' : 'Hit_Chest', { once: true, fade: 0.06, restart: true });
+      else { fo.stag = fo.boss ? (FAIR() ? 0.32 : 0.35) : (FAIR() ? 0.42 : 0.45); fo.f.play(zone === 'head' || zone === 'neck' ? 'Hit_Head' : 'Hit_Chest', { once: true, fade: 0.06, restart: true });
         if (FAIR() && !fo.boss && CTX && CTX.player && !fo.kb) { const P = CTX.player.pos, kx = fo.pos.x - P.x, kz = fo.pos.z - P.z, kl = Math.hypot(kx, kz) || 1; fo.kb = { x: kx / kl * 2.6, z: kz / kl * 2.6, t: 0.16 }; } } } // 普通受击只用短的 Hit_Chest/Hit_Head（Hit_Knockback 是整个倒地动作，0.55s 就被切掉 = 瞬间弹起）
     if (fo.sayT <= 0 && Math.random() < 0.5) { if (fo.boss) talk(fo, '', '#ffb0a0'); else sayP(fo, 'hurt', SAY.hit, '#ffb0a0'); } else if (!fo.boss && window.Persona) Persona.line(fo, 'pain', true); // 第二十四轮：没说话时也会痛呼
     if (!fo.boss && !fo.dead && window.Persona && fo.state === 'chase' && Persona.fleeHp(fo) && fo.hp < fo.maxHp * Persona.fleeHp(fo) && !fo.fledOnce) { fo.fledOnce = true; fo.state = 'flee'; fo.brave = false; sayP(fo, 'flee', SAY.flee); } // 胆小：挨几刀就跑向门

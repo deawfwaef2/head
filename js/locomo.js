@@ -72,7 +72,7 @@ window.Locomo = (() => {
       if (Math.hypot(L.vx, L.vz) > 0.15) { L.rel = ang(Math.atan2(L.vx, L.vz) - fo.yaw); const ar = Math.abs(L.rel); if (!L.bk && ar > 1.92) L.bk = true; else if (L.bk && ar < 1.66) L.bk = false; } }
     if (fo.dead || fo.rag) { if (L.active) deactivate(f, L, 0.1); f.root.rotation.z = 0; return; }
     // 倾身：向转弯内侧，随速度
-    const lean = clamp(-(fo.yawV || 0) * L.s * 0.03, -0.12, 0.12); f.root.rotation.z += (lean - f.root.rotation.z) * (1 - Math.exp(-6 * dt));
+    const lean = clamp(-(fo.yawV || 0) * L.s * 0.012, -0.04, 0.04); f.root.rotation.z += (lean - f.root.rotation.z) * (1 - Math.exp(-6 * dt));
     if (!L.active) return;
     L.want -= dt;
     if (L.pend && L.s < 0.35) { const [n, o] = L.pend; L.pend = null; f.play(n, o); return; }

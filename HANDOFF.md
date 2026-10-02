@@ -2062,3 +2062,11 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - `js/mods.js`/`mods_i18n.js`：新增 `dissect_pick`、`part_editor`；MOD 行支持 `btn:{l,o,f}` 按钮（`data-a="mbtn"`）。
 - `js/workshop.js`：`onSever` 变空操作；body 拆解配方标 `legacy:1`（`sack.js` 仅在持有对应材料时显示）；h3/a3/a4 配方改用 bone/sinew/hide。`js/props.js`：断手/断脚/肠索不再出现在制作列表（已有的仍可摆放）。
 - 测试：`tools/test/partedit.html`（独立 harness）。FBX/.blend 不支持，需先转 glb。
+
+## R55d 用户反馈修正（敌人弯腰 / 光环 / 后退 / 黑框字）
+用户原话：战斗时敌人弯腰不面对主角；光环太耀眼；现在后退太慢了；经常战斗时冒出黑方框文字，不要了。（长期有效：不要在战斗中弹黑框字卡；不要刺眼的光环；后退不要被压得太慢）
+- 后退：`worlds.js` back_slow 由 55% 速度改为 88%（`bk*0.12`）。
+- 黑框字：MOD `whispers`（r54n.js 角色浮现 .wsCard）默认关。
+- 光环：MOD `lens_flare`（master.js 镜头光晕/彩虹光环）默认关。以上两项靠 `mods.js` 迁移 `__v 25` 对旧存档生效。
+- 敌人弯腰/不面对：`stance.js` 架势体态不再前压/后仰（lean=0）、歪头和侧身减小，上身扭回更多；`foe.js` 受击硬直 0.62→0.42（BOSS 0.4→0.32），硬直中也持续转向面对玩家；`locomo.js` 转身侧倾 ±0.12→±0.04。
+- 未动：顶部「护盾被打光了」等 toast（若用户也嫌黑框，下一步统一改成无框描边字）；`Foe.say` 头顶气泡。

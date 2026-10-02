@@ -63,9 +63,9 @@ window.Stance = (() => {
     return (fo._stp = {
       main, alt, cur: main, swT: 3 + r() * 6,
       tempo: 0.8 + r() * 0.45,
-      blade: (r() < 0.5 ? -1 : 1) * (0.16 + r() * 0.3) * (fo.armed ? 1 : 0.6), // 侧身
-      lean: -0.05 + bold * 0.2, // 前压 / 后仰
-      tilt: (r() - 0.5) * 0.16, // 歪头
+      blade: (r() < 0.5 ? -1 : 1) * (0.1 + r() * 0.16) * (fo.armed ? 1 : 0.6), // 侧身（R55d 减小，上身全部扭回正对）
+      lean: 0, // R55d：用户反馈敌人战斗时弯腰——不再前压/后仰
+      tilt: (r() - 0.5) * 0.05, // 歪头（R55d 减小）
       sw: 0, lastA: null,
     });
   }
@@ -114,7 +114,7 @@ window.Stance = (() => {
         const w = P.sw; if (w > 1e-3) {
           const mv = L && L.active ? 1 - smooth(0.3, 1.2, L.s) * 0.6 : 1; // 移动中侧身减弱
           const b = P.blade * w * mv, le = P.lean * w, ti = P.tilt * w;
-          rotW(B.hips, UP, b); rotW(B.chest || B.spine, UP, -b * 0.45); rotW(B.neck, UP, -b * 0.55);
+          rotW(B.hips, UP, b); rotW(B.chest || B.spine, UP, -b * 0.7); rotW(B.neck, UP, -b * 0.3);
           rotW(B.spine, R, le * 0.5); rotW(B.chest || B.upperChest, R, le * 0.5); rotW(B.neck, R, -le * 0.7);
           if (B.head) { F.set(Math.sin(yaw), 0, Math.cos(yaw)); rotW(B.head, F, ti); }
         }
