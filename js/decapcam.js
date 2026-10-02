@@ -41,7 +41,7 @@ window.DecapCam = (() => {
   // ---------------- 界面 ----------------
   function addCss() {
     if (css) return; css = true; const st = document.createElement('style'); st.textContent = `
-body.dcam>*:not(canvas):not(#dcRoot):not(script):not(style):not(:has(canvas)){opacity:0!important;transition:opacity .2s}
+body.dcam>*:not(#game):not(#dcRoot):not(script):not(style):not(link){visibility:hidden!important}
 #dcRoot{position:fixed;inset:0;z-index:90;pointer-events:none;overflow:hidden}
 #dcRoot .bar{position:absolute;left:0;right:0;height:13vh;background:#000;transition:transform .32s cubic-bezier(.2,.8,.2,1)}
 #dcRoot .bt{top:0;transform:translateY(-101%)}#dcRoot .bb{bottom:0;transform:translateY(101%)}
@@ -71,12 +71,12 @@ body.dcam>*:not(canvas):not(#dcRoot):not(script):not(style):not(:has(canvas)){op
   function slashArc(s) {
     const T = THREE, np = new T.Vector3(); if (!neckPos(s, np)) return;
     if (!slashArc.tex) { const c = document.createElement('canvas'); c.width = 256; c.height = 16; const g = c.getContext('2d'), h = g.createLinearGradient(0, 0, 256, 0); h.addColorStop(0, 'rgba(255,255,255,0)'); h.addColorStop(0.35, 'rgba(255,240,230,.9)'); h.addColorStop(0.6, 'rgba(255,255,255,1)'); h.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = h; g.fillRect(0, 0, 256, 16); const v = g.createLinearGradient(0, 0, 0, 16); v.addColorStop(0, 'rgba(0,0,0,1)'); v.addColorStop(0.5, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,1)'); g.globalCompositeOperation = 'destination-out'; g.fillStyle = v; g.fillRect(0, 0, 256, 16); slashArc.tex = new T.CanvasTexture(c); }
-    const grp = new T.Group(); for (const [w, h, col, op] of [[1.9, 0.07, '#ffffff', 1], [2.3, 0.2, '#ff3a30', 0.55]]) { const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: slashArc.tex, color: col, transparent: true, opacity: op, blending: T.AdditiveBlending, depthWrite: false, depthTest: false, side: T.DoubleSide })); m.renderOrder = 9; m.userData.op = op; grp.add(m); }
-    grp.position.copy(np); grp.lookAt(G.camera.position); grp.rotateZ(s.sa || 0); grp.scale.set(0.3, 1, 1); s.sc.add(grp); s.arc = grp;
+    const grp = slashArc.grp || (slashArc.grp = (() => { const g0 = new T.Group(); for (const [w, h, col, op] of [[1.9, 0.07, '#ffffff', 1], [2.3, 0.2, '#ff3a30', 0.55]]) { const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: slashArc.tex, color: col, transparent: true, opacity: op, blending: T.AdditiveBlending, depthWrite: false, depthTest: false, side: T.DoubleSide })); m.renderOrder = 9; m.userData.op = op; m.frustumCulled = false; g0.add(m); } return g0; })());
+    grp.children.forEach(m => { m.material.opacity = m.userData.op; }); grp.position.copy(np); grp.rotation.set(0, 0, 0); grp.lookAt(G.camera.position); grp.rotateZ(s.sa || 0); grp.scale.set(0.3, 1, 1); s.sc.add(grp); s.arc = grp;
   }
   function arcTick(s, real) {
     const a = s.arc; if (!a) return; s.arcT = (s.arcT || 0) + real; const k = s.arcT; a.scale.x = Math.min(1.15, 0.3 + k * 6); const op = k < 0.15 ? 1 : Math.max(0, 1 - (k - 0.15) / 1.4);
-    a.children.forEach(m => { m.material.opacity = m.userData.op * op; }); if (op <= 0) { a.parent && a.parent.remove(a); a.children.forEach(m => { m.geometry.dispose(); m.material.dispose(); }); s.arc = null; }
+    a.children.forEach(m => { m.material.opacity = m.userData.op * op; }); if (op <= 0) { a.parent && a.parent.remove(a); s.arc = null; } // 几何/材质复用，不再每次新建再丢弃
   }
   function lensBlood(dist) {
     if (!root || dist > 4.8) return; const n = dist < 2.5 ? 9 : 5;
@@ -160,8 +160,21 @@ body.dcam>*:not(canvas):not(#dcRoot):not(script):not(style):not(:has(canvas)){op
     if (s.pg < 1.0) { const hp = headPos(s, p); if (hp) { let hn = Math.floor(260 * gd + Math.random()); while (hn-- > 0) { v.set((Math.random() - 0.5) * 0.9, -0.2 + Math.random() * 0.6, (Math.random() - 0.5) * 0.9); drop(hp, v, 0.9 + Math.random() * 0.5, 0.65 + Math.random() * 0.5); } } }
   }
   const _q = { a: null, m: null, v: null };
+  // 进图后空闲时把血珠实例网格 / 血雾 / 刀痕的着色器提前编好（以前第一次斩首的慢镜头里现编 = 卡一下）
+  let warmSc = null, warmSeen = 0, warmFor = null;
+  function warm() {
+    try {
+      const W = window.Worlds && Worlds.active && Worlds._W; if (!W || !W.B || !G.renderer || !G.camera || G.uiOpen || W.busy || !on()) { warmFor = null; return; }
+      if (warmSc === W.B.sc) return; if (warmFor !== W.B.sc) { warmFor = W.B.sc; warmSeen = performance.now(); return; } if (performance.now() - warmSeen < 3500) return;
+      warmSc = W.B.sc; const R = G.renderer, sc = W.B.sc; bloodInit(sc, W.B.H);
+      const T = THREE; slashArc({ sc, sa: 0, fo: { f: { bones: {} }, pos: new T.Vector3() } }); const arc = slashArc.grp; if (arc) arc.position.set(0, -50, 0);
+      const post = G.post, viaRT = !!(post && post.on), tm = R.toneMapping, rt0 = R.getRenderTarget();
+      try { if (window.ShaderQ && ShaderQ.async) ShaderQ.compile(R, sc, G.camera); else { if (viaRT) { const rt = warm.rt || (warm.rt = new T.WebGLRenderTarget(16, 16, { depthBuffer: true })); R.toneMapping = T.NoToneMapping; R.setRenderTarget(rt); } R.compile(sc, G.camera); } } finally { R.toneMapping = tm; R.setRenderTarget(rt0); }
+      if (arc && arc.parent === sc) sc.remove(arc);
+    } catch (e) { console.warn('DecapCam.warm', e); }
+  }
   function pre(dt, now) {
-    if (!bl && !S) return; try {
+    if (!S) warm(); if (!bl && !S) return; try {
       const real = Math.min(dt || 0.016, 0.05);
       if (!S) { if (bl) { bloodTick(real); if (!bl.P.length && !bl.mist.some(m => m.o.visible)) { /* 保留血斑，不清理 */ } } return; }
       const s = S, W = window.Worlds && Worlds.active ? Worlds._W : null;

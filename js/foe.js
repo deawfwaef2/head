@@ -112,10 +112,10 @@ window.Foe = (() => {
     }
     // 挂头：静止姿势下算好相对 H_head 的偏移
     root.updateMatrixWorld(true);
-    const fit = headFit(E), headBone = bones.head;
+    const fit = headFit(E), headBone = bones.head, fit0s = fit.s;
     if (window.Mods && Mods.on('head_natural')) { try { const bb = new THREE.Box3(); hb.group.updateMatrixWorld(true); hb.group.traverse(o => { if (o.isMesh && o.userData.kind === 'skin') bb.expandByObject(o); }); const hH = bb.max.y - bb.min.y; if (hH > 0.05 && hH < 1) { fit.s = Math.min(fit.s, 0.272 / hH);
       if (!window.Mods || Mods.on('head_norm') !== false) { /* R49d head_norm：按「身体身高」把脸高统一到 身高/6.6（以前按眼高公式，头模不同就忽大忽小），夹在原比例的 0.8~1.15 倍内防极端 */
-        const hy = new V3().setFromMatrixPosition(headBone.matrixWorld).y - new V3().setFromMatrixPosition(root.matrixWorld).y, tgt = (hy + 0.2) / 6.6, s0 = fit.s; fit.s = Math.max(s0 * 0.8, Math.min(s0 * 1.15, tgt / hH));
+        const hy = new V3().setFromMatrixPosition(headBone.matrixWorld).y - new V3().setFromMatrixPosition(root.matrixWorld).y, tgt = (hy + 0.2) / 6.6, s0 = fit.s; fit.s = Math.max(Math.min(s0, fit0s) * 0.8, Math.min(Math.max(s0 * 1.15, fit0s * 1.6), tgt / hH)); // 大体型身体：上限不再被 0.272m 绝对头高卡死（“大身体小头”）
         if (fit.s !== s0) { const ey = E.eyeY != null ? E.eyeY : E.headY + 0.058; fit.pos = new V3(E.headX || 0, ey + 0.0102 * fit.s, (E.eyeZ != null ? E.eyeZ : (E.headZ || 0) + 0.03) - 0.02 * fit.s); } } } } catch (e) {} } // R43b：个别头模（Vivi/Vita/Victoria）脸比别的高 8%，再压到同一上限，避免偶发大头娃娃
     const holder = new THREE.Group(); holder.name = 'headHolder';
     const want = new M4().compose(fit.pos, new Q(), new V3(1, 1, 1));
@@ -360,7 +360,7 @@ window.Foe = (() => {
       if (window.Living) try { Living.foe(fo, it); } catch (e) { console.warn('Living.foe', e); } // R54g：等级/阶位
       FOES.push(fo); out.push(fo);
     }
-    if (!keep) evict(used, 5); prewarm(ctx); { const seenB = new Set(); for (const fo of FOES) if (!seenB.has(fo.f.bodyName)) { seenB.add(fo.f.bodyName); sevWarm(fo); } }
+    if (!keep) evict(used, 5); prewarm(ctx, keep); { const seenB = new Set(); for (const fo of FOES) if (!seenB.has(fo.f.bodyName)) { seenB.add(fo.f.bodyName); sevWarm(fo); } }
     return out;
   }
   function warnMat() { if (warnMat.m) return warnMat.m; const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
@@ -379,11 +379,13 @@ window.Foe = (() => {
     finally { R.toneMapping = tm; R.setRenderTarget(rt0); }
   }
   function FF(m) { return window.FaceFill ? FaceFill.wrap(m, window.Mods && Mods.on('char_lift') ? 0.95 : 0.85) : m; } // 第二十四轮：身体也补一点光（与脸一致，不会脸亮身体黑）
-  function prewarm(ctx) {
+  const PWK = new Set(); let PWBASE = false; // 已预热过的材质类型：中途刷怪不再重跑整套 compile+render（这就是刷怪卡一下的来源）
+  function prewarm(ctx, keep) {
     if (!ctx.renderer || !ctx.camera) return; const grp = new THREE.Group(), geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3)); geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(6), 2)); geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([0, 1, 0, 0, 1, 0, 0, 1, 0]), 3));
-    const seen = new Set();
-    for (const fo of FOES) for (const m of fo.mats) { const k = m.type + (m.map ? 1 : 0) + m.side + (m.alphaTest > 0 ? 'a' : ''); if (seen.has(k)) continue; seen.add(k); grp.add(new THREE.Mesh(geo, FF(m.clone()))); }
+    const seen = new Set(); let fresh = 0;
+    for (const fo of FOES) for (const m of fo.mats) { const k = m.type + (m.map ? 1 : 0) + m.side + (m.alphaTest > 0 ? 'a' : ''); if (seen.has(k)) continue; seen.add(k); if (keep && PWK.has(k)) continue; PWK.add(k); grp.add(new THREE.Mesh(geo, FF(m.clone()))); fresh++; }
+    if (keep && PWBASE && !fresh) return; PWBASE = true;
     bloodMat(); spark(new V3(), 0); grp.add(new THREE.Sprite(blood.mat), new THREE.Mesh(blood.dgeo, blood.dmat), new THREE.Sprite(spark.mat), new THREE.Sprite(warnMat()), new THREE.Sprite(guardMat()));
     const hid = []; for (const fo of FOES) { fo.f.cut.forEach(o => { if (!o.visible) { o.visible = true; hid.push(o); } }); fo.f.hb.group.traverse(o => { if (o.isMesh && o.userData.kind === 'cut' && !o.visible) { o.visible = true; hid.push(o); } }); }
     { const cp = ctx.camera.getWorldPosition(new V3()), cd = ctx.camera.getWorldDirection(new V3()); grp.position.copy(cp).addScaledVector(cd, 3); } // 第十九轮：放在相机前（视锥+阴影相机内），离屏渲染不会被看见

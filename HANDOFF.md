@@ -4500,3 +4500,10 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - `cinescript.js`：台词跨场次去重（localStorage `cs_recent`，最近 70 句）；hand/ots/back/ecu 随机省略；min 时长缩短；新增「情报」卡（目标/异变/猎手跟踪）。
 - 活人不再有泪痕/鼻血/淤青：`ModelHeads.create(look,{alive:true})` 清空 `look.fx`，只有被斩下的头才带差分。
 - 未验证：本地没有 `big/` 身体，电影全流程（走路、情报卡、冻结）没能实机跑，请你在完整环境里看一眼。
+
+## R63d（卡顿 / 解剖底模 / 头身比）
+- 斩首特写每次卡一下：① `decapcam.js` 的 `body.dcam>*:not(:has(canvas)){opacity:0!important;transition}` 改成 `visibility:hidden`（不再给全页几十个元素建合成层/重算玻璃面板的 backdrop-filter）；② 刀痕网格/材质复用，不再每次 new + dispose；③ 新增 `warm()`：进图 3.5 秒后在空闲时建好血珠实例网格/血雾/刀痕并按 Master 的 RT 状态 compile，首次斩首不再现编着色器。
+- 刷敌人卡：`foe.js prewarm(ctx, keep)` 对中途追加（猎手/精英 keep:true）只预热新出现的材质类型，没有新类型就整段跳过（以前每次都重做 compile+render）。
+- 大身体小头：`head_norm` 上限不再被 0.272m 绝对头高卡死（`fit0s*1.6` 作上限），按身体身高/6.6 取目标头高。**未实机验证**（本地无 `big/`），若个别模型变成大头请回报身体名。
+- 解剖底模：此前只有「skin 层存在但面积 <45%」才用素体。现在 ① 阈值 0.6；② 没有真正的皮肤层（衣服+皮肤融合的单网格，或只剩颈断面 cap 2）时，原网格整层当“衣物”（cloth，可用「衣着」按钮脱掉），素体当皮肤层。用 BASE_BODY 自制假骨架做了 bake 冒烟测试：无 skin 材质 → `base.used=true`、原网格变 cloth、`hasCloth=true`；有 skin 材质且完整 → 不触发。autopsy 新着色器（R62）在 WebGL 编译通过。
+- 未做：真实身体上的视觉确认（本地无 `big/body`）。

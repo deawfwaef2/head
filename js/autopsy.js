@@ -87,15 +87,15 @@ window.Autopsy = (() => {
   function faceColorOf(root, look) { // 脸的肤色：优先取角色头部的目标肤色（look.skinHex，头部着色器就是把脸调到这个色），否则取头部皮肤贴图平均色；数值空间同着色器里直接采样贴图
     let out = null; if (look && look.skinHex) { try { const c = new T.Color(look.skinHex); return [c.r, c.g, c.b]; } catch (e) { } } root.traverse(o => { if (out || !o.isMesh) return; const mats = Array.isArray(o.material) ? o.material : [o.material]; for (const m of mats) { if (!m || !/face.*skin|skin.*face/i.test((m.name || '') + ' ' + o.name) || !m.map) continue; const td = texData(m.map); if (!td) continue; let r = 0, g = 0, b = 0, n = 0; for (let i = 0; i < td.px.length; i += 16) { const R = td.px[i], G = td.px[i + 1], Bc = td.px[i + 2], A = td.px[i + 3]; if (A < 128 || (R + G + Bc) < 330) continue; r += R; g += G; b += Bc; n++; } if (n > 50) { const mc = m.color || { r: 1, g: 1, b: 1 }; out = [r / n / 255 * mc.r, g / n / 255 * mc.g, b / n / 255 * mc.b]; return; } } }); return out;
   }
-  function attachBase(sets, BN, root, look) {
+  function attachBase(sets, BN, root, look, force) {
     const info = { used: false }; try {
-      if (window.Mods && Mods.on && !Mods.on('autopsy_base')) return info; const D = baseData(); if (!D || !rigOk(BN)) return info; const skins = sets.filter(q => q.skin && q.cap === 1); if (!skins.length) return info;
+      if (window.Mods && Mods.on && !Mods.on('autopsy_base')) return info; const D = baseData(); if (!D || !rigOk(BN)) return info; const skins = sets.filter(q => q.skin && q.cap === 1); if (!skins.length && !force) return info;
       const area = (V, I) => { const a = [0, 0, 0]; for (let t = 0; t < I.length; t += 3) { const p = I[t] * S, q = I[t + 1] * S, r = I[t + 2] * S, c = regionOf(V[p + S - 1] | 0); if (c < 0) continue; const ux = V[q] - V[p], uy = V[q + 1] - V[p + 1], uz = V[q + 2] - V[p + 2], vx = V[r] - V[p], vy = V[r + 1] - V[p + 1], vz = V[r + 2] - V[p + 2]; a[c] += 0.5 * Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx); } return a; };
       const ca = [0, 0, 0]; for (const q of skins) { const a = area(q.V, q.I); for (let k = 0; k < 3; k++) ca[k] += a[k]; }
       const BV = []; for (let i = 0; i < D.n; i++) { const o = [D.pos[i * 3], D.pos[i * 3 + 1], D.pos[i * 3 + 2], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, D.reg[i]]; BV.push(o); }
       if (!D.area) { const flat = []; for (const o of BV) flat.push(...o); D.area = area(flat, Array.from(D.idx)); }
       const lg = (A, a, b) => Math.hypot(A[a][0] - A[b][0], A[a][1] - A[b][1], A[a][2] - A[b][2]), sc = Math.pow(lg(BN, 'leftUpperLeg', 'leftFoot') / (lg(D.bones, 'leftUpperLeg', 'leftFoot') || 1), 2);
-      info.ratios = ca.map((x, k) => x / ((D.area[k] * sc) || 1)); info.need = info.ratios.some(r => r < 0.45); if (!info.need) return info;
+      info.ratios = ca.map((x, k) => x / ((D.area[k] * sc) || 1)); info.need = !!force || info.ratios.some(r => r < 0.6); if (!info.need) return info;
       // —— 重定位：每根骨头 M(x) = T + s·R·(x − S)，R 把素体这段骨头的方向转到角色这段的方向，s 是长度比；顶点按素体蒙皮权重混合
       const TF = {}, Q = T.Quaternion, getTF = name => { if (TF[name]) return TF[name]; const par = BPAR[name], pt = par ? getTF(par) : { R: new Q(), s: 1, Sb: D.bones.hips, Tb: BN.hips };
         const Sb = D.bones[name], Tb = BN[name]; let R = pt.R, sg = pt.s; const ch = (BCHILD[name] || []).find(c => D.bones[c] && BN[c]);
@@ -144,7 +144,8 @@ window.Autopsy = (() => {
     const c = bb.getCenter(new V3()), dx = -c.x, dy = -bb.min.y, dz = -c.z; for (const s of sets) for (let i = 0; i < s.V.length; i += S) { s.V[i] += dx; s.V[i + 1] += dy; s.V[i + 2] += dz; }
     for (const s of sets) { const n = s.V.length / S, P = new Float32Array(n * 3), N = new Float32Array(n * 3); for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) { P[i * 3 + k] = s.V[i * S + k]; N[i * 3 + k] = s.V[i * S + 3 + k]; } s.rg = { P, N, sk: Float32Array.from(s.sk) }; delete s.sk; }
     const BN = {}; for (const [o, k] of bk) { const p = new V3().setFromMatrixPosition(o.matrixWorld); BN[k] = [p.x + dx, p.y + dy, p.z + dz]; }
-    const baseInfo = attachBase(sets, BN, root, look);
+    let baseInfo; // 没有真正的皮肤层（衣服+皮肤融合的单网格，或只剩颈断面）时：原网格整层当“衣物”，素体当真正的皮肤层
+    if (!sets.some(s => s.skin && s.cap === 1)) { const was = sets.map(s => [s.cap, s.cloth]); for (const s of sets) if (s.cap !== 2) { s.cap = 0; s.cloth = true; } baseInfo = attachBase(sets, BN, root, look, true); if (!baseInfo.used) sets.forEach((s, i) => { s.cap = was[i][0]; s.cloth = was[i][1]; }); } else baseInfo = attachBase(sets, BN, root, look);
     // 「素衣」：只保留躯干到大腿根这一段（用顶点的 reg 低位=0 且高度在带内）；reg 的第 5 位(+32)记为“素衣保留”
     const HH = bb.max.y - bb.min.y, legs = ['leftUpperLeg', 'rightUpperLeg'].map(k => BN[k]).filter(Boolean), nk = BN.neck || BN.upperChest; let hasLin = false;
     if (legs.length && nk) { const hem = legs.reduce((a, b) => a + b[1], 0) / legs.length - 0.17 * HH, top = nk[1] - 0.02 * HH; let n3 = 0, y0 = 1e9, y1 = -1e9;
