@@ -108,7 +108,9 @@ window.Autopsy = (() => {
         for (let t = 0; t < s.I.length; t += 3) { if (V[s.I[t] * S + S - 1] >= 32 && V[s.I[t + 1] * S + S - 1] >= 32 && V[s.I[t + 2] * S + S - 1] >= 32) { n3++; for (let k = 0; k < 3; k++) { const y = V[s.I[t + k] * S + 1]; if (y < y0) y0 = y; if (y > y1) y1 = y; } } } }
       const sb = new T.Box3(), ab = new T.Box3(), tp = new V3(); for (const q of sets) for (let i = 0; i < q.V.length; i += S) { tp.set(q.V[i], q.V[i + 1], q.V[i + 2]); ab.expandByPoint(tp); if (!q.cloth) sb.expandByPoint(tp); }
       const sbs = sb.getSize(new V3()), abs = ab.getSize(new V3()); // 去掉衣服后，皮肤层必须仍是完整的人形（否则四肢画在衣服层里，去衣就会缺胳膊少腿）
-      hasLin = n3 >= 300 && (y1 - y0) >= 0.2 * HH && !sb.isEmpty() && sbs.y >= 0.92 * abs.y && sbs.x >= 0.8 * abs.x; }
+      hasLin = n3 >= 300 && (y1 - y0) >= 0.2 * HH && !sb.isEmpty() && sbs.y >= 0.92 * abs.y && sbs.x >= 0.8 * abs.x;
+      // 衣服删空后露出的是模型自带的人体层：躯干到大腿根这一段直接涂成绷带（不另外生成网格，不遮挡视野）
+      if (hasLin) for (const s of sets) if (s.skin && s.cap !== 2) { const V = s.V; for (let i = 0; i < V.length; i += S) { const y = V[i + 1], code = V[i + S - 1] | 0; if ((code === 0 || code === 18 || code === 19 || code === 20) && y >= hem && y <= top) BASE_STYLES[0].paint(V, i); } } }
     const BONES = [['hips', 'spine', 0.032], ['spine', 'chest', 0.03], ['chest', 'upperChest', 0.028], ['upperChest', 'neck', 0.022], ['leftUpperArm', 'leftLowerArm', 0.014], ['leftLowerArm', 'leftHand', 0.011], ['rightUpperArm', 'rightLowerArm', 0.014], ['rightLowerArm', 'rightHand', 0.011], ['leftUpperLeg', 'leftLowerLeg', 0.026], ['leftLowerLeg', 'leftFoot', 0.019], ['rightUpperLeg', 'rightLowerLeg', 0.026], ['rightLowerLeg', 'rightFoot', 0.019], ['leftFoot', 'leftToes', 0.011], ['rightFoot', 'rightToes', 0.011], ['upperChest', 'leftUpperArm', 0.012], ['upperChest', 'rightUpperArm', 0.012], ['hips', 'leftUpperLeg', 0.02], ['hips', 'rightUpperLeg', 0.02]];
     const bones = BONES.filter(b => BN[b[0]] && BN[b[1]]).map(b => ({ a: BN[b[0]].slice(), b: BN[b[1]].slice(), r: b[2] }));
     return { sets, BN, bones, height: HH, hasCloth: hasLin, rig: rigOk(BN) };
@@ -600,7 +602,7 @@ if ( vTw < -2.5 ) {
       el.innerHTML = '<div class="wt">👗 衣橱</div>' + gs.map(g => { const off = g.hid === g.n; return `<button class="gm${off ? ' off' : ''}" data-gm="${g.k}"><i>${wdIcon(g.k)}</i><span>${g.k}</span><b>${off ? '已脱' : '穿着'}</b></button>`; }).join('') + `<div class="bs"><button class="ar" data-bs="-1">◀</button><span><i>${BASE_STYLES[baseIdx].icon}</i> ${BASE_STYLES[baseIdx].name}${BASE_STYLES[baseIdx].empty ? ' · 待添加' : ''}<em>${BASE_STYLES.map((_, k) => k === baseIdx ? '●' : '○').join(' ')}</em></span><button class="ar" data-bs="1">▶</button></div><div class="wt2">底衬样式</div><button class="bt" data-wd="lin">👕 全部换素衣</button><div class="wf">🛡 躯干的素麻底衬不会脱</div>`;
     }
     function restyleBase() {
-      for (const p of st.pieces.slice()) { let ch = false; for (const q of p.part.sets) { if (!(q.bandOf || (st.linen && q.cloth))) continue; ch = true; const V = q.V; for (let i = 0; i < V.length; i += S) { if (V[i + 14] < 0 && V[i + 14] > -2.5) continue; bandPaint(V, i); } delete q._g; }
+      for (const p of st.pieces.slice()) { let ch = false; for (const q of p.part.sets) { const sk = q.skin && !q.bandOf && !!BASE_STYLES[baseIdx].paint; if (!(q.bandOf || (st.linen && q.cloth) || sk)) continue; let any = !sk; const V = q.V; for (let i = 0; i < V.length; i += S) { if (sk && !(V[i + 14] < -2.5)) continue; if (V[i + 14] < 0 && V[i + 14] > -2.5) continue; bandPaint(V, i); any = true; } if (!any) continue; ch = true; delete q._g; }
         if (ch) { const pos = p.obj.position.clone(), qq = p.obj.quaternion.clone(), tk = p.take, was = p.rb.sleep; removePiece(p); const n = addPiece(p.part, pos, qq); n.take = tk; n.rb.sleep = was; } }
       ui();
     }
