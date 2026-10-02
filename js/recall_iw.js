@@ -30,12 +30,12 @@ window.RecallIW = (() => {
     return g;
   }
   function ensureRig() {
-    if (rig) return rig; const g = new THREE.Group(), L = makeHand(true), R = makeHand(false); g.add(L); g.add(R); rig = { g, L, R }; return rig;
+    if (rig) return rig; const g = new THREE.Group(), L = makeHand(false), R = makeHand(true); g.add(L); g.add(R); rig = { g, L, R }; return rig; // limb_hand 未镜像是左手
   }
 
   // ---------------- 姿势（相机局部坐标：x 右，y 上，-z 前）----------------
   // 每个姿势 = { H:[x,y,z,rx,ry,rz], L:[...], R:[...], C:[x,y,z,rx,ry,rz,fov] }；手：rz 决定掌心朝向（0=向下，PI=向上，-PI/2=朝左，PI/2=朝右），rx>0 手指上翘
-  const BASE = { H: [0, -0.07, -0.44, -0.1, 0, 0], L: [-0.105, -0.2, -0.43, 0.95, 0, PI / 2 + 0.35], R: [0.105, -0.2, -0.43, 0.95, 0, -PI / 2 - 0.35], C: [0, 0, 0, -0.06, 0, 0, -14] };
+  const BASE = { H: [0, -0.07, -0.44, -0.1, 0, 0], L: [-0.094, -0.2, -0.42, 0.95, 0, PI / 2 + 0.35], R: [0.094, -0.2, -0.42, 0.95, 0, -PI / 2 - 0.35], C: [0, 0, 0, -0.06, 0, 0, -14] };
   const YOFF = 0.09; // R51：0.04→0.09，动作栏恢复可见后，头（两眼）抬到画面中部偏下，下巴不压栏
   const cp = p => ({ H: p.H.slice(), L: p.L.slice(), R: p.R.slice(), C: p.C.slice() });
   const P = (o) => { const p = cp(BASE); for (const k in o) { if (k === 'dH' || k === 'dC') { const t = k === 'dH' ? p.H : p.C; o[k].forEach((v, i) => t[i] += v); } else p[k] = o[k].slice(); } return p; };
@@ -144,7 +144,7 @@ window.RecallIW = (() => {
 #riw .pn{position:absolute;right:18px;top:60px;width:390px;max-height:calc(100% - 260px);overflow:auto;pointer-events:auto;background:rgba(14,10,12,.9);border:1px solid rgba(232,192,112,.35);border-radius:12px;padding:14px 18px;display:none;box-shadow:0 10px 36px #000b}#riw .pn.on{display:block;animation:riwp .3s}@keyframes riwp{from{opacity:0;transform:translateX(12px)}}
 #riw .pn .px{position:absolute;right:10px;top:6px;cursor:pointer;color:#9d8a78}#riw .pn p{margin:4px 0;font-size:13.5px;line-height:1.7}
 body.riw-on #cross,body.riw-on #tip,body.riw-on #hint,body.riw-on #labels,body.riw-on #hud{opacity:0!important;transition:opacity .3s}
-html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body.riw-on #toast,html body.riw-on #hintTag,html body.riw-on #feelBubble,html body.riw-on #spbubs,html body.riw-on #spchip,html body.riw-on #tip,html body.riw-on #hint{visibility:hidden!important;opacity:0!important}`;
+html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body.riw-on #toast,html body.riw-on #hintTag,html body.riw-on #feelBubble,html body.riw-on #spbubs,html body.riw-on #spchip,html body.riw-on #tip,html body.riw-on #hint,html body.riw-on #hpC{visibility:hidden!important;opacity:0!important}`;
   function build() {
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     el = document.createElement('div'); el.id = 'riw';
@@ -167,8 +167,10 @@ html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body
     const r = S.rec, c = r.c, K = Recall.known, n = Recall.nKnown(c), tot = Recall.FAC.length;
     const card = el.querySelector('.rcard'); card.style.setProperty('--c', RC[c.rar] || '#ccc');
     const title = window.Ranks && K(c, 'rank') ? Ranks.text(c) : (c.title || '');
+    let prod = ''; try { const ch = G.heads.find(x => x.rec === r || (x.rec && r.id != null && x.rec.id === r.id)), e = ch && G.headEcon ? G.headEcon(ch) : null, F = window.SAN_CFG && SAN_CFG.fmt ? SAN_CFG.fmt : (n => n);
+      prod = e ? `<div class="id" style="color:#ffd27a">🔮 ${e.roundOn ? (e.loose ? `每回合 ≈ ${e.coin}（散放）· 挂上建筑 ≈ ${e.coinB}+` : `每回合 ≈ ${e.special ? '特殊规则' : e.coin}（建筑）`) : `≈ ${e.coin}/次`}${e.click ? ` · <span style="color:#8fe6ff">🌀 点一下 +${F(e.click)}${e.san > 0 ? ` · ${F(e.san)}/秒` : ''}</span>` : ''}</div>` : '<div class="id" style="color:#a89886">🔮 不在洞里（魂库）——放回洞里才产魂晶</div>'; } catch (e) { prod = ''; }
     card.innerHTML = `<div class="rr">${RN[c.rar] || ''}${c.shiny ? ' · ✨异色' : ''}</div><div class="nm">${esc(window.NM ? NM(c) : c.name)}</div>${title ? `<div class="rtt">${esc(title)}</div>` : ''}
-      <div class="id">${K(c, 'race') ? esc(`${c.raceN} · ${c.idN} · ${c.age} 岁`) : '身份：？？？'} · 得自 ${esc(c.locN || '？')}</div>
+      <div class="id">${K(c, 'race') ? esc(`${c.raceN} · ${c.idN} · ${c.age} 岁`) : '身份：？？？'} · 得自 ${esc(c.locN || '？')}</div>${prod}
       <div class="pg">记忆 <i><b style="width:${n / tot * 100}%"></b></i> ${n} / ${tot}</div>` +
       Recall.FAC.map(f => { const k = K(c, f.k); return `<div class="fr${k ? '' : ' u'}${fresh === f.k ? ' nw' : ''}${k && S.openRows && S.openRows.has(f.k) ? ' open' : ''}" data-k="${f.k}" title="${k ? esc(f.v(r)) : '点击查看怎么想起'}"><span class="i">${f.ic}</span><span class="n">${f.n}</span><span class="v">${k ? esc(f.v(r)) : `？？？<em>${esc(howTo(f.k).split(' / ')[0])}</em>`}</span></div>`; }).join('') + (window.Siphon ? Siphon.cardHTML(r) : '');
     // 动作栏
@@ -182,7 +184,7 @@ html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body
   function go(a) {
     if (!a || !S.active || S.act || S.sip) return; const x = PLAY[a] || SIP[a] || Recall.ACT[a]; if (!x) return;
     if (x.need && !Recall.hasB(x.need)) { snd('deny'); return; }
-    if (SIP[a]) { const ck = window.Siphon && Siphon.can(S.rec); if (!ck || !ck.ok) { snd('deny'); sub(`<span class="d">${esc(ck ? ck.why : '')}。</span>`); return; } panel(null); if (Siphon.begin({ rec: S.rec, h: S.h, mode: a === 'sipM' ? 'm' : 'n', api: { sub, onEnd() { S.sip = false; refresh(); sub('你把木棒放下。她的头安静地垂在你手里，比之前轻了一点。'); } } })) { S.sip = true; refresh(); } return; }
+    if (SIP[a]) { const ck = window.Siphon && Siphon.can(S.rec); if (!ck || !ck.ok) { snd('deny'); sub(`<span class="d">${esc(ck ? ck.why : '')}。</span>`); return; } panel(null); if (Siphon.begin({ rec: S.rec, h: S.h, mode: a === 'sipM' ? 'm' : 'n', k: S.k || 1.4, api: { sub, onEnd() { S.sip = false; refresh(); sub('你把木棒放下。她的头安静地垂在你手里，比之前轻了一点。'); } } })) { S.sip = true; refresh(); } return; }
     if (a === 'seance') { seance(); return; }
     const D = A[a]; if (!D) return; panel(null);
     S.act = a; S.t = 0; S.dur = D.dur; S.cueI = 0; S.pend = PLAY[a] ? null : Recall.narrate(a, S.rec);
@@ -237,9 +239,9 @@ html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body
     if (!G.uiOpen && G.setUI) G.setUI(true); if (document.pointerLockElement) try { document.exitPointerLock(); } catch (e) { } // R54p：别的模块/连点复位把鼠标重新锁住 → 突然变回第一人称
     if (!h.g || !h.g.parent) { close(true); return; }
     S.openT = Math.min(1, S.openT + dt / 0.55); const oe = sm(S.openT);
+    if (S.sip && window.Siphon && Siphon.active) { const R0 = ensureRig(); if (R0.g.parent !== cam) cam.add(R0.g); if (Siphon.frame(dt, now, { cam, h, S, rig: R0, k: S.k || 1 })) return; }
     let tgt;
-    if (S.sip && window.Siphon && Siphon.active) { tgt = Siphon.pose(dt, now, { cp, BASE, S }); }
-    else if (S.act) {
+    if (S.act) {
       const D = A[S.act]; if (!S.freeze) S.t += dt; while (D.cue && S.cueI < D.cue.length && S.t >= D.cue[S.cueI][0]) snd(D.cue[S.cueI++][1]);
       tgt = sample(S.act, S.t); if (D.fx) D.fx(S.t / D.dur, S.t, tgt); if (D.flash) el.querySelector('.fl').style.opacity = Math.max(0, Math.sin(Math.min(1, S.t / D.dur) * PI)) * 0.45;
       if (D.flash && S.t > 0.9 && S.t < 1.8) S.shake = 0.012;
@@ -271,7 +273,6 @@ html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body
     _e.set(Hh[3], Hh[4], Hh[5], 'XYZ'); _q.setFromEuler(_e); _q2.copy(cam.quaternion).multiply(_q); if (S.hc) _v.sub(_c.copy(S.hc).applyQuaternion(_q2)); if (oe < 1) h.g.quaternion.slerp(_q2, oe); else h.g.quaternion.copy(_q2);
     if (oe < 1) h.g.position.lerp(_v, oe); else h.g.position.copy(_v);
     h.g.updateMatrixWorld(true); if (h.vel) h.vel.set(0, 0, 0); h.sleep = 0;
-    if (S.sip && window.Siphon && Siphon.active) Siphon.post({ cam, h, rig: R, k: kk, dt });
   }
 
   // ---------------- 输入 ----------------
@@ -314,7 +315,7 @@ html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body
       const bb = new THREE.Box3().setFromObject(h.hb && h.hb.group ? h.hb.group : h.g), sz = bb.getSize(new THREE.Vector3()), ctr = bb.getCenter(new THREE.Vector3());
       S.hc = ctr.sub(h.g.position); S.k = Math.max(0.5, Math.min(3, (sz.y || 0.26) / 0.26)); { /* R37：非 VRoid 头（MMD 系）的包围盒把发量/发饰/兽耳都算进去（0.27~0.59 vs VRoid 中位 0.30）→ k 偏大 → 手被放大、头显得小。非 VRoid 头的 k 向 VRoid 中位数（1.15）收敛 */ let gp = ''; try { const lk = (h.rec && h.rec.look) || (rec && rec.look); const mt = lk && window.ModelHeads && ModelHeads.meta(lk); gp = (mt && mt.grp) || ''; } catch (e) { } if (gp && gp !== 'vroid') { S.kRaw = S.k; S.k = Math.max(1.05, Math.min(1.3, 1.15 + 0.1 * (S.k - 1.15))); } } { const ff = faceFit(h); S.kOld = S.k; S.k = ff.k; if (ff.hc) S.hc = ff.hc; S.kT = 0; S.hcT = null; S.kM = 0; }
       h.g.quaternion.copy(q0); h.g.updateMatrixWorld(true); S.hsz = sz.toArray().map(v => +v.toFixed(3)); }
-    Object.assign(S, { openAt: performance.now(), active: true, h, rec, cb: cb || {}, act: '', openRows: new Set(), t: 0, yaw: 0, pitch: 0, dist: -0.15, drag: null, play: 0, fov0: G.camera.fov, openT: 0, shake: 0, pend: null });
+    Object.assign(S, { openAt: performance.now(), active: true, h, rec, cb: cb || {}, act: '', openRows: new Set(), t: 0, yaw: 0, pitch: 0, dist: -0.06, drag: null, play: 0, fov0: G.camera.fov, openT: 0, shake: 0, pend: null });
     cur = null; G.setUI(true); document.body.classList.add('riw-on');
     el.style.display = 'block'; requestAnimationFrame(() => el.classList.add('on')); panel(null); refresh();
     const c = rec.c; sub(Recall.nKnown(c) > 3 ? `你把<b>${esc(NM(c))}</b>捧到面前。她的眼睛半睁着，已经不会再眨了。` : `一颗陌生的头。你把她捧到面前——还想不起她是谁。<br><span class="d">试试下面的动作，一点点想起来。</span>`);

@@ -152,16 +152,22 @@ window.startGame = function () {
     if (rec.calm) y *= 1.5; // 通灵后安抚
     return y;
   }
-  // R64：鼠标悬停首级时显示她能产出的魂晶（回合结算）和 SAN（每秒）
+  // R64/R69：悬停首级时显示产出——魂晶（回合结算；散放也产，挂建筑更多）、SAN（挂机每秒）、左键点一下的 SAN
+  function headEcon(h) {
+    const s = st(), pos = h.g.position, aura = auraMul(pos) * (window.Props ? Props.auraMul(pos) : 1) * beaconMul(h) * (h.buff && h.buff > clock.elapsedTime ? 2 : 1), base = h.yield * s.yieldMul * globalMul() * aura;
+    const mt = h.mount, d = mt && CAT[mt.type], sp = mt && window.San && San.spec ? San.spec(mt.type) : null, roundOn = !!(window.Loop && Loop.rOn && Loop.rOn());
+    const o = { roundOn, loose: !mt, coin: 0, coinB: 0, special: false, san: 0, click: 0 };
+    if (roundOn && Loop.hv) { const hv = Loop.hv(h) * Math.min(2, aura), L = Loop.LOOSE || 0; if (mt) { const f = d && Loop.bf ? Loop.bf(d) : 0; o.special = !!(Loop.ROUND && Loop.ROUND[mt.type]); o.coin = Math.round(Math.max(hv * f, hv * L)); } else { o.coin = Math.round(hv * L); o.coinB = Math.round(hv); } }
+    else o.coin = Math.round(base * (sp ? sp.mult : 1));
+    const SC = window.SAN_CFG; if (window.San && San.live && San.live() && SC && SC.C) { o.san = sp && sp.period ? Math.round(base * sp.mult * SC.C.K) / sp.period : 0; const ss = San.st ? San.st() : {}; o.click = Math.round(SC.poke(base * (window.Props && Props.pokeMul ? Props.pokeMul(pos) : 1), ss.idle || 0, 0) * (ss.fz > 0 ? SC.C.FRENZY_X : 1)); }
+    return o;
+  }
   function yieldLine(h) {
     try {
-      const s = st(), pos = h.g.position, aura = auraMul(pos) * (window.Props ? Props.auraMul(pos) : 1) * beaconMul(h) * (h.buff && h.buff > clock.elapsedTime ? 2 : 1), base = h.yield * s.yieldMul * globalMul() * aura;
-      const mt = h.mount, d = mt && CAT[mt.type], sp = mt && window.San && San.spec ? San.spec(mt.type) : null, roundOn = window.Loop && Loop.rOn && Loop.rOn();
-      let coin = 0, why = '';
-      if (roundOn && Loop.hv) { const f = d && Loop.bf ? Loop.bf(d) : 0; coin = f ? Math.round(Loop.hv(h) * f * aura) : 0; if (!mt) why = '（挂到建筑上才结算）'; } else coin = Math.round(base * (sp ? sp.mult : 1));
-      let sanS = '';
-      if (window.San && San.live && San.live() && window.SAN_CFG && SAN_CFG.C) { const per = sp && sp.period ? Math.round(base * sp.mult * SAN_CFG.C.K) / sp.period : 0; sanS = ` · <span style="color:#8fe6ff">🌀 SAN ${per > 0 ? '≈ ' + SAN_CFG.fmt(per) + '/秒' : '0（挂到建筑上才产）'}</span>`; }
-      return `<br><small><span style="color:#ffd27a">🔮 ${coin > 0 ? '≈ ' + fmtN(coin) + (roundOn ? ' /回合结算' : ' /次') : '0'}${why}</span>${sanS}</small>`;
+      const e = headEcon(h), F = window.SAN_CFG && SAN_CFG.fmt ? SAN_CFG.fmt : fmtN;
+      const coin = e.roundOn ? (e.loose ? `🔮 ≈ ${fmtN(e.coin)} /回合（散放）· 挂上建筑 ≈ ${fmtN(e.coinB)}+` : `🔮 ≈ ${e.special ? '特殊规则' : fmtN(e.coin)} /回合结算`) : `🔮 ≈ ${fmtN(e.coin)} /次`;
+      const san = e.click ? ` · <span style="color:#8fe6ff">🌀 点一下 +${F(e.click)}${e.san > 0 ? ` · 挂机 ≈ ${F(e.san)}/秒` : ''}</span>` : '';
+      return `<br><small><span style="color:#ffd27a">${coin}</span>${san}</small>`;
     } catch (e) { return ''; }
   }
   // 神魂 / 异色：环绕的魂光粒子
@@ -1412,7 +1418,7 @@ window.startGame = function () {
   // ---------------- 对外 ----------------
   window.G = {
     _dbg: { supportH: h => supportH(h), hullOf: h => hullOf(h), submitBounty: h => submitBounty(h), interactE: () => interactE(), startSeance: h => startSeance(h), carry() { bagCarrying = true; }, unloadBag: () => unloadBag(), get cine() { return cine; } },
-    hasAff, yieldOf, xpMul, headBonus, exhibit, codexInfo, daily, DAILY, bounties, rerollBounties, EX_T, fmtN, S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
+    hasAff, yieldOf, headEcon, xpMul, headBonus, exhibit, codexInfo, daily, DAILY, bounties, rerollBounties, EX_T, fmtN, S, heads, builds, player, RAR, st, buildBonus, cost, bought, startPlace, cancelBuild, dig, buyEquip, buyItem, useItem, train, damage, flash, toast, addCoins,
     save, wipe, setUI, lockPointer, spawnReturnHeads, addHeadRecs, createReturnBag, usedSig, usedNames, headOf, removeHead, refreshWeapon, burst, get cave() { return cave; },
     post, lod, get lodStat() { return lodStat; }, startHP, confirmHP, cancelHP, updateHP, get hplace() { return hplace; }, storeHead, takeOut, storeLoose, vaultCount, MAX_HEADS, VAULT_MAX, HOOK, rebuildHead, floatText, spawnBeam, gachaCard, lookHit, unmount, soulWisp, trigger, SAVE_KEY, get clock() { return clock; }, get held() { return held; }, set held(v) { held = v; }, get keys() { return keys; }, get cine() { return cine; }, setUIOpen: v => setUI(v),
     get playing() { return playing; }, get uiOpen() { return uiOpen; }, unstick, relockNeeded, vm, get weapon() { return weaponMesh; }, fist, get held() { return held; }, renderer, camera, scene, poke, mountHead, createHead, addBuild

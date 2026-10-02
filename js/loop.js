@@ -148,6 +148,7 @@ window.Loop = (() => {
   const BASE = [10, 20, 36, 60, 100];
   const hv = h => { const c = h.rec.c; return BASE[Math.max(0, Math.min(4, c.rar | 0))] * (c.shiny ? 1.5 : 1) * (c.boss ? 2 : 1) * (h.rec.calm ? 1.1 : 1); };
   const bf = d => !d || !d.mount || d.mount.mult === 0 ? 0 : Math.min(1.5, 0.85 + 0.12 * Math.min(5, d.mount.mult || 1)) + (d.showcase ? 0.15 : 0);
+  const LOOSE = 0.4, LOOSE_N = 24;
   const raceN = k => (window.Lore && Lore.RACES && Lore.RACES[k] && Lore.RACES[k].n) || k;
   const bkey = b => b.type + '@' + (+b.x).toFixed(1) + ',' + (+b.z).toFixed(1);
   function settle(died) {
@@ -167,7 +168,13 @@ window.Loop = (() => {
       const d = C[b.type]; if (!d) continue; let v = 0, note = ''; const fn = ROUND[b.type];
       if (fn) { try { const o = fn(b, L, ctx) || {}; v = o.v || 0; note = o.note || ''; } catch (e) { console.warn('round', b.type, e); } }
       else { const f = bf(d); for (const h of L) v += ctx.val(h, f); note = f ? `每颗 ×${f.toFixed(2)}` : '这座建筑不产魂晶'; }
+      { const fl = L.reduce((s, h) => s + ctx.val(h, LOOSE), 0); if (v < fl) { v = fl; note = (note ? note + '；' : '') + '保底＝散放产出'; } }
       v = Math.max(0, Math.round(v)); out.v += v; out.heads += L.length; out.lines.push({ t: b.type, ic: d.icon, n: d.n, k: L.length, v, note });
+    }
+    { // R69：没挂建筑的首级也产（基础 ×LOOSE；按价值排序，前 LOOSE_N 颗全额，其余 1/4）
+      const lo = (g.heads || []).filter(h => h && !h.mount && h.rec && h.rec.c).map(h => hv(h) * LOOSE * aura(h)).sort((a, b) => b - a);
+      const v = Math.round(lo.reduce((s, x, i) => s + x * (i < LOOSE_N ? 1 : 0.25), 0));
+      if (v > 0) { out.v += v; out.heads += lo.length; out.lines.push({ t: '_loose', ic: '💀', n: '散放的首级', k: lo.length, v, note: `不挂建筑也产（每颗 ×${LOOSE}${lo.length > LOOSE_N ? `，超过 ${LOOSE_N} 颗的只算 1/4` : ''}）；挂上建筑更多` }); }
     }
     try { if (window.Props && Props.on && Props.on() && window.Sack) { let pc = 0; const got = {}; for (const it of Props.items || []) { const d = it.d; if (it.ghost || !d || !d.tick) continue; if (d.tick.kind === 'coin') pc += d.tick.n * 3; else if (Sack.IT[d.tick.kind]) { Sack.stashAdd(Sack.mk(d.tick.kind, d.tick.n * 3)); got[d.tick.kind] = (got[d.tick.kind] || 0) + d.tick.n * 3; } }
       if (pc) { out.v += pc; out.lines.push({ t: '_props', ic: '🧰', n: '摆件产出', k: 0, v: pc, note: '藏宝箱等每回合结算一次' }); } const gs = Object.keys(got); if (gs.length) out.notes.push('🧰 摆件产出材料：' + gs.map(k => Sack.IT[k].icon + Sack.IT[k].n + '×' + got[k]).join('、') + '（已进储物箱）'); } } catch (e) { }
@@ -268,5 +275,5 @@ ${S ? `<section><h4>🌙 主线 · 月之魔女</h4><div class="pips">${pips}<b>
   wrapStart(); setTimeout(wrapStart, 0);
   // 每杀一人回血（世道“盛宴” / 议会祝福）
   function onKill() { trip.k++; const h = mod('heal', 0) + (nb().heal || 0); if (h > 0) try { const s = G().st(); G().S.hp = Math.min(s.maxHp, G().S.hp + s.maxHp * h); } catch (e) { } }
-  return { on, rOn, R, MODS, runDmg, runHp, runSpd, enemyHp, enemyDmg, nemRate, enemyLv, chapLv, isBossTrip, leaveNode, onKill, payout, capCave, caveGate, ROUND, hv, bf, settle, showSettle, stash, CB, CHB, chBoss, bossLv, bossAff, arena, nb, ward };
+  return { on, rOn, R, MODS, runDmg, runHp, runSpd, enemyHp, enemyDmg, nemRate, enemyLv, chapLv, isBossTrip, leaveNode, onKill, payout, capCave, caveGate, ROUND, hv, bf, LOOSE, LOOSE_N, settle, showSettle, stash, CB, CHB, chBoss, bossLv, bossAff, arena, nb, ward };
 })();
