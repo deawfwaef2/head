@@ -141,14 +141,17 @@ window.Rogue = (() => {
     else if (s.pend > 0) h += `<div class="h" style="margin-top:8px">🎴 祝福抉择 ×${s.pend} <small>（3 选 1；同一个可升到 Lv3，同标签 3 种成套）</small></div><div class="cards">${boonOffer().map(b => `<button class="cd" data-rgb="${b.k}" style="--c:${TAG[b.tag]}"><b>${b.ic} ${b.n}${s.b[b.k] ? ` → Lv${s.b[b.k] + 1}` : ''}</b><i>标签：${b.tag}${(tcn[b.tag] || 0) === 2 && !s.b[b.k] ? ' · 选它成套！' : ''}</i><span>${b.d((s.b[b.k] || 0) + 1)}</span></button>`).join('')}</div>`;
     return h;
   }
-  function inject() {
-    if (!on() || W()) return; const host = document.querySelector('.rq-pick') || document.querySelector('.locs'); if (!host || !host.offsetParent || document.getElementById('rgPanel')) return; css();
-    const d = document.createElement('div'); d.id = 'rgPanel'; d.innerHTML = panelHTML(); host.parentNode.insertBefore(d, host);
-    if (GU() && !st().arch) setTimeout(openArch, 250); else if (GU() && st().pend > 0 && !inject.asked) { inject.asked = 1; setTimeout(openBoon, 250); }
-    d.addEventListener('click', e => { if (GU() && e.target.closest('[data-rgopen]')) { e.stopPropagation(); if (!st().arch) openArch(); else openBoon(); return; } const a = e.target.closest('[data-rga]'), b = e.target.closest('[data-rgb]'); if (!a && !b) return; e.stopPropagation(); const s = st();
+  // R56：不再往“探索 UI”里塞面板（太臃肿）——流派/祝福搬进 Hub「🎴 流派 · 祝福」页（san.js 里挂页）；出洞选地点时只弹一次大选择界面
+  function watchExplore() {
+    if (!on() || W()) return; const host = document.querySelector('.rq-pick') || document.querySelector('.locs'); if (!host || !host.offsetParent) { watchExplore.seen = 0; return; } if (watchExplore.seen) return; watchExplore.seen = 1;
+    if (GU() && !st().arch) setTimeout(openArch, 250); else if (GU() && st().pend > 0) setTimeout(openBoon, 250);
+  }
+  function mount(d) {
+    css(); d.id = 'rgPanel'; d.innerHTML = panelHTML();
+    d.onclick = e => { if (GU() && e.target.closest('[data-rgopen]')) { e.stopPropagation(); if (!st().arch) openArch(); else openBoon(); return; } const a = e.target.closest('[data-rga]'), b = e.target.closest('[data-rgb]'); if (!a && !b) return; e.stopPropagation(); const s = st();
       if (a && !s.arch) pickArch(a.dataset.rga);
       if (b && s.pend > 0) pickBoon(b.dataset.rgb);
-      d.innerHTML = panelHTML(); });
+      d.innerHTML = panelHTML(); };
   }
   const GU = () => !!(window.GrandUI && GrandUI.on());
   function refresh() { const d = document.getElementById('rgPanel'); if (d) d.innerHTML = panelHTML(); }
@@ -165,6 +168,6 @@ window.Rogue = (() => {
       cards: boonOffer().map(b => ({ k: b.k, ic: b.ic, col: TAG[b.tag], name: b.n, epi: TAGN[b.tag], rib: b.tag, lv: s.b[b.k] ? `Lv${s.b[b.k]} → Lv${s.b[b.k] + 1}` : '新祝福', html: `${b.d((s.b[b.k] || 0) + 1)}${(tcn[b.tag] || 0) === 2 && !s.b[b.k] ? `<br><br><span class="hl">选它就成套：${SETS[b.tag]}</span>` : `<br><br><small>${b.tag} 标签 ${tcn[b.tag] || 0}/3 · 套装：${SETS[b.tag]}</small>`}` })),
       later: '稍后再选', onPick: k => { pickBoon(k); if (st().pend > 0) setTimeout(openBoon, 350); } });
   }
-  setInterval(() => { try { inject(); } catch (e) { } }, 400);
-  return { on, outDmg, event, inDmg, hpK, spdK, dmgK, grant, roundPick, st, ARCH, BOON, SETS, tagCount, lv, openArch, openBoon };
+  setInterval(() => { try { watchExplore(); } catch (e) { } }, 400);
+  return { on, outDmg, event, inDmg, hpK, spdK, dmgK, grant, roundPick, st, ARCH, BOON, SETS, tagCount, lv, openArch, openBoon, mount, refresh };
 })();

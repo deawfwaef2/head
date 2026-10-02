@@ -185,7 +185,7 @@ window.UI = (() => {
       grid = vis.map(k => {
         const d = C[k], lock = d.depth && d.depth > S.depth, c = G.cost(k), own = G.bought(k), maxed = d.max && own >= d.max, rmN = window.RegEcon && RegEcon.need ? RegEcon.need(k) : {}, rmOk = !window.RegEcon || RegEcon.hasAll(rmN);
         return `<div class="bp-item ${lock ? 'locked' : maxed ? 'done' : S.coins < c || !rmOk ? 'poor' : ''}" ${lock || maxed ? '' : `data-a="place" data-v="${k}"`}>
-          ${own ? `<div class="bp-own">已建 ${own}</div>` : ''}<div class="bp-icon">${lock ? '🔒' : d.icon}</div><div class="bp-name">${d.n}</div>
+          ${own ? `<div class="bp-own">已建 ${own}</div>` : ''}<div class="bp-icon">${lock ? '🔒' : d.icon}</div><div class="bp-name">${d.n}${window.San && San.badge ? San.badge(k) : ''}</div>
           <div class="bp-cost">${lock ? `需洞窟第 ${d.depth} 层` : maxed ? '已建成' : '🔮 ' + fmt(c)}</div>${lock || maxed || !window.RegEcon ? '' : RegEcon.needHTML(rmN)}
           <div class="bp-stat">${statTxt(d.stat)}${d.regen ? ' 恢复+' + d.regen + '%' : ''}${own && (d.stat || d.regen) && !(window.Mods && Mods.on('build_stat_cap') === false) ? ' <small style="opacity:.7">（属性同种只算 1 座）</small>' : ''}</div><div class="bp-desc" title="${esc((d.desc || '').replace(/<[^>]+>/g, ''))}">${esc((d.desc || '').replace(/<br\s*\/?>/g, ' ').replace(/<[^>]+>/g, ''))}</div></div>`;
       }).join('');

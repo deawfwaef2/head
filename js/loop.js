@@ -30,7 +30,7 @@ window.Loop = (() => {
   }
   const mod = (f, def) => { if (!on()) return def; let v = def; for (const k of R().mods) { const M = MODS.find(x => x.k === k); if (M && M[f] != null) v = typeof def === 'number' && def === 1 ? v * M[f] : v + M[f]; } return v; };
   // ---- 玩家/敌人倍率（被 nemesis / living 读取）；nb = 上回合建筑给的「下一趟」祝福；Rogue = 本局肉鸽流派/祝福 ----
-  const nb = () => (on() && R().nb) || {};
+  const nb = () => { const a = (on() && R().nb) || {}; if (!(window.San && San.on() && San.nb)) return a; const b = San.nb(); if (!b) return a; const o = Object.assign({}, a); for (const k in b) o[k] = (o[k] || 0) + b[k]; return o; }; // R56\uff1aSAN \u796d\u575b\u4e70\u7684\u4e34\u65f6\u589e\u76ca\u5e76\u5165\u4e0b\u4e00\u8dd1
   const RG = k => (window.Rogue && Rogue.on && Rogue.on() && Rogue[k] ? Rogue[k]() : 1);
   let wc = { t: 0, v: 0 };
   function ward() { const n = performance.now(); if (n - wc.t < 2000) return wc.v; wc.t = n; let k = 0; try { for (const h of G().heads || []) if (h && h.mount && h.mount.type === 'rh_palisade') k++; } catch (e) { } wc.v = Math.min(0.45, k * 0.08); return wc.v; }
@@ -163,14 +163,18 @@ window.Loop = (() => {
     const aura = h => { if (aC.has(h)) return aC.get(h); let m = 1; const p = h.g.position; for (const b of auras) { const d = C0[b.type]; if ((p.x - b.x) ** 2 + (p.z - b.z) ** 2 < d.aura * d.aura) m *= d.auraMul; } try { if (window.Props && Props.on && Props.on()) m *= Props.roundMul ? Props.roundMul(p) : Props.auraMul(p); } catch (e) { } m = Math.min(2, m); aC.set(h, m); return m; };
     const ctx = { r, g, hv, setK, nb: {}, rm: [], boons: 0, notes: out.notes, val: (h, k = 1) => hv(h) * k * (1 + (setK.get(h) || 0)) * aura(h), st: b => (r.bst[bkey(b)] = r.bst[bkey(b)] || {}), bless: (k, v) => { ctx.nb[k] = (ctx.nb[k] || 0) + v; } };
     const byB = new Map(); for (const h of hs) { if (!byB.has(h.mount)) byB.set(h.mount, []); byB.get(h.mount).push(h); }
+    const sanB = [];
     for (const [b, L] of byB) {
       const d = C[b.type]; if (!d) continue; let v = 0, note = ''; const fn = ROUND[b.type];
+      if (!fn && window.San && San.on() && San.kind(b.type) === 'san') { out.heads += L.length; sanB.push(d.icon + d.n + '×' + L.length); continue; } // R56：SAN 型建筑在洞里挂机产 SAN，不进魂晶结算
       if (fn) { try { const o = fn(b, L, ctx) || {}; v = o.v || 0; note = o.note || ''; } catch (e) { console.warn('round', b.type, e); } }
       else { const f = bf(d); for (const h of L) v += ctx.val(h, f); note = f ? `每颗 ×${f.toFixed(2)}` : '这座建筑不产魂晶'; }
       v = Math.max(0, Math.round(v)); out.v += v; out.heads += L.length; out.lines.push({ t: b.type, ic: d.icon, n: d.n, k: L.length, v, note });
     }
     try { if (window.Props && Props.on && Props.on() && window.Sack) { let pc = 0; const got = {}; for (const it of Props.items || []) { const d = it.d; if (it.ghost || !d || !d.tick) continue; if (d.tick.kind === 'coin') pc += d.tick.n * 3; else if (Sack.IT[d.tick.kind]) { Sack.stashAdd(Sack.mk(d.tick.kind, d.tick.n * 3)); got[d.tick.kind] = (got[d.tick.kind] || 0) + d.tick.n * 3; } }
       if (pc) { out.v += pc; out.lines.push({ t: '_props', ic: '🧰', n: '摆件产出', k: 0, v: pc, note: '藏宝箱等每回合结算一次' }); } const gs = Object.keys(got); if (gs.length) out.notes.push('🧰 摆件产出材料：' + gs.map(k => Sack.IT[k].icon + Sack.IT[k].n + '×' + got[k]).join('、') + '（已进储物箱）'); } } catch (e) { }
+    out.sanB = sanB.length; if (sanB.length) out.notes.push('🌀 SAN 型建筑（' + sanB.slice(0, 4).join('、') + (sanB.length > 4 ? ' 等 ' + sanB.length + ' 座' : '') + '）在洞里持续产 SAN，不计入魂晶结算；魂晶靠高阶建筑 / 祭仪厅 / 出猎');
+    try { if (window.San && San.on()) { const t = San.endTrip(); if (t) out.notes.push(t); } } catch (e) { }
     const chK = 1 + (r.chap - 1) * 0.2, pay = mod('pay', 1), ex = g.exhibit ? 1 + g.exhibit().tier * 0.04 : 1, inc = 1 + (r.inc || 0); r.inc = 0;
     out.mul = { chK, pay, ex, inc }; out.stash = Math.round(r.stash || 0); out.src = Object.assign({}, r.src);
     out.tot = Math.round(out.v * chK * pay * ex * inc) + out.stash; out.died = died; out.nb = ctx.nb; out.boons = ctx.boons;
@@ -187,7 +191,7 @@ window.Loop = (() => {
     if (window.GrandUI && GrandUI.on()) {
       const rw = [...M.values()].sort((a, b) => b.v - a.v).map(o => ({ ic: o.ic, n: o.n + (o.b > 1 ? ` ×${o.b}` : ''), sub: `${o.k} 颗首级在岗${o.nt.size ? ' · ' + [...o.nt].slice(0, 2).join('；') : ''}`, v: '+' + o.v }));
       if (P.stash) rw.push({ ic: '📦', n: '洞内活动', sub: src || '存着的收益', v: '+' + P.stash });
-      if (!rw.length) rw.push({ ic: '🕸️', n: '空荡的洞穴', sub: '没有首级在岗——把首级插到建筑上，下次回洞就有产出', v: '+0' });
+      if (!rw.length) rw.push(P.sanB ? { ic: '🌀', n: '首级都在 SAN 型建筑上', sub: '它们在洞里挂机产 SAN，没有魂晶。魂晶靠高阶建筑 / 祭仪厅 / 出猎', v: '+0' } : { ic: '🕸️', n: '空荡的洞穴', sub: '没有首级在岗——把首级插到建筑上，下次回洞就有产出', v: '+0' });
       const ex = [...P.sets, ...P.notes, P.boons ? `🎴 额外祝福抉择 ×${P.boons}` : '', nbText(P.nb) ? `🎐 下一趟祝福：${nbText(P.nb)}` : '', `第 ${R().chap} 章 ×${P.mul.chK.toFixed(2)} · 世道 ×${P.mul.pay.toFixed(2)} · 展厅 ×${P.mul.ex.toFixed(2)}${P.mul.inc > 1 ? ` · 回合香 ×${P.mul.inc.toFixed(2)}` : ''}`].filter(Boolean);
       GrandUI.ceremony({ kicker: `第 ${R().round} 回 合`, title: P.died ? '你倒下了，但首级还在' : '魂首归窟', sub: '洞里的首级替你干完了这一回合的活', rows: rw, extras: ex, total: P.tot, ok: '收下', onClose: () => { try { if (window.Rogue && Rogue.st().pend > 0) setTimeout(Rogue.openBoon, 300); } catch (e) { } } });
       try { SFX.coins && SFX.coins(); } catch (e) { } return;

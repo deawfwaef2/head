@@ -2154,3 +2154,15 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - `components()`: islands (e.g. hands) are tied to the neighbour island by nearest-vertex ties (`islandTies`), cap tris unioned to shell via `cmap`; layer merge across sets is volume-overlap ≥0.5 (the old touching-bbox rule merged the two sides of a cut).
 - Any cut drops `part.rig` (vertex layout changes) → ragdoll only on an uncut body; Ctrl+Z to go back.
 - Test scripts (lost on reset): t16/t17 cut cases, t18 ragdoll toggle.
+
+
+## R59 用户（原话，长期有效）：SAN 值 / 洞穴挂机 / 血契 UI 搬家
+> “现在还有问题，就是洞里左键点头没反馈了，这并不是我想要的，我还是想结合下洞穴挂机？比如说你设计一种资源【SAN值】-就是你点头还是有SAN值，然后SAN值这个系统就更像是临时BUFF加成，就是给你下一局的临时BUFF加成，你那个血契的UI位置也不好，不应该塞在探索UI里。搞得探索UI非常臃肿，SAN值就是持续挂机式产出资源，然后你所有建筑应该设计就是有的产出SAN值，有的产出魂晶，魂晶就是比较稀有轮式，SAN值就是那种刷的很快，SAN值的作用也有很多，比如说强化下一局？武器暂时性附魔？SAN值都是暂时性的效果。”
+- **根因**：R54k round_yield 让 `game.js trigger()` 在回合制下第一行就 `return 0`（首级只在回合结算时产魂晶）→ 左键没任何反馈、建筑计时也停了。
+- **新 MOD `san`（`js/san.js`，默认开，依赖 run_loop + round_yield）**：回合制下洞里 `trigger()` 改为 `San.gain()`（飘字 `🌀+N`，青色）；SAN = 旧版魂晶产出 × `K`(3) × 躁动(×2)；`game.js` 建筑计时/魂轮对“SAN 型”建筑照常运转（`San.live()` = 洞里 + 回合制）。左键把玩系数 `POKE`=1。常量都在 san.js 顶部（K / POKE / COIN_MULT / AWAY / 各项价格 `BUFFS`/`ECOST`/`FCOST`/`XCOST`/`BCOST`，价格随章节 ×(1+0.15·(章-1))、同类增益 ×1.6 叠价）。
+- **建筑分类 `San.kind(type)`**：有 `ROUND[type]`（祭仪厅 rh_*）→ 魂晶；`mount.mult ≥ 2` → 魂晶（骨龛/通灵台/胸像/…高倍率，回合结算发）；`mult` 0 或周期 >1e6（锻造/syn_* /遗物祭坛）→ none；其余（枪桩、展示柜、魂轮…）→ SAN。`Loop.settle` 对 SAN 型建筑 `continue`（不发魂晶，只在结算页加一行提示 + `San.endTrip()` 的“本回合累计 SAN”）。建造菜单里每座建筑名后有 `🌀SAN` / `🔮魂晶` 标记（`ui.js` 调 `San.badge`）。
+- **SAN 祭坛**（Hub「角色」组新页 `🌀 SAN 祭坛`，热键反引号 `` ` ``，只在洞里）：① 武器附魔六选一（炽焰/霜寒/雷鸣/剧毒/血饮/噬魂，`worlds.js foeEvent0` → `San.event`，用 `Foe.dot({proc:true})`、`fo._chill`）；② 下一趟增益六种（伤害/生命/移速/恐惧/啜饮/贪婪，各 ≤3 层，经 `Loop.nb()` 合并进 `runDmg/runHp/runSpd/enemyHp/clear/onKill`）；③ 特别仪式：躁动（120s SAN×2）、魂晶香（`Loop.R().inc` +10%，上限 35%）、月光窥视（`Rogue.grant(1)`，每回合越买越贵，结算后重置）。
+- **“临时”机制**：购买写入 `S.san.arm`；出洞（`Worlds.active` false→true）时 `arm → act`，回洞即清空，所以只管下一趟；换附魔退还原价。离洞期间首级仍挂机：回洞按 `idle速率 × min(时长,600s) × 0.5` 补 SAN。存档在 `S.san`（旧存档惰性初始化）。
+- **血契 / 流派 UI 搬家**：`rogue.js` 不再往探索 UI 里注入 `#rgPanel`（`inject` 删除，换成 `watchExplore()` 只在打开“选地点”时弹一次 GrandUI 大选择）；面板函数 `Rogue.mount(host)` 供 Hub 新页「🎴 流派 · 祝福」使用；洞里右下角（☰ 菜单上方）有个小角标提示“还没选杀法 / 祝福抉择 ×N”。SAN HUD 贴在魂晶数字右边（`.u-san`，野外显示当前生效的 SAN 强化摘要）。
+- **验证（Playwright）**：trigger 在洞里返回 SAN 且魂晶不变；枪桩+展示柜计时产 SAN；骨龛走回合结算；买增益 → `Loop.nb()` 并入；模拟 `Worlds.active` 切换：arm→act→回洞清空 + 离洞补 SAN；六种附魔用桩函数跑过无异常；Hub 两个新页能开、选杀法后面板刷新。**没验证**：真实出猎一整趟里附魔的体感与数值平衡、`Foe.dot` 对真敌人的伤害量、GrandUI 结算页上新备注的排版。
+- **没做/想法**：SAN 的“效果”只有这些，可继续加（陷阱、召唤物暂时增强、护符掉率…）；`POKE`/`K` 偏高时挂机反而没存在感，调这两个常量即可；离线（关页面）期间不累积 SAN。
