@@ -406,7 +406,7 @@ window.startGame = function () {
   }, false);
   let dragLook = false, dragMoved = 0, mouseDown = false;
   document.addEventListener('mousemove', e => {
-    if (!playing || uiOpen) return;
+    if (!playing || uiOpen || window.__wheelOpen) return;
     if (!locked && !(noLock && dragLook)) return;
     let dx = e.movementX, dy = e.movementY; if (Math.abs(dx) > 250 || Math.abs(dy) > 250) return;
     if (window.Combat && Combat.drawn) { const k = Combat.onMove(dx, dy); dx *= k; dy *= k; } // 第十四轮：挥砍/格挡时鼠标主要控制武器
@@ -414,7 +414,7 @@ window.startGame = function () {
     player.yaw -= dx * 0.0022; player.pitch = Math.max(-1.45, Math.min(1.45, player.pitch - dy * 0.0022));
   });
   canvas.addEventListener('mousedown', e => {
-    if (uiOpen) return;
+    if (uiOpen || window.__wheelOpen) return;
     if (!playing) return;
     if (lockRetry && !locked) { lockRetry = false; lockPointer(); return; }
     if (window.Worlds && Worlds.active) { Worlds.onDown(e.button); return; }
