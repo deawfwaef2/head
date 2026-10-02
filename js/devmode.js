@@ -99,11 +99,12 @@ window.DevMode = (() => {
     document.body.appendChild(el);
   }
   function toggle(v) {
+    if (window.DevLab && !DevLab.off) { DevLab.toggle(v); return; } // R63：DEV 按钮 / F8 改开「开发者工坊」大面板
     if (!el) build(); const open = v == null ? !el.classList.contains('on') : v; el.classList.toggle('on', open);
     el.querySelectorAll('input[data-o]').forEach(i => { i.checked = !!O[i.dataset.o]; });
     try { if (open) { G.setUI(true); } else { G.setUI(false); G.lockPointer && G.lockPointer(); } } catch (e) { }
   }
-  addEventListener('keydown', e => { if (e.code === 'F8') { e.preventDefault(); e.stopImmediatePropagation(); toggle(); } }, true);
+  addEventListener('keydown', e => { if (e.code === 'F8' && !(window.DevLab && !DevLab.off)) { e.preventDefault(); e.stopImmediatePropagation(); toggle(); } }, true);
 
   function boot() {
     if (!window.G || !G.S) { setTimeout(boot, 500); return; }

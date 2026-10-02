@@ -1098,18 +1098,18 @@ window.startGame = function () {
   function placeBuild() {
     if (!ghost) return;
     const k = buildMode, c = cost(k), d = CAT[k];
-    if (!ghostOk) { SFX.deny(); toast('这里放不下', '#f66', 1); return; }
-    if (S.coins < c) { SFX.deny(); toast('魂晶不足', '#f66', 1); cancelBuild(); return; }
-    if (d.max && bought(k) >= d.max) { SFX.deny(); toast('只能建一个', '#f66', 1); cancelBuild(); return; }
-    if (window.RegEcon && RegEcon.can && !RegEcon.can(k)) { SFX.deny(); toast('材料不足：' + RegEcon.lackText(RegEcon.need(k)) + ' —— 去对应地区搜刮', '#f96', 3); cancelBuild(); return; }
-    S.coins -= c;
-    if (window.RegEcon && RegEcon.pay) RegEcon.pay(k);
+    const FREE = !!(window.DevLab && DevLab.free && DevLab.free()); // R63 开发者工坊：免费无限建造（不花钱/材料、不限数量、可重叠）
+    if (!ghostOk && !FREE) { SFX.deny(); toast('这里放不下', '#f66', 1); return; }
+    if (!FREE && S.coins < c) { SFX.deny(); toast('魂晶不足', '#f66', 1); cancelBuild(); return; }
+    if (!FREE && d.max && bought(k) >= d.max) { SFX.deny(); toast('只能建一个', '#f66', 1); cancelBuild(); return; }
+    if (!FREE && window.RegEcon && RegEcon.can && !RegEcon.can(k)) { SFX.deny(); toast('材料不足：' + RegEcon.lackText(RegEcon.need(k)) + ' —— 去对应地区搜刮', '#f96', 3); cancelBuild(); return; }
+    if (!FREE) { S.coins -= c; if (window.RegEcon && RegEcon.pay) RegEcon.pay(k); }
     const b = addBuild(k, ghost.position.x, ghost.position.z, buildRot);
     SFX.wood(); SFX.mine(); burst(new V3(b.x, 0.3, b.z), '#b0a090', 30, 2, 0.8, -6); shake = 0.1;
     const statTxt = d.stat ? Object.entries(d.stat).map(([k2, v]) => RPG.STATS.find(s => s[0] === k2)[1] + '+' + v).join(' ') : '';
     toast(`建成 <b>${d.n}</b> ${statTxt}`, '#8fe0a0', 2);
     save();
-    if (S.coins < cost(k) || (d.max && bought(k) >= d.max) || (window.RegEcon && RegEcon.can && !RegEcon.can(k))) cancelBuild();
+    if (!FREE && (S.coins < cost(k) || (d.max && bought(k) >= d.max) || (window.RegEcon && RegEcon.can && !RegEcon.can(k)))) cancelBuild();
   }
   function RegEcon_ok(o) { return !window.RegEcon || !RegEcon.hasAll || RegEcon.hasAll(o); }
   function dig() {

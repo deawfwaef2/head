@@ -338,7 +338,7 @@ window.Foe = (() => {
     for (const it of list) {
       const r = mulberry32(((it.h.look.seed || 7) * 2654435761) >>> 0);
       if (window.IdLook) { try { IdLook.apply(it.h); } catch (e) { console.warn('IdLook', e); } } // R43：身份决定发色/头饰
-      const bodyName = bodyFor(it.h, r, it.boss && it.bossK, used); used.add(bodyName);
+      const bodyName = it.body || bodyFor(it.h, r, it.boss && it.bossK, used); /* R63 DevLab：it.body 指定身体 */ used.add(bodyName);
       let f; try { f = await build(bodyName, it.h.look); await animate(f); if (window.IdLook && !it.boss) IdLook.dress(f, it.h.c.id, it.h.look.seed); } catch (e) { console.warn('foe body', bodyName, e); continue; }
       const c = it.h.c, rar = c.rar, id = c.id;
       const fo = { h: it.h, f, pos: f.root.position, yaw: r() * 6.28, rar, id, hp: 0, maxHp: 0, state: 'idle', t: 0, cd: 1 + r() * 2, sayT: 0, seen: false,
