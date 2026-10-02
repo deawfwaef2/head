@@ -71,7 +71,7 @@ window.CharLight = (() => {
       vec3 up = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
       // 皮肤判定（按反照率色相/饱和度）：皮肤用柔和宽过渡 + 更亮的阴影，不出硬阴影块（二次元脸靠设计好的面部阴影，没有就宁可平）
       float _mx = max(alb.r, max(alb.g, alb.b)), _mn = min(alb.r, min(alb.g, alb.b)), _st = (_mx - _mn) / max(_mx, 1e-3), _al = dot(alb, W);
-      float skin = smoothstep(0.06, 0.16, _st) * (1.0 - smoothstep(0.55, 0.75, _st)) * step(alb.g, alb.r + 0.01) * step(alb.b, alb.g + 0.03) * smoothstep(0.12, 0.28, _al);
+      float skin = smoothstep(0.03, 0.1, _st) * (1.0 - smoothstep(0.55, 0.75, _st)) * step(alb.g, alb.r + 0.01) * step(alb.b, alb.g + 0.03) * smoothstep(0.04, 0.16, _al); // 瓷白/深棕肤色也算皮肤：头和脖子的明暗交界才不会一个硬一个软
       float sunQs = smoothstep(-0.25, 0.55, dot(N, L)) * mix(1.0, shd, 0.3);
       #ifdef CL_HEAD
         float tc = smoothstep(${f(s.th * 0.35 - s.w)}, ${f(s.th * 0.35 + s.w)}, sunQ);
@@ -128,13 +128,14 @@ window.CharLight = (() => {
     const lum = r * 0.3 + g * 0.59 + b * 0.11, br = Math.min(1, Math.max(0.12, lum * 0.9)), n = Math.max(lum, 1e-3);
     OL.uOLc.value.setRGB(0.2 * br * (0.6 + 0.4 * r / n), 0.17 * br * (0.6 + 0.4 * g / n), 0.19 * br * (0.6 + 0.4 * b / n));
   }
-  function olMat(src) {
-    const k = src.uuid; if (olMats.has(k)) return olMats.get(k);
+  function olMat(src, fade) {
+    const k = src.uuid + (fade ? ':f' : ''); if (olMats.has(k)) return olMats.get(k);
+    const fu = { value: fade ? fade.clone() : new THREE.Vector3(0, 0, 0) }; // x,y = 渐变区间（网格本地 y），z = +1 头（断面以下不画、往上渐显）/ -1 身体（颈口以上渐隐）/ 0 不处理
     const m = new THREE.MeshBasicMaterial({ map: src.map || null, color: src.color ? src.color.clone() : 0xffffff, side: THREE.BackSide, alphaTest: src.alphaTest || 0, transparent: false, fog: true });
     m.userData.outline = 1;
     m.onBeforeCompile = sh => {
-      Object.assign(sh.uniforms, OL);
-      sh.vertexShader = sh.vertexShader.replace('void main() {', 'uniform vec2 uOLr; uniform float uOLw;\nvoid main() {')
+      Object.assign(sh.uniforms, OL, { uOLf: fu });
+      sh.vertexShader = sh.vertexShader.replace('void main() {', 'uniform vec2 uOLr; uniform float uOLw; uniform vec3 uOLf; varying float vOLy;\nvoid main() {')
         .replace('#include <project_vertex>', `#include <project_vertex>
         #ifdef USE_SKINNING
           vec3 _n = objectNormal;
@@ -143,13 +144,13 @@ window.CharLight = (() => {
         #endif
         gl_Position = projectionMatrix * (mvPosition + vec4(0.0, 0.0, -0.02, 0.0)); // 外壳往后推 2cm：内部褶皱/发丝不出线，只留外轮廓
         vec3 _nv = normalize(normalMatrix * _n);
-        vec2 _d = (projectionMatrix * vec4(_nv, 0.0)).xy * uOLr; float _l = length(_d);
-        if (_l > 1e-5) { _d /= _l; float _w = uOLw * clamp(3.5 / gl_Position.w, 0.3, 1.0) * step(gl_Position.w, 30.0);
+        vec2 _d = (projectionMatrix * vec4(_nv, 0.0)).xy * uOLr; float _l = length(_d); vOLy = position.y;
+        if (_l > 1e-5) { _d /= _l; float _fk = uOLf.z > 0.5 ? smoothstep(uOLf.x, uOLf.y, position.y) : (uOLf.z < -0.5 ? 1.0 - smoothstep(uOLf.x, uOLf.y, position.y) : 1.0); float _w = uOLw * _fk * clamp(3.5 / gl_Position.w, 0.3, 1.0) * step(gl_Position.w, 30.0);
           gl_Position.xy += _d / uOLr * 2.0 * _w * gl_Position.w; }`);
-      sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform vec3 uOLc;\nvoid main() {')
+      sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform vec3 uOLc; uniform vec3 uOLf; varying float vOLy;\nvoid main() {\n  if (uOLf.z > 0.5 && vOLy < uOLf.x) discard;')
         .replace('#include <map_fragment>', '#include <map_fragment>\n  { float _l = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)); diffuseColor.rgb = max(mix(vec3(_l), diffuseColor.rgb, 1.5), 0.0) * uOLc; }');
     };
-    m.customProgramCacheKey = () => 'charOL';
+    m.customProgramCacheKey = () => 'charOL2';
     olMats.set(k, m); return m;
   }
   const tmpV = new THREE.Vector2();
@@ -167,8 +168,8 @@ window.CharLight = (() => {
       if (m.transparent || m.userData.outline || o.userData.kind === 'cut' || SKIP.test(o.name) || SKIP.test(m.name || '')) continue;
       if (!(m.isMeshStandardMaterial || m.isMeshToonMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial)) continue;
       let h;
-      if (o.isSkinnedMesh) { h = new THREE.SkinnedMesh(o.geometry, olMat(m)); h.bind(o.skeleton, o.bindMatrix); h.bindMode = o.bindMode; }
-      else h = new THREE.Mesh(o.geometry, olMat(m));
+      if (o.isSkinnedMesh) { h = new THREE.SkinnedMesh(o.geometry, olMat(m, o.userData.olFade)); h.bind(o.skeleton, o.bindMatrix); h.bindMode = o.bindMode; }
+      else h = new THREE.Mesh(o.geometry, olMat(m, o.userData.olFade));
       if (o.morphTargetInfluences) { h.morphTargetInfluences = o.morphTargetInfluences; h.morphTargetDictionary = o.morphTargetDictionary; }
       h.userData.olHull = 1; h.castShadow = false; h.receiveShadow = false; h.frustumCulled = false; h.renderOrder = o.renderOrder; h.raycast = () => {};
       h.onBeforeRender = onOL; o.add(h);

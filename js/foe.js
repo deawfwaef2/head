@@ -117,6 +117,18 @@ window.Foe = (() => {
       if (!window.Mods || Mods.on('head_norm') !== false) { /* R49d head_norm：按「身体身高」把脸高统一到 身高/6.6（以前按眼高公式，头模不同就忽大忽小），夹在原比例的 0.8~1.15 倍内防极端 */
         const hy = new V3().setFromMatrixPosition(headBone.matrixWorld).y - new V3().setFromMatrixPosition(root.matrixWorld).y, tgt = (hy + 0.2) / 6.6, s0 = fit.s; fit.s = Math.max(Math.min(s0, fit0s) * 0.8, Math.min(Math.max(s0 * 1.15, fit0s * 1.6), tgt / hH)); // 大体型身体：上限不再被 0.272m 绝对头高卡死（“大身体小头”）
         if (fit.s !== s0) { const ey = E.eyeY != null ? E.eyeY : E.headY + 0.058; fit.pos = new V3(E.headX || 0, ey + 0.0102 * fit.s, (E.eyeZ != null ? E.eyeZ : (E.headZ || 0) + 0.03) - 0.02 * fit.s); } } } } catch (e) {} } // R43b：个别头模（Vivi/Vita/Victoria）脸比别的高 8%，再压到同一上限，避免偶发大头娃娃
+    if (alive && hb.U && hb.U.neckW && window.Mods && Mods.on('neck_join')) { try { // R67 neck_join：头缩放后断面仍对齐身体颈口 + 颈半径渐变到身体颈径 + 颈部肤色与身体一致（近看不再像被斩首的切口）
+      const bt = hb.meta && hb.meta.bottom, ey = E.eyeY != null ? E.eyeY : E.headY + 0.058;
+      if (bt != null && Math.abs(fit.s - fit0s) > 1e-4) fit.pos.y = ey + 0.0102 * fit0s + bt * (fit0s - fit.s);
+      const cy = E.cut ? E.cut.y : null; let ov = 0; // ov：身体颈口高出头断面的量（头断面插进颈口里，至少 4mm，不留缝）
+      if (bt != null && cy != null) { const gap = fit.pos.y + bt * fit.s - (cy - 0.004); if (gap > 0) fit.pos.y -= Math.min(gap, 0.05); ov = Math.max(0, cy - (fit.pos.y + bt * fit.s)); }
+      if (bt != null) hb.U.neckP.value.y = bt + ov / fit.s;
+      const nr = E.cut && E.cut.r, hr = hb.stubR || (hb.meta.cut && hb.meta.cut.r);
+      if (nr && hr) { const K = Math.min(1.3, Math.max(0.7, nr * 0.96 / (hr * fit.s))); hb.U.neckK.value = Math.abs(K - 1) > 0.04 ? K : 1; } // 颈口处头颈比身体颈细 4%：不 z 打架
+      const gc = new THREE.Color(look.skinHex).convertSRGBToLinear().multiplyScalar(/^Q_/.test(bodyName) ? 1 : (T.gain || 1)); if (Mods.on('head_pbr')) gc.multiplyScalar(1 / Math.max(0.2, FaceFill.hk.value));
+      hb.U.neckC.value.copy(gc); hb.U.neckW.value = 1;
+      if (cy != null) root.traverse(o => { if (o.isMesh && o.userData.olFade === undefined) o.userData.olFade = new V3(cy - 0.035, cy - 0.004, -1); }); // 勾线：颈口一圈的描边渐隐（头和身体各自的开口边缘会画出一圈黑线 = “切口”）
+    } catch (e) { console.warn('neck_join', e); } }
     const holder = new THREE.Group(); holder.name = 'headHolder';
     const want = new M4().compose(fit.pos, new Q(), new V3(1, 1, 1));
     const inv = new M4().copy(root.matrixWorld).invert().multiply(headBone.matrixWorld).invert(); // 身体根空间 → 头骨局部
@@ -882,7 +894,7 @@ window.Foe = (() => {
     f.holder.updateMatrixWorld(true);
     // 直接把脖子上这颗活人的头摘下来，换成“首级”的样子：只改 uniform/可见性，不新建任何几何、材质、着色器
     const g = new THREE.Group(); f.holder.matrixWorld.decompose(g.position, g.quaternion, g.scale); g.scale.set(1, 1, 1); ctx.sc.add(g); g.attach(f.holder);
-    if (hb.U) { if (hb.U.pale) hb.U.pale.value = lk.pale || 0.2; if (hb.U.blood) hb.U.blood.value = lk.blood || 0; if (hb.U.spat) hb.U.spat.value = lk.spat || 0; }
+    if (hb.U) { if (hb.U.pale) hb.U.pale.value = lk.pale || 0.2; if (hb.U.blood) hb.U.blood.value = lk.blood || 0; if (hb.U.spat) hb.U.spat.value = lk.spat || 0; if (hb.U.neckW) { hb.U.neckW.value = 0; hb.U.neckK.value = 1; } }
     (hb.hl || []).forEach(m => m.visible = false); // 死眼：去掉高光
     try { hb.setExpression(lk.ex || { blink: 0.6 }); } catch (e) {}
     hb.group.traverse(o => { if (o.isMesh && o.userData.kind === 'cut') o.visible = true; });

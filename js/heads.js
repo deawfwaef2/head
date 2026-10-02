@@ -498,10 +498,10 @@ window.ModelHeads = (() => {
     THREE.ShaderLib.toon.__soft = 1;
   }
   const BRZ = (!window.Mods || Mods.on('breeze')) ? '1.0' : '0.0';
-  function injectVertex(sh, sway) {
+  function injectVertex(sh, sway, neck) {
     sh.vertexShader = sh.vertexShader
-      .replace('void main() {', `varying vec3 vHP;\n${sway ? 'uniform vec3 uSway; uniform float uHTop; uniform float uHLen; uniform float uT; uniform float uPh;' : ''}\nvoid main() {`)
-      .replace('#include <morphtarget_vertex>', `#include <morphtarget_vertex>\n${sway ? 'float sw = clamp((uHTop - transformed.y) / uHLen, 0.0, 1.0); sw = sw * sw * (0.4 + 0.6 * clamp(length(transformed.xz) * 12.0, 0.0, 1.0)); vec3 hs = uSway; hs.x *= 0.72; hs.z *= 0.28; hs += ' + BRZ + ' * vec3(sin(uT * 1.15 + uPh + transformed.y * 28.0) * 0.0042 + sin(uT * 2.6 + uPh * 1.7 + transformed.x * 35.0) * 0.0016, sin(uT * 1.7 + uPh) * 0.0008, cos(uT * 0.93 + uPh * 0.6 + transformed.y * 22.0) * 0.0032); transformed += hs * sw;' : ''}\nvHP = transformed;`);
+      .replace('void main() {', `varying vec3 vHP;\n${sway ? 'uniform vec3 uSway; uniform float uHTop; uniform float uHLen; uniform float uT; uniform float uPh;' : ''}${neck ? 'uniform float uNeckK; uniform float uNeckB; uniform vec3 uNeckP;' : ''}\nvoid main() {`)
+      .replace('#include <morphtarget_vertex>', `#include <morphtarget_vertex>\n${neck ? 'transformed.xz = uNeckP.xz + (transformed.xz - uNeckP.xz) * mix(1.0, uNeckK, 1.0 - smoothstep(0.0, uNeckB, transformed.y - uNeckP.y));' : ''}${sway ? 'float sw = clamp((uHTop - transformed.y) / uHLen, 0.0, 1.0); sw = sw * sw * (0.4 + 0.6 * clamp(length(transformed.xz) * 12.0, 0.0, 1.0)); vec3 hs = uSway; hs.x *= 0.72; hs.z *= 0.28; hs += ' + BRZ + ' * vec3(sin(uT * 1.15 + uPh + transformed.y * 28.0) * 0.0042 + sin(uT * 2.6 + uPh * 1.7 + transformed.x * 35.0) * 0.0016, sin(uT * 1.7 + uPh) * 0.0008, cos(uT * 0.93 + uPh * 0.6 + transformed.y * 22.0) * 0.0032); transformed += hs * sw;' : ''}\nvHP = transformed;`);
   }
 
   function hairMat(src, U, lum) {
@@ -563,11 +563,12 @@ window.ModelHeads = (() => {
   function skinMat(src, U) {
     const m = new MTM({ map: src.map || null, color: src.color ? src.color.clone() : new THREE.Color(1, 1, 1), gradientMap: grad, transparent: src.transparent, alphaTest: src.alphaTest, side: src.side, depthWrite: src.depthWrite });
     m.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, { uMk: U.mk, uHover: U.hover, uSkin: U.skin, uSkinFix: { value: (window.Mods && Mods.on('head_repair') && src.userData ? src.userData._headGreenFix || 0 : 0) }, uPale: U.pale, uBlood: U.blood, uSpat: U.spat, uSeed: U.seed, uCutY: U.cutY, uH: U.hH, uScar: U.scar, uPaint: U.paint, uPaintC: U.paintC, uEye: U.eye, uFx: U.fx });
-      injectVertex(sh, false);
+      Object.assign(sh.uniforms, { uMk: U.mk, uHover: U.hover, uSkin: U.skin, uSkinFix: { value: (window.Mods && Mods.on('head_repair') && src.userData ? src.userData._headGreenFix || 0 : 0) }, uPale: U.pale, uBlood: U.blood, uSpat: U.spat, uSeed: U.seed, uCutY: U.cutY, uH: U.hH, uScar: U.scar, uPaint: U.paint, uPaintC: U.paintC, uEye: U.eye, uFx: U.fx, uNeckC: U.neckC, uNeckW: U.neckW, uNeckK: U.neckK, uNeckB: U.neckB, uNeckP: U.neckP });
+      injectVertex(sh, false, true);
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <dithering_fragment>', '\n#include <dithering_fragment>\n gl_FragColor.rgb += uHover * (0.1 + 0.6 * pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 2.2)) * vec3(1.0, 0.8, 0.5);')
         .replace('void main() {', `varying vec3 vHP; uniform float uHover; uniform vec3 uMk; uniform vec3 uSkin; uniform float uSkinFix; uniform float uPale; uniform float uBlood; uniform float uSpat; uniform float uSeed; uniform float uCutY; uniform float uH;
+          uniform vec3 uNeckC; uniform float uNeckW; uniform float uNeckB; uniform vec3 uNeckP;
           uniform vec4 uScar; uniform float uPaint; uniform vec3 uPaintC; uniform vec3 uEye; uniform vec4 uFx; ${NOISE}
           float segD(vec2 p, vec2 a, vec2 b){ vec2 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0); return length(pa-ba*h); }
           void main() {`)
@@ -633,6 +634,7 @@ window.ModelHeads = (() => {
             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.55, 0.16, 0.16), clamp(sm + st * 0.8, 0.0, 1.0) * 0.9);
           }
           // 血：颈部浸染 + 向上抹开的血痕 + 喷溅
+          diffuseColor.rgb = mix(diffuseColor.rgb, uNeckC, uNeckW * (1.0 - smoothstep(0.0, 1.0, (vHP.y - uNeckP.y) / uNeckB))); // R67：颈部一圈的反照率渐变到身体颈口的肤色（避免“头和脖子两种肉色”的接缝）
           float h = (vHP.y - uCutY) / uH;
           float col = floor(vHP.x * 110.0 + uSeed * 7.0);
           float drip = pow(fract(sin(col * 12.9898 + uSeed) * 43758.5453), 5.0);
@@ -643,7 +645,7 @@ window.ModelHeads = (() => {
           vec3 blood = mix(vec3(0.20, 0.0, 0.01), vec3(0.42, 0.02, 0.03), sp);
           diffuseColor.rgb = mix(diffuseColor.rgb, blood, bm * 0.88);`);
     };
-    m.customProgramCacheKey = () => 'skin8';
+    m.customProgramCacheKey = () => 'skin9';
     return FaceFill.wrap(m, 1.0);
   }
 
@@ -953,6 +955,7 @@ window.ModelHeads = (() => {
       skin: { value: new V3(sk.r / baseSkin.r, sk.g / baseSkin.g, sk.b / baseSkin.b).multiply(look.skinMul ? new V3(...look.skinMul) : new V3(1, 1, 1)) }, pale: { value: look.pale },
       blood: { value: look.blood }, spat: { value: look.spat }, seed: { value: look.seed }, ph: { value: ((look.seed || 0) * 7.13) % 6.283 }, hover: { value: 0 }, mk: { value: new THREE.Vector3(...((look.mk && (!window.Mods || Mods.on('makeup'))) ? look.mk : [0, 0, 0])) }, fx: { value: new THREE.Vector4(...((look.fx && (!window.Mods || Mods.on('face_despair') !== false)) ? look.fx : [0, 0, 0, 0])) },
       cutY: { value: faceMeta.bottom }, hH: { value: (faceMeta.skullTop || 0.1) - faceMeta.bottom },
+      neckC: { value: new THREE.Color(1, 1, 1) }, neckW: { value: 0 }, neckK: { value: 1 }, neckB: { value: 0.03 }, neckP: { value: new V3((faceMeta.cut && faceMeta.cut.x) || 0, faceMeta.bottom, (faceMeta.cut && faceMeta.cut.z) || 0) }, // R67 neck_join：颈部反照率 / 半径渐变到身体颈口（foe.js build 设置，默认关）
       scar: { value: look.scar ? new THREE.Vector4(...look.scar) : new THREE.Vector4(-10, 0, 0, 0) },
       paint: { value: look.paint }, paintC: { value: new THREE.Color(look.paintC) },
       eye: { value: new V3(...(faceMeta.eye || [0.017, -0.014, 0.03])) }
@@ -1302,6 +1305,13 @@ window.ModelHeads = (() => {
       m.geometry.computeBoundingBox(); const bb = m.geometry.boundingBox; if ((bb.min.y + bb.max.y) / 2 < ey - 0.005 || bb.max.y < ey + 0.01) continue; out.add(m); }
     OWNACC.set(t, out); return out;
   }
+  function stubR(t) { // 断面上方 0.1~0.6cm 颈柱的实际半径（给 neck_join 用）
+    if (t._stubR !== undefined) return t._stubR; t._stubR = null;
+    try { const b = t.meta.bottom, cx = (t.meta.cut && t.meta.cut.x) || 0, cz = (t.meta.cut && t.meta.cut.z) || 0; let s = 0, n = 0;
+      for (const m of t.faceMeshes) { if (m.userData.kind !== 'skin') continue; const A = m.geometry.attributes.position; for (let i = 0; i < A.count; i++) { const y = A.getY(i); if (y > b + 0.0014 && y < b + 0.006) { s += Math.hypot(A.getX(i) - cx, A.getZ(i) - cz); n++; } } }
+      if (n >= 8) t._stubR = s / n; } catch (e) { }
+    return t._stubR;
+  }
   function create(look, opts = {}) {
     look = resolve(look);
     if (opts.alive && look.fx) look = Object.assign({}, look, { fx: null }); // 活人没有泪痕/血/淤青，只有被斩下的头才有
@@ -1357,6 +1367,7 @@ window.ModelHeads = (() => {
       if (strip && strip.has(m)) continue;
       if (m.userData.kind === 'hl' && !opts.alive) continue; // 死眼：去掉高光（通灵 MV 里的“生前”版本保留）
       const c = new THREE.Mesh(m.geometry, fmMat(getMat(m, F), SRC.get(m), m.userData.kind)); c.name = m.name; c.renderOrder = m.renderOrder; c.userData.kind = m.userData.kind;
+      if (c.userData.kind === 'skin' && F.meta.bottom != null) c.userData.olFade = new THREE.Vector3(F.meta.bottom + 0.002, F.meta.bottom + 0.016, 1); // 勾线：断面以下不画、往上渐显（charlight.js olMat）
       if (m.userData.kind === 'hl') hlMeshes.push(c);
       if (m.morphTargetInfluences) { c.morphTargetInfluences = new Array(m.morphTargetInfluences.length).fill(0); c.morphTargetDictionary = m.morphTargetDictionary; }
       byName[m.name] = c; g.add(c);
@@ -1431,7 +1442,7 @@ window.ModelHeads = (() => {
     if (window.HeadWear && look.hw && look.hw.length && (!window.Mods || Mods.on('headwear')) && !(window.Mods && Mods.on('head_native') && (() => { const fi = idxOf(look.f); return fi >= 0 && T[fi].meta.grp === 'mmd'; })())) try { /* R36b head_native：MMD/原神头自带发型和头饰，不再额外叠程序化头饰 */ HeadWear.build({ g, look, S, onShell, grad, disp: disposables }); } catch (e) { console.warn('headwear', e); }
     const radius = 0.1;
     return {
-      group: g, U, radius, meta: F.meta, hl: hlMeshes, presets,
+      group: g, U, radius, meta: F.meta, hl: hlMeshes, presets, stubR: stubR(F),
       setSway(v) { U.sway.value.copy(v); },
       setExpression,
       setFx(a) { const f = U.fx.value; if (a && a.length >= 4) f.set(a[0], a[1], a[2], a[3]); else f.set(0, 0, 0, 0); },

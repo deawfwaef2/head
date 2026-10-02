@@ -4546,3 +4546,18 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 加载更快：`CineStage.play` 并行搭演员；`NemStory.prewarm()` 在无追击时一次一个预读将登场猎手的身体模板。
 - 更丰富：开场旁白/时间点/逃脱后/追问+回答/多次成长/额外宿敌追问等随机池（`TIMEP/OPENN/ESCN/ESCL/FOLLOW/RESOLVE/MOREN`），镜头与是否有手部特写随机；`cinescript.nem()` 里的 `her` 改取 `B[0].castFo`（额外宿敌插曲原先会认错主角）。
 - 事故：用 PowerShell 5.1 `Get-Content -Raw | Set-Content` 改 UTF-8 文件会按 ANSI 读写毁掉中文，必须 `git checkout` 恢复后重做；改文件只用编辑工具。
+
+## R67（近看头颈像被斩首：头颈接缝）
+
+- 本地复现（tools 没有身体模型，用 `ModelHeads.create` + 合成颈柱 + 独立 WebGLRenderer 渲染）：头断面只比颈口高一点点就会露出一条背景缝（皮肤 shader 在断面+1.2mm 以下 discard）；头、身体各自的勾线外壳（`CharLight.dress`）在各自的开口边缘画出一圈黑线；头皮肤与身体颈部反照率不同（头多出 uHeadK、skinMul 校准是旧光照下的）。三者叠加 = 近看像被斩首的切口。R63d 放宽 head_norm 缩放上限（最高 1.6×）后，缩放让断面相对颈口上下漂移、颈径对不上，更明显。
+- 新 MOD `neck_join`（`mods.js`，默认开，活人头）：`foe.js build()`
+  - 头缩放后按 `bottom*(fit0s-fit.s)` 补偿，断面位置保持标定时的位置；
+  - 若 `E.cut.y` 已知：头断面至少插进颈口 4mm（最多下移 5cm），消除缝；
+  - 颈径渐变：`hb.U.neckK = 0.96·E.cut.r/(stubR·s)`（`stubR` = `ModelHeads.create` 返回的断面上方 1–6mm 颈柱实测半径），skin 顶点着色器里 `uNeckP.y`（颈口高度）向上 3cm 内由 K 渐变到 1；
+  - 颈部反照率：`hb.U.neckC = lin(skinHex)·gain/uHeadK`，片元里同一 3cm 区间渐变到该色；
+  - 勾线：`userData.olFade`（头皮肤 `[bottom+2mm, bottom+16mm, +1]`、身体网格 `[cy-35mm, cy-4mm, -1]`），`charlight.js olMat` 里描边宽度在颈口一圈渐隐，头外壳断面以下 discard（程序缓存 key `charOL2`）。
+  - 斩首（`Foe.decapitate`）时 `neckW=0, neckK=1`。
+- `charlight.js`：皮肤判定放宽（`smoothstep(0.03,0.1,sat)`、亮度 `0.04~0.16`），瓷白/深棕肤色不再被当成非皮肤（头和脖子明暗交界一个硬一个软）。
+- 皮肤着色器 cache key `skin8→skin9`。
+- 未验证：真实身体（big/ 本地缺）上的颈口高度/半径是否被正确读取（`E.cut.y/r`），缩放补偿方向；Q_ / VH_ / 原神身体的肤色匹配。若仍有缝，先看 `Foe.build` 的 `ov / neckK` 数值。
+- 改文件注意：`replace_string_in_file` 原始参数里的 `\n` 会原样写进文件（mods.js 又中招一次，已修）。
