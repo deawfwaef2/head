@@ -4450,3 +4450,8 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
   - `js/devmode.js`：toggle 和 F8 转给 DevLab（DevLab 不存在时保持旧小面板）。
   - `js/mods.js`：dev_mode 描述前加 R63 说明。
   - `index.html`：devmode.js 后加 `<script src="js/devlab.js">`。
+
+## R53d — VRoid Hub 第四轮：高评分/高质量优先（agent: sourcing）
+- 重新用 63 个奇幻关键词扫 Hub（授权三项全允许），去重后按爱心数排序，只看 ≥40 爱心的 132 个角色缩略图，人工挑 34 个（剔除版权角色/裸露/男性/Q 版/现代装），下载 25 个，23 个过体型质检推上 origin，13 个登记进 `js/vroid_pack.js`（现 181 条左右）。
+- 授权全允许的模型里高人气的本就稀少（最高才 ~800 爱心）；这批多为あわ、Arcroid、巫女/炼金/精灵/酒馆风。署名见 `CREDITS.md`；id 清单 `tools/hub/ids/n1.txt`。
+- 注意：沙箱 /tmp 只有 ~1GB，gitsetup 克隆和管线同时跑会 "No space left on device"，先等 gitsetup 完成。

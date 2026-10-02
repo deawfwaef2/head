@@ -324,3 +324,16 @@ models/CLS_*.js，由 js/headpacks.js 按 MOD pack_voc / pack_touhou / pack_cls 
 
 ## 解剖台素体底模 `js/basebody.js`
 - 来源：VRoid Studio 旧β版“新建模型”默认素体（pixiv 官方帮助页声明为 CC0）。取自 `madjin/vrm-samples` 仓库 `vroid/fem_vroid.vrm`（VRM 元数据作者 "jin"，licenseName "Other"，内容即上述 CC0 素体）。只提取 `Body_00_SKIN` 网格、蒙皮权重、骨骼静止位置与 512px 皮肤贴图，转换脚本见 `tools/convert_basebody.py`。
+- `VH_792555` Alisia Arcroid — archekitai (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/911969770469619656/models/2799913824541792555
+- `VH_064628` 巫女服ぽい衣装 — マユラ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/659897744070935367/models/8269307378065064628
+- `VH_407996` Celisia Arcroid — archekitai (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/5712824519786250522/models/6636309824221407996
+- `VH_839242` Blu — batmanreptar (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/3259618041448285076/models/9105731598233839242
+- `VH_036887` プリスゥ — がりょうてん (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2146920482302987092/models/4528994310291036887
+- `VH_461940` 【Free model】Ki — 白い白米 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/5216127528712133624/models/7641493879527461940
+- `VH_303740` Fbf 1.0 — JustAPal (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2829458986838662701/models/3276411895749303740
+- `VH_246980` Geminiちゃん (Ver.2) — マユラ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/665688289993094051/models/5575163071004246980
+- `VH_293115` 時雨しぐ — 夢喰ねるよ (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2734366632274099626/models/6665243607317293115
+- `VH_418530` Haley — Young66austin1 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/4378109793681484412/models/8697765297134418530
+- `VH_175329` ジトメちゃん — ヽ｜∵｜ゝ(Fantom) (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2089525207077426323/models/3376344186259175329
+- `VH_949838` Boothにて無料配布中 — 安全太郎(旧01_mit) (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/2825453020096694533/models/6916943412428949838
+- `VH_340200` godess — lilone12 (VRoid Hub; 暴力/改造/再分发 允许) https://hub.vroid.com/en/characters/105657022597535184/models/6681477312828340200
