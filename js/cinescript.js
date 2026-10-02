@@ -124,7 +124,10 @@ window.CineScript = (() => {
     const out = [], origin = ev && ev.why === 'origin';
     let seenOther = false;
     B.forEach((b, i) => {
-      if (i === 0) { b.scene = { key: 'A', cast: acts.slice(), cap: '', sub: '' }; b.shot = 'est'; if (origin) b.act = [[her, 'Crouch_Idle_Loop']]; out.push(b); return; }
+      if (i === 0) { b.scene = { key: 'A', cast: acts.slice(), cap: '', sub: '' }; b.shot = 'est'; if (origin) b.act = [[her, 'Crouch_Idle_Loop']]; out.push(b);
+        const rp = !origin && window.NemStory && NemStory.report && NemStory.report(); // 开场先交代：这段时间宿敌怎么变强的
+        if (rp) out.push({ shot: 'mcu', castFo: her, boost: { k: '这 段 时 间', n: rp.mins ? `你离开的 ${rp.mins} 分钟里` : '你不在的时候', col: '#ff9a8a', rows: rp.rows, f: rp.foot }, lines: [], min: 4.8, tr: 'cut' });
+        return; }
       if (origin && i === 1) b.act = [[her, 'Crouch_Idle_Loop']];
       if (b.castFo === other && !seenOther && other) { seenOther = true; b.walk = { who: other, d: 2.6 }; b.shot = 'cFace'; if (origin) b.act = [[her, 'Idle_Loop']]; }
       if (b.shot === 'cHand') {

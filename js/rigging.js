@@ -44,9 +44,10 @@ window.Rig = (() => {
   const linkGeo = new THREE.TorusGeometry(0.036, 0.0105, 6, 14); linkGeo.scale(1.5, 1, 1);
   const pickMat = new THREE.MeshBasicMaterial({ visible: false });
   const mesh = (g, m) => { const o = new THREE.Mesh(g, m || IRON); return o; };
-  function visNail() { // 钉头在原点，钉身沿 -Z
-    const g = new THREE.Group(), head = mesh(new THREE.CylinderGeometry(0.024, 0.02, 0.011, 10)), body = mesh(new THREE.CylinderGeometry(0.0075, 0.005, 0.17, 7)), tip = mesh(new THREE.ConeGeometry(0.005, 0.03, 7));
-    head.rotation.x = Math.PI / 2; head.position.z = 0.002; body.rotation.x = Math.PI / 2; body.position.z = -0.09; tip.rotation.x = -Math.PI / 2; tip.position.z = -0.19; g.add(head, body, tip); return g;
+  function visNail(len) { // 钉头在原点，钉身沿 -Z；len = 钉身长度（滚轮可调）
+    len = len || 0.17;
+    const g = new THREE.Group(), head = mesh(new THREE.CylinderGeometry(0.024, 0.02, 0.011, 10)), body = mesh(new THREE.CylinderGeometry(0.0075, 0.005, len, 7)), tip = mesh(new THREE.ConeGeometry(0.005, 0.03, 7));
+    head.rotation.x = Math.PI / 2; head.position.z = 0.002; body.rotation.x = Math.PI / 2; body.position.z = -(len / 2 + 0.005); tip.rotation.x = -Math.PI / 2; tip.position.z = -(len + 0.02); g.add(head, body, tip); return g;
   }
   function visHook() { // 沿本地 Y：眼圈在 +0.15，钩尖/弯口在 -0.15
     const g = new THREE.Group(), eye = mesh(new THREE.TorusGeometry(0.03, 0.0085, 6, 14)); eye.position.y = 0.12; g.add(eye);
@@ -124,7 +125,7 @@ window.Rig = (() => {
     if (k === 'nail') {
       let pt; if (d.host) { const b = bodyOfRef(d.host); pt = b ? attPt(b, lv(d.host)) : null; rt.body = b; }
       if (!pt) { pt = mkPt('n' + d.id, new V3().fromArray(d.p), 0, 0.02); if (d.host) { rt.dead = true; } }
-      rt.ports = [pt]; rt.obj = visNail(); rt.obj.userData.n = d.n; addPick(rt.obj, d.id, 0, 0.09); rt.anim = rt.d.fresh ? 0 : 1; delete rt.d.fresh; return;
+      rt.ports = [pt]; rt.obj = visNail(d.len); rt.obj.userData.n = d.n; addPick(rt.obj, d.id, 0, 0.09); rt.anim = rt.d.fresh ? 0 : 1; delete rt.d.fresh; return;
     }
     if (k === 'chain') {
       const pa = ptOf(d.a) || mkPt('c' + d.id + '.a', new V3().fromArray(d.fa || [0, 1, 0]), 1 / 0.25, 0.02), pb = ptOf(d.b) || mkPt('c' + d.id + '.b', new V3().fromArray(d.fb || [0, 1, 0]), 1 / 0.25, 0.02);
@@ -132,7 +133,9 @@ window.Rig = (() => {
       const dist = pa.p.distanceTo(pb.p), sag = Math.sqrt(Math.max(0, d.len * d.len - dist * dist)) * 0.5;
       for (let i = 1; i < n; i++) { const t = i / n; tmp.lerpVectors(pa.p, pb.p, t); tmp.y -= Math.sin(t * Math.PI) * sag * 0.9; tmp.x += (Math.random() - 0.5) * 0.004; tmp.z += (Math.random() - 0.5) * 0.004; ps.push(mkPt('c' + d.id + '.' + i, tmp, 1 / 0.25, 0.03)); }
       ps.push(pb); for (let i = 0; i < n; i++) addCon(ps[i], ps[i + 1], seg, false);
-      const im = new THREE.InstancedMesh(linkGeo, IRON, n); im.frustumCulled = false; im.userData.rigChain = d.id; rt.obj = im; rt.chain = ps; rt.seg = seg; rt.ports = [pa, pb]; chains.push(rt); return;
+      const im = new THREE.InstancedMesh(linkGeo, IRON, n); im.frustumCulled = false; im.userData.rigChain = d.id; rt.obj = im; rt.chain = ps; rt.seg = seg; rt.ports = [pa, pb]; chains.push(rt);
+      rt.studs = []; for (const [ref, pt] of [[d.a, pa], [d.b, pb]]) { if (!ref || (ref.t !== 'head' && ref.t !== 'prop')) continue; const b = bodyOfRef(ref); if (!b) continue; const st = mesh(new THREE.TorusGeometry(0.03, 0.009, 6, 12)); st.frustumCulled = false; im.add(st); rt.studs.push({ pt, b, st }); } // 连在首级/摆件上的那一端：加一颗可见的环钉，链环穿过它（以前链头埋在头里看不见 = “没连上”）
+      return;
     }
     if (k === 'hook') {
       const pa = ptOf(d.a) || mkPt('p' + d.id + '.0', new V3().fromArray(d.fa || [0, 1.15, 0]), 1 / 0.3, 0.03), pb = ptOf(d.b) || mkPt('p' + d.id + '.1', new V3().fromArray(d.fb || [0, 0.85, 0]), 1 / 0.3, 0.03);
@@ -243,6 +246,7 @@ window.Rig = (() => {
         _m4.makeBasis(_d, tmp2, tmp); _q.setFromRotationMatrix(_m4); const sc = clamp(rt.seg / LINK, 0.7, 1.5); _s.set(sc, 1, 1); _m4.compose(_p, _q, _s); im.setMatrixAt(i, _m4);
       }
       im.instanceMatrix.needsUpdate = true;
+      for (const s of rt.studs || []) { _d.copy(s.pt.p).sub(s.b.com.p); if (_d.lengthSq() > 1e-8) { _d.normalize(); s.st.position.copy(s.pt.p); s.st.quaternion.setFromUnitVectors(Zp, _d); } }
     }
     for (const rt of RT.values()) {
       const d = rt.d, o = rt.obj; if (!o) continue;
@@ -309,22 +313,22 @@ window.Rig = (() => {
   }
   function resolveEnd(a, why) { // → Ref 或 null（失败）
     if (a.type === 'port') return { t: 'part', id: a.rt.d.id, port: a.port };
-    if (a.type === 'head' || a.type === 'prop') { const r = bodyRef(a, 0.55); delete r.q0; return r; }
+    if (a.type === 'head' || a.type === 'prop') { const r = bodyRef(a, 0.85); delete r.q0; return r; }
     if (a.type === 'surf') { if (!haveItem('nail')) { G.toast('这里要先钉一颗铁钉才能挂东西，背包里没有铁钉了。', '#f88', 2); return null; } takeItem('nail'); const nd = addPart({ k: 'nail', p: a.pt.toArray(), n: a.n.toArray(), fresh: 1 }); window.SFX && SFX.play && SFX.play('metal', 0.5, 0.8); return { t: 'part', id: nd.id, port: 0 }; }
     G.toast('对准钉子、铁环、首级、摆件或岩壁。', '#f88', 1.6); return null;
   }
   let mode = null, hintEl = null, ghost = null, ghostLine = null;
-  function hint() { if (!hintEl) { hintEl = document.createElement('div'); hintEl.id = 'rigHint'; hintEl.style.cssText = 'position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:31;pointer-events:none;background:linear-gradient(180deg,rgba(18,20,26,.92),rgba(10,12,16,.92));border:1px solid #7a8aa0;border-radius:12px;padding:10px 22px;color:#e6edf6;font:600 16px/1.6 system-ui,"Microsoft YaHei",sans-serif;text-align:center;white-space:nowrap;display:none;box-shadow:0 6px 24px rgba(0,0,0,.5)'; document.body.appendChild(hintEl); } return hintEl; }
+  function hint() { if (!hintEl) { hintEl = document.createElement('div'); hintEl.id = 'rigHint'; hintEl.style.cssText = 'position:fixed;left:50%;top:84px;transform:translateX(-50%);z-index:31;pointer-events:none;background:linear-gradient(180deg,rgba(18,20,26,.92),rgba(10,12,16,.92));border:1px solid #7a8aa0;border-radius:12px;padding:10px 22px;color:#e6edf6;font:600 16px/1.6 system-ui,"Microsoft YaHei",sans-serif;text-align:center;white-space:nowrap;display:none;box-shadow:0 6px 24px rgba(0,0,0,.5)'; document.body.appendChild(hintEl); } return hintEl; }
   const setHint = html => { const h = hint(); if (!html) { h.style.display = 'none'; return; } if (h._s !== html) { h._s = html; h.innerHTML = html; } h.style.display = 'block'; };
   function closeUI() { try { if (window.UI && UI.close) UI.close(true); } catch (e) { } if (G.uiOpen && G.setUIOpen) G.setUIOpen(false); }
   function startPlace(k) {
     if (!KD[k]) return; if (mode) cancel(); if (inWild()) { G.toast('回洞里才能布置装具。', '#f88'); return; } if (!haveItem(k)) { G.toast('没有这件装具——先在「🧷 道具」页签里制作。', '#f88'); return; }
     if (G.held || G.hplace) { G.toast('先放下手里的首级。', '#f88'); return; } closeUI();
-    mode = { k, stage: 0, a: null, len: null, ref: null }; ensureGhost();
+    mode = { k, stage: 0, a: null, len: k === 'nail' ? 0.17 : null, ref: null }; ensureGhost();
     G.toast(`装具：<b>${KD[k].icon} ${KD[k].n}</b> — ${({ nail: '准星指向岩壁/地面/首级/摆件，左键钉入', chain: '左键点第一端，再点第二端；滚轮调长短', hook: '左键点上端（钉子/铁环），再点下端（首级/摆件）', ring: '对准钉子等就挂上去，对准地面则落在地上', weight: '对准钉子/铁环/链端挂上去', bell: '对准钉子/铁环/链端挂上去，晃它就会响', lantern: '对准钉子/铁环/链端挂上去' })[k]}；右键取消`, '#cfe0f5', 3.6);
   }
   function ensureGhost() {
-    clearGhost(); if (!mode) return; if (VIS[mode.k]) { ghost = VIS[mode.k](); ghostify(ghost); group.add(ghost); }
+    clearGhost(); if (!mode) return; if (VIS[mode.k]) { ghost = mode.k === 'nail' ? visNail(mode.len) : VIS[mode.k](); ghostify(ghost); group.add(ghost); }
     if (mode.k === 'chain' || mode.k === 'hook') { const g = new THREE.BufferGeometry().setFromPoints(Array.from({ length: 20 }, () => new V3())); ghostLine = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x9fd0ff, transparent: true, opacity: 0.85, depthTest: false })); ghostLine.frustumCulled = false; group.add(ghostLine); }
   }
   function clearGhost() { if (ghost) { group.remove(ghost); ghost = null; } if (ghostLine) { group.remove(ghostLine); ghostLine = null; } }
@@ -335,7 +339,7 @@ window.Rig = (() => {
     const m = mode, a = aim(m.k === 'nail' ? { noPorts: true } : {}); m.aim = a; const k = m.k, ok = a.type !== 'air';
     if (k === 'nail') {
       const okN = a.type === 'surf' || a.type === 'head' || a.type === 'prop'; m.ok = okN; ghost.visible = okN; if (okN) { ghost.position.copy(a.pt).addScaledVector(a.n, 0.01); ghost.quaternion.setFromUnitVectors(Zp, a.n); }
-      setHint(`<b>🔩 铁钉</b>　${okN ? ({ surf: '钉进岩壁 / 地面（固定点）', head: '钉进这颗首级（它身上多一个挂点）', prop: '钉进这件摆件（它身上多一个挂点）' })[a.type] : '对准要钉的地方'}<br><b>左键</b> 钉入 · <b>右键</b> 取消　剩余 ${window.Sack ? Sack.have('pr_nail') : '?'} 颗`); return;
+      setHint(`<b>🔩 铁钉</b>　${okN ? ({ surf: '钉进岩壁 / 地面（固定点）', head: '钉进这颗首级（它身上多一个挂点）', prop: '钉进这件摆件（它身上多一个挂点）' })[a.type] : '对准要钉的地方'}<br><b>滚轮</b> 调钉长 <b>${Math.round(m.len * 100)} cm</b> · <b>左键</b> 钉入 · <b>右键</b> 取消　剩余 ${window.Sack ? Sack.have('pr_nail') : '?'} 颗`); return;
     }
     if (k === 'chain' || k === 'hook') {
       const a0 = m.a ? ptWorld(m.a) : null; ghost && (ghost.visible = false); const L = k === 'hook' ? 0.3 : null;
@@ -354,7 +358,7 @@ window.Rig = (() => {
     const m = mode, a = m.aim; if (!a || m.ok === false) { window.SFX && SFX.play && SFX.play('error', 0.4); return; } const k = m.k;
     if (k === 'nail') {
       if (!takeItem('nail')) { G.toast('铁钉不够了。', '#f88'); endMode(); return; }
-      const d = { k: 'nail', p: a.pt.toArray(), n: a.n.toArray(), fresh: 1 };
+      const d = { k: 'nail', p: a.pt.toArray(), n: a.n.toArray(), len: +(m.len || 0.17).toFixed(3), fresh: 1 };
       if (a.type === 'head' || a.type === 'prop') { const r = bodyRef(a, 1.0); d.n = a.n.clone().applyQuaternion(r.q0).toArray(); delete r.q0; d.host = r; }
       addPart(d); snd('nail', null, 'metal', 0.7, 0.9); if (!(window.SfxPack && SfxPack.ready)) setTimeout(() => window.SFX && SFX.play && SFX.play('wood', 0.5, 1.3), 90); if (!haveItem('nail')) endMode(); return;
     }
@@ -407,7 +411,7 @@ window.Rig = (() => {
   // 输入拦截
   document.addEventListener('mousedown', e => { if (!mode) return; e.preventDefault(); e.stopImmediatePropagation(); if (e.button === 0) commit(); else if (e.button === 2) { if (mode.restore) { const d = mode.restore.d; removePart(d); rebuild(); endMode(); } else cancel(); } }, true);
   document.addEventListener('contextmenu', e => { if (mode) e.preventDefault(); }, true);
-  document.addEventListener('wheel', e => { if (!mode) return; e.preventDefault(); e.stopImmediatePropagation(); if (mode.k === 'chain') { const dir = e.deltaY < 0 ? 1 : -1; mode.auto = false; mode.len = clamp((mode.len || 1) + dir * (e.shiftKey ? 0.5 : 0.1), 0.3, MAXL); } }, { capture: true, passive: false });
+  document.addEventListener('wheel', e => { if (!mode) return; e.preventDefault(); e.stopImmediatePropagation(); if (mode.k === 'chain') { const dir = e.deltaY < 0 ? 1 : -1; mode.auto = false; mode.len = clamp((mode.len || 1) + dir * (e.shiftKey ? 0.5 : 0.1), 0.3, MAXL); } else if (mode.k === 'nail') { const dir = e.deltaY < 0 ? 1 : -1; mode.len = clamp((mode.len || 0.17) + dir * (e.shiftKey ? 0.05 : 0.02), 0.06, 0.6); ensureGhost(); } }, { capture: true, passive: false });
   document.addEventListener('keydown', e => { if (!mode) return; if (e.code === 'Escape') { cancel(); return; } if (['KeyE', 'KeyQ', 'KeyG', 'KeyH', 'KeyF', 'KeyT', 'KeyY', 'Tab'].includes(e.code)) { e.stopImmediatePropagation(); } }, true);
 
   // ---------------------------------------------------------------- 每帧

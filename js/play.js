@@ -406,8 +406,8 @@ window.Play = (() => {
   const FACES = [['安眠', { blink: 1, relaxed: 0.3 }], ['微笑', { happy: 0.75, blink: 0.1 }], ['惊讶', { surprised: 0.85, oh: 0.45 }], ['委屈', { sad: 0.85, blink: 0.2 }], ['生气', { angry: 0.85 }], ['失焦', { blink: 0.05, surprised: 0.35 }], ['半阖', { blink: 0.55, aa: 0.12 }], ['吐舌', { happy: 0.5, aa: 0.35 }]];
   const FACE_ALL = () => FACES.map(([n, ex]) => ({ n, ex, fx: [0, 0, 0, 0] })).concat((ModelHeads.FACES || []).map(f => ({ n: f.n, ex: f.ex, fx: f.fx })));
   const FX_N = ['泪痕', '鼻血', '口角血', '淄青'], FX_L = [0, 0.5, 0.8, 1];
-  const HW_KEYS = ['ribbon', 'twinbows', 'hairpins', 'star', 'kanzashi', 'bells', 'feather', 'maid', 'bunny', 'flowercrown', 'goggles', 'thorncrown', 'beret', 'minihat'];
-  const HW_ICON = { ribbon: '🎀', twinbows: '🎀', hairpins: '📎', star: '⭐', kanzashi: '🌸', bells: '🔔', feather: '🪶', maid: '🤍', bunny: '🐰', flowercrown: '💐', goggles: '🥽', thorncrown: '👑', beret: '🎨', minihat: '🎩' };
+  const HW_KEYS = ['ribbon', 'twinbows', 'hairpins', 'star', 'kanzashi', 'bells', 'feather', 'maid', 'bunny', 'flowercrown', 'goggles', 'thorncrown', 'beret', 'minihat', 'halo', 'horns', 'dropchain', 'headchain', 'wingpin', 'crescent', 'skullpin'];
+  const HW_ICON = { ribbon: '🎀', twinbows: '🎀', hairpins: '📎', star: '⭐', kanzashi: '🌸', bells: '🔔', feather: '🪶', maid: '🤍', bunny: '🐰', flowercrown: '💐', goggles: '🥽', thorncrown: '👑', beret: '🎨', minihat: '🎩', halo: '😇', horns: '😈', dropchain: '💎', headchain: '⛓', wingpin: '🪽', crescent: '🌙', skullpin: '💀' };
   function dressCost(h) { return 60 * (h.rec.c.rar + 1); }
   function openDresser(h) {
     const look = h.rec.look, hw = look.hw || [], cost = dressCost(h);

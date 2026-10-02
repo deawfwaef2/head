@@ -23,6 +23,7 @@ window.Eco = (() => {
     if (QF != null) return QF > 0 ? QF : 0;
     if (!on()) return 0;
     if (!document.hasFocus()) return 15;
+    if (document.body.classList.contains('hubon')) return 20; // Tab 菜单盖着整屏，背后的 3D 不需要 30fps
     if (busyUI()) return 30;
     if (performance.now() - lastInput > 120000 && !cine()) return 30;
     return 60;

@@ -8,8 +8,8 @@ window.HeadWear = (() => {
     flower: ['#ffffff', '#ffd0e0', '#ffe27a', '#c8a8ff', '#ff8aa8', '#a8d8ff', '#ff6a5a'],
     feather: [['#ffffff', '#a8c8ff'], ['#2a6a5a', '#9affd0'], ['#a01a1a', '#ffb060'], ['#1a1a1e', '#8a5aff'], ['#e8d8b0', '#6a4020']]
   };
-  const N = { veil: '头纱', ribbon: '大蝴蝶结', maid: '女仆头饰', bunny: '兔耳发箍', beret: '贝雷帽', minihat: '迷你礼帽', hairpins: '交叉发夹', star: '星星发夹', flowercrown: '花冠', goggles: '护目镜', kanzashi: '流苏发簪', bells: '铃铛发绳', feather: '羽饰', thorncrown: '暗棘之冠', twinbows: '双侧蝴蝶结' };
-  const GROUP = { veil: 'hat', beret: 'hat', minihat: 'hat', maid: 'band', bunny: 'band', goggles: 'band', flowercrown: 'band', thorncrown: 'band', ribbon: 'side', hairpins: 'side', star: 'side', kanzashi: 'side', bells: 'side', feather: 'side', twinbows: 'side' };
+  const N = { veil: '头纱', ribbon: '大蝴蝶结', maid: '女仆头饰', bunny: '兔耳发箍', beret: '贝雷帽', minihat: '迷你礼帽', hairpins: '交叉发夹', star: '星星发夹', flowercrown: '花冠', goggles: '护目镜', kanzashi: '流苏发簪', bells: '铃铛发绳', feather: '羽饰', thorncrown: '暗棘之冠', twinbows: '双侧蝴蝶结', halo: '天使光环', horns: '小恶魔角', dropchain: '垂坠宝石链', headchain: '额饰链', wingpin: '小翅发夹', crescent: '月牙发饰', skullpin: '骷髅发夹' };
+  const GROUP = { veil: 'hat', beret: 'hat', minihat: 'hat', maid: 'band', bunny: 'band', goggles: 'band', flowercrown: 'band', thorncrown: 'band', ribbon: 'side', hairpins: 'side', star: 'side', kanzashi: 'side', bells: 'side', feather: 'side', twinbows: 'side', halo: 'halo', horns: 'horn', dropchain: 'drop', headchain: 'band', wingpin: 'side', crescent: 'side', skullpin: 'side' };
   const BY_ID = {
     villager: { ribbon: 0.4, flowercrown: 0.25, hairpins: 0.2 }, shepherd: { flowercrown: 0.4, ribbon: 0.3, beret: 0.2 }, barmaid: { maid: 0.75, ribbon: 0.3 },
     smithgirl: { goggles: 0.7, hairpins: 0.3 }, herbalist: { flowercrown: 0.6, hairpins: 0.25 }, huntress: { feather: 0.6 }, bard: { beret: 0.7, feather: 0.5 },
@@ -26,7 +26,7 @@ window.HeadWear = (() => {
     abyssqueen: { thorncrown: 0.8 }, dragonprincess: { kanzashi: 0.5, hairpins: 0.3 }, avatar: { flowercrown: 0.6 }, archangel: { flowercrown: 0.5 },
     dragonslayer: { feather: 0.5 }, dragonmiko: { kanzashi: 0.6, bells: 0.6 }
   };
-  const EXTRA = { ribbon: 0.14, hairpins: 0.1, star: 0.06, bunny: 0.05, twinbows: 0.06, flowercrown: 0.05, beret: 0.04 };
+  const EXTRA = { ribbon: 0.14, hairpins: 0.1, star: 0.06, bunny: 0.05, twinbows: 0.06, flowercrown: 0.05, beret: 0.04, halo: 0.015, horns: 0.025, dropchain: 0.05, headchain: 0.04, wingpin: 0.03, crescent: 0.04, skullpin: 0.03 };
 
   function rng(seed) { let s = (seed * 2654435761) >>> 0 || 1; return () => (s = (Math.imul(s ^ (s >>> 15), 2246822519) + 0x9e3779b9) >>> 0) / 4294967296; }
   const pick = (r, a) => a[Math.floor(r() * a.length)];
@@ -59,6 +59,13 @@ window.HeadWear = (() => {
     else if (k === 'feather') { const f = pick(r, PAL.feather); e.c = f[0]; e.c2 = f[1]; e.v = r() < 0.5 ? 1 : -1; }
     else if (k === 'thorncrown') e.c = pick(r, ['#b04aff', '#ff2a4a', '#4affd0']);
     else if (k === 'veil') { e.c = pick(r, ['#15131a', '#15131a', '#2a2630']); e.c2 = '#f4f2ee'; }
+    else if (k === 'halo') e.c = pick(r, ['#ffe9a0', '#cfe8ff', '#ffb8e0', '#b8ffcf']);
+    else if (k === 'horns') { e.c = pick(r, ['#c8243a', '#e8e0d0', '#8a3ad0', '#2a2a40']); }
+    else if (k === 'dropchain') e.c = pick(r, ['#ff2a4a', '#4affd0', '#b04aff', '#ffd24a', '#6aa8ff']);
+    else if (k === 'headchain') { e.c = pick(r, ['#e0b040', '#d0d4e0']); e.c2 = pick(r, ['#ff2a4a', '#4affd0', '#b04aff', '#6aa8ff']); }
+    else if (k === 'wingpin') { e.c = pick(r, ['#ffffff', '#1a1a22', '#b89aff', '#ffd0e0']); e.v = r() < 0.5 ? 1 : -1; }
+    else if (k === 'crescent') { e.c = pick(r, PAL.metal.slice(0, 2)); e.v = r() < 0.5 ? 1 : -1; }
+    else if (k === 'skullpin') { e.c = pick(r, ['#e8e0d0', '#d0c8b8', '#8a8a96']); e.v = r() < 0.5 ? 1 : -1; }
     return e;
   }
   const names = hw => (hw || []).map(e => N[e.k]).filter(Boolean);
@@ -89,8 +96,52 @@ window.HeadWear = (() => {
         if (e.k === 'bells') bells(e);
         if (e.k === 'feather') feather(e);
         if (e.k === 'veil') veil(e);
+        if (e.k === 'halo') halo(e);
+        if (e.k === 'horns') horns(e);
+        if (e.k === 'dropchain') dropchain(e);
+        if (e.k === 'headchain') headchain(e);
+        if (e.k === 'wingpin') wingpin(e);
+        if (e.k === 'crescent') crescent(e);
+        if (e.k === 'skullpin') skullpin(e);
       } catch (err) { console.warn('headwear', e.k, err); }
     }
+    // --- 工坊饰品（R63e）---
+    function halo(e) { // 悬在头顶的发光光环
+      const s = surf(0, 1, -0.02, 0), grp = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: e.c, emissive: e.c, emissiveIntensity: 0.9, metalness: 0.4, roughness: 0.3 }); disp.push(m);
+      const r = new THREE.Mesh(geo('haloR', () => new THREE.TorusGeometry(0.058, 0.0034, 10, 56)), m); r.rotation.x = Math.PI / 2; grp.add(r);
+      const gm = new THREE.MeshBasicMaterial({ color: e.c, transparent: true, opacity: 0.22, depthWrite: false }); disp.push(gm); const gl = new THREE.Mesh(geo('haloG', () => new THREE.TorusGeometry(0.058, 0.0095, 8, 56)), gm); gl.rotation.x = Math.PI / 2; grp.add(gl);
+      grp.position.copy(s.p).add(V(0, 0.055, 0)); grp.rotation.x = -0.1; g.add(grp);
+    }
+    function hornGeo() { const c = new THREE.CatmullRomCurve3([V(0, 0, 0), V(0.004, 0.02, 0.002), V(0.012, 0.036, 0.008), V(0.024, 0.044, 0.016)]), G = new THREE.TubeGeometry(c, 14, 0.0078, 8, false), p = G.attributes.position;
+      for (let i = 0; i < p.count; i++) { const t = Math.min(1, Math.floor(i / 9) / 14), ct = c.getPointAt(t), k = 1 - t * 0.93; p.setXYZ(i, ct.x + (p.getX(i) - ct.x) * k, ct.y + (p.getY(i) - ct.y) * k, ct.z + (p.getZ(i) - ct.z) * k); } G.computeVertexNormals(); return G; }
+    function horns(e) { const m = toon(e.c); for (const sx of [-1, 1]) { const s = surf(sx * 0.42, 0.9, 0.22, 0.001), h = new THREE.Mesh(geo('horn', hornGeo), m); face(h, s.p, s.n); h.rotateZ(-sx * 0.4); h.rotateX(-0.25); h.scale.set(1.9 * sx, 1.9, 1.9); g.add(h); } }
+    function dropchain(e) { // 发侧垂下的金链 + 水滴宝石
+      const gold = metal('#e0b040', 0.25), gem = new THREE.MeshStandardMaterial({ color: e.c, emissive: e.c, emissiveIntensity: 0.55, metalness: 0.2, roughness: 0.1 }); disp.push(gem);
+      for (const sx of [-1, 1]) { const s = surf(sx * 0.98, 0.12, -0.02, 0.002), grp = new THREE.Group(); grp.add(new THREE.Mesh(geo('dcClip', () => new THREE.TorusGeometry(0.0062, 0.0013, 6, 16)), gold));
+        for (let i = 1; i <= 3; i++) { const b = new THREE.Mesh(geo('bead', () => new THREE.SphereGeometry(0.0019, 8, 6)), gold); b.position.y = -0.006 - i * 0.0055; grp.add(b); }
+        const d = new THREE.Mesh(geo('dcGem', () => { const G = new THREE.OctahedronGeometry(0.0066); G.scale(0.8, 1.5, 0.8); return G; }), gem); d.position.y = -0.038; grp.add(d); grp.position.copy(s.p); g.add(grp); }
+    }
+    function headchain(e) { // 额前一圈细链，正中垂一颗宝石
+      const pts = []; for (let i = 0; i <= 40; i++) { const a = (i / 40 - 0.5) * 2.2, y = 0.64 - 0.12 * (1 - Math.pow(a / 1.1, 2)), d = V(Math.sin(a), y, Math.cos(a) + 0.12); pts.push(surf(d.x, d.y, d.z, 0.002).p); }
+      const gold = metal(e.c, 0.25), tg = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 56, 0.0018, 6, false); disp.push(tg); g.add(new THREE.Mesh(tg, gold));
+      const mid = pts[20], gm = new THREE.MeshStandardMaterial({ color: e.c2, emissive: e.c2, emissiveIntensity: 0.6, metalness: 0.2, roughness: 0.1 }); disp.push(gm);
+      const gem = new THREE.Mesh(geo('hcGem', () => { const G = new THREE.OctahedronGeometry(0.0075); G.scale(0.8, 1.35, 0.7); return G; }), gm); gem.position.copy(mid).add(V(0, -0.012, 0.004)); g.add(gem);
+      for (const i of [8, 14, 26, 32]) { const b = new THREE.Mesh(geo('bead', () => new THREE.SphereGeometry(0.0019, 8, 6)), gm); b.position.copy(pts[i]); g.add(b); }
+    }
+    function wingpin(e) { // 侧边一对迷你羽翼
+      const s = surf(e.v * 0.8, 0.55, 0.25, 0.0), grp = new THREE.Group(), m = toon(e.c, { side: THREE.DoubleSide });
+      for (let i = 0; i < 3; i++) { const f = new THREE.Mesh(geo('wing', () => { const G = new THREE.SphereGeometry(0.5, 12, 8); G.translate(0.5, 0, 0); G.scale(0.05, 0.011, 0.003); return G; }), m); f.scale.setScalar(1 - i * 0.18); f.rotation.z = 0.15 + i * 0.28; f.position.y = -i * 0.004; grp.add(f); }
+      grp.scale.set(e.v * 1.7, 1.7, 1.7); face(grp, s.p, s.n); g.add(grp);
+    }
+    function crescent(e) { const s = surf(e.v * 0.7, 0.62, 0.3, 0.001), grp = new THREE.Group(), gold = metal(e.c, 0.25);
+      const arc = new THREE.Mesh(geo('cres', () => new THREE.TorusGeometry(0.015, 0.003, 8, 28, Math.PI * 1.45)), gold); arc.rotation.z = Math.PI * 0.28; grp.add(arc);
+      const gm = new THREE.MeshStandardMaterial({ color: '#fff4c0', emissive: '#ffe080', emissiveIntensity: 0.7, roughness: 0.2 }); disp.push(gm); const st = new THREE.Mesh(geo('cresS', () => new THREE.SphereGeometry(0.0034, 10, 8)), gm); st.position.set(0.006, 0.0, 0.002); grp.add(st);
+      face(grp, s.p, s.n); g.add(grp); }
+    function skullpin(e) { const s = surf(e.v * 0.72, 0.6, 0.3, 0.001), grp = new THREE.Group(), bone = toon(e.c), dark = toon('#14101a');
+      const sk = new THREE.Mesh(geo('skl', () => { const G = new THREE.SphereGeometry(0.0105, 14, 10); G.scale(1, 0.9, 0.9); return G; }), bone); grp.add(sk);
+      const jaw = new THREE.Mesh(geo('skj', () => new THREE.BoxGeometry(0.0085, 0.005, 0.007)), bone); jaw.position.set(0, -0.0105, 0.0015); grp.add(jaw);
+      for (const sx of [-1, 1]) { const ey = new THREE.Mesh(geo('ske', () => new THREE.SphereGeometry(0.0022, 8, 6)), dark); ey.position.set(sx * 0.0038, -0.0006, 0.0085); grp.add(ey); }
+      face(grp, s.p, s.n); g.add(grp); }
     // --- 各件 ---
     function arcPts(n, spread, tiltZ, lift = 0.001) { const P = [], Nn = []; for (let i = 0; i <= n; i++) { const t = (i / n - 0.5) * 2 * spread; const d = V(Math.sin(t), Math.cos(t), tiltZ).normalize(); P.push(onShell(S, d.x, d.y, d.z, -lift)); Nn.push(d); } return { P, N: Nn }; }
     function maid(e) {

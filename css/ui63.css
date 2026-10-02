@@ -253,6 +253,10 @@ body.u63.hubwheel #uiroot .modal, body.u63.hubwheel #r35root .modal { min-height
 }
 /* 打开页面时战斗体力条不再漏在舞台中央 */
 body.u63.hubon #combatHud, body.u63.hubon #cross, body.u63.hubon #atkCd, body.u63.hubon #hitHud { visibility: hidden !important; }
+/* 全屏 backdrop-filter 叠在实时 WebGL 画布上，每帧都要回读 + 模糊 = 按 Tab 卡顿的主因：一律关掉，用更深的底色代替 */
+body.u63 *, body.u63 *::before, body.u63 *::after { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+body.u63 #uiroot, body.u63 #r35root, body.u63 #modbox, body.u63 #kg, body.u63 .pmodal, body.u63 #sanPn { background-color: rgba(4,2,5,.5); }
+body.u63 #whl .bg { background: radial-gradient(ellipse at 50% 50%, rgba(14,6,8,.78) 0, rgba(4,2,4,.92) 55%, rgba(0,0,0,.97) 100%); }
 /* 滚动型页面（出征准备等）：底部让出提示条高度 */
 body.u63.hubwheel #sppan .sp-in { padding-bottom: 80px; }
 

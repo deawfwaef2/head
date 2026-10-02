@@ -587,15 +587,20 @@ window.ModelHeads = (() => {
               float inReg = smoothstep(0.022, 0.012, length(vec2(abs(vHP.x) - abs(uEye.x) * 0.9, (vHP.y - (uEye.y - 0.022)) * 1.6)));
               diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62, 0.36, 0.26), step(0.93, hsh) * inReg * 0.55); }
             // R62 脸部差分（uFx = 泪痕 / 鼻血 / 口角血 / 淄青）：坐标都是头局部空间，和脸模自带的眼睛位置 uEye 对齐
-            if (uFx.x > 0.01) { float tl = uFx.x; float ex = abs(vHP.x) - abs(uEye.x); float dy = (uEye.y - 0.009) - vHP.y;
-              float rim = smoothstep(0.016, 0.004, length(vec2(ex * 0.9, (vHP.y - uEye.y + 0.002) * 1.5)));
-              diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.36, 0.40), rim * 0.34 * tl);
-              for (int i = 0; i < 2; i++) { float fi = float(i); float off = 0.0015 + fi * 0.0085;
-                float len = (0.028 + 0.062 * tl) * (0.75 + 0.45 * fract(sin(uSeed * 3.7 + fi * 5.3) * 437.58));
-                float wob = (vn3(vec3(vHP.y * 55.0 + fi * 9.0, uSeed, 3.0)) - 0.5) * 0.0042 + dy * 0.05;
-                float w = mix(0.0026, 0.0012, clamp(dy / len, 0.0, 1.0)); float run = step(0.0, dy) * (1.0 - smoothstep(len * 0.82, len, dy)); float ax = abs(ex - off - wob);
-                float line = smoothstep(w, w * 0.35, ax) * run; float edge = smoothstep(w * 1.9, w, ax) * (1.0 - line) * run;
-                diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.78, edge * 0.5); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.80, 0.90, 1.0), line * 0.62); } }
+            if (uFx.x > 0.01) { float tl = uFx.x; float ex = abs(vHP.x) - abs(uEye.x); float dy = (uEye.y - 0.009) - vHP.y; vec3 tc = diffuseColor.rgb;
+              float rim = smoothstep(0.020, 0.004, length(vec2(ex * 0.8, (vHP.y - uEye.y + 0.002) * 1.4))); tc = mix(tc, vec3(0.84, 0.30, 0.34), rim * 0.42 * tl); // 哭红的眼周
+              float flush = smoothstep(0.03, 0.0, length(vec2(ex * 0.7, (vHP.y - uEye.y + 0.016) * 1.0))); tc = mix(tc, tc * vec3(1.06, 0.84, 0.84), flush * 0.35 * tl); // 颧骨泛红
+              float lid = smoothstep(0.0032, 0.0005, abs(vHP.y - (uEye.y - 0.0105))) * smoothstep(0.016, 0.004, abs(ex)); tc = mix(tc, tc * 0.78 + vec3(0.16, 0.14, 0.14), lid * 0.7 * tl); // 下眼睑蓄泪的水线
+              for (int i = 0; i < 3; i++) { float fi = float(i); float vis = smoothstep(fi * 0.34 - 0.12, fi * 0.34 + 0.06, tl); float off = 0.0012 + fi * 0.0062;
+                float len = (0.024 + 0.072 * tl) * (0.55 + 0.7 * fract(sin(uSeed * 3.7 + fi * 5.3) * 437.58)) * (1.0 - 0.18 * fi);
+                float wob = (vn3(vec3(vHP.y * 45.0 + fi * 9.0, uSeed, 3.0)) - 0.5) * 0.0036 + dy * (0.05 + fi * 0.035);
+                float w = mix(0.0022, 0.0011, clamp(dy / len, 0.0, 1.0)); float run = step(0.0, dy) * (1.0 - smoothstep(len * 0.9, len, dy)) * vis; float ax = abs(ex - off - wob);
+                float wet = smoothstep(w * 1.7, w * 0.5, ax) * run; tc = mix(tc, tc * vec3(0.84, 0.78, 0.78), wet * 0.6); // 水膜：皮肤变深变饱和
+                float gl = smoothstep(w * 0.5, 0.0, abs(ex - off - wob - w * 0.38)) * run * (0.5 + 0.5 * vn3(vec3(vHP.y * 90.0 + fi, uSeed, 7.0))); tc += vec3(1.0, 0.96, 0.92) * gl * 0.5; // 高光线
+                float ye = (uEye.y - 0.009) - len; float wobE = (vn3(vec3(ye * 45.0 + fi * 9.0, uSeed, 3.0)) - 0.5) * 0.0036 + len * (0.05 + fi * 0.035);
+                vec2 bq = vec2(ex - off - wobE, (vHP.y - ye) * 0.85); float bd = length(bq); float bead = smoothstep(0.0034, 0.0024, bd) * vis; float ring = smoothstep(0.0038, 0.0030, bd) * (1.0 - bead) * vis;
+                tc = mix(tc, tc * 0.66, ring * 0.7); tc = mix(tc, tc * 0.92 + vec3(0.09), bead * 0.6); tc += vec3(1.0) * smoothstep(0.0012, 0.0, length(bq - vec2(-0.0008, 0.0010))) * bead * 0.7; } // 流到尽头的泪珠
+              diffuseColor.rgb = tc; }
             if (uFx.y > 0.01) { float nb = uFx.y; vec2 np = vec2(abs(vHP.x), vHP.y); float ny0 = uEye.y - 0.034; float dy = ny0 - np.y; float len = 0.016 + 0.07 * nb;
               float xs = 0.0050 + (vn3(vec3(np.y * 70.0, uSeed + 11.0, 1.0)) - 0.5) * 0.0024; float wgt = vHP.x > 0.0 ? 1.0 : 0.55 + 0.45 * step(0.5, fract(uSeed * 0.31));
               float w = mix(0.0030, 0.0016, clamp(dy / len, 0.0, 1.0)) * (0.8 + 0.5 * nb); float rv = smoothstep(w, w * 0.4, abs(np.x - xs)) * step(-0.0016, dy) * (1.0 - smoothstep(len * 0.8, len, dy));
@@ -638,7 +643,7 @@ window.ModelHeads = (() => {
           vec3 blood = mix(vec3(0.20, 0.0, 0.01), vec3(0.42, 0.02, 0.03), sp);
           diffuseColor.rgb = mix(diffuseColor.rgb, blood, bm * 0.88);`);
     };
-    m.customProgramCacheKey = () => 'skin7';
+    m.customProgramCacheKey = () => 'skin8';
     return FaceFill.wrap(m, 1.0);
   }
 

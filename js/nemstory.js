@@ -196,11 +196,12 @@ window.NemStory = (() => {
   function poll() {
     if (!on() || !G() || !G().S) return; const s = S(), H2 = window.Hunters2;
     if (!s.intro && G().S) { s.intro = 1; queue({ k: 'intro', why: 'intro', t: Date.now() }); }
+    if (!s.rep) { const N0 = window.Nemesis && Nemesis.S && Nemesis.S(); s.rep = { play: (N0 && N0.play) || 0, lv: {} }; }
     if (H2 && H2.SS && (!H2.on || H2.on())) {
       const hs = H2.SS();
       for (const d of H2.D) {
         const L = hs.L && hs.L[d.id]; if (!L || L.dead) continue; const key = 'h:' + d.id, lv = H2.lvOf(d.id);
-        if (s.lv[key] == null) { s.lv[key] = lv; s.esc = s.esc || {}; s.esc[d.id] = L.esc; continue; }
+        if (s.lv[key] == null) { s.lv[key] = lv; s.rep.lv[key] = lv; s.esc = s.esc || {}; s.esc[d.id] = L.esc; continue; }
         if (lv > s.lv[key]) { s.esc = s.esc || {}; const why = L.esc > (s.esc[d.id] || 0) ? 'esc' : 'grow'; s.esc[d.id] = L.esc; grow(key, why, s.lv[key], lv); s.lv[key] = lv; }
       }
     }
@@ -440,6 +441,18 @@ window.NemStory = (() => {
   }
 
   setInterval(() => { try { tick(); } catch (e) { console.warn('NemStory', e); } }, 250);
+  function report() { // 这段时间宿敌怎么积累强度的：与上一部电影相比的等级变化 + 积累进度条
+    try {
+      const s = S(), N = window.Nemesis && Nemesis.S && Nemesis.S(), H2 = window.Hunters2, play = (N && N.play) || 0, rep = s.rep || (s.rep = { play, lv: {} }), rows = [];
+      const bar = f => { const n = Math.round(f * 8); return '▰'.repeat(n) + '▱'.repeat(8 - n); };
+      const stp = (H2 && H2.HATE_STEP) || 15, hs = H2 && H2.SS && H2.SS(), fr = hs ? (hs.hate % stp) / stp : 0;
+      if (H2 && hs) for (const d of H2.D) { const L = hs.L[d.id]; if (!L || L.dead) continue; const key = 'h:' + d.id, lv = H2.lvOf(d.id), lv0 = rep.lv[key] != null ? rep.lv[key] : lv; rep.lv[key] = lv;
+        rows.push({ ic: d.ic || '🏹', a: `${d.n}　Lv.${lv0} → Lv.${lv}${lv > lv0 ? '（+' + (lv - lv0) + '）' : ''}`, e: lv > lv0 ? '这段时间持续积累，已突破一级' : `积累中 ${bar(fr)} ${Math.round(fr * 100)}%`, col: lv > lv0 ? '#ffb090' : d.col }); }
+      for (const x of ((N && N.extra) || []).slice(-2)) { const key = 'x:' + x.n, lv = x.lv + Math.floor((play - x.at) / 300), lv0 = rep.lv[key] != null ? rep.lv[key] : lv; rep.lv[key] = lv; rows.push({ ic: '🩸', a: `${x.n}　Lv.${lv0} → Lv.${lv}${lv > lv0 ? '（+' + (lv - lv0) + '）' : ''}`, e: '从你手里逃走的人：每 5 分钟 +1 级', col: '#ff8a7a' }); }
+      const mins = Math.max(0, Math.round((play - rep.play) / 60)); rep.play = play;
+      if (!rows.length) return null; return { mins, rows: rows.slice(0, 6), foot: `距上次 ${mins} 分钟 · 每 8 分钟全员 +1 级 · 你的击杀和斩首会加速` };
+    } catch (e) { return null; }
+  }
   function pending() { // \u8fdb\u56fe\u90a3\u4e00\u523b\u5c31\u76d6\u9ed1\uff0c\u4e0d\u8ba9\u73a9\u5bb6\u5148\u770b\u5230\u5730\u56fe\u518d\u5361\u987f\u52a0\u8f7d\u7535\u5f71
     try {
       if (st || !on() || !G() || !G().S || !S().q.length) return false;
@@ -449,5 +462,5 @@ window.NemStory = (() => {
       return W.B !== W.__nsB || !(W.mapKey && W.mapKey === lastMap);
     } catch (e) { return false; }
   }
-  return { on, hold, apply, aff, S, ASP, grow, queue, pending, get busy() { return !!st; }, _dbg: { start, pickEvent, poll } };
+  return { on, hold, apply, aff, S, ASP, grow, queue, pending, report, get busy() { return !!st; }, _dbg: { start, pickEvent, poll } };
 })();

@@ -281,7 +281,7 @@ html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body
   function onDown(e) { if (!S.active || e.target.closest && e.target.closest('#riw .rcard,#riw .rbar,#riw .pn,#riw .x')) return; S.drag = { x: e.clientX, y: e.clientY, acc: 0 }; e.preventDefault(); }
   function onMove(e) { if (!S.active || !S.drag) return; const dx = e.clientX - S.drag.x, dy = e.clientY - S.drag.y; S.drag.x = e.clientX; S.drag.y = e.clientY; S.yaw += dx * 0.012; S.pitch = Math.max(-0.9, Math.min(0.9, S.pitch + dy * 0.008)); S.drag.acc += Math.abs(dx) * 0.012 + Math.abs(dy) * 0.008; if (S.drag.acc > 1.4) { S.drag.acc = 0; S.play++; if (window.SFX && SFX.on && SFX.ctx) noise(SFX.ctx.currentTime, 0.3, 0.05, 'highpass', 2600, 4200, 0.6); if (S.play === 8 && !Recall.known(S.rec.c, 'adorn')) finish('pat'); else refresh(); } }
   function onUp() { if (S.drag) { S.drag = null; } }
-  function onWheel(e) { if (!S.active) return; if (e.target.closest && e.target.closest('#riw .rcard,#riw .pn')) return; e.preventDefault(); e.stopPropagation(); S.dist = Math.max(-0.12, Math.min(0.14, S.dist + (e.deltaY > 0 ? 0.02 : -0.02))); }
+  function onWheel(e) { if (!S.active) return; if (e.target.closest && e.target.closest('#riw .rcard,#riw .pn')) return; e.preventDefault(); e.stopPropagation(); S.dist = Math.max(-0.28, Math.min(0.14, S.dist + (e.deltaY > 0 ? 0.02 : -0.02))); }
   // 按住左键时也会触发 game.js 的把玩(poke)；回忆中屏蔽 canvas 的 mousedown
   function block(e) { if (S.active && !(e.target.closest && e.target.closest('#riw'))) { e.stopImmediatePropagation(); } }
 
@@ -305,7 +305,7 @@ html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body
       const bb = new THREE.Box3().setFromObject(h.hb && h.hb.group ? h.hb.group : h.g), sz = bb.getSize(new THREE.Vector3()), ctr = bb.getCenter(new THREE.Vector3());
       S.hc = ctr.sub(h.g.position); S.k = Math.max(0.5, Math.min(3, (sz.y || 0.26) / 0.26)); { /* R37：非 VRoid 头（MMD 系）的包围盒把发量/发饰/兽耳都算进去（0.27~0.59 vs VRoid 中位 0.30）→ k 偏大 → 手被放大、头显得小。非 VRoid 头的 k 向 VRoid 中位数（1.15）收敛 */ let gp = ''; try { const lk = (h.rec && h.rec.look) || (rec && rec.look); const mt = lk && window.ModelHeads && ModelHeads.meta(lk); gp = (mt && mt.grp) || ''; } catch (e) { } if (gp && gp !== 'vroid') { S.kRaw = S.k; S.k = Math.max(1.05, Math.min(1.3, 1.15 + 0.1 * (S.k - 1.15))); } } { const ff = faceFit(h); S.kOld = S.k; S.k = ff.k; if (ff.hc) S.hc = ff.hc; S.kT = 0; S.hcT = null; S.kM = 0; }
       h.g.quaternion.copy(q0); h.g.updateMatrixWorld(true); S.hsz = sz.toArray().map(v => +v.toFixed(3)); }
-    Object.assign(S, { openAt: performance.now(), active: true, h, rec, cb: cb || {}, act: '', openRows: new Set(), t: 0, yaw: 0, pitch: 0, dist: 0, drag: null, play: 0, fov0: G.camera.fov, openT: 0, shake: 0, pend: null });
+    Object.assign(S, { openAt: performance.now(), active: true, h, rec, cb: cb || {}, act: '', openRows: new Set(), t: 0, yaw: 0, pitch: 0, dist: -0.15, drag: null, play: 0, fov0: G.camera.fov, openT: 0, shake: 0, pend: null });
     cur = null; G.setUI(true); document.body.classList.add('riw-on');
     el.style.display = 'block'; requestAnimationFrame(() => el.classList.add('on')); panel(null); refresh();
     const c = rec.c; sub(Recall.nKnown(c) > 3 ? `你把<b>${esc(NM(c))}</b>捧到面前。她的眼睛半睁着，已经不会再眨了。` : `一颗陌生的头。你把她捧到面前——还想不起她是谁。<br><span class="d">试试下面的动作，一点点想起来。</span>`);

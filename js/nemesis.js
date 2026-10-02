@@ -58,7 +58,8 @@ window.Nemesis = (() => {
   let wasW = null, plan = null, chip = null;
   function chipUI(show) { if (!chip) { css(); chip = document.createElement('div'); chip.id = 'nemChip'; document.body.appendChild(chip); } chip.style.display = show ? 'block' : 'none'; if (!show) return; const p = S().p; chip.classList.toggle('full', p >= 100);
     const H = window.HudTidy && HudTidy.on() && window.Hunters2 && Hunters2.on() && Hunters2.T && Hunters2.alive().length ? Hunters2.T : null, hm = H ? Math.floor(H.m || 0) : -1; // R54n：猎手感应并入宿敌条
-    chip.innerHTML = `🩸 宿敌逼近 ${Math.round(p)}%<i><b style="width:${Math.min(100, p)}%"></b></i>${hm >= 0 ? `<span style="margin-left:14px;color:${hm >= 100 ? '#ff7a6a' : '#e7c27a'}">🏹 猎手 ${hm}%${hm >= 100 ? ' · 随时会来' : ''}</span><i><b style="width:${Math.min(100, hm)}%;background:linear-gradient(90deg,#7a5a20,#e7c27a)"></b></i>` : ''}<span style="margin-left:12px;font-size:11.5px;color:#c8b8a8">U 档案</span>`; }
+    let gr = ''; try { const H2 = window.Hunters2, hs = H2 && H2.SS && H2.on && H2.on() ? H2.SS() : null; if (hs) { const stp = H2.HATE_STEP || 15, f = (hs.hate % stp) / stp, rem = Math.ceil((1 - f) * 480), lvp = Math.floor(hs.hate / stp); gr = `<span style="margin-left:14px;color:#ffb070">📈 宿敌成长 +${lvp} 级</span><i><b style="width:${(f * 100).toFixed(1)}%;background:linear-gradient(90deg,#8a3a10,#ffb070)"></b></i><span style="margin-left:4px;font-size:11.5px;color:#c8b8a8">${Math.floor(rem / 60)}:${String(rem % 60).padStart(2, '0')} 后再升一级</span>`; } } catch (e) { }
+    chip.innerHTML = `🩸 宿敌逼近 ${Math.round(p)}%<i><b style="width:${Math.min(100, p)}%"></b></i>${gr}${hm >= 0 ? `<span style="margin-left:14px;color:${hm >= 100 ? '#ff7a6a' : '#e7c27a'}">🏹 猎手 ${hm}%${hm >= 100 ? ' · 随时会来' : ''}</span><i><b style="width:${Math.min(100, hm)}%;background:linear-gradient(90deg,#7a5a20,#e7c27a)"></b></i>` : ''}<span style="margin-left:12px;font-size:11.5px;color:#c8b8a8">U 档案</span>`; }
   // R54p：宿敌档案（并入 U 猎手档案窗口底部）
   function dossierHTML() {
     if (!onN()) return ''; const s = S(), ex = s.extra || [], pl = plv(), e2 = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -106,7 +107,7 @@ window.Nemesis = (() => {
   }
   function tick() {
     if (!G() || !G().S) return; const s = S(), w = W(), dt = 1;
-    if (G().playing) { s.play += dt; if (onN() && s.play - s.grow >= 480 && window.Hunters2 && Hunters2.SS) { s.grow = s.play; const H2 = Hunters2.SS(); H2.hate += Hunters2.HATE_STEP || 15; try { G().toast(window.NemStory && NemStory.on() ? '🩸 宿敌们在你看不见的地方又变强了——下次出猎时，你会看到发生了什么' : '🩸 宿敌们在你看不见的地方又变强了（猎手全体 +1 级）', '#ff9a8a', 2.8); } catch (e) { } } }
+    if (G().playing) { s.play += dt; if (onN() && window.Hunters2 && Hunters2.SS) { const H2 = Hunters2.SS(), stp = Hunters2.HATE_STEP || 15, b0 = Math.floor(H2.hate / stp); H2.hate += stp / 480 * dt; /* 每 8 分钟 +1 级，改成每秒连续积累（条可见） */ if (Math.floor(H2.hate / stp) > b0) { s.grow = s.play; try { G().toast(window.NemStory && NemStory.on() ? '🩸 宿敌们在你看不见的地方又变强了——下次出猎时，你会看到发生了什么' : '🩸 宿敌们在你看不见的地方又变强了（猎手全体 +1 级）', '#ff9a8a', 2.8); } catch (e) { } } } }
     if (w !== wasW) { // 出发 / 回洞
       if (w && !wasW) { plan = onN() ? { first: s.p >= 100 || Math.random() * 100 < s.p, next: performance.now() / 1000 + 240 + Math.random() * 180, enteredAt: 0 } : null; s.p = 0; if (onR()) { s.act = s.buff || null; s.buff = null; } }
       if (!w && wasW) { s.act = null; plan = null; }

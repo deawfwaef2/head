@@ -339,7 +339,7 @@ window.Foe = (() => {
       const r = mulberry32(((it.h.look.seed || 7) * 2654435761) >>> 0);
       if (window.IdLook) { try { IdLook.apply(it.h); } catch (e) { console.warn('IdLook', e); } } // R43：身份决定发色/头饰
       const bodyName = it.body || bodyFor(it.h, r, it.boss && it.bossK, used); /* R63 DevLab：it.body 指定身体 */ used.add(bodyName);
-      let f; try { f = await build(bodyName, it.h.look); await animate(f); if (window.IdLook && !it.boss) IdLook.dress(f, it.h.c.id, it.h.look.seed); } catch (e) { console.warn('foe body', bodyName, e); continue; }
+      let f; try { if (keep) await new Promise(r => requestAnimationFrame(() => r())); f = await build(bodyName, it.h.look); if (keep) await new Promise(r => requestAnimationFrame(() => r())); await animate(f); if (window.IdLook && !it.boss) IdLook.dress(f, it.h.c.id, it.h.look.seed); } catch (e) { console.warn('foe body', bodyName, e); continue; }
       const c = it.h.c, rar = c.rar, id = c.id;
       const fo = { h: it.h, f, pos: f.root.position, yaw: r() * 6.28, rar, id, hp: 0, maxHp: 0, state: 'idle', t: 0, cd: 1 + r() * 2, sayT: 0, seen: false,
         brave: !!it.boss || !!ARMED[id] || r() < 0.2 + rar * 0.1, boss: it.boss || null, bossK: it.bossK, dead: false, decap: false, rag: null, stag: 0, atk: null, block: 0, iq: 0.4 + rar * 0.15 + (it.boss ? 0.4 : 0),
@@ -408,7 +408,7 @@ window.Foe = (() => {
   const _fr = new THREE.Frustum(), _pm = new THREE.Matrix4(), _pm2 = new THREE.Matrix4(), _lsp = new THREE.Sphere();
   function lodFoe(fo, fr, d) {
     const f = fo.f, R = f.root; _lsp.center.set(fo.pos.x, fo.pos.y + 1, fo.pos.z); _lsp.radius = 3 * (fo.sc || 1);
-    const vis = d < 4 || fr.intersectsSphere(_lsp); if (R.visible !== vis) R.visible = vis; fo.lodVis = vis;
+    const vis = d < 4 || (fo.t || 0) < 3 || fr.intersectsSphere(_lsp); // 新敌人前 3 秒必须照常渲染：贴图上传/着色器在它“突然出现”之前就完成，不在它走进视野那一帧才卡 if (R.visible !== vis) R.visible = vis; fo.lodVis = vis;
     const far = d > (fo.lodSh ? 18 : 22);
     if (far !== !!fo.lodSh) {
       if (far) { const L = fo.lodSh = []; R.traverse(o => { if (o.isMesh && o.castShadow) { o.castShadow = false; L.push(o); } }); }

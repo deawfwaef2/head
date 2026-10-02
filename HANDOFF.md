@@ -4507,3 +4507,12 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - 大身体小头：`head_norm` 上限不再被 0.272m 绝对头高卡死（`fit0s*1.6` 作上限），按身体身高/6.6 取目标头高。**未实机验证**（本地无 `big/`），若个别模型变成大头请回报身体名。
 - 解剖底模：此前只有「skin 层存在但面积 <45%」才用素体。现在 ① 阈值 0.6；② 没有真正的皮肤层（衣服+皮肤融合的单网格，或只剩颈断面 cap 2）时，原网格整层当“衣物”（cloth，可用「衣着」按钮脱掉），素体当皮肤层。用 BASE_BODY 自制假骨架做了 bake 冒烟测试：无 skin 材质 → `base.used=true`、原网格变 cloth、`hasCloth=true`；有 skin 材质且完整 → 不触发。autopsy 新着色器（R62）在 WebGL 编译通过。
 - 未做：真实身体上的视觉确认（本地无 `big/body`）。
+
+## R63e（宿敌成长条 / 工坊头饰 / 装具 / 性能）
+- 宿敌：`nemesis.js tick` 把「每 8 分钟仇恨 +15」改成每秒连续 +15/480（等级节奏不变），`#nemChip` 新增「📈 宿敌成长 +N 级」条 + 距下次升级倒计时。`NemStory.report()`（新）= 与上一部电影相比各猎手/宿敌的等级变化 + 积累进度条；`cinescript.nem` 在宿敌电影第一镜后插入「这段时间 / 你离开的 N 分钟里」情报卡（boost 面板）。baseline 存 `G.S.nst.rep`。
+- 工坊头饰（`headwear.js` + `play.js` 梳妆台）：新增 天使光环 / 小恶魔角 / 垂坠宝石链 / 额饰链 / 小翅发夹 / 月牙发饰 / 骷髅发夹（`HeadWear.N/GROUP/mk/build`，`HW_KEYS` 已加到梳妆台；随机 roll 里 EXTRA 也有小概率）。已离屏渲染确认能显示，位置/大小请用梳妆台实机微调。**未做**：真正的“工坊制作 + 材料消耗”流程，目前走梳妆台直接装。
+- 装具 `rigging.js`：钉子长度（滚轮 2cm/Shift 5cm，6–60cm，存 `d.len`）；放置提示条从屏幕底部移到顶部（不再挡建造栏）；链/钩连到首级/摆件的那一端加可见环钉（`rt.studs`），挂点由 0.55 提到 0.85 贴近表面。“锁链没正确链接人物会被卡掉”只确认到这一层，若还有具体复现请给场景。
+- Tab 卡：`ui63.css` 全局关掉 `backdrop-filter`（全屏毛玻璃叠在实时 WebGL 上，每帧回读+模糊），底色加深代替；`eco.js` hubon 时帧率 20fps。headless 无法复现 GPU 开销，按原理修，需实机确认。
+- 敌人突然出现卡：`foe_lod` 对新敌人前 3 秒强制可见（先渲染/上传贴图再允许视锥隐藏）；`populate(keep)` 每个敌人 build/animate 之间让出一帧。
+- F 回忆视角头太小：`recall_iw.js` 初始 `dist -0.15`、滚轮范围 -0.28~0.14（更近 = 更大）。
+- 泪痕：`heads.js uFx.x` 重做（哭红眼周、颧骨泛红、下眼睑水线、最多 3 道泪痕：湿润变深 + 高光线 + 尽头泪珠），缓存键 skin8。
