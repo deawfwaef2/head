@@ -1299,6 +1299,7 @@ window.ModelHeads = (() => {
   }
   function create(look, opts = {}) {
     look = resolve(look);
+    if (opts.alive && look.fx) look = Object.assign({}, look, { fx: null }); // 活人没有泪痕/血/淤青，只有被斩下的头才有
     let fi = idxOf(look.f); if (fi < 0) fi = 0;
     let hi = idxOf(look.h); if (hi < 0) hi = fi;
     hi = coverHair(fi, hi, look); // 第二十一轮 MOD hair_cover：避免借来的头发盖不住后脑 → 后颈/后脑露洞

@@ -162,6 +162,7 @@ void main(){
     }
     a.sh.position.set(a.f.root.position.x, a.f.root.position.y + 0.015, a.f.root.position.z);
     for (const [b, q] of a.rest) b.quaternion.copy(q);
+    if (a.f._L && window.Locomo) { const fk = a.fk || (a.fk = { f: a.f, pos: a.f.root.position, yaw: 0, yawV: 0 }); fk.yaw = a.f.root.rotation.y; try { Locomo.tick(fk, dt); } catch (e) { } } // npc_locomo 把走路动作权重交给 tick 驱动；摄影棚不调用就会 T 字形平移
     try { a.f.mixer.update(dt); } catch (e) { }
     a.f.root.updateMatrixWorld(true);
     // 注视（走路时不扭头）
@@ -386,7 +387,9 @@ void main(){
   function css() {
     if (document.getElementById('csCss')) return; const s = document.createElement('style'); s.id = 'csCss';
     s.textContent = `
-body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cscine #skills,body.cscine #bar,body.cscine #toast,body.cscine .float,body.cscine #minimap,body.cscine #compass,body.cscine #sgRoot,body.cscine #nsHud{visibility:hidden!important}
+body.cscine>*:not(#game):not(#csRoot):not(script):not(style):not(link){visibility:hidden!important;pointer-events:none!important}
+body.cscine .wsay,body.cscine .hbub,body.cscine .wlabel{visibility:hidden!important}
+body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cscine #skills,body.cscine #bar,body.cscine #toast,body.cscine .float,body.cscine #minimap,body.cscine #compass,body.cscine #sgRoot,body.cscine #nsHud,body.cscine .wsay,body.cscine .hbub,body.cscine .wlabel,body.cscine #wRoot,body.cscine #hubBtn,body.cscine #mmBox,body.cscine #nemChip,body.cscine #h2Hud,body.cscine #tbBar,body.cscine #hpC,body.cscine #tbCol,body.cscine #rqHud,body.cscine #cross,body.cscine #combatHud,body.cscine #hitHud,body.cscine #icCard,body.cscine #atkCd,body.cscine #tut,body.cscine #tutArrow,body.cscine #arTrack,body.cscine #mtTrack,body.cscine #sgTrack{visibility:hidden!important}
 #csRoot{position:fixed;inset:0;z-index:9500;pointer-events:none;font-family:"Noto Serif SC","Source Han Serif SC","Songti SC",serif;color:#f4ece0;display:none}
 #csRoot.on{display:block}
 #csRoot .bar{position:absolute;left:0;right:0;height:var(--bh,12vh);background:#000;transition:transform .7s cubic-bezier(.2,.8,.2,1)}
@@ -542,7 +545,7 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
       const a = b.walk.a, d = b.walk.d || 2.6, rt = camRt(A.aud), sd = b.walk.side || (a.home.clone().sub(A.ctr).dot(rt) >= 0 ? 1 : -1);
       const from = a.home.clone().addScaledVector(rt, sd * d).addScaledVector(A.aud, -0.6), dir = a.home.clone().sub(from).setY(0);
       a.walk = { from, to: a.home.clone(), t: 0, dur: dir.length() / (b.walk.speed || 1.15), yw: Math.atan2(dir.x, dir.z) };
-      a.f.root.position.copy(from); setClip(a, b.walk.clip || 'Walk_Loop', 0);
+      a.f.root.position.copy(from); if (a.f._L) { a.f._L.lastP = null; a.f._L.s = 0; } setClip(a, b.walk.clip || 'Walk_Loop', 0);
     }
     b.lead = b.card ? (b.lines.length ? 2.8 : 0.4) : (b.walk ? 1.2 : 0.45);
     b.cardShow = b.card ? [b.card.a, b.card.b, b.card.c] : null; b.cardOn = b.cardOff = b.bOn = false;
@@ -663,7 +666,7 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
     return true;
   }
   function stop(natural) {
-    if (!A) return; const a0 = A; A = null;
+    if (!A) return; const a0 = A; A = null; graceT = performance.now() + 2200;
     window.__skipMenuUntil = performance.now() + 1500;
     el.blk.classList.remove('off'); hideAll();
     setTimeout(() => { if (!A && root && !veilShown) root.className = ''; }, 380);
@@ -675,13 +678,20 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
     try { a0.o.onEnd && a0.o.onEnd(!!natural); } catch (e) { console.warn('cine end', e); }
   }
   addEventListener('keydown', e => {
-    if (!A) return; if (/^F\d+$/.test(e.code)) return;
+    if (!A) { if (veilOn() && !/^F\d+$/.test(e.code)) { e.preventDefault(); e.stopImmediatePropagation(); } return; }
+    if (/^F\d+$/.test(e.code)) return;
     e.preventDefault(); e.stopImmediatePropagation(); if (e.repeat) return;
     if (A.phase !== 'play') return;
     if (e.code === 'Escape') return stop(false);
     if (['Space', 'Enter', 'NumpadEnter', 'KeyE'].includes(e.code)) next();
   }, true);
-  addEventListener('keyup', e => { if (A) e.stopImmediatePropagation(); }, true);
+  addEventListener('keyup', e => { if (A || veilOn()) e.stopImmediatePropagation(); }, true);
+  // 过场期间鼠标全部吞掉（以前还能挥武器）；左键 = 继续
+  for (const t of ['mousedown', 'mouseup', 'click', 'dblclick', 'contextmenu', 'wheel', 'pointerdown', 'pointerup', 'mousemove', 'pointermove']) {
+    addEventListener(t, e => { if (!(A || veilOn())) return; e.stopImmediatePropagation(); if (e.cancelable) e.preventDefault(); if (t === 'mousedown' && e.button === 0 && A && A.phase === 'play') next(); }, true);
+  }
+  let graceT = 0, veilAt = 0;
+  const veilOn = () => veilShown && performance.now() - veilAt < 45000;
   addEventListener('resize', () => { if (root) root.style.setProperty('--bh', barH() + 'px'); });
 
   // ================= 进图黑场（有电影要播时，先别让玩家看到场上的人）=================
@@ -689,7 +699,7 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
   function veilWanted() {
     if (!on()) return false; const W = window.Worlds && Worlds.active && Worlds._W; if (!W || !W.B) return false;
     if (W.B !== lastB) { lastB = W.B; bAt = performance.now(); }
-    if (performance.now() - bAt > 14000) return false;
+    if (performance.now() - bAt > 40000) return false;
     if (window.Saga && Saga.cine) return false; // 旧播放器在播
     if (window.Arrival2 && Arrival2.isOpen && Arrival2.isOpen()) return false;
     const sagaP = window.Saga && Saga.pendingCine && Saga.pendingCine(), nemP = window.NemStory && (NemStory.busy || (NemStory.pending && NemStory.pending()));
@@ -698,7 +708,7 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
   function hook(renderer) {
     if (A) return draw(renderer);
     if (veilWanted()) {
-      ensureUI(); if (!veilShown) { veilShown = true; root.className = 'on'; el.blk.classList.remove('off'); el.ld.classList.add('on'); hideAll(); }
+      ensureUI(); if (!veilShown) { veilShown = true; veilAt = performance.now(); root.className = 'on'; el.blk.classList.remove('off'); el.ld.classList.add('on'); hideAll(); }
       const cc = renderer.getClearColor(new THREE.Color()), ca = renderer.getClearAlpha(); renderer.setRenderTarget(null); renderer.setClearColor(0, 1); renderer.clear(); renderer.setClearColor(cc, ca);
       return true;
     }
@@ -726,5 +736,5 @@ body.cscine #hud,body.cscine .hud,body.cscine #crosshair,body.cscine #xh,body.cs
   }
   function playHere(o) { const w = worldHere(); if (!w) return Promise.resolve(false); o.world = w; o.hide = w.hide; return play(o); }
 
-  return { on, play, playHere, draw, hook, next, stop: () => stop(false), get active() { return !!A; }, get playing() { return !!A && A.phase === 'play'; }, _A: () => A, _stage: stage, SHOT };
+  return { on, play, playHere, draw, hook, next, stop: () => stop(false), get active() { return !!A; }, get playing() { return !!A && A.phase === 'play'; }, get hold() { return !!A || veilOn(); }, get grace() { return !!A || veilOn() || performance.now() < graceT; }, _A: () => A, _stage: stage, SHOT };
 })();

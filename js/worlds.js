@@ -678,7 +678,7 @@ window.Worlds = (() => {
         if (type === 'block' && window.Combat) { Combat.recoil(1); G.toast && G.toast('🛡️ 被她挡住了——换个方向砍，或蓄力重斩破防', '#9fd0ff', 1.1); } if (type === 'break') { W.shake = Math.max(W.shake || 0, 0.35); G.toast && G.toast('💥 破防！', '#9fd0ff', 1.1); } },
       power: (fo) => { const wk = (window.RPG && RPG.wpnK ? RPG.wpnK() : 1) * (window.Nemesis ? Nemesis.dmgK() : 1); /* MOD weak_starter；R54h 血祭/首级加成 */ if ((window.FoeAbs && FoeAbs.on)) return FoeAbs.power() * (window.Gear2 ? Gear2.hitMul() : 1) * wk; const q = G.st().power / ((fo.boss ? node.loc.rec * (fo.boss.pow || 2) : node.loc.rec * [0.7, 0.9, 1.15, 1.5, 2.1][fo.rar])); return Math.pow(clamp(q, 0.25, 3), 0.7) * (window.Sack ? Sack.dmgMul() : 1) * wk; },
       rec: (fo) => node.loc.rec * (fo.boss ? (fo.boss.pow || 2) : [0.7, 0.9, 1.15, 1.5, 2.1][fo.rar]), // R34：这个敌人的“推荐战力”（foe_ai2 按它缩放血量/伤害）
-      hitPlayer: (fo, n, h = {}) => { const s = G.st(); if ((window.FoeAbs && FoeAbs.on)) n = FoeAbs.conv(fo, n, s, node.loc.rec); if (window.Talents && Talents.avoid(fo, h)) return; n = Math.max(1, Math.round(n * (1 - s.dodge * 0.5) * (1 - Math.min(0.5, s.def / (s.def + 300)))));
+      hitPlayer: (fo, n, h = {}) => { if (window.CineStage && CineStage.grace) return; const s = G.st(); if ((window.FoeAbs && FoeAbs.on)) n = FoeAbs.conv(fo, n, s, node.loc.rec); if (window.Talents && Talents.avoid(fo, h)) return; n = Math.max(1, Math.round(n * (1 - s.dodge * 0.5) * (1 - Math.min(0.5, s.def / (s.def + 300)))));
         const now = performance.now() / 1000, CS = window.Combat && Combat.drawn && !(window.Stamina && Stamina.ex) && Combat.state; // 力竭：格挡失效
         // 闪身无敌帧
         if (W.dodgeT > now) { const perfect = now - W.dodgeAt < 0.22; if (perfect) { W.shake = Math.max(W.shake || 0, 0.25); fo.broken = Math.max(fo.broken || 0, 1.1); fo.stag = Math.max(fo.stag || 0, 0.9); G.toast && G.toast('💨 完美闪避！她露出了破绽', '#c8f0ff', 1.4); foeEvent('perfectdodge', fo); } else foeEvent('dodge', fo); return; }
@@ -1053,7 +1053,8 @@ window.Worlds = (() => {
     if (!W || !W.B) { if (W && G.post && G.post.on && W.B) G.post.render(W.B.sc, G.camera); return; }
     if (W.shWait) return; // 着色器异步编译期间不渲染（加载画面盖着），否则主线程会被同步编译卡死
     const B = W.B, P = G.player, K = G.keys || {}; W.t += dt; WIND.value = now;
-    const active = G.playing && !G.uiOpen && !W.busy && !W.mapOpen && !W.dead;
+    const FZ = !!(window.CineStage && CineStage.hold); // 电影期间整个世界冻结（敌人不动、不出招、不说话）
+    const active = G.playing && !G.uiOpen && !W.busy && !W.mapOpen && !W.dead && !FZ;
     if (active) {
       const f = (K.KeyW || K.ArrowUp ? 1 : 0) - (K.KeyS || K.ArrowDown ? 1 : 0), s = (K.KeyD || K.ArrowRight ? 1 : 0) - (K.KeyA || K.ArrowLeft ? 1 : 0);
       P.crouch += ((K.KeyC ? 1 : 0) - P.crouch) * Math.min(1, dt * 12); P.h = EYE - 0.55 * P.crouch;
@@ -1098,11 +1099,11 @@ window.Worlds = (() => {
     W.interNear = null; { let bd = 9; for (const it of B.inter) { const dd = Math.hypot(W.pos.x - it.x, W.pos.z - it.z); if (!it.done && dd < (it.corpse ? 2.3 : 1.9) && dd < bd) { bd = dd; W.interNear = it; } } }
     if (window.Sack) try { Sack.frame(dt); } catch (e) { console.warn(e); }
     // 猎物 / 霸主
-    try { if (W.foes) { Foe.update(dt, now); if (W.boss) W.boss.sayT -= dt; } else { updatePrey(dt, now); if (W.boss) updateBoss(dt, now); } } catch (e) { console.warn('foes', e); }
-    if (window.Beasts && Beasts.list.length) try { Beasts.update(dt, now); } catch (e) { console.warn('beasts', e); }
+    if (!FZ) { try { if (W.foes) { Foe.update(dt, now); if (W.boss) W.boss.sayT -= dt; } else { updatePrey(dt, now); if (W.boss) updateBoss(dt, now); } } catch (e) { console.warn('foes', e); }
+    if (window.Beasts && Beasts.list.length) try { Beasts.update(dt, now); } catch (e) { console.warn('beasts', e); } }
     W.headNear = W.foes ? Foe.nearHead(W.pos, G.player.yaw) : null;
-    try { updateSay(); } catch (e) { console.warn(e); }
-    if (window.Combat) { try { Combat.update(dt, now); Combat.prerender(); } catch (e) { console.warn(e); } }
+    if (!FZ) try { updateSay(); } catch (e) { console.warn(e); }
+    if (window.Combat && !FZ) { try { Combat.update(dt, now); Combat.prerender(); } catch (e) { console.warn(e); } }
     W.hintT -= dt; if (W.hintT <= 0) { W.hintT = 0.12; try { hud(); skillHud(); } catch (e) { console.warn(e); } }
     if (G.S.hp <= 0) dieNow();
     if (window.CFX3D) try { CFX3D.frame(dt, now); } catch (e) { console.warn(e); } if (window.FPV) try { FPV.frame(dt, now); FPV.pre(dt, now); } catch (e) { console.warn(e); } if (window.DecapCam) { try { DecapCam.pre(dt, now); } catch (e) { } } if (window.Feel54) { try { Feel54.frame(dt); } catch (e) { } } if (window.Living) { try { Living.frame(dt); } catch (e) { } } /* R49h */ { const hw = G.HOOK && G.HOOK.world; if (hw) for (const f of hw) { try { f(dt, now); } catch (e) { console.warn(e); } } } /* R49h：出猎世界里补跑 Talents / 技能栏 / 血魂条 的每帧（HOOK.frame 在这里不跑） */ /* R41：3D 战斗特效 / 第一人称兽人手 / 第三人称（HOOK 在出猎世界里不跑，这里直接调） */

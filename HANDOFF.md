@@ -4491,3 +4491,12 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - `js/ui3a.js`：新增 30 个 SVG 图标（mouse/globe/speaker/archery/gear/menu/hand/plus/compass/person/chart/clipboard/cards/coin/ring/wings/eyeoff/helmet/boot/target/ruler/nut/question/dice/door/bulb/sun）和约 120 个 emoji 映射，覆盖 13 个总览页 + MOD 页，实测 `.u-emo`（未映射 emoji）残留为 0。
 - `css/ui63.css`：§6 页面顶对齐 + 窄屏抽屉化侧栏（血祭 / 章节）；打开 Hub 页面时隐藏 `#combatHud/#cross/#atkCd/#hitHud`（以前体力条漏在舞台中央）。
 - 未做：游戏中的死亡结算 / 交易 / 对话 / 建造模式 HUD / 解剖台界面逐一重塑；日文模式下顶栏标签字体（`キャラクター` 等）字距偏窄。
+
+## R63c 热修（电影 / 表情）
+- 电影期间世界冻结：`CineStage.hold`（电影 + 进图黑场）时 `worlds.js frame` 跳过 Foe/Beasts/Combat/updateSay；`hitPlayer` 与 `G.damage` 在 `CineStage.grace`（电影 + 结束后 2.2s）内直接返回 → 宿敌不再在电影里打玩家。
+- 电影期间鼠标/滚轮/指针事件全部吞掉（以前还能挥武器），左键 = 继续；`body.cscine > *`（除 #game / #csRoot）全部 visibility:hidden，NPC 气泡 `.wsay/.hbub` 不再弹。黑场 45s 自动失效防卡输入。
+- 走路 T 字形平移：npc_locomo 的 `f.play` 把走路动作权重交给 `Locomo.tick` 驱动，摄影棚没调用 → 全 0 权重。`cinestage.js act()` 现在每帧给演员调 `Locomo.tick`，走位起点重置 lastP。
+- 进图顺序：`NemStory.pending()`（新）让进图第一帧就盖黑，搭演员/播电影都在黑场里，不再「先看到地图再卡顿」。
+- `cinescript.js`：台词跨场次去重（localStorage `cs_recent`，最近 70 句）；hand/ots/back/ecu 随机省略；min 时长缩短；新增「情报」卡（目标/异变/猎手跟踪）。
+- 活人不再有泪痕/鼻血/淤青：`ModelHeads.create(look,{alive:true})` 清空 `look.fx`，只有被斩下的头才带差分。
+- 未验证：本地没有 `big/` 身体，电影全流程（走路、情报卡、冻结）没能实机跑，请你在完整环境里看一眼。

@@ -440,5 +440,14 @@ window.NemStory = (() => {
   }
 
   setInterval(() => { try { tick(); } catch (e) { console.warn('NemStory', e); } }, 250);
-  return { on, hold, apply, aff, S, ASP, grow, queue, get busy() { return !!st; }, _dbg: { start, pickEvent, poll } };
+  function pending() { // \u8fdb\u56fe\u90a3\u4e00\u523b\u5c31\u76d6\u9ed1\uff0c\u4e0d\u8ba9\u73a9\u5bb6\u5148\u770b\u5230\u5730\u56fe\u518d\u5361\u987f\u52a0\u8f7d\u7535\u5f71
+    try {
+      if (st || !on() || !G() || !G().S || !S().q.length) return false;
+      const W = window.Worlds && Worlds.active && Worlds._W; if (!W || !W.B || W.dead || !W.graph) return false;
+      const nd = W.graph.nodes[W.cur]; if (!nd || nd.eliteArena || nd.huntArena || W.graph.arena) return false;
+      if (window.Elites && Elites.E) return false; if (window.Saga && Saga.cine) return false; if (window.Arrival2 && Arrival2.isOpen()) return false;
+      return W.B !== W.__nsB || !(W.mapKey && W.mapKey === lastMap);
+    } catch (e) { return false; }
+  }
+  return { on, hold, apply, aff, S, ASP, grow, queue, pending, get busy() { return !!st; }, _dbg: { start, pickEvent, poll } };
 })();

@@ -43,11 +43,14 @@ window.CineScript = (() => {
   const FIN = ['{T}，{place}。就这么定了。', '她们怕我。很好——怕我的人，不会挡路。', '首级在{place}等我。走。', '先找到{T}。剩下的，路上再说。'];
   const HUNT = ['{L}。我闻得到它——血、铁锈，还有首级的味道。', '这一次，我不会再让它跑了。', '悬赏单上的价钱又涨了。很好。'];
   const HUNT2 = ['我数着你砍下的每一颗头，食人魔。', '跑吧。我喜欢追。', '你的脚印很新。你就在附近。'];
+  // 最近播过的台词跨场次记着，下一部优先挑没听过的
+  const RECENT = []; try { RECENT.push(...JSON.parse(localStorage.getItem('cs_recent') || '[]')); } catch (e) { }
 
   // ================= 地区入场电影 =================
   function region(sg, opt) {
     if (!window.RPG || !RPG.foe || !sg || !sg.T || !sg.W) return null;
-    const r = sg.r || Math.random, pk = a => a[Math.floor(r() * a.length)], used = new Set(), pick = arr => { const a = arr.filter(x => !used.has(x)); const v = pk(a.length ? a : arr); used.add(v); return v; };
+    const r = sg.r || Math.random, pk = a => a[Math.floor(r() * a.length)], used = new Set();
+    const pick = arr => { let a = arr.filter(x => !used.has(x) && !RECENT.includes(x)); if (!a.length) a = arr.filter(x => !used.has(x)); const v = pk(a.length ? a : arr); used.add(v); RECENT.push(v); while (RECENT.length > 70) RECENT.shift(); return v; };
     const A = sg.arch || {}, Lc = LOC(sg.k), REG = (D().REG || {})[sg.k] || {};
     const c = Object.assign({}, sg.ctx || {}, { W: sg.W.n, Wr: sg.W.role, V: sg.V, PT: (sg.prev && sg.prev.T) || '她', L: Lc.n }), f = t => fill(t, c);
     const vid = (REG.wit || []).find(x => x !== sg.W.id) || sg.W.id;
@@ -72,17 +75,17 @@ window.CineScript = (() => {
     const sB = { key: 'B', cap: c.place || '远处', sub: '同 一 时 刻', cast: [T] };
     const beats = [];
     // —— 第一场：异变现场 ——
-    beats.push({ scene: sA, shot: 'est', castFo: W, act: [[W, kneel]], card: { a: sg.vis <= 1 ? '初 访' : `第 ${sg.vis} 次 踏 入`, b: Lc.n, c: c.sky || '' }, lines: [nar(pick(A.sign || KNEEL))], min: 5, tag: (A.nm ? '异变 · ' + A.nm : '') });
-    beats.push({ shot: 'hand', castFo: W, lines: [nar(pick(KNEEL))], react: false });
+    beats.push({ scene: sA, shot: 'est', castFo: W, act: [[W, kneel]], card: { a: sg.vis <= 1 ? '初 访' : `第 ${sg.vis} 次 踏 入`, b: Lc.n, c: c.sky || '' }, lines: [nar(pick(A.sign || KNEEL))], min: 3.6, tag: (A.nm ? '异变 · ' + A.nm : '') });
+    if (r() < 0.4) beats.push({ shot: 'hand', castFo: W, lines: [nar(pick(KNEEL))], react: false });
     beats.push({ shot: 'mcu', castFo: W, act: [[W, 'Idle_Loop']], cc: cardW, lines: [sp(W, pick(sg.prev ? W_PREV.concat(W_OPEN) : W_OPEN))] });
     beats.push({ shot: 'mcu', castFo: V, walk: { who: V, d: 2.8 }, cc: cardV, lines: [sp(V, pick(V_REPLY))] });
-    beats.push({ shot: 'ots', castFo: W, lines: [sp(W, pick(W_2))] });
-    beats.push({ shot: 'ots', castFo: V, lines: [sp(V, pick(V_2))] });
+    if (r() < 0.65) { beats.push({ shot: 'ots', castFo: W, lines: [sp(W, pick(W_2))] }); beats.push({ shot: 'ots', castFo: V, lines: [sp(V, pick(V_2))] }); }
+    else beats.push({ shot: 'two', castFo: W, lines: [sp(W, pick(W_2)), sp(V, pick(V_2))] });
     // —— 第二场：她 ——
-    beats.push({ scene: sB, shot: 'est', castFo: T, lines: [nar(pick(A.cause || TDESC))], min: 4.5 });
-    beats.push({ shot: 'back', castFo: T, lines: [nar(pick(TDESC))] });
+    beats.push({ scene: sB, shot: 'est', castFo: T, lines: [nar(pick(A.cause || TDESC))], min: 3.2 });
+    if (r() < 0.5) beats.push({ shot: 'back', castFo: T, lines: [nar(pick(TDESC))] });
     beats.push({ shot: 'low', castFo: T, cc: cardT, lines: [sp(T, pick(((sg.envoy ? D().ELINE : D().TLINE) || {}).meet || T_MONO))] });
-    beats.push({ shot: 'ecu', castFo: T, lines: [sp(T, pick(T_MONO))], tr: 'cut' });
+    if (r() < 0.6) beats.push({ shot: 'ecu', castFo: T, lines: [sp(T, pick(T_MONO))], tr: 'cut' });
     // —— 猎手：同一时刻，有人跟着你 ——
     if (Hn) {
       const sH = { key: 'C', cap: Lc.n + ' · 外围', sub: '同 一 时 刻', cast: [Hn] }, d = Hn.d;
@@ -94,8 +97,16 @@ window.CineScript = (() => {
     // —— 第三场：回到异变现场，消息传来 ——
     beats.push({ scene: Object.assign({}, sA, { cap: '', sub: '' }), tr: 'dissolve', shot: 'two', castFo: W, lines: [sp(V, pick(NEWS)), sp(W, pick(W_FEAR))] });
     beats.push({ shot: 'mcu', castFo: W, lines: [sp(W, pick(W_HOOK))] });
+    { // 情报卡：这场电影真正要交代的事
+      const lvH = Hn ? (() => { try { return ' Lv.' + Hunters2.lvOf(Hn.id); } catch (e) { return ''; } })() : '';
+      const rows = [{ ic: sg.envoy ? '🌙' : '🎯', a: (sg.envoy ? '月之使者 ' : '讨伐目标 ') + T.nm + (sg.T.title ? '「' + sg.T.title + '」' : ''), e: '在' + (c.place || Lc.n) + '，是本地区的主要敌人', col: Tcol }];
+      if (A.nm) rows.push({ ic: '🌀', a: '异变：' + A.nm, e: f(pk(A.sign || KNEEL)).slice(0, 38), col: '#ffe0a8' });
+      if (Hn) rows.push({ ic: Hn.d.ic || '⚔', a: '猎手 ' + Hn.nm + lvH, e: '正在外围追踪你，战斗中可能插手', col: Hn.col });
+      beats.push({ shot: 'mcu', castFo: T, boost: { k: '情 报', n: Lc.n, col: REG.col || '#e7c27a', rows, f: '击败她，才能让这里恢复原样' }, lines: [], min: 4.2 });
+    }
     beats.push({ shot: 'two', castFo: W, tr: 'flash', stake: { good: f(pk(A.good || ['{L}会恢复原样。'])), bad: f(pk(A.bad || ['{L}会更糟。'])), ge: opt && opt.ge || '', be: opt && opt.be || '', head: opt && opt.head || '' }, lines: [] });
-    beats.push({ scene: Object.assign({}, sB, { cap: '', sub: '' }), shot: 'est', castFo: T, card: { a: '讨 伐', b: T.nm, c: sg.T.title ? `「${sg.T.title}」` : '' }, lines: [L(f(pick(FIN)), '我', '#fff', true)], min: 4.5 });
+    beats.push({ scene: Object.assign({}, sB, { cap: '', sub: '' }), shot: 'est', castFo: T, card: { a: '讨 伐', b: T.nm, c: sg.T.title ? `「${sg.T.title}」` : '' }, lines: [L(f(pick(FIN)), '我', '#fff', true)], min: 3.4 });
+    try { localStorage.setItem('cs_recent', JSON.stringify(RECENT)); } catch (e) { }
     return { actors, beats, col: (REG.col || '#e7c27a'), hunter: !!Hn };
   }
 

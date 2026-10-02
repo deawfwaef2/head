@@ -1148,7 +1148,7 @@ window.startGame = function () {
     SFX.levelup(); if (k === 'ter') SFX.roar(0.8); save(); return gain;
   }
   function flash(color) { ui.vign.style.boxShadow = `inset 0 0 180px 60px ${color}`; ui.vign.style.opacity = 1; setTimeout(() => ui.vign.style.opacity = 0, 120); }
-  function damage(n) { S.hp = Math.max(0, S.hp - n); flash('#ff0010'); SFX.heartbeat(); }
+  function damage(n) { if (window.CineStage && CineStage.grace) return; S.hp = Math.max(0, S.hp - n); flash('#ff0010'); SFX.heartbeat(); }
 
   // ---------------- 远征返回：倒出首级 ----------------
   function spawnReturnHeads(list) {
