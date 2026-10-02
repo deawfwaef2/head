@@ -4373,3 +4373,19 @@ User: "mana/cast system is shit, mana should be visible to the player, UI up to 
 - **没验证**：遮罩网格在真实带衣服人体上的范围 / 外观（本机没模型）；扇形兜底对凹多边形会略粗糙。
 - 修正：遮罩偏移方向曾向内（烘焙后皮肤层法线朝里）。`skinBand` 现在按“遮罩范围顶点相对躯干中轴的法线点积之和”定每个 set 的外侧符号 `sg`，再沿 `法线×sg` 外推，不再信任法线朝向。
 - 用户反馈自动判定仍然向内 → 衣橱面板加了「🧵 遮罩偏移：向外 / 向内（点击反转）」按钮（`flipMask`，存 localStorage `autopsy_maskdir`，默认 -1＝在自动判定基础上反转一次；点击会把已生成的遮罩网格按新方向重建，可 Ctrl+Z）。
+
+## R59s（剧情摄影棚 cine_stage，与上面 SAN 的 R59 无关；agent: story）
+用户原话要点：宿敌插曲和地区入场对话两段电影“镜头/动作/背景光照/文字卡片全方位低质量，全程掉帧”。
+- **新文件 `js/cinestage.js`（`window.CineStage`），MOD `cine_stage` 默认开**（关掉 = 回到 R57s 旧电影 Saga.reel / startCN）。
+  - 独立小场景：只有演员（`Foe.build` 克隆，地区对话用在场女人同一 `f.bodyName` + 同 `h.look`）+ 三点布光（取大地图太阳/半球/雾色）+ 脚下柔影。
+  - 背景：**每次切镜头**用该镜头机位把大地图（隐藏 Foe、第一人称手）拍成 0.3 倍分辨率 RT，摄影棚里全屏虚化（景深感）。大地图之后不再每帧渲染 → 不掉帧。不走 master.js 后处理（它按深度加雾，会把背景片当天空）。
+  - 只渲染 2.39:1 画幅（scissor），黑场里 `renderer.compile`；45 s 搭建超时自动放弃。过场期间不掉血。
+  - 表演：说话者 Idle_Talking_Loop + 口型(aa/oh，与眨眼/情绪合并成一次 setExpression，30Hz) + 开口点头；所有人看向说话者（头/颈/胸 rotW，±0.55 rad 限制）。
+  - 镜头：low / mcu / ots / ecu / side / two / wide，全部在观众一侧（不越轴），慢推 + 轻手持；单人镜头自动绕开挡镜头的其他演员（clearLine）。
+  - UI `#csRoot`（自带 CSS，body 类 `cscine` 隐藏 HUD）：单行打字机字幕 + 说话人名、首次出场下三分之一名牌、左侧标题卡、右侧变强卡、恩/祸双卡；空格/E/回车 = 下一句，Esc = 跳过，点击 = 下一句。
+- **接入（改动点）**：
+  - `js/worlds.js` 帧末渲染行：`CineStage.active && CineStage.draw(G.renderer)` 时跳过大地图渲染。
+  - `js/saga.js`：新增 `stagePlay()`（play() 里 talk 剧本全部有 castFo 时走摄影棚，失败回退 startCN）；`get cine` 在摄影棚播放时返回占位对象；`pendingCine` 摄影棚播放时为真（开局框不会中途弹出）。
+  - `js/nemstory.js`：`st.stage` 时 `rig()` 只返回演员表，`start()` 调 `CineStage.playHere`。
+  - `js/mods.js` 新 MOD；`index.html` 在 nemesis.js 前加 `<script src="js/cinestage.js">`。
+- 测试台：`tools/test/cine.html`（真实 foe/heads/VRoid + 假地图），`startCine('talk'|'intro')` 后 `step(秒)` 推进；驱动脚本思路：playwright 截图（swiftshader 下截图偶尔超时，可退回 canvas.toDataURL）。
