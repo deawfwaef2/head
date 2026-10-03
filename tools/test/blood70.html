@@ -1,0 +1,33 @@
+<!doctype html><html><head><meta charset="utf-8"><title>R70 blood harness</title>
+<style>html,body{margin:0;background:#000;overflow:hidden}#game{position:fixed;inset:0}</style></head><body><div id="game"></div>
+<script src="../../lib/three.min.js"></script>
+<script>
+// R70 测试台：斩首特写新血效（decap_blood2）+ 命中血（hit_feel2）。双击打开即可（file://）。
+// 用法：页面载入后自动斩首一次；按 1 再斩一次，按 2 命中血，?old=1 用旧血效对比。window.__step(sec) 手动推进。
+const OLD = /[?&]old=1/.test(location.search);
+window.Mods = { on: id => id === 'decap_blood2' || id === 'hit_feel2' ? !OLD : true };
+const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.outputEncoding = THREE.sRGBEncoding; R.toneMapping = THREE.ACESFilmicToneMapping; document.getElementById('game').appendChild(R.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color('#2a2622'); sc.fog = new THREE.Fog('#2a2622', 8, 30);
+const cam = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.03, 100); cam.position.set(0.2, 1.55, 2.4); cam.lookAt(0, 1.2, 0); sc.add(cam);
+sc.add(new THREE.HemisphereLight(0xfff0e0, 0x403028, 0.9)); const sun = new THREE.DirectionalLight(0xfff2e0, 2.2); sun.position.set(3, 6, 4); sc.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(30, 30).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#6b6250', roughness: 0.95 })); sc.add(ground);
+const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 1.3, 16), new THREE.MeshStandardMaterial({ color: '#5a4a6a', roughness: 0.8 })); body.position.set(0, 0.65, 0); sc.add(body);
+const neck = new THREE.Object3D(); neck.position.set(0, 1.42, 0); sc.add(neck);
+const holder = new THREE.Mesh(new THREE.SphereGeometry(0.11, 20, 16), new THREE.MeshStandardMaterial({ color: '#e8c4a8', roughness: 0.6 })); holder.position.set(0, 1.56, 0); sc.add(holder);
+window.G = { camera: cam, renderer: R, S: { hp: 100 }, playing: true, uiOpen: false, cine: false, toast() { } };
+window.Worlds = { active: true, _W: { B: { sc, H: () => 0 } } };
+window.Foe = { foes: [], slowSet() { }, say() { } };
+const fo = { f: { holder, bones: { neck }, hb: { setExpression() { } } }, pos: new THREE.Vector3(0, 0, 0), h: { name: '测试' } };
+</script>
+<script src="../../js/decapcam.js"></script>
+<script>
+let hv = new THREE.Vector3(0.8, 2.2, -0.4), last = performance.now(), T0 = 0; window.__err = [];
+addEventListener('error', e => __err.push(String(e.message)));
+function headFly(dt) { if (!DecapCam.active) return; const k = DecapCam.k; hv.y -= 9.8 * dt * k; holder.position.addScaledVector(hv, dt * k); if (holder.position.y < 0.11) { holder.position.y = 0.11; hv.set(0, 0, 0); } }
+function step(dt) { headFly(dt); DecapCam.pre(dt, 0); R.render(sc, cam); }
+window.__step = (sec, fps = 60) => { const n = Math.round(sec * fps); for (let i = 0; i < n; i++) step(1 / fps); };
+window.__decap = () => { holder.position.set(0, 1.56, 0); hv.set(0.8, 2.2, -0.4); DecapCam.onEvent('decap', fo); };
+window.__hit = () => DecapCam.hitBlood(new THREE.Vector3(0, 1.2, 0.15), new THREE.Vector3(3, 0.5, 0.5), 1.2);
+addEventListener('keydown', e => { if (e.key === '1') __decap(); if (e.key === '2') __hit(); });
+__decap(); (function loop() { requestAnimationFrame(loop); const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now; if (!window.__manual) step(dt); })();
+</script></body></html>

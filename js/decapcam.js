@@ -161,7 +161,7 @@ body.dcam>*:not(#game):not(#dcRoot):not(script):not(style):not(link){visibility:
   }
   // ---------------- R70 MOD decap_blood2：新血效（连贯血柱 + 速度拉丝 + 湿润高光 + 不规则溅射血斑 + 血泊）----------------
   const B2 = () => !window.Mods || !Mods.on || Mods.on('decap_blood2') !== false;
-  const CAP2 = 760, NSPLAT2 = 110, NMIST2 = 30;
+  const CAP2 = 1200, NSPLAT2 = 110, NMIST2 = 30;
   function blobPath(g, x, y, r, n, j) { g.beginPath(); for (let k = 0; k <= n; k++) { const a = k / n * 6.2832, rr = r * (1 + (Math.random() - 0.5) * j), px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr; k ? g.lineTo(px, py) : g.moveTo(px, py); } g.closePath(); g.fill(); }
   function splatTex(i) { // 溅射形状（只用作 alpha）：主斑 + 甩出的卫星点 + 拖尾
     const K = splatTex.c || (splatTex.c = []); if (K[i]) return K[i];
@@ -173,12 +173,12 @@ body.dcam>*:not(#game):not(#dcRoot):not(script):not(style):not(link){visibility:
   }
   function poolTex() { if (poolTex.t) return poolTex.t; const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.translate(64, 64); g.fillStyle = '#fff'; blobPath(g, 0, 0, 40, 40, 0.22); for (let k = 0; k < 5; k++) { const a = Math.random() * 6.28; blobPath(g, Math.cos(a) * 30, Math.sin(a) * 30, 14 + Math.random() * 10, 20, 0.3); } return (poolTex.t = new THREE.CanvasTexture(c)); }
   function mistTex() { if (mistTex.t) return mistTex.t; const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
-    for (let k = 0; k < 7; k++) { const x = 32 + (Math.random() - 0.5) * 24, y = 32 + (Math.random() - 0.5) * 24, r = 10 + Math.random() * 14, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(150,8,16,.55)'); gr.addColorStop(0.6, 'rgba(105,3,10,.25)'); gr.addColorStop(1, 'rgba(80,0,6,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); }
+    for (let k = 0; k < 7; k++) { const x = 32 + (Math.random() - 0.5) * 24, y = 32 + (Math.random() - 0.5) * 24, r = 10 + Math.random() * 14, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(78,3,8,.42)'); gr.addColorStop(0.6, 'rgba(58,1,5,.18)'); gr.addColorStop(1, 'rgba(40,0,3,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); }
     return (mistTex.t = new THREE.CanvasTexture(c)); }
   function bloodInit2(sc, H) {
     if (bl && bl.sc === sc && bl.v2) { bl.H = H; return bl; } if (bl) bloodKill();
-    const T = THREE, geo = new T.SphereGeometry(1, 10, 8), mat = new T.MeshStandardMaterial({ color: 0x8e0a12, emissive: 0x1e0003, roughness: 0.13, metalness: 0.06 });
-    const im = new T.InstancedMesh(geo, mat, CAP2); im.frustumCulled = false; im.count = 0; im.renderOrder = 4; const c0 = new T.Color(), cs = ['#6e050d', '#9c0c15', '#b8121b', '#83070f', '#a00e17']; for (let i = 0; i < CAP2; i++) { c0.set(cs[i % 5]); im.setColorAt(i, c0); } sc.add(im);
+    const T = THREE, geo = new T.SphereGeometry(1, 8, 6), mat = new T.MeshStandardMaterial({ color: 0x5c040c, emissive: 0x080000, roughness: 0.07, metalness: 0.0 });
+    const im = new T.InstancedMesh(geo, mat, CAP2); im.frustumCulled = false; im.count = 0; im.renderOrder = 4; const c0 = new T.Color(), cs = ['#4a0207', '#6a0a10', '#7c0c14', '#5a050b', '#701018']; for (let i = 0; i < CAP2; i++) { c0.set(cs[i % 5]); im.setColorAt(i, c0); } sc.add(im);
     const pg = new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), sms = [0, 1, 2, 3].map(i => new T.MeshStandardMaterial({ color: 0x55020a, roughness: 0.2, metalness: 0.04, alphaMap: splatTex(i), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 }));
     const splats = []; for (let i = 0; i < NSPLAT2; i++) { const m = new T.Mesh(pg, sms[i & 3]); m.visible = false; m.renderOrder = 2; sc.add(m); splats.push(m); }
     const pm = new T.MeshStandardMaterial({ color: 0x48010a, roughness: 0.06, metalness: 0.05, alphaMap: poolTex(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }), pools = [];
@@ -186,7 +186,7 @@ body.dcam>*:not(#game):not(#dcRoot):not(script):not(style):not(link){visibility:
     const tex = mistTex(), mist = []; for (let i = 0; i < NMIST2; i++) { const sp = new T.Sprite(new T.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0, rotation: Math.random() * 6.28 })); sp.visible = false; sp.renderOrder = 5; sc.add(sp); mist.push({ o: sp, t: 0, d: 1, v: new T.Vector3(), s: 0.2 }); }
     bl = { v2: true, sc, H, im, splats, si: 0, grow: [], pools, pi: 0, mist, mi: 0, P: [], tmpM: new T.Matrix4(), q: new T.Quaternion(), s: new T.Vector3(), p: new T.Vector3(), Y: new T.Vector3(0, 1, 0), d: new T.Vector3() }; return bl;
   }
-  function drop2(p, v, life, r) { if (!bl || bl.P.length >= CAP2) return; bl.P.push({ x: p.x, y: p.y, z: p.z, vx: v.x, vy: v.y, vz: v.z, t: life, big: r, r: 0.0105 * r }); }
+  function drop2(p, v, life, r) { if (!bl || bl.P.length >= CAP2) return; bl.P.push({ x: p.x, y: p.y, z: p.z, vx: v.x, vy: v.y, vz: v.z, t: life, big: r, r: 0.0042 * r }); }
   function splat2(x, z, sz) { if (!bl || !bl.v2) return; const m = bl.splats[bl.si++ % NSPLAT2], k = sz * (0.8 + Math.random() * 0.6); m.position.set(x, bl.H(x, z) + 0.012 + (bl.si % 7) * 0.0004, z); m.rotation.y = Math.random() * 6.28; m.scale.set(k * 0.3, 1, k * 0.3); m.visible = true; bl.grow.push({ m, t: 0, k }); if (bl.grow.length > 60) bl.grow.shift(); }
   function poolAt(x, z) { if (!bl || !bl.v2) return; const p = bl.pools[bl.pi++ % bl.pools.length]; p.m.position.set(x, bl.H(x, z) + 0.011, z); p.m.rotation.y = Math.random() * 6.28; p.m.scale.set(0.05, 1, 0.05); p.m.visible = true; p.t = 0; p.max = 0.75 + Math.random() * 0.4; }
   function bloodTick2(gd) {
@@ -196,27 +196,27 @@ body.dcam>*:not(#game):not(#dcRoot):not(script):not(style):not(link){visibility:
       const gy = B.H(d.x, d.z) + 0.01; if (d.y <= gy || d.t <= 0) { if (d.y <= gy && Math.random() < (d.big > 0.9 ? 0.55 : 0.22)) splat2(d.x, d.z, 0.05 + 0.09 * d.big + Math.min(0.12, Math.hypot(d.vx, d.vz) * 0.02)); P[i] = P[P.length - 1]; P.pop(); }
     }
     for (let i = 0; i < P.length; i++) { // 血珠沿速度方向拉成血丝（越快越长）
-      const d = P[i], sp = Math.hypot(d.vx, d.vy, d.vz) || 1, len = clamp(1 + sp * 0.6, 1, 6.5);
+      const d = P[i], sp = Math.hypot(d.vx, d.vy, d.vz) || 1, len = clamp(1 + sp * 1.15, 1, 10);
       B.d.set(d.vx / sp, d.vy / sp, d.vz / sp); B.q.setFromUnitVectors(B.Y, B.d); B.s.set(d.r, d.r * len, d.r); B.p.set(d.x, d.y, d.z); B.tmpM.compose(B.p, B.q, B.s); B.im.setMatrixAt(n++, B.tmpM);
     }
     B.im.count = n; B.im.instanceMatrix.needsUpdate = true;
     for (let i = B.grow.length - 1; i >= 0; i--) { const g = B.grow[i]; g.t += gd; const u = Math.min(1, g.t / 0.22), k = g.k * (0.3 + 0.7 * (1 - (1 - u) * (1 - u))); g.m.scale.set(k, 1, k); if (u >= 1) B.grow.splice(i, 1); }
     for (const p of B.pools) if (p.m.visible && p.t < 6) { p.t += gd; const k = p.max * (1 - Math.exp(-p.t / 1.5)) + 0.05; p.m.scale.set(k, 1, k * 0.85); }
-    for (const m of B.mist) if (m.o.visible) { m.t -= gd; if (m.t <= 0) { m.o.visible = false; continue; } const u = 1 - m.t / m.d; m.o.position.addScaledVector(m.v, gd); m.v.multiplyScalar(1 - 1.5 * gd); m.v.y -= 0.35 * gd; m.o.scale.setScalar(m.s * (1 + u * 2.2)); m.o.material.opacity = 0.62 * (1 - u) * Math.min(1, u * 10 + 0.25); }
+    for (const m of B.mist) if (m.o.visible) { m.t -= gd; if (m.t <= 0) { m.o.visible = false; continue; } const u = 1 - m.t / m.d; m.o.position.addScaledVector(m.v, gd); m.v.multiplyScalar(1 - 1.5 * gd); m.v.y -= 0.35 * gd; m.o.scale.setScalar(m.s * (1 + u * 2.2)); m.o.material.opacity = 0.5 * (1 - u) * Math.min(1, u * 10 + 0.25); }
   }
   function spray2(s, gd) {
     if (!bl) return; const T = THREE; _n.v = _n.v || new T.Vector3(); _u.v = _u.v || new T.Vector3(); const np = _n.v, up = _u.v; if (!neckPos(s, np, up)) return; if (up.y < 0.25) up.y = 0.25; up.normalize();
     const v = s._v || (s._v = new T.Vector3()), p = s._p || (s._p = new T.Vector3());
     if (!s.cut) { s.cut = 1; // 刀口那一瞬：沿刀路两侧甩出一扇细血珠 + 一团血雾
       const q = G.camera.quaternion, rx = new T.Vector3(1, 0, 0).applyQuaternion(q), uy = new T.Vector3(0, 1, 0).applyQuaternion(q), sd = rx.multiplyScalar(Math.cos(s.sa || 0)).addScaledVector(uy, -Math.sin(s.sa || 0)).normalize();
-      for (let i = 0; i < 110; i++) { const sg = Math.random() < 0.72 ? 1 : -1, sp = 1.8 + Math.random() * 5.2; v.copy(sd).multiplyScalar(sg * sp); v.x += (Math.random() - 0.5) * 1.4; v.y += 0.3 + Math.random() * 1.8; v.z += (Math.random() - 0.5) * 1.4; drop2(np, v, 1.8, 0.35 + Math.random() * 0.75); }
+      for (let i = 0; i < 160; i++) { const sg = Math.random() < 0.72 ? 1 : -1, sp = 1.8 + Math.random() * 5.2; v.copy(sd).multiplyScalar(sg * sp); v.x += (Math.random() - 0.5) * 1.4; v.y += 0.3 + Math.random() * 1.8; v.z += (Math.random() - 0.5) * 1.4; drop2(np, v, 1.8, 0.4 + Math.random() * 0.9); }
       for (let k = 0; k < 7; k++) puff(np, 0.16 + Math.random() * 0.22, v.set((Math.random() - 0.5) * 2.2, 0.5 + Math.random(), (Math.random() - 0.5) * 2.2));
     }
     s.pg += gd; const idx = Math.floor(s.pg / 0.2), ph = (s.pg % 0.2) / 0.2, str = Math.pow(0.84, idx), live = s.pg < 1.6;
     if (idx !== s.pulse) { s.pulse = idx; s.aim = s.aim || new T.Vector3(); s.aim.copy(up).add(v.set((Math.random() - 0.5) * 0.6, 0, (Math.random() - 0.5) * 0.6)).normalize(); // 每一搏：沿颈轴、方向轻微摆动
       if (live) { sfxSpurt(str); for (let k = 0; k < 3; k++) puff(np, 0.13 + 0.1 * str, v.copy(s.aim).multiplyScalar(1.1 + Math.random())); } }
     if (!s.pool && s.pg > 0.3) { s.pool = 1; poolAt(np.x, np.z); }
-    if (live) { const burst = ph < 0.45, rate = (burst ? 950 * str : 110) * gd; let nn = Math.floor(rate); if (Math.random() < rate - nn) nn++;
+    if (live) { const burst = ph < 0.45, rate = (burst ? 1500 * str : 160) * gd; let nn = Math.floor(rate); if (Math.random() < rate - nn) nn++;
       for (let i = 0; i < nn; i++) { const sp = (burst ? 3.0 + Math.random() * 2.8 : 0.9 + Math.random() * 1.1) * (0.5 + 0.5 * str); v.copy(s.aim).multiplyScalar(sp); const j = burst ? 0.22 : 0.6; v.x += (Math.random() - 0.5) * j * sp; v.y += (Math.random() - 0.5) * j * 0.5 * sp; v.z += (Math.random() - 0.5) * j * sp; p.copy(np).addScaledVector(up, 0.02 + Math.random() * 0.03); drop2(p, v, 2.4, burst ? 0.75 + Math.random() * 1.0 : 0.45 + Math.random() * 0.5); } }
     else if (s.pg < 4 && Math.random() < 30 * gd) { v.set((Math.random() - 0.5) * 0.3, 0.2, (Math.random() - 0.5) * 0.3); drop2(np, v, 1.5, 0.5 + Math.random() * 0.4); } // 喷完后颈口还在往下淌
     if (s.pg < 1.2) { const hp = headPos(s, p); if (hp) { let hn = Math.floor(200 * gd + Math.random()); while (hn-- > 0) { v.set((Math.random() - 0.5) * 0.8, -0.3 + Math.random() * 0.5, (Math.random() - 0.5) * 0.8); drop2(hp, v, 1.1, 0.5 + Math.random() * 0.6); } } }
@@ -225,7 +225,7 @@ body.dcam>*:not(#game):not(#dcRoot):not(script):not(style):not(link){visibility:
   function hitBlood(pt, vel, k) {
     try { const W = window.Worlds && Worlds.active && Worlds._W; if (!W || !W.B || !B2() || !window.THREE) return false; bloodInit2(W.B.sc, W.B.H);
       const T = THREE, v = new T.Vector3(), dir = new T.Vector3(0, 1, 0); if (vel && (vel.x || vel.y || vel.z)) dir.set(vel.x, vel.y || 0, vel.z).normalize();
-      const n = Math.round(16 + 30 * k); for (let i = 0; i < n; i++) { const sp = 1.0 + Math.random() * 3.4 * (0.6 + 0.4 * k); v.copy(dir).multiplyScalar(sp); v.x += (Math.random() - 0.5) * 1.6; v.y += 0.3 + Math.random() * 1.5; v.z += (Math.random() - 0.5) * 1.6; drop2(pt, v, 1.4, 0.3 + Math.random() * 0.7 * (0.6 + 0.5 * k)); }
+      const n = Math.round(26 + 44 * k); for (let i = 0; i < n; i++) { const sp = 1.0 + Math.random() * 3.4 * (0.6 + 0.4 * k); v.copy(dir).multiplyScalar(sp); v.x += (Math.random() - 0.5) * 1.6; v.y += 0.3 + Math.random() * 1.5; v.z += (Math.random() - 0.5) * 1.6; drop2(pt, v, 1.4, 0.3 + Math.random() * 0.7 * (0.6 + 0.5 * k)); }
       puff(pt, 0.08 + 0.07 * k, v.copy(dir).multiplyScalar(0.7)); if (k > 0.9) puff(pt, 0.14, v.set(0, 0.4, 0)); return true;
     } catch (e) { return false; }
   }

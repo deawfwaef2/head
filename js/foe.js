@@ -121,10 +121,10 @@ window.Foe = (() => {
       const bt = hb.meta && hb.meta.bottom, ey = E.eyeY != null ? E.eyeY : E.headY + 0.058;
       if (bt != null && Math.abs(fit.s - fit0s) > 1e-4) fit.pos.y = ey + 0.0102 * fit0s + bt * (fit0s - fit.s);
       const cy = E.cut ? E.cut.y : null; let ov = 0; // ov：身体颈口高出头断面的量（头断面插进颈口里，至少 4mm，不留缝）
-      if (bt != null && cy != null) { const gap = fit.pos.y + bt * fit.s - (cy - 0.004); if (gap > 0) fit.pos.y -= Math.min(gap, 0.05); ov = Math.max(0, cy - (fit.pos.y + bt * fit.s)); }
-      if (bt != null) hb.U.neckP.value.y = bt + ov / fit.s;
+      if (bt != null && cy != null) { const gap = fit.pos.y + bt * fit.s - (cy - 0.004); if (gap > 0) fit.pos.y -= Math.min(gap, 0.03); ov = Math.max(0, cy - (fit.pos.y + bt * fit.s)); }
+      if (bt != null) { hb.U.neckP.value.y = bt + Math.min(ov / fit.s, 0.006); hb.U.neckB.value = 0.02; } // R70：颈部半径渐变带以前会被 ov 抬到下巴、下颌被径向放大 → “地包天”；现在带宽 2cm、最多上移 6mm
       const nr = E.cut && E.cut.r, hr = hb.stubR || (hb.meta.cut && hb.meta.cut.r);
-      if (nr && hr) { const K = Math.min(1.3, Math.max(0.7, nr * 0.96 / (hr * fit.s))); hb.U.neckK.value = Math.abs(K - 1) > 0.04 ? K : 1; } // 颈口处头颈比身体颈细 4%：不 z 打架
+      if (nr && hr) { const K = Math.min(1.12, Math.max(0.88, nr * 0.96 / (hr * fit.s))); hb.U.neckK.value = Math.abs(K - 1) > 0.04 ? K : 1; } // 颈口处头颈比身体颈细 4%：不 z 打架；R70：倍率夹在 0.88~1.12（以前 0.7~1.3 会把下巴往前推）
       const gc = new THREE.Color(look.skinHex).convertSRGBToLinear().multiplyScalar(/^Q_/.test(bodyName) ? 1 : (T.gain || 1)); if (Mods.on('head_pbr')) gc.multiplyScalar(1 / Math.max(0.2, FaceFill.hk.value));
       hb.U.neckC.value.copy(gc); hb.U.neckW.value = 1;
       if (cy != null) root.traverse(o => { if (o.isMesh && o.userData.olFade === undefined) o.userData.olFade = new V3(cy - 0.035, cy - 0.004, -1); }); // 勾线：颈口一圈的描边渐隐（头和身体各自的开口边缘会画出一圈黑线 = “切口”）
