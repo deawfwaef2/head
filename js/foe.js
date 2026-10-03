@@ -444,7 +444,7 @@ window.Foe = (() => {
     let LODF = null; if ((!window.Mods || Mods.on('foe_lod')) && ctx.camera) { ctx.camera.updateMatrixWorld(); _pm2.copy(ctx.camera.matrixWorld).invert(); _pm.multiplyMatrices(ctx.camera.projectionMatrix, _pm2); _fr.setFromProjectionMatrix(_pm); LODF = _fr; }
     for (const fo of FOES) {
       const f = fo.f; try {
-      if (fo.dead) { if (fo.lodVis === false || fo.lodSh) { fo.f.root.visible = true; fo.lodVis = true; if (fo.lodSh) { for (const o of fo.lodSh) o.castShadow = true; fo.lodSh = null; } } if (fo.rag) ragStep(fo, dt); if (fo.warn) fo.warn.visible = false; if (fo.gs) fo.gs.visible = false; if (fo.duel && fo.duel.rib) fo.duel.rib.visible = false;
+      if (fo.dead) { if (fo.lodVis === false || fo.lodSh) { fo.f.root.visible = true; fo.lodVis = true; if (fo.lodSh) { for (const o of fo.lodSh) o.castShadow = true; fo.lodSh = null; } } if (fo.rag) ragStep(fo, dt); else if (fo.deadAnim) f.mixer.update(dt); if (fo.warn) fo.warn.visible = false; if (fo.gs) fo.gs.visible = false; if (fo.duel && fo.duel.rib) fo.duel.rib.visible = false;
         if (fo.spurt > 0 && !fo.headOnPiece) { fo.spurt -= dt; const nb = f.bones.neck; if (nb && Math.random() < 0.8) { nb.getWorldPosition(tv2); const up = tv.set(0, 1, 0).applyQuaternion(nb.getWorldQuaternion(_q)); blood(tv2.addScaledVector(up, 0.05), 1, up, 0.9 + fo.spurt * 0.3); } }
         continue; }
       if (fo.hp !== fo.hp) fo.hp = fo._lastHp > 0 ? fo._lastHp : Math.max(1, fo.maxHp || 1); else fo._lastHp = fo.hp; // R70：NaN 血量（某个倍率算坏）回到上一帧的值，不再“打不死”
@@ -891,7 +891,7 @@ window.Foe = (() => {
   function die(fo, info, quiet) {
     if (!fo.boss && window.Persona) { const t = Persona.line(fo, 'die'); if (t) talk(fo, t, '#c8c8d0'); } // 第二十四轮：最后一句
     fo.dead = true; fo.atk = null; fo.anchor.gone = true; try { if (window.FoeAI2) FoeAI2.onDie(fo, info); } catch (e) { foeErr(e); }
-    try { ragStart(fo, info); fo.f.mixer.stopAllAction(); ragPose(fo); } catch (e) { foeErr(e); } // 先按当前动作姿势建粒子，再停动画（停动画会把骨骼还原成 T 姿势）；R70：任何一步出错都不能让后面的死亡结算（BOSS 条/尸体/击杀事件）丢掉
+    try { ragStart(fo, info); fo.f.mixer.stopAllAction(); ragPose(fo); } catch (e) { foeErr(e); fo.rag = null; try { fo.f.play('Hit_Knockback', { once: true, fade: 0.1, restart: true }); fo.deadAnim = true; } catch (e2) { } } // 先按当前动作姿势建粒子，再停动画（停动画会把骨骼还原成 T 姿势）；R70：布娃娃建不起来就播倒地动作，不再定格站着
     try { CTX.onDeath && CTX.onDeath(fo); } catch (e) { foeErr(e); } try { CTX.event && CTX.event('kill', fo); } catch (e) { foeErr(e); }
     if (!quiet) CTX.toast('☠️ 她倒下了——砍下她的头才能带走首级', '#ffb0a0', 2.6);
   }
@@ -1058,7 +1058,8 @@ window.Foe = (() => {
     const MIN = (a, b, k) => { if (idx[a] == null || idx[b] == null) return; sticks.push([idx[a], idx[b], R.P[a].distanceTo(R.P[b]) * k, 2]); };
     MIN('leftUpperLeg', 'leftFoot', 0.55); MIN('rightUpperLeg', 'rightFoot', 0.55); MIN('leftUpperArm', 'leftHand', 0.4); MIN('rightUpperArm', 'rightHand', 0.4); MIN('hips', 'head', 0.8);
     const act = {}; keys.forEach(k => act[k] = true); act.head = act.top = !fo.decap;
-    fo.rag = { pts, idx, sticks, act, R, inv, t: 0, sleep: 0 };
+    const fw = new V3(Math.sin(fo.yaw), 0, Math.cos(fo.yaw)), tip = fw.clone().multiplyScalar(Math.random() < 0.55 ? -1 : 1).applyAxisAngle(up, (Math.random() - 0.5) * 1.2);
+    fo.rag = { pts, idx, sticks, act, R, inv, t: 0, sleep: 0, pdt: 1 / 60, buckle: 0.55, fw, tip }; // buckle：死后腿软、膝盖往前折，保证会倒（站姿的 Verlet 布娃娃本来可以一直站着）
     ragKick(fo, info, 1);
   }
   function ragKick(fo, info, k) {
@@ -1069,9 +1070,13 @@ window.Foe = (() => {
     for (const q of rg.pts) { const w = pt ? Math.max(0.2, 1 - q.p.distanceTo(pt) * 1.5) : 0.6; q.o.addScaledVector(v, -w); }
   }
   function ragStep(fo, dt) {
-    const rg = fo.rag, ctx = CTX; if (rg.sleep > 2) return; dt = Math.min(dt, 1 / 30);
+    const rg = fo.rag, ctx = CTX; if (rg.sleep > 2 || !(dt > 0)) return; dt = Math.min(dt, 1 / 30);
+    const dmp = Math.pow(0.985, dt * 60) * Math.min(4, dt / (rg.pdt || 1 / 60)), fr = 1 - Math.pow(0.55, dt * 60); rg.pdt = dt; // R70：按真实时间积分——以前按帧阻尼，斩首慢镜头 4.6 秒里把倒地的冲量全耗光，镜头结束后尸体直挺挺站着不动
     const g = -9.8 * dt * dt; let moving = 0;
-    for (const q of rg.pts) { const vx = (q.p.x - q.o.x) * 0.985, vy = (q.p.y - q.o.y) * 0.985, vz = (q.p.z - q.o.z) * 0.985; q.o.copy(q.p); q.p.x += vx; q.p.y += vy + g; q.p.z += vz; moving += Math.abs(vx) + Math.abs(vy) + Math.abs(vz); }
+    for (const q of rg.pts) { const vx = (q.p.x - q.o.x) * dmp, vy = (q.p.y - q.o.y) * dmp, vz = (q.p.z - q.o.z) * dmp; q.o.copy(q.p); q.p.x += vx; q.p.y += vy + g; q.p.z += vz; moving += Math.abs(vx) + Math.abs(vy) + Math.abs(vz); }
+    if (rg.buckle > 0 && rg.tip) { rg.buckle -= dt; const bk = 10 * dt * dt; rg.sleep = 0;
+      for (const k of ['hips', 'chest', 'neck', 'leftUpperArm', 'rightUpperArm']) { const i = rg.idx[k]; if (i == null) continue; const q = rg.pts[i]; q.p.y -= bk; q.p.x += rg.tip.x * bk * 0.2; q.p.z += rg.tip.z * bk * 0.2; }
+      for (const k of ['leftLowerLeg', 'rightLowerLeg']) { const i = rg.idx[k]; if (i == null) continue; const q = rg.pts[i]; q.p.x += rg.fw.x * bk * 0.45; q.p.z += rg.fw.z * bk * 0.45; } }
     const actIdx = rg.pts.map(() => true); for (const [k, i] of Object.entries(rg.idx)) actIdx[i] = rg.act[k] !== false;
     // 第十八轮：地面高度每点每帧只查一次（原来 24 点 × 10 次迭代 = 240 次/具/帧）
     const gys = rg.gys || (rg.gys = new Float32Array(rg.pts.length)); for (let i = 0; i < rg.pts.length; i++) gys[i] = ctx.H(rg.pts[i].p.x, rg.pts[i].p.z) + 0.045;
@@ -1081,12 +1086,12 @@ window.Foe = (() => {
         if (soft === 2 && d >= L) continue; const diff = (d - L) / d * (soft === 1 ? 0.2 : 1), wa = pb.m / (pa.m + pb.m), wb = pa.m / (pa.m + pb.m);
         pa.p.addScaledVector(tv, diff * wa); pb.p.addScaledVector(tv, -diff * wb);
       }
-      for (let i = 0; i < rg.pts.length; i++) { const q = rg.pts[i], gy = gys[i]; if (q.p.y < gy) { q.p.y = gy; q.o.x += (q.p.x - q.o.x) * 0.45; q.o.z += (q.p.z - q.o.z) * 0.45; } }
+      for (let i = 0; i < rg.pts.length; i++) { const q = rg.pts[i], gy = gys[i]; if (q.p.y < gy) { q.p.y = gy; q.o.x += (q.p.x - q.o.x) * fr; q.o.z += (q.p.z - q.o.z) * fr; } }
     }
     // 第十八轮：只和尸体附近 4m 的碰撞体比较（每秒刷新一次列表）
     rg.colT = (rg.colT || 0) - dt; if (!rg.cols || rg.colT <= 0) { rg.colT = 1; const c0 = rg.pts[0].p; rg.cols = ctx.cols.filter(c => Math.hypot(c.x - c0.x, c.z - c0.z) < c.r + 4); }
     for (const q of rg.pts) collideList(q.p, 0.05, rg.cols);
-    if (moving < 0.002) rg.sleep += dt; else rg.sleep = 0;
+    if (moving < 0.12 * dt) rg.sleep += dt; else rg.sleep = 0;
     ragPose(fo);
   }
   const _q = new Q(), _q2 = new Q(), _m = new M4(), _a = new V3(), _b = new V3(), _c = new V3();
