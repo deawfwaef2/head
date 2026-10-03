@@ -30,7 +30,7 @@ window.Loop = (() => {
   }
   const mod = (f, def) => { if (!on()) return def; let v = def; for (const k of R().mods) { const M = MODS.find(x => x.k === k); if (M && M[f] != null) v = typeof def === 'number' && def === 1 ? v * M[f] : v + M[f]; } return v; };
   // ---- 玩家/敌人倍率（被 nemesis / living 读取）；nb = 上回合建筑给的「下一趟」祝福；Rogue = 本局肉鸽流派/祝福 ----
-  const nb = () => { const a = (on() && R().nb) || {}; if (!(window.San && San.on() && San.nb)) return a; const b = San.nb(); if (!b) return a; const o = Object.assign({}, a); for (const k in b) o[k] = (o[k] || 0) + b[k]; return o; }; // R56\uff1aSAN \u796d\u575b\u4e70\u7684\u4e34\u65f6\u589e\u76ca\u5e76\u5165\u4e0b\u4e00\u8dd1
+  const nb = () => { const a = (on() && R().nb) || {}, L = []; if (window.San && San.on() && San.nb) L.push(San.nb()); if (window.HeadPlay && HeadPlay.on() && HeadPlay.nb) L.push(HeadPlay.nb()); if (!L.some(Boolean)) return a; const o = Object.assign({}, a); for (const b of L) if (b) for (const k in b) o[k] = (o[k] || 0) + b[k]; return o; }; // R71: + HeadPlay buffs. // R56\uff1aSAN \u796d\u575b\u4e70\u7684\u4e34\u65f6\u589e\u76ca\u5e76\u5165\u4e0b\u4e00\u8dd1
   const RG = k => (window.Rogue && Rogue.on && Rogue.on() && Rogue[k] ? Rogue[k]() : 1);
   let wc = { t: 0, v: 0 };
   function ward() { const n = performance.now(); if (n - wc.t < 2000) return wc.v; wc.t = n; let k = 0; try { for (const h of G().heads || []) if (h && h.mount && h.mount.type === 'rh_palisade') k++; } catch (e) { } wc.v = Math.min(0.45, k * 0.08); return wc.v; }

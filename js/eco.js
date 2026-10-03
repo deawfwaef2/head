@@ -24,6 +24,7 @@ window.Eco = (() => {
     if (!on()) return 0;
     if (!document.hasFocus()) return 15;
     if (document.body.classList.contains('hubon')) return 20; // Tab 菜单盖着整屏，背后的 3D 不需要 30fps
+    try { if ((window.HeadPlay && HeadPlay.active) || (window.Siphon && Siphon.active)) return 60; } catch (e) { } // R71：余兴小游戏 / 汲魂是节拍玩法，虽然 uiOpen 也要 60fps
     if (busyUI()) return 30;
     if (performance.now() - lastInput > 120000 && !cine()) return 30;
     return 60;

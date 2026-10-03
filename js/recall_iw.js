@@ -66,6 +66,7 @@ window.RecallIW = (() => {
   };
   const PLAY = { toss: { ic: '🤹', n: '抛接', d: '把她往上一抛，再稳稳接住' }, spin: { ic: '🌀', n: '转一圈', d: '托在掌心，拨着她转起来' }, poke: { ic: '👉', n: '戳脸颊', d: '用指尖戳一戳她冰凉的脸颊' }, pat: { ic: '🫳', n: '拍拍头', d: '轻轻拍两下她的头顶' } };
   const SIP = { sipM: { ic: '🪵', n: '口汲', d: '木棒插进她嘴里来回抽动，汲取残魂（只用空格踩节拍 · 每颅头一次）' }, sipN: { ic: '🪵', n: '颈汲', d: '木棒从断颈里插进去来回抽动，汲取残魂（只用空格踩节拍 · 每颅头一次）' } };
+  const HPM = { hpm: { ic: '🎪', n: '余兴', d: 'R71 首级余兴：把她和洞里其他首级搬上桌，玩 8 种小游戏之一 → 下一趟出猎得到独特祝福' } };
   const PLAY_TXT = {
     toss: ['她在半空翻了一圈，头发散开，又“噗”地落回你掌心。', '你把她抛得老高——落下来的时候，她的脸正好对着你。', '接住的那一下很沉，沉得你手腕一麻。'],
     spin: ['她在你掌心里转起来，发梢甩成一圈，慢慢停下时正好对着你。', '转了两圈，她的脸在火光里一明一暗。', '你拨得太用力，她转得像只陀螺。'],
@@ -152,6 +153,7 @@ html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body
       <div class="pn rc-host"><span class="px">✕</span><div class="rpb"></div></div><div class="sub"></div><div class="pr"><b></b></div><div class="tipb"></div><div class="rbar"></div>`;
     document.body.appendChild(el);
     el.querySelector('.x').onclick = () => close(); el.querySelector('.px').onclick = () => panel(null);
+    el.querySelector('.pn').addEventListener('click', e => { const m = e.target.closest('[data-hp]'); if (m) hpGo(m.dataset.hp); });
     el.querySelector('.rbar').addEventListener('click', e => { const b = e.target.closest('.b'); if (b) go(b.dataset.a); });
     el.querySelector('.rbar').addEventListener('mouseover', e => { const b = e.target.closest('.b'), t = el.querySelector('.tipb'); if (!b) { t.style.display = 'none'; return; } t.innerHTML = b.dataset.tip || ''; t.style.display = b.dataset.tip ? 'block' : 'none'; });
     el.querySelector('.rbar').addEventListener('mouseleave', () => el.querySelector('.tipb').style.display = 'none');
@@ -161,7 +163,7 @@ html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body
   function howTo(k) { const out = []; for (const a of Object.keys(Recall.ACT)) { const x = Recall.ACT[a]; if (a === 'handle') continue; if (x.fac === k || x.fac2 === k) out.push(x.n); } if (k === 'adorn') out.unshift('把玩'); if (k === 'rank') out.push('想起任意 4 项'); if (k === 'goal') out.push('想起 7 项'); return out.join(' / ') || '？'; }
   let subT = 0;
   function sub(html) { const s = el.querySelector('.sub'); s.style.opacity = 0; clearTimeout(subT); subT = setTimeout(() => { s.innerHTML = html; s.style.opacity = 1; }, 120); }
-  function panel(html) { const p = el.querySelector('.pn'); if (!html) { p.classList.remove('on'); return; } p.querySelector('.rpb').innerHTML = html; p.classList.add('on'); }
+  function panel(html) { const p = el.querySelector('.pn'); S.hpMenu = false; if (!html) { p.classList.remove('on'); return; } p.querySelector('.rpb').innerHTML = html; p.classList.add('on'); }
   let ORD = [];
   function refresh(fresh) {
     const r = S.rec, c = r.c, K = Recall.known, n = Recall.nKnown(c), tot = Recall.FAC.length;
@@ -172,23 +174,31 @@ html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body
     card.innerHTML = `<div class="rr">${RN[c.rar] || ''}${c.shiny ? ' · ✨异色' : ''}</div><div class="nm">${esc(window.NM ? NM(c) : c.name)}</div>${title ? `<div class="rtt">${esc(title)}</div>` : ''}
       <div class="id">${K(c, 'race') ? esc(`${c.raceN} · ${c.idN} · ${c.age} 岁`) : '身份：？？？'} · 得自 ${esc(c.locN || '？')}</div>${prod}
       <div class="pg">记忆 <i><b style="width:${n / tot * 100}%"></b></i> ${n} / ${tot}</div>` +
-      Recall.FAC.map(f => { const k = K(c, f.k); return `<div class="fr${k ? '' : ' u'}${fresh === f.k ? ' nw' : ''}${k && S.openRows && S.openRows.has(f.k) ? ' open' : ''}" data-k="${f.k}" title="${k ? esc(f.v(r)) : '点击查看怎么想起'}"><span class="i">${f.ic}</span><span class="n">${f.n}</span><span class="v">${k ? esc(f.v(r)) : `？？？<em>${esc(howTo(f.k).split(' / ')[0])}</em>`}</span></div>`; }).join('') + (window.Siphon ? Siphon.cardHTML(r) : '');
+      Recall.FAC.map(f => { const k = K(c, f.k); return `<div class="fr${k ? '' : ' u'}${fresh === f.k ? ' nw' : ''}${k && S.openRows && S.openRows.has(f.k) ? ' open' : ''}" data-k="${f.k}" title="${k ? esc(f.v(r)) : '点击查看怎么想起'}"><span class="i">${f.ic}</span><span class="n">${f.n}</span><span class="v">${k ? esc(f.v(r)) : `？？？<em>${esc(howTo(f.k).split(' / ')[0])}</em>`}</span></div>`; }).join('') + (window.Siphon ? Siphon.cardHTML(r) : '') + (window.HeadPlay ? HeadPlay.cardHTML(r) : '');
     // 动作栏
-    ORD = []; const grp = (name, keys) => { let h = `<div class="grp"><small>${name}</small><div>`; for (const a of keys) { const x = PLAY[a] || SIP[a] || Recall.ACT[a], sk = SIP[a] ? Siphon.can(S.rec) : null, lock = sk ? !sk.ok : (x.need && !Recall.hasB(x.need)); ORD.push(a); const i = ORD.length, key = i <= 9 ? i : i === 10 ? 0 : ''; const done = SIP[a] ? !!S.rec.c.sip : (!PLAY[a] && !lock && K(c, x.fac)); const tip = lock ? (sk ? `🔒 ${esc(sk.why)}` : `🔒 需要建筑：${esc(Recall.bn(x.need))}`) : `${esc(x.d)}${PLAY[a] || SIP[a] ? '' : `　→ 想起：${esc(Recall.FK[x.fac].n)}`}`; h += `<div class="b${lock ? ' lk' : ''}${done ? ' dn' : ''}${S.act === a ? ' run' : ''}" data-a="${lock ? '' : a}" data-tip="${tip}"><span class="k">${key}</span><span class="ic">${x.ic}</span><span class="l">${x.n.replace(/ ·.*$/, '')}</span></div>`; } return h + '</div></div>'; };
+    ORD = []; const grp = (name, keys) => { let h = `<div class="grp"><small>${name}</small><div>`; for (const a of keys) { const x = PLAY[a] || SIP[a] || HPM[a] || Recall.ACT[a], sk = SIP[a] ? Siphon.can(S.rec) : null, lock = sk ? !sk.ok : (x.need && !Recall.hasB(x.need)); ORD.push(a); const i = ORD.length, key = i <= 9 ? i : i === 10 ? 0 : ''; const done = HPM[a] ? false : SIP[a] ? !!S.rec.c.sip : (!PLAY[a] && !lock && K(c, x.fac)); const tip = lock ? (sk ? `🔒 ${esc(sk.why)}` : `🔒 需要建筑：${esc(Recall.bn(x.need))}`) : `${esc(x.d)}${PLAY[a] || SIP[a] || HPM[a] ? '' : `　→ 想起：${esc(Recall.FK[x.fac].n)}`}`; h += `<div class="b${lock ? ' lk' : ''}${done ? ' dn' : ''}${S.act === a ? ' run' : ''}" data-a="${lock ? '' : a}" data-tip="${tip}"><span class="k">${key}</span><span class="ic">${x.ic}</span><span class="l">${x.n.replace(/ ·.*$/, '')}</span></div>`; } return h + '</div></div>'; };
     const bld = ['seance', 'tea', 'mirror', 'dress', 'appraise', 'chess', 'card'], avail = bld.filter(a => Recall.hasB(Recall.ACT[a].need)), lockd = bld.filter(a => !Recall.hasB(Recall.ACT[a].need));
-    el.querySelector('.rbar').innerHTML = grp('回忆', ['stare', 'stroke', 'sniff', 'listen', 'battle']) + grp(`把玩 ${Math.min(8, S.play)}/8`, ['toss', 'spin', 'poke', 'pat']) + grp('建筑', avail.concat(lockd).slice(0, Math.max(3, avail.length))) + (window.Siphon && Siphon.on() ? grp('汲魂', ['sipM', 'sipN']) : '');
-    el.classList.toggle('busy', !!S.act || !!S.sip);
+    el.querySelector('.rbar').innerHTML = grp('回忆', ['stare', 'stroke', 'sniff', 'listen', 'battle']) + grp(`把玩 ${Math.min(8, S.play)}/8`, ['toss', 'spin', 'poke', 'pat']) + grp('建筑', avail.concat(lockd).slice(0, Math.max(3, avail.length))) + (window.Siphon && Siphon.on() ? grp('汲魂', ['sipM', 'sipN']) : '') + (window.HeadPlay && HeadPlay.on() ? grp('余兴', ['hpm']) : '');
+    el.classList.toggle('busy', !!S.act || !!S.sip || !!S.hp);
   }
 
   // ---------------- 动作 ----------------
   function go(a) {
-    if (!a || !S.active || S.act || S.sip) return; const x = PLAY[a] || SIP[a] || Recall.ACT[a]; if (!x) return;
+    if (!a || !S.active || S.act || S.sip || S.hp) return;
+    if (HPM[a]) { if (!window.HeadPlay) return; panel(HeadPlay.menuHTML(S.rec)); S.hpMenu = true; snd('page'); sub('<span class="d">选一个余兴节目——她是主演，洞里的其他首级来客串。按数字键或点右侧开演。</span>'); return; }
+    const x = PLAY[a] || SIP[a] || Recall.ACT[a]; if (!x) return;
     if (x.need && !Recall.hasB(x.need)) { snd('deny'); return; }
     if (SIP[a]) { const ck = window.Siphon && Siphon.can(S.rec); if (!ck || !ck.ok) { snd('deny'); sub(`<span class="d">${esc(ck ? ck.why : '')}。</span>`); return; } panel(null); if (Siphon.begin({ rec: S.rec, h: S.h, mode: a === 'sipM' ? 'm' : 'n', k: S.k || 1.4, api: { sub, onEnd() { S.sip = false; refresh(); sub('你把木棒放下。她的头安静地垂在你手里，比之前轻了一点。'); } } })) { S.sip = true; refresh(); } return; }
     if (a === 'seance') { seance(); return; }
     const D = A[a]; if (!D) return; panel(null);
     S.act = a; S.t = 0; S.dur = D.dur; S.cueI = 0; S.pend = PLAY[a] ? null : Recall.narrate(a, S.rec);
     sub(`<span class="d">${esc(x.d)}……</span>`); el.querySelector('.pr').style.opacity = 1; refresh();
+  }
+  function hpGo(id) {
+    if (!S.active || S.act || S.sip || S.hp || !window.HeadPlay) return; const b = HeadPlay.btn(id, S.rec); if (!b) return;
+    if (b.lock) { snd('deny'); sub(`<span class="d">${esc(b.why)}。</span>`); return; }
+    panel(null);
+    if (HeadPlay.begin(id, { rec: S.rec, h: S.h, k: S.k || 1.4, api: { sub, onEnd(done) { S.hp = false; refresh(); sub(done ? '散场了。演员们被一颗颗摆回原位——她们的表情，好像比开演前更复杂了一点。' : '<span class="d">演出取消了。</span>'); } } })) { S.hp = true; refresh(); }
   }
   function finish(a) {
     const rec = S.rec; S.act = ''; el.querySelector('.pr').style.opacity = 0; el.querySelector('.fl').style.opacity = 0;
@@ -278,6 +288,7 @@ html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body
   // ---------------- 输入 ----------------
   function onKey(e) {
     if (!S.active) return;
+    if (S.hp && window.HeadPlay && HeadPlay.active) { HeadPlay.key(e); return; } // R71 余兴：键盘全部交给小游戏（含松开：按住类节拍）
     if (S.sip && window.Siphon && Siphon.active) { // 汲魂：只有空格（按下/松开），Esc/F = 抽出木棒
       if (e.code === 'Space') { e.preventDefault(); e.stopImmediatePropagation(); if (e.type === 'keydown') { if (!e.repeat) Siphon.press(); } else Siphon.release(); return; }
       if (e.type === 'keydown' && (e.code === 'Escape' || e.code === 'KeyF')) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) Siphon.abort(); return; }
@@ -286,12 +297,12 @@ html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body
     if (e.repeat || performance.now() - (S.openAt || 0) < 300) { e.stopImmediatePropagation(); e.preventDefault(); return; }
     if (e.code === 'Escape' || e.code === 'KeyF') { e.preventDefault(); e.stopImmediatePropagation(); close(); return; }
     e.stopImmediatePropagation();
-    const m = /^Digit(\d)$/.exec(e.code); if (m) { const i = m[1] === '0' ? 10 : +m[1]; const a = ORD[i - 1]; if (a) { const x = PLAY[a] || Recall.ACT[a]; if (!x.need || Recall.hasB(x.need)) go(a); else snd('deny'); } }
+    const m = /^Digit(\d)$/.exec(e.code); if (m) { const i = m[1] === '0' ? 10 : +m[1]; if (S.hpMenu && window.HeadPlay && el.querySelector('.pn').classList.contains('on')) { const id = HeadPlay.ids()[i - 1]; if (id) hpGo(id); return; } const a = ORD[i - 1]; if (a) { const x = PLAY[a] || SIP[a] || HPM[a] || Recall.ACT[a]; if (x && (!x.need || Recall.hasB(x.need))) go(a); else snd('deny'); } }
   }
-  function onDown(e) { if (!S.active || S.sip || e.target.closest && e.target.closest('#riw .rcard,#riw .rbar,#riw .pn,#riw .x')) return; S.drag = { x: e.clientX, y: e.clientY, acc: 0 }; e.preventDefault(); }
+  function onDown(e) { if (!S.active || S.sip || S.hp || e.target.closest && e.target.closest('#riw .rcard,#riw .rbar,#riw .pn,#riw .x')) return; S.drag = { x: e.clientX, y: e.clientY, acc: 0 }; e.preventDefault(); }
   function onMove(e) { if (!S.active || !S.drag) return; const dx = e.clientX - S.drag.x, dy = e.clientY - S.drag.y; S.drag.x = e.clientX; S.drag.y = e.clientY; S.yaw += dx * 0.012; S.pitch = Math.max(-0.9, Math.min(0.9, S.pitch + dy * 0.008)); S.drag.acc += Math.abs(dx) * 0.012 + Math.abs(dy) * 0.008; if (S.drag.acc > 1.4) { S.drag.acc = 0; S.play++; if (window.SFX && SFX.on && SFX.ctx) noise(SFX.ctx.currentTime, 0.3, 0.05, 'highpass', 2600, 4200, 0.6); if (S.play === 8 && !Recall.known(S.rec.c, 'adorn')) finish('pat'); else refresh(); } }
   function onUp() { if (S.drag) { S.drag = null; } }
-  function onWheel(e) { if (!S.active || S.sip) return; if (e.target.closest && e.target.closest('#riw .rcard,#riw .pn')) return; e.preventDefault(); e.stopPropagation(); S.dist = Math.max(-0.28, Math.min(0.14, S.dist + (e.deltaY > 0 ? 0.02 : -0.02))); }
+  function onWheel(e) { if (!S.active || S.sip || S.hp) return; if (e.target.closest && e.target.closest('#riw .rcard,#riw .pn')) return; e.preventDefault(); e.stopPropagation(); S.dist = Math.max(-0.28, Math.min(0.14, S.dist + (e.deltaY > 0 ? 0.02 : -0.02))); }
   // 按住左键时也会触发 game.js 的把玩(poke)；回忆中屏蔽 canvas 的 mousedown
   function block(e) { if (S.active && !(e.target.closest && e.target.closest('#riw'))) { e.stopImmediatePropagation(); } }
 
@@ -322,7 +333,7 @@ html body.riw-on #hud,html body.riw-on #labels,html body.riw-on #cross,html body
     snd('open'); return true;
   }
   function close(silent) {
-    if (!S.active) return; if (window.Siphon && Siphon.active) { Siphon.close(true); S.sip = false; } S.active = false; const cam = G.camera;
+    if (!S.active) return; if (window.Siphon && Siphon.active) { Siphon.close(true); S.sip = false; } if (window.HeadPlay && HeadPlay.active) { HeadPlay.close(true); S.hp = false; } S.active = false; const cam = G.camera;
     if (rig && rig.g.parent) rig.g.parent.remove(rig.g);
     cam.fov = S.fov0; cam.updateProjectionMatrix();
     el.classList.remove('on'); setTimeout(() => { if (!S.active) el.style.display = 'none'; }, 350); panel(null);

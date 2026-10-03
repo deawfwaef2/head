@@ -1,0 +1,57 @@
+<!doctype html><html><head><meta charset="utf-8"><title>R71 HeadPlay harness</title>
+<style>html,body{margin:0;background:#000;overflow:hidden;font-family:system-ui}#log{position:fixed;left:6px;top:4px;z-index:999;color:#ff8;font:11px/1.35 monospace;white-space:pre;pointer-events:none;text-shadow:0 1px 2px #000;max-width:60vw;overflow:hidden}
+#pn{position:fixed;right:18px;top:60px;width:390px;max-height:calc(100% - 90px);overflow:auto;background:rgba(14,10,12,.9);border:1px solid rgba(232,192,112,.35);border-radius:12px;padding:14px 18px;color:#efe4d4;font:14px/1.55 system-ui;z-index:50}</style></head><body><div id="log"></div>
+<script>
+// R71 测试台：首级余兴（js/headplay.js + js/headplay_games.js）。双击打开（file://）；需要 models/ 下的 CC0 头（完整仓库自带）。
+// ?g=juggle|shell|wish|totem|court|dice|choir|stage（默认 juggle）  &auto=0 不自动玩（默认自动：节拍全按准、选项随机）
+// &speed=3 加速  &t=秒（剧本时间到点冻结画面，截图用）  &menu=1 只显示 F 界面的「余兴」面板  &close=1 结算后自动落幕  &seed=N 换一批首级
+// window.__log 里是全部日志（W/E = console.warn/error，ERR = 未捕获异常）；window.__done = 结算后的状态。
+const QS = new URLSearchParams(location.search), GID = QS.get('g') || 'juggle', AUTO = QS.get('auto') !== '0', SPEED = +(QS.get('speed') || 1), TSTOP = QS.has('t') ? +QS.get('t') : Infinity, SEED = +(QS.get('seed') || 0);
+window.__log = []; const lg = s => { __log.push(s); document.getElementById('log').textContent = __log.slice(-10).join('\n'); };
+{ const w0 = console.warn.bind(console), e0 = console.error.bind(console); console.warn = (...a) => { lg('W ' + a.map(x => x && x.stack ? x.stack.split('\n').slice(0, 2).join(' ') : String(x)).join(' ')); w0(...a); }; console.error = (...a) => { lg('E ' + a.map(String).join(' ')); e0(...a); }; }
+addEventListener('error', e => lg('ERR ' + e.message + ' @' + (e.filename || '').split('/').pop() + ':' + e.lineno));
+const pn0 = performance.now.bind(performance); let vt = pn0(), lastR = pn0(), frozen = false;
+performance.now = () => { const r = pn0(); if (!frozen) vt += (r - lastR) * SPEED; lastR = r; return vt; };
+window.SFX = { on: false };
+</script>
+<script src="../../lib/three.min.js"></script><script src="../../lib/GLTFLoader.js"></script>
+<script src="../../js/mods.js"></script><script src="../../js/lore.js"></script><script src="../../js/rpg.js"></script>
+<script src="../../models/AvatarSample_D_Darkness.js"></script><script src="../../models/Base_Female.js"></script><script src="../../models/Darkness_Shibu.js"></script><script src="../../models/HairSample_Female.js"></script><script src="../../models/Sendagaya_Shino.js"></script>
+<script src="../../js/hair_cover.js"></script><script src="../../js/cc0mode.js"></script><script src="../../js/heads.js"></script><script src="../../js/headwear.js"></script><script src="../../js/idlook.js"></script>
+<script>/* 防缓存：改了脚本刷新就生效 */ document.write(['headplay', 'headplay_games'].map(f => `<script src="../../js/${f}.js?v=${Date.now()}"><\/script>`).join(''));</script>
+<script>
+window.Recall = { hasB: () => true, known: () => true, reveal: () => false, bn: t => t, FK: {}, nm: c => c.name };
+(async () => {
+  const R = new THREE.WebGLRenderer({ antialias: true }); R.setPixelRatio(1); R.setSize(innerWidth, innerHeight); R.outputEncoding = THREE.sRGBEncoding; R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.15; R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFShadowMap; document.body.appendChild(R.domElement);
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.05, 100);
+  try { await ModelHeads.init(); } catch (e) { lg('ModelHeads.init ' + e); }
+  const S = { eq: { weapon: 0, helm: 0, armor: 0, charm: 0, bag: 0 }, stats: { trips: 3 }, heads: [] }, used = new Set(), sig = new Set(), recs = [];
+  for (let i = 0; i < 6; i++) { const L = Lore.LOCS[(i + SEED) % Lore.LOCS.length]; const h = RPG.foe(S, L, (4242 + i * 977 + SEED * 131) >>> 0, used, sig); h.id = i + 1; if (!(+h.c.age >= 18)) h.c.age = 19 + i; recs.push(h); }
+  S.heads = recs.slice(1);
+  window.G = { renderer: R, scene, camera, heads: [], S, post: null, uiOpen: true, playing: true, save() { }, toast(t) { lg('toast ' + t); }, addCoins(n) { lg('coins +' + n); } };
+  lg(recs.map(r => `${r.c.name}·${r.c.raceN}${r.c.idN}(${r.c.id}) 想${r.c.goal}`).join('\n'));
+  if (QS.get('menu') === '1') { const d = document.createElement('div'); d.id = 'pn'; d.innerHTML = HeadPlay.menuHTML(recs[0]); document.body.appendChild(d); R.setClearColor('#2a2024'); R.render(scene, camera); return; }
+  const hb = ModelHeads.create(recs[0].look), g = new THREE.Group(); hb.group.scale.setScalar(1.55); g.add(hb.group); scene.add(g);
+  const ok = HeadPlay.begin(GID, { rec: recs[0], h: { rec: recs[0], hb, g }, api: { sub: s => lg('sub ' + s), onEnd: d => { lg('END ' + d + ' ' + JSON.stringify(HeadPlay._st())); window.__ended = 1; } } });
+  lg('begin ' + GID + ' -> ' + ok);
+  const press = (code, up) => HeadPlay.key({ type: up ? 'keyup' : 'keydown', code, repeat: false, preventDefault() { }, stopImmediatePropagation() { } });
+  (function auto() {
+    requestAnimationFrame(auto); const Z = HeadPlay.active && HeadPlay.api.Z; if (!Z) return;
+    if (Z.t >= TSTOP && !frozen) { frozen = true; lg('frozen @' + Z.t.toFixed(2) + ' phase ' + Z.phase); }
+    { // &at=pick|choice|ring|res（&n=第几次，从 0 起）：到这种提示出现时冻结画面
+      const AT = QS.get('at'), want = +(QS.get('n') || 0), hit = AT === 'pick' ? Z.pickP && !Z.pickP.done && Z.t - Z.pickP.t0 > 0.35 && Z.pickP : AT === 'choice' ? Z.choice && !Z.choice.done && Z.t - Z.choice.t0 > 0.5 && Z.choice : AT === 'ring' ? Z.rings.find(r => !r.done && Z.t > r.tt - 0.25) : AT === 'res' ? Z.phase === 'res' && Z.t - Z.resAt > 1.2 && Z : AT === 'seq' ? Z.seqP && !Z.seqP.done && Z.t - Z.seqP.last > 0.2 && Z.seqP : null;
+      if (hit && !frozen) { if (!hit.__seen) { hit.__seen = 1; auto.n = (auto.n || 0) + 1; } if (auto.n - 1 >= want) { frozen = true; lg('frozen at ' + AT + ' #' + (auto.n - 1) + ' @' + Z.t.toFixed(2)); } }
+    }
+    if (Z.phase === 'res' && !window.__done) { window.__done = { g: Z.forceG || HeadPlay.api.grade(), pts: Z.pts, max: Z.max, st: HeadPlay._st() }; lg('RESULT ' + JSON.stringify(window.__done)); }
+    if (!AUTO || frozen) return;
+    if (Z.phase === 'res') { if (QS.get('close') === '1' && Z.t - Z.resAt > 1.5) press('Space'); return; }
+    if (Z.phase !== 'play') return;
+    for (const r of Z.rings) { if (r.done || r.au || r.kind === 'avoid') continue;
+      if (r.kind === 'mash') { if (Z.t >= r.tt) { r.au = true; let n = 0; const iv = setInterval(() => { if (!HeadPlay.active || r.done || n++ > r.n + 4) { clearInterval(iv); return; } press(r.key); press(r.key, true); }, 20); } continue; }
+      if (Z.t >= r.tt - 0.02) { r.au = true; press(r.key); if (r.kind === 'hold') { const end = r.tt + r.hold + 0.04; const iv = setInterval(() => { const Z2 = HeadPlay.active && HeadPlay.api.Z; if (!Z2 || Z2.t >= end || r.done) { clearInterval(iv); press(r.key, true); } }, 8); } else press(r.key, true); } }
+    if (Z.choice && !Z.choice.done && Z.t - Z.choice.t0 > 0.8) press('Digit' + (1 + Math.floor(Math.random() * Z.choice.o.opts.length)));
+    if (Z.pickP && !Z.pickP.done && Z.t - Z.pickP.t0 > 0.8) press('Digit' + (1 + Math.floor(Math.random() * Z.pickP.o.n)));
+    if (Z.seqP && !Z.seqP.done && Z.t - Z.seqP.last > 0.35) press('Digit' + (Z.seqP.o.seq[Z.seqP.i] + 1));
+  })();
+})();
+</script></body></html>
