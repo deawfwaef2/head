@@ -3,7 +3,7 @@
 // · 有的需要建筑（示威矛墙 / 亡者议会 / 命运骰塔 / 双生镜龛 / 新建筑「颅偶剧场」），有的不需要。
 // · 独立舞台场景（三点布光 + 木桌 + 幕布），独立 rAF 循环（主循环 __pauseMain 暂停），走 Master 后处理。
 // · 剧本 = 生成器：yield 秒数（等待）或 yield 提示对象（节拍环 / 抉择 / 指认 / 顺序输入）；镜头 = 机位表硬切蒙太奇。
-// · 游戏内容（8 个剧本 + 文案）在 js/headplay_games.js，用 HeadPlay.reg({...}) 注册。
+// · 游戏内容（9 个剧本 + 文案）在 js/headplay_games.js，用 HeadPlay.reg({...}) 注册。
 window.HeadPlay = (() => {
   const on = () => !window.Mods || !Mods.on || Mods.on('head_play') !== false;
   const PI = Math.PI, V3 = THREE.Vector3, Q4 = THREE.Quaternion;
@@ -34,7 +34,8 @@ window.HeadPlay = (() => {
     verdict: { ic: '⚖️', n: '判决', col: '#ff8a7a', txt: k => `对生命低于 30% 的敌人伤害 +${Math.round(45 * k)}%（行刑）`, nb: () => ({}) },
     luck: { ic: '🎲', n: '赌运', col: '#9fe8a0', txt: k => `清空奖励 +${Math.round(40 * k)}% · 每次击杀 ${Math.round(12 * k)}% 几率爆出一笔魂晶彩头`, nb: k => ({ clear: 0.4 * k }) },
     hymn: { ic: '🔔', n: '走调战歌', col: '#a8c8ff', txt: k => `每次击杀回复 ${Math.round(6 * k)}% 最大生命`, nb: k => ({ heal: 0.06 * k }) },
-    infamy: { ic: '🎭', n: '恶名昭彰', col: '#ff6a8a', txt: k => `敌人生命 -${Math.round(15 * k)}%（听过你的戏）· 击杀时 7 米内的敌人有 ${Math.round(45 * k)}% 几率吓得踉跄`, nb: k => ({ fear: 0.15 * k }) }
+    infamy: { ic: '🎭', n: '恶名昭彰', col: '#ff6a8a', txt: k => `敌人生命 -${Math.round(15 * k)}%（听过你的戏）· 击杀时 7 米内的敌人有 ${Math.round(45 * k)}% 几率吓得踉跄`, nb: k => ({ fear: 0.15 * k }) },
+    strike: { ic: '🎳', n: '全中', col: '#7fd0ff', txt: k => `每次击杀后 4 秒内伤害 +${Math.round(12 * k)}%（连杀叠加，最多 3 层，再杀刷新）——连锁撞倒的手感`, nb: () => ({}) }
   };
   function st() { const S = G().S; const s = S.hplay || (S.hplay = { pend: {}, act: {}, used: {}, n: 0 }); s.pend = s.pend || {}; s.act = s.act || {}; s.used = s.used || {}; return s; }
   const inField = () => !!(window.Worlds && Worlds.active);
@@ -54,8 +55,10 @@ window.HeadPlay = (() => {
   function out(fo, info, d) {
     let k = actK('eye'); if (k && !info.crit && Math.random() < 0.18 * k) { info.crit = true; d = Math.round(d * 1.75); }
     k = actK('verdict'); if (k && fo && fo.maxHp > 0 && fo.hp / fo.maxHp < 0.3) d = Math.round(d * (1 + 0.45 * k));
+    k = actK('strike'); if (k && stk && performance.now() < stkT) d = Math.round(d * (1 + 0.12 * k * stk));
     return d;
   }
+  let stk = 0, stkT = 0;
   function inn(fo, n) {
     const k = actK('catch'); if (!k || !(n > 0)) return n; const W = window.Worlds && Worlds._W; if (!W) return n;
     if (nodeW !== W.cur) { nodeW = W.cur; caught = false; } if (caught) return n; caught = true;
@@ -63,7 +66,8 @@ window.HeadPlay = (() => {
   }
   function ev(t, fo) {
     if (t !== 'kill' || !fo) return; const g = G();
-    let k = actK('flow'); if (k) { const ch = (() => { try { return Loop.R().chap || 1; } catch (e) { return 1; } })(), n = Math.round(16 * k * (1 + 0.4 * (ch - 1))); try { g.addCoins(n); const W = Worlds._W; if (W && W.trip) W.trip.coins += n; } catch (e) { } try { window.Talents && Talents.addMana && Talents.addMana(30 * k); } catch (e) { } }
+    let k = actK('strike'); if (k) { const now = performance.now(); stk = now < stkT ? Math.min(3, stk + 1) : 1; stkT = now + 4000; }
+    k = actK('flow'); if (k) { const ch = (() => { try { return Loop.R().chap || 1; } catch (e) { return 1; } })(), n = Math.round(16 * k * (1 + 0.4 * (ch - 1))); try { g.addCoins(n); const W = Worlds._W; if (W && W.trip) W.trip.coins += n; } catch (e) { } try { window.Talents && Talents.addMana && Talents.addMana(30 * k); } catch (e) { } }
     k = actK('luck'); if (k && Math.random() < 0.12 * k) { try { const W = Worlds._W, L = W && W.graph && W.graph.loc && W.graph.loc.loot, n = Math.round(((L ? (L[0] + L[1]) / 2 : 20) * 0.9) * (0.6 + k)); g.addCoins(n); if (W && W.trip) W.trip.coins += n; g.toast(`🎲 彩头！🔮+${n}——命运骰塔又欠你一次`, '#9fe8a0', 2); SFX.coins && SFX.coins(); } catch (e) { } }
     k = actK('infamy'); if (k && window.Foe && Foe.foes) { let said = false; for (const o of Foe.foes) { if (o === fo || o.dead || !o.pos || !fo.pos || o.pos.distanceTo(fo.pos) > 7) continue; if (Math.random() < 0.45 * k) { o.stag = Math.max(o.stag || 0, 0.6); o.atk = null; if (!said && Foe.say) { said = true; try { Foe.say(o, pk(['是、是那个演戏的食人魔……！', '他会把我的头也搬上台……', '别看我！别看我！', '我不要演配角……！']), '#ffd0e0'); } catch (e) { } } } } }
   }
@@ -474,7 +478,7 @@ window.HeadPlay = (() => {
     if (!pend && !h) return ''; return `<div style="margin-top:10px">${h ? `<div style="font-size:12px;color:#d8b8a0;line-height:1.6">🎪 演出记录：${esc(h)}</div>` : ''}${pend ? `<div style="font-size:12px;letter-spacing:.15em;color:#ffd27a;margin-top:4px">🎪 下一趟余兴祝福</div>${pend}` : ''}</div>`;
   }
   function ids() { return GAMES.map(g => g.id); }
-  // F 界面「余兴」面板：8 个节目（数字键 / 点击开演）
+  // F 界面「余兴」面板：全部节目（数字键 / 点击开演）
   function menuHTML(rec) {
     css(); const x = cx(rec), pend = buffsHTML('pend');
     let h = `<div class="hpmh">🎪 首级余兴</div><div class="hpmn">主演：<b>${esc(x.n)}</b>。洞里（和魂库）的其他首级来客串，格罗克亲自配音。每个节目每回合演一次；评级 S~D 决定下一趟出猎的祝福强度。<b>数字键</b>或点击开演。</div>${pend ? `<div style="margin-top:8px;font-size:12px;letter-spacing:.15em;color:#ffd27a">已攒下的祝福（下一趟生效）</div>${pend}` : ''}`;

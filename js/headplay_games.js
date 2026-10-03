@@ -177,6 +177,68 @@
     else if (k === 'sad') { Z.ex(0, { sad: 0.9, blink: 0.4 }); }
   }
 
+  // ===================================================================== ⑨ 滚颅保龄 · 全中之夜（无需建筑，4 颗头）——赢的那颗挨个嘲笑倒下的
+  const BW = { pins: [[0, -0.17], [-0.17, -0.33], [0.17, -0.33]], start: [0, 0.4], R: 0.2 }, BWQ = new THREE.Quaternion(), BWA = new THREE.Vector3();
+  function pinLine(x) { const id = x.idk; return ARMS.test(id) ? '「瓶：{n}，{id}。站岗是她的老本行——今天看她还站不站得住。」' : NOBLE.test(id) ? '「瓶：{n}，高贵的{id}。生前从不低头——今天不用低，直接倒。」' : FAITH.test(id) ? '「瓶：{n}，{id}。她跪了一辈子，今天终于能躺下了。」' : FOLK.test(id) ? '「瓶：{n}，{id}。她这辈子被人推来推去——今天也一样。」' : '「瓶：{n}，{tr}的{ri}。站好别动——反正你也动不了。」'; }
+  function bwKnock(Z, B, i, nx, nz, v) {
+    B.down[i] = 1; const hd = Z.hd[i], s = 0.7 + Math.min(2, v) * 0.55; Z.direct(i, true);
+    B.fly.push({ i, vx: nx * s, vz: nz * s, vy: 0.8 + Math.random() * 0.6, w: new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize(), ws: 7 + Math.random() * 7, rest: false });
+    Z.snd('thud'); Z.snd('catch'); Z.shake(0.55); Z.ex(i, { surprised: 0.85, oh: 0.5 }, true); Z.sparks(hd.P.clone().add(new THREE.Vector3(0, 0.06, 0)), 12, '#ffd0d0', 0.6);
+    if (!B.slowT) { B.slow = 0.28; B.slowT = Z.t + 1.1; }
+  }
+  HP.reg({
+    id: 'bowl', ic: '🎳', n: '滚颅保龄', sub: '全中之夜', need: null, heads: 4, buff: 'strike', col: '#7fd0ff', tag: '她滚过去的时候，另外三颗头只能看着她过来', roles: ['球', '瓶', '瓶', '瓶'], reveal: ['name', 'race', 'goal'],
+    d: '她当球，另外三颗当瓶，打两局。先按空格卡准瞄准线（越准越正），再按住空格蓄力出手——正中第一颗，连锁撞倒后两颗就是全中。赢的那颗会挨个嘲笑倒下的。',
+    setup(Z) {
+      const B = Z.Z.bw = { roll: null, fly: [], slow: 1, slowT: 0, down: [0, 0, 0, 0], aim: 0, aimOn: false };
+      Z.rest(0, BW.start[0], BW.start[1], 0); BW.pins.forEach((p, i) => Z.rest(i + 1, p[0], p[1], 0));
+      const ar = Z.prop(new THREE.BoxGeometry(0.014, 0.004, 0.42).translate(0, 0, -0.21), { color: '#7fd0ff', emissive: '#3a90c0', emissiveIntensity: 0.9 }); ar.visible = false; ar.castShadow = false; B.arrow = ar;
+    },
+    update(Z, dt, t) {
+      const B = Z.Z.bw; if (!B) return; if (B.slowT && t > B.slowT) { B.slow = 1; B.slowT = 0; } const k = dt * B.slow;
+      if (B.aimOn) { B.aim = 0.35 * Math.sin(B.om * (t - B.aimT0)); const P = Z.hd[0].P; B.arrow.visible = true; B.arrow.position.set(P.x, 0.006, P.z - 0.12); B.arrow.rotation.y = -B.aim; } else B.arrow.visible = false;
+      const R = B.roll; if (R && !R.done) { const hd = Z.hd[0], P = hd.P;
+        if (!R.fall && !B.appr) { for (let i = 1; i < 4; i++) { if (B.down[i]) continue; const q = Z.hd[i].P; if (Math.hypot(q.x - P.x, q.z - P.z) < BW.R + 0.13) { B.appr = Z.t; B.slow = 0.3; B.slowT = t + 1.3; for (let j = 1; j < 4; j++) Z.ex(j, SHOCK, true); break; } } }
+        if (!R.fall) { R.v = Math.max(0, R.v - 0.3 * k); P.x += R.dx * R.v * k; P.z += R.dz * R.v * k; hd.q.premultiply(BWQ.setFromAxisAngle(BWA.set(R.dz, 0, -R.dx), R.v * k / 0.13));
+          for (let i = 1; i < 4; i++) { if (B.down[i]) continue; const q = Z.hd[i].P, dx = q.x - P.x, dz = q.z - P.z, dd = Math.hypot(dx, dz) || 1e-3; if (dd < BW.R) { const nx = dx / dd, nz = dz / dd; bwKnock(Z, B, i, nx, nz, R.v); const vn = R.dx * nx + R.dz * nz; R.dx -= 0.6 * vn * nx; R.dz -= 0.6 * vn * nz; const l = Math.hypot(R.dx, R.dz) || 1; R.dx /= l; R.dz /= l; R.v *= 0.68; } }
+          if (Math.abs(P.x) > 0.72 || P.z < -0.45) { R.fall = true; R.vy = 0; Z.snd('whoosh'); } else if (R.v < 0.03) R.done = true; }
+        else { R.vy -= 9.8 * k; P.y += R.vy * k; P.x += R.dx * R.v * 0.5 * k; P.z += R.dz * R.v * 0.5 * k; if (P.y < -0.78 + hd.H * 0.4) { P.y = -0.78 + hd.H * 0.4; R.done = true; Z.snd('drop'); } } }
+      for (const f of B.fly) { if (f.rest) continue; const hd = Z.hd[f.i], P = hd.P;
+        f.vy -= 9.8 * k; P.x += f.vx * k; P.y += f.vy * k; P.z += f.vz * k; hd.q.premultiply(BWQ.setFromAxisAngle(f.w, f.ws * k));
+        const onT = Math.abs(P.x) < 0.73 && P.z > -0.46 && P.z < 0.46, fy = (onT ? 0 : -0.78) + hd.H * 0.38;
+        if (P.y < fy && f.vy < 0 && (onT || P.y < fy)) { P.y = fy; f.vy *= -0.3; f.vx *= 0.55; f.vz *= 0.55; f.ws *= 0.45; if (Math.abs(f.vy) < 0.3) f.rest = true; else Z.snd('thud'); }
+        for (let j = 1; j < 4; j++) { if (B.down[j] || j === f.i) continue; const q = Z.hd[j].P, dx = q.x - P.x, dz = q.z - P.z, dd = Math.hypot(dx, dz) || 1e-3; if (dd < BW.R && P.y < q.y + 0.12) { const sp = Math.hypot(f.vx, f.vz); bwKnock(Z, B, j, dx / dd, dz / dd, sp * 0.9); f.vx *= 0.45; f.vz *= 0.45; } } }
+    },
+    *script(Z) {
+      const B = Z.Z.bw, X = Z.x, ball = X[0]; Z.keys('<b>空格</b> 卡准瞄准线　→　<b>按住空格</b> 蓄力出手'); Z.meter('撞倒 <b>0</b> / 6', 0); let tot = 0, strikes = 0;
+      Z.cut({ t: () => V(Z, 0, 0.12, -0.05), az: 1.15, el: 0.35, d: 1.4, fov: 40, dr: { az: -0.25 } });
+      yield* line(Z, og, '格罗克把桌子清空：「今晚打保龄。」三颗头在桌子那头站成一个三角——站得比她们生前任何时候都直。');
+      Z.cut(face(0, { az: 0.3, el: 0.15 })); yield* line(Z, og, '「球——{n}！」{ri}，她想{goal}。今天她要滚得比这辈子走过的路都快。', ball);
+      for (let i = 1; i < 4; i++) { Z.cut(face(i, { az: [0.2, -0.3, 0.35][i - 1], el: 0.15 })); Z.ex(i, { surprised: 0.35, sad: 0.45 }); yield* line(Z, og, pinLine(X[i]), X[i]); }
+      for (let r = 0; r < 2; r++) {
+        if (r) { B.fly = []; B.roll = null; for (let i = 0; i < 4; i++) { Z.direct(i, false); Z.hd[i].snap = true; Z.roll(i, 0, 0); } B.down = [0, 0, 0, 0]; Z.rest(0, BW.start[0], BW.start[1], Math.PI); BW.pins.forEach((p, i) => Z.rest(i + 1, p[0], p[1], 0)); Z.hd.forEach((h, i) => Z.ex(i, i ? SAD : GRUDGE)); Z.banner('第二局', '重新摆瓶', Z.gm.col, 1.4); yield* line(Z, nar, '你把三颗头捡回来，重新摆好。她们的头发乱了，眼神也乱了。'); }
+        Z.cut({ t: () => V(Z, 0, 0.08, -0.12), az: 0, el: 0.34, d: 1.0, fov: 42 }); Z.ex(0, { angry: 0.4, sad: 0.4 }); if (!r) { Z.rest(0, BW.start[0], BW.start[1], Math.PI, 5); yield 0.6; }
+        B.om = r ? 2.8 : 2.2; B.aimT0 = Z.t; B.aimOn = true; B.aimLock = null; Z.say(r ? '第二球。瞄准线晃得更快了。' : '蓝色的瞄准线在桌面上来回摇摆——在它正对中间那一刻按空格。');
+        const A = yield Z.ring({ key: 'Space', at: 2 * Math.PI / B.om, lead: 1.0, a: () => V(Z, 0, 0.02, -0.02), tag: '瞄准中线', on: () => { B.aimLock = B.aim; } });
+        const aim = A === 'miss' || B.aimLock == null ? (Math.random() < 0.5 ? -1 : 1) * (0.22 + Math.random() * 0.12) : B.aimLock; B.aimOn = false; B.arrow.visible = true; B.arrow.rotation.y = -aim; Z.score({ perfect: 1, great: 0.8, ok: 0.5, miss: 0 }[A] || 0, 1);
+        const Pw = yield Z.ring({ key: 'Space', at: 0.9, lead: 0.8, kind: 'hold', hold: 0.6, a: 'h0.center', tag: '按住蓄力' }); const v0 = { perfect: 1.45, great: 1.3, ok: 1.1, miss: 0.85 }[Pw] || 0.85; Z.score({ perfect: 1, great: 0.8, ok: 0.5, miss: 0.1 }[Pw] || 0.1, 1);
+        B.arrow.visible = false; B.appr = 0; Z.direct(0, true); B.roll = { dx: Math.sin(aim), dz: -Math.cos(aim), v: v0 }; Z.snd('whoosh'); Z.ex(0, DIZZY); Z.roll(0, 0.4, -0.3); Z.say(fmt(pk(['{n}滚了出去——头发一圈圈缠在脸上。', '她在桌面上翻滚，每转一圈，都有一次正对着那三颗头。', '{n}滚得歪歪扭扭，像她生前走过的每一条路。']), ball));
+        Z.cut({ t: 'h0.center', az: 0.85, el: 0.3, d: 0.9, fov: 40 }); let cp = false; const tEnd = Z.t + 8;
+        while (Z.t < tEnd && !(B.roll.done && B.fly.every(f => f.rest))) { if (!cp && (B.appr || B.roll.done)) { cp = true; Z.cut({ t: () => V(Z, 0, 0.12, -0.26), az: Z.pk([0.4, -0.4]), el: 0.16, d: 0.8, fov: 38, dr: { d: 0.15 } }); } yield 0.05; }
+        yield 0.5; const down = [1, 2, 3].filter(i => B.down[i]), up = [1, 2, 3].filter(i => !B.down[i]), n = down.length; tot += n; Z.score(n / 3, 2.5); Z.meter(`撞倒 <b>${tot}</b> / 6`, tot / 6);
+        if (n === 3) { strikes++; Z.banner('全 中！', 'STRIKE', Z.gm.col, 2); Z.snd('cheer'); Z.snd('fan'); Z.crystals(V(Z, 0, 0.3, -0.3), 26, true, '#7fd0ff'); yield 1.6; }
+        else if (!n) { Z.snd('boo'); yield* line(Z, sn, B.roll.fall ? '「洗沟球！她直接滚到地上去了！」' : '「一个都没倒？老大，她们是不是在用力站着？」'); }
+        else Z.pop(`撞倒 ${n}`, Z.gm.col);
+        const P0 = Z.hd[0].P; Z.cut({ t: 'h0.center', az: Z.pk([-0.5, 0.5]), el: 0.35, d: 0.62, fov: 36 }); Z.ex(0, SMUG); Z.roll(0, -0.2, 0.25);
+        if (n) { const v = Z.x[Z.pk(down)], ctx = { pn: v.n, pgoal: v.goal, pact: v.act, ptr: v.tr };
+          yield* voiceL(Z, 0, pk(['「{pn}，你不是想{pgoal}吗？躺着也算吗？」', '「{pn}，听说你生前{pact}——现在连站都站不住了。」', '「别瞪我，{pn}。要怪就怪你站在那儿——就像你一辈子都站错了地方。」', '「{pn}，你的{ptr}呢？倒下的时候怎么没带上？」']), ctx); Z.ex(down[0], GRUDGE); }
+        if (up.length) { const j = up[0], s = X[j]; Z.cut(face(j, { az: 0.2, el: 0.12 })); Z.ex(j, SMUG); yield* voiceL(Z, j, pk(['「就这？{bn}，你想{bgoal}？你连我都撞不倒。」', '「{bn}，滚得不错。可惜方向跟你这辈子一样——歪的。」']), { bn: ball.n, bgoal: ball.goal }); Z.ex(0, GRUDGE); if (P0.y < 0) yield* line(Z, nar, '{n}躺在桌子底下，脸朝着地面。没人去捡她。', ball); }
+      }
+      Z.stat(`撞倒 <b>${tot}</b> / 6 · 全中 <b>${strikes}</b> 次`);
+      Z.endLine(fmt(strikes === 2 ? '两局全中。{n}被你从桌子那头捡回来时，嘴角居然挂着一点得意——这是她这辈子赢得最干脆的一次。' : tot >= 4 ? '桌上东倒西歪地躺着几颗头。{n}滚回你脚边，脸上沾着别人的头发。' : '保龄球之夜草草收场。三颗“瓶”还站着，像在嘲笑这颗不够圆的球。', ball));
+    }
+  });
+
   // ===================================================================== ④ 嚎叫图腾 · 串首魂桥（需要「示威矛墙」）
   HP.reg({
     id: 'totem', ic: '🪵', n: '嚎叫图腾', sub: '串首魂桥', need: 'rh_palisade', heads: 3, buff: 'flow', coin: 90, col: '#c78bff', tag: '一根矛，三颗头，一股往上涌的魂', roles: ['底座', '中段', '顶端'],

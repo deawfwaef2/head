@@ -12,6 +12,7 @@ window.__log = []; const lg = s => { __log.push(s); document.getElementById('log
 addEventListener('error', e => lg('ERR ' + e.message + ' @' + (e.filename || '').split('/').pop() + ':' + e.lineno));
 const pn0 = performance.now.bind(performance); let vt = pn0(), lastR = pn0(), frozen = false;
 performance.now = () => { const r = pn0(); if (!frozen) vt += (r - lastR) * SPEED; lastR = r; return vt; };
+window.__freeze = v => { frozen = v !== false; }; // 外部（playwright）在任意时刻冻结 / 解冻
 window.SFX = { on: false };
 </script>
 <script src="../../lib/three.min.js"></script><script src="../../lib/GLTFLoader.js"></script>
