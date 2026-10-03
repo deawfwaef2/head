@@ -149,7 +149,7 @@ ${el.length ? `<div>👑 可挑战的精英：${el.map(d => `<b style="color:${d
     if (!trk) { css(); trk = document.createElement('div'); trk.id = 'arTrack'; document.body.appendChild(trk); }
     const rq = document.getElementById('rqTrack'), r = rq && rq.offsetParent ? rq.getBoundingClientRect() : null, top = r && r.height ? r.bottom + 6 : 132;
     if (!(window.HudTidy && HudTidy.on())) trk.style.top = top + 'px'; trk.style.display = 'block';
-    trk.innerHTML = T.side.map(x => { const [a, b] = SQ[x.t].prog(x.q, W); return `🔹 <b>${esc(SQ[x.t].n(x.q))}</b> ${x.done ? '<span class="ok">✓</span>' : `<span>${a}/${b}</span>`}`; }).join('<br>') + `<br><small>支线奖励 🔮${T.side.reduce((s, x) => s + x.coin, 0)}${T.side.some(x => x.gear) ? ' + 饰品' : ''}</small>`;
+    const th = T.side.map(x => { const [a, b] = SQ[x.t].prog(x.q, W); return `🔹 <b>${esc(SQ[x.t].n(x.q))}</b> ${x.done ? '<span class="ok">✓</span>' : `<span>${a}/${b}</span>`}`; }).join('<br>') + `<br><small>支线奖励 🔮${T.side.reduce((s, x) => s + x.coin, 0)}${T.side.some(x => x.gear) ? ' + 饰品' : ''}</small>`; if (trk._h !== th) { trk._h = th; trk.innerHTML = th; }
     const hs = document.getElementById('h2Sense'); if (hs) hs.style.top = (top + trk.offsetHeight + 8) + 'px';
   }
   function tick() {

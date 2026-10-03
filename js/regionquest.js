@@ -222,7 +222,7 @@ window.RegionQuest = (() => {
     const [a, b] = prog(T.q);
     if (!T.done && a >= b) { T.done = true; SS().done = (SS().done || 0) + 1; const got = give(T.q); setTimeout(() => banner('任务完成', esc(mText(T.q)), got), T.minis.some(x => x.dead && x.m.n === T.q.m) ? 4400 : 300); }
     const alive = T.minis.filter(x => !x.dead).length;
-    h.track.innerHTML = `📜 <b>${esc(mText(T.q))}</b> ${T.done ? '<span class="ok">✓ 完成</span>' : `<span>${a}/${b}</span>`}<br><small>奖励 ${rText(T.q)}${alive ? ` · ⚔️ 小BOSS ×${alive}` : ''}</small>`;
+    const th = `📜 <b>${esc(mText(T.q))}</b> ${T.done ? '<span class="ok">✓ 完成</span>' : `<span>${a}/${b}</span>`}<br><small>奖励 ${rText(T.q)}${alive ? ` · ⚔️ 小BOSS ×${alive}` : ''}</small>`; if (h.track._h !== th) { h.track._h = th; h.track.innerHTML = th; }
   }
 
   // ================= 选地点界面 =================

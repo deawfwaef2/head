@@ -679,7 +679,7 @@ window.Foe = (() => {
     if (fo.role && window.FoeRoles && !fo._chainStep) clip = FoeRoles.clip(fo, clip, d, force) || clip;
     if (!force && !fo._chainStep && window.Moves && Moves.on()) clip = Moves.pick(fo, d, clip) || clip; // R55g 招式库：按职业从更大的招式池里选（变体/连招）
     const T = ATK[clip], real = (T && T.clip) || clip, c = f.clips[real]; if (!c || !T) return;
-    const base = fo.boss ? (fo.rage ? 0.08 : 0.07) : 0.03 + fo.rar * 0.014 + (fo.armed ? 0.02 : 0); // 第十九轮：BOSS 每刀 10%→7%（狂暴 8%）
+    const base = (fo.boss ? (fo.rage ? 0.08 : 0.07) : 0.03 + fo.rar * 0.014 + (fo.armed ? 0.02 : 0)) * (BAL() ? (fo.boss ? 1.25 : 1.4) : 1); // 第十九轮：BOSS 每刀 10%→7%（狂暴 8%）；R70 bal70：普通敌人 ×1.4、BOSS ×1.25（以前 rar0 要挨 30+ 下才倒，战斗没有威胁）
     const ws = fo.boss ? 0.45 : 0.46 + Math.min(0.2, fo.iq * 0.12);
     const hits = T.hits.map(([t, a, k]) => ({ t, a: a * D2R, ang: a * D2R, heavy: k === 'heavy', thrust: k === 'thrust' }));
     const act = f.play(real, { once: true, fade: 0.12, speed: 1, restart: true }); if (!act) return; if (T.from) act.time = T.from; lastAtkAt = CLK; if (CTX.windup) try { CTX.windup(fo, clip); } catch (e) {}
@@ -699,6 +699,7 @@ window.Foe = (() => {
     return (hold ? A.hold + Math.max(0, A.holdAt - ct) / w : 0) + Math.max(0, h.t - 0.06 - Math.max(ct, hold ? A.holdAt : 0)) / w + Math.min(0.06, Math.max(0, h.t - ct)); }
   const PRESS = () => !window.Mods || Mods.on('foe_press') !== false;
   const TRACK = () => !window.Mods || Mods.on('foe_track') !== false;
+  const BAL = () => !window.Mods || Mods.on('bal70') !== false;
   function atkStep(fo, dt, d, face) {
     const A = fo.atk, act = A.act, ct = act.time, h = A.hits[A.hi]; let sc = 0.9, turnTo = null, spd = 0;
     if (FAIR() && !A.hi && ct < 0.08 && !A.faced) { if (Math.abs(ang(face - fo.yaw)) > 0.45 && (A.faceT = (A.faceT || 0) + dt) < 0.8) { act.timeScale = 0; return { turnTo: face, spd: 0 }; } A.faced = 1; } // 先转过来对着你再起手
@@ -850,6 +851,7 @@ window.Foe = (() => {
     if (window.Talents) { const d2 = Talents.outDmg(fo, info, dealt, zone, brk); if (isFinite(d2)) dealt = d2; } if (window.Rogue) { const d3 = Rogue.outDmg(fo, info, dealt, zone, brk); if (isFinite(d3)) dealt = d3; } /* R54k rogue_boons */ /* R36b：霸主/精英/猎手单刀上限 = 最大血量 10%，不可能再被一击秒杀 */ if (fo.boss || fo.hunter || fo.eliteId) dealt = Math.min(dealt, Math.max(1, Math.ceil(fo.maxHp * 0.1))); // R36：属性/天赋/暴击/背刺/印记
     if (fo.defMul && fo.defMul < 1) dealt = Math.max(1, Math.round(dealt * fo.defMul)); // 宿敌防御（NemStory.stat）
     const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.16; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk || !!info.crit);
+    if (window.HitFeel) try { HitFeel.hit(fo, c.point, info.vel, Math.min(1.6, 0.45 + dealt / Math.max(1, fo.maxHp) * 3 + (info.charged || info.crit ? 0.4 : 0)), { crit: info.crit, charged: info.charged, brk, kill: fo.hp <= 0 }); } catch (e) { } // R70 hit_feel2
     { const kv = (info.vel || tv.set(0, 0, 0)).clone(); kv.y = 0; if (kv.lengthSq() > 1e-4) { kv.normalize().multiplyScalar((fo.boss ? 0.08 : 0.22) * sp * (WP ? WP.kb : 1)); fo.kb = { x: kv.x / 0.16, z: kv.z / 0.16, t: 0.16 }; } } // 击退：0.16 秒内推完（以前是一帧内整段位移 = “瞬移”）
     ctx.event && ctx.event('hit', fo, { dealt, zone, brk, kind: info.kind, spd, charged: info.charged, crit: info.crit, skill: info.skill, spell: info.spell, proc: info.proc });
     if (!fo.seen) { fo.seen = true; fo.state = fo.brave ? 'chase' : 'flee'; if (fo.boss) ctx.bossMeet(fo); }
