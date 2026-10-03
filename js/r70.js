@@ -33,7 +33,8 @@ window.HitFeel = (() => {
       if (big) edge(Math.min(1.4, k + 0.3), fl.crit ? 'rgba(255,170,40,.8)' : 'rgba(170,0,10,.85)');
     } catch (e) { }
   }
-  return { on, hit, edge };
+  function warm(sc) { const s = sprite(sc); s.visible = true; s.position.set(0, -50, 0); s.material.opacity = 0; pool.push(s); return s; } // DecapCam.warm 进图时一起预编译（不在第一次命中时现编）
+  return { on, hit, edge, warm };
 })();
 
 window.FieldTier = (() => {

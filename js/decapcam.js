@@ -239,8 +239,10 @@ body.dcam>*:not(#game):not(#dcRoot):not(script):not(style):not(link){visibility:
       warmSc = W.B.sc; const R = G.renderer, sc = W.B.sc; (B2() ? bloodInit2 : bloodInit)(sc, W.B.H);
       const T = THREE; slashArc({ sc, sa: 0, fo: { f: { bones: {} }, pos: new T.Vector3() } }); const arc = slashArc.grp; if (arc) arc.position.set(0, -50, 0);
       const post = G.post, viaRT = !!(post && post.on), tm = R.toneMapping, rt0 = R.getRenderTarget();
+      const shown = []; if (bl && bl.v2) { for (const o of [bl.splats[0], bl.splats[1], bl.splats[2], bl.splats[3], bl.pools[0].m, bl.mist[0].o]) if (o && !o.visible) { o.visible = true; o.position.y = -50; shown.push(o); } } // R70：three 的 compile 跳过不可见物体——血斑/血泊/血雾以前第一次出现才现编着色器
+      if (window.HitFeel && HitFeel.warm) try { const s = HitFeel.warm(sc); if (s) shown.push(s); } catch (e) { }
       try { if (window.ShaderQ && ShaderQ.async) ShaderQ.compile(R, sc, G.camera); else { if (viaRT) { const rt = warm.rt || (warm.rt = new T.WebGLRenderTarget(16, 16, { depthBuffer: true })); R.toneMapping = T.NoToneMapping; R.setRenderTarget(rt); } R.compile(sc, G.camera); } } finally { R.toneMapping = tm; R.setRenderTarget(rt0); }
-      if (arc && arc.parent === sc) sc.remove(arc);
+      if (arc && arc.parent === sc) sc.remove(arc); for (const o of shown) { o.visible = false; if (o.isSprite && o.parent && !(bl && bl.mist.some(m => m.o === o))) o.parent.remove(o); }
     } catch (e) { console.warn('DecapCam.warm', e); }
   }
   function pre(dt, now) {

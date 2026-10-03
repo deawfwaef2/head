@@ -447,7 +447,8 @@ window.Foe = (() => {
       if (fo.dead) { if (fo.lodVis === false || fo.lodSh) { fo.f.root.visible = true; fo.lodVis = true; if (fo.lodSh) { for (const o of fo.lodSh) o.castShadow = true; fo.lodSh = null; } } if (fo.rag) ragStep(fo, dt); if (fo.warn) fo.warn.visible = false; if (fo.gs) fo.gs.visible = false; if (fo.duel && fo.duel.rib) fo.duel.rib.visible = false;
         if (fo.spurt > 0 && !fo.headOnPiece) { fo.spurt -= dt; const nb = f.bones.neck; if (nb && Math.random() < 0.8) { nb.getWorldPosition(tv2); const up = tv.set(0, 1, 0).applyQuaternion(nb.getWorldQuaternion(_q)); blood(tv2.addScaledVector(up, 0.05), 1, up, 0.9 + fo.spurt * 0.3); } }
         continue; }
-      if (!(fo.hp > 0) && fo.maxHp > 0) { try { const p = fo.pos.clone(); p.y += 1; die(fo, { point: p, vel: new V3(0, 0, 0), speed: 3, kind: 'slash' }, false); } catch (e) { foeErr(e); fo.dead = true; } continue; } // R70：血量 ≤0（或 NaN）却没死 = 某个命中钩子抛错跳过了 die()（用户：BOSS 血到 0 卡着不动）
+      if (fo.hp !== fo.hp) fo.hp = fo._lastHp > 0 ? fo._lastHp : Math.max(1, fo.maxHp || 1); else fo._lastHp = fo.hp; // R70：NaN 血量（某个倍率算坏）回到上一帧的值，不再“打不死”
+      if (fo.hp <= 0 && fo.maxHp > 0) { try { const p = fo.pos.clone(); p.y += 1; die(fo, { point: p, vel: new V3(0, 0, 0), speed: 3, kind: 'slash' }, false); } catch (e) { foeErr(e); fo.dead = true; } continue; } // R70：血量 ≤0 却没死 = 某个命中钩子抛错跳过了 die()（用户：BOSS 血到 0 卡着不动）
       fo.t += dt; fo.cd -= dt; fo.sayT -= dt; if (fo.stag > 0) fo.stag -= dt; if (fo.block > 0) fo.block -= dt;
       if (fo.stag > 0 && fo.f.clips.LayToIdle && (fo.f.cur === 'Hit_Knockback' || fo.f.cur === 'LayToIdle')) { // 击倒：倒地(0.8s) → 起身(LayToIdle) 播完才恢复行动；以前倒到一半被硬切回走路 = 躺着的人瞬间弹起来
         const A = fo.f.mixer.clipAction(fo.f.clips[fo.f.cur]); fo.kdT = (fo.kdT || 0) + dt;
