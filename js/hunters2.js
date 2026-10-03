@@ -126,7 +126,7 @@ window.Hunters2 = (() => {
     T.m = Math.min(100, T.m); T.quiet = !!quiet;
     const al = alive();
     const inf = (locK && s.reg[locK]) || 0, SR = SURE(), gate = SR ? s.hate >= 8 && mins >= 1.5 : s.hate >= 8 && inf >= 6 && mins >= 1.5 && !T.omenFired; /* R49d：开局不刷猎手——要这个地区有足够的“恶名”、仇恨够高、且已停留 1.5 分钟以上；入场伏击由 rollOmen 决定（带电影） */
-    T.gate = gate; if (SR && !T.fo && (!gate || quiet)) T.m = Math.min(T.m, 95); // R70 nem_sure：条满 100% 就一定会来；条件不够时停在 95%（以前满条也可能永远不来）
+    T.gate = gate; if (SR && !T.fo && (!gate || (quiet && !W.busy))) T.m = Math.min(T.m, 95); // R70 nem_sure：条满 100% 就一定会来；条件不够时停在 95%（以前满条也可能永远不来）；过门加载时不压条，进下一个地点就来
     if (!T.fo && !quiet && gate && T.m >= 100 && al.length && now > T.cool) {
       if (!T.armedAt) T.armedAt = now;
       if (SR) { if (!T.spawning && now - T.armedAt > 2500 && now - (T.sureAt || 0) > 4000) { T.sureAt = now; spawn(al[Math.floor(Math.random() * al.length)].id); } }
@@ -155,6 +155,7 @@ window.Hunters2 = (() => {
       const k0 = Worlds.onKey; Worlds.onKey = function (e) {
         const W = Worlds._W;
         if (on() && T && T.fo && !T.fo.dead && (window.Nemesis && Nemesis.sealed ? Nemesis.sealed() : !T.fleeAt) && W && e.code === 'KeyE' && !e.repeat && W.doorNear) { try { G.toast(`🔒 ${BY[T.id].n} 在这里——门被封死了，打倒她或者撑到她撤退！`, '#ff9070', 2); } catch (x) { } return true; }
+        if (on() && SURE() && T && !T.fo && T.m >= 100 && T.gate && !T.quiet && T.armedAt && performance.now() - T.armedAt < 9000 && alive().length && W && e.code === 'KeyE' && !e.repeat && W.doorNear) { try { G.toast('🏹 猎手已经锁定了你——她马上就到，这扇门出不去了！', '#ff9070', 2); } catch (x) { } return true; } // R70 nem_sure：满条=逃不掉（最多拦 9 秒，刷不出来也不会把你困死）
         return k0.apply(this, arguments);
       };
       const s0 = Worlds.start; Worlds.start = function () { const r = s0.apply(this, arguments); try { newTrip(); } catch (e) { } return r; };
