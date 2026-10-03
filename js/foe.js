@@ -447,11 +447,13 @@ window.Foe = (() => {
       if (fo.dead) { if (fo.lodVis === false || fo.lodSh) { fo.f.root.visible = true; fo.lodVis = true; if (fo.lodSh) { for (const o of fo.lodSh) o.castShadow = true; fo.lodSh = null; } } if (fo.rag) ragStep(fo, dt); if (fo.warn) fo.warn.visible = false; if (fo.gs) fo.gs.visible = false; if (fo.duel && fo.duel.rib) fo.duel.rib.visible = false;
         if (fo.spurt > 0 && !fo.headOnPiece) { fo.spurt -= dt; const nb = f.bones.neck; if (nb && Math.random() < 0.8) { nb.getWorldPosition(tv2); const up = tv.set(0, 1, 0).applyQuaternion(nb.getWorldQuaternion(_q)); blood(tv2.addScaledVector(up, 0.05), 1, up, 0.9 + fo.spurt * 0.3); } }
         continue; }
+      if (!(fo.hp > 0) && fo.maxHp > 0) { try { const p = fo.pos.clone(); p.y += 1; die(fo, { point: p, vel: new V3(0, 0, 0), speed: 3, kind: 'slash' }, false); } catch (e) { foeErr(e); fo.dead = true; } continue; } // R70：血量 ≤0（或 NaN）却没死 = 某个命中钩子抛错跳过了 die()（用户：BOSS 血到 0 卡着不动）
       fo.t += dt; fo.cd -= dt; fo.sayT -= dt; if (fo.stag > 0) fo.stag -= dt; if (fo.block > 0) fo.block -= dt;
       if (fo.stag > 0 && fo.f.clips.LayToIdle && (fo.f.cur === 'Hit_Knockback' || fo.f.cur === 'LayToIdle')) { // 击倒：倒地(0.8s) → 起身(LayToIdle) 播完才恢复行动；以前倒到一半被硬切回走路 = 躺着的人瞬间弹起来
-        const A = fo.f.mixer.clipAction(fo.f.clips[fo.f.cur]);
-        if (fo.f.cur === 'Hit_Knockback') { if (A.time >= 0.78) fo.f.play('LayToIdle', { once: true, fade: 0.12, restart: true, speed: 1.8 }); else fo.stag = Math.max(fo.stag, 0.78 - A.time + 0.88); }
-        else fo.stag = Math.max(fo.stag, Math.max(0, 1.5 - A.time) / 1.8 + 0.03); }
+        const A = fo.f.mixer.clipAction(fo.f.clips[fo.f.cur]); fo.kdT = (fo.kdT || 0) + dt;
+        if (fo.kdT > 3.2) { fo.kdT = 0; fo.stag = 0; fo.f.play(fo.armed ? 'Sword_Idle' : 'Idle_Loop', { fade: 0.25 }); } // R70：动作时间不走（被别的层停掉）时不会永远躺着
+        else if (fo.f.cur === 'Hit_Knockback') { if (A.time >= 0.78) fo.f.play('LayToIdle', { once: true, fade: 0.12, restart: true, speed: 1.8 }); else fo.stag = Math.max(fo.stag, 0.78 - A.time + 0.88); }
+        else fo.stag = Math.max(fo.stag, Math.max(0, 1.5 - A.time) / 1.8 + 0.03); } else fo.kdT = 0;
       const dx = P.pos.x - fo.pos.x, dz = P.pos.z - fo.pos.z, d = Math.hypot(dx, dz) || 1e-3;
       const face = Math.atan2(dx, dz);
       const see = ctx.sees(fo.pos, (fo.boss ? 16 : 9 + fo.rar * 2) * (P.crouch > 0.5 ? 0.55 : 1)) && (fo.seen || Math.abs(ang(face - fo.yaw)) < 1.4 || d < 3);
@@ -696,6 +698,7 @@ window.Foe = (() => {
   function atkLeft(A) { const h = A.hits[A.hi]; if (!h) return 0; const ct = A.act.time, w = A.hi ? A.ws2 : A.ws, hold = A.hold > 0;
     return (hold ? A.hold + Math.max(0, A.holdAt - ct) / w : 0) + Math.max(0, h.t - 0.06 - Math.max(ct, hold ? A.holdAt : 0)) / w + Math.min(0.06, Math.max(0, h.t - ct)); }
   const PRESS = () => !window.Mods || Mods.on('foe_press') !== false;
+  const TRACK = () => !window.Mods || Mods.on('foe_track') !== false;
   function atkStep(fo, dt, d, face) {
     const A = fo.atk, act = A.act, ct = act.time, h = A.hits[A.hi]; let sc = 0.9, turnTo = null, spd = 0;
     if (FAIR() && !A.hi && ct < 0.08 && !A.faced) { if (Math.abs(ang(face - fo.yaw)) > 0.45 && (A.faceT = (A.faceT || 0) + dt) < 0.8) { act.timeScale = 0; return { turnTo: face, spd: 0 }; } A.faced = 1; } // 先转过来对着你再起手
@@ -705,6 +708,7 @@ window.Foe = (() => {
       if (ct < h.t - 0.14) turnTo = face; // 出手前最后一瞬不再转身：侧闪有效
       if (A.lunge && ct < h.t && d > 1.1 && sc > 0) spd = A.lunge;
       if (PRESS() && !A.ranged && ct < h.t && sc > 0 && d > A.reach * 0.75) spd = Math.max(spd, (h.heavy ? 3.0 : 1.9) * (fo.boss ? 1.15 : 1) * (FAIR() ? 0.55 : 1)); // R43 foe_press：出招时边打边逼近（重击迈得更多）——不能靠无限后撤躲开
+      if (TRACK() && !A.ranged && ct < h.t - 0.04 && d > A.reach * 0.6 && CTX.pvel) { const P = CTX.player.pos, pv = CTX.pvel, away = (pv.x * (P.x - fo.pos.x) + pv.z * (P.z - fo.pos.z)) / Math.max(d, 0.1); if (away > 0.6) { if (sc === 0 && A.hold > 0.06 && d > A.reach + 0.4) A.hold = 0.06; if (sc > 0 || d > A.reach + 0.4) spd = Math.max(spd, Math.min(fo.boss ? 4.9 : 4.4, away + 1.0)); } } // R70 foe_track：你倒着走，她就提前出手并跟上来（比后退快约 1m/s，不在定格蓄力姿势里滑行）——躲刀靠侧移/闪身/格挡
       const left = atkLeft(A); if (left > A.tot) A.tot = left;
       if (ct >= h.t) { A.hi++; A.tot = 0;
         if (window.CombatFX) CombatFX.enemySwing(fo, h);
@@ -883,10 +887,9 @@ window.Foe = (() => {
   }
   function die(fo, info, quiet) {
     if (!fo.boss && window.Persona) { const t = Persona.line(fo, 'die'); if (t) talk(fo, t, '#c8c8d0'); } // 第二十四轮：最后一句
-    fo.dead = true; fo.atk = null; fo.anchor.gone = true; if (window.FoeAI2) FoeAI2.onDie(fo, info);
-    ragStart(fo, info); // 先按当前动作姿势建粒子，再停动画（停动画会把骨骼还原成 T 姿势）
-    fo.f.mixer.stopAllAction(); ragPose(fo);
-    CTX.onDeath && CTX.onDeath(fo); CTX.event && CTX.event('kill', fo);
+    fo.dead = true; fo.atk = null; fo.anchor.gone = true; try { if (window.FoeAI2) FoeAI2.onDie(fo, info); } catch (e) { foeErr(e); }
+    try { ragStart(fo, info); fo.f.mixer.stopAllAction(); ragPose(fo); } catch (e) { foeErr(e); } // 先按当前动作姿势建粒子，再停动画（停动画会把骨骼还原成 T 姿势）；R70：任何一步出错都不能让后面的死亡结算（BOSS 条/尸体/击杀事件）丢掉
+    try { CTX.onDeath && CTX.onDeath(fo); } catch (e) { foeErr(e); } try { CTX.event && CTX.event('kill', fo); } catch (e) { foeErr(e); }
     if (!quiet) CTX.toast('☠️ 她倒下了——砍下她的头才能带走首级', '#ffb0a0', 2.6);
   }
   function decapitate(fo, info) {

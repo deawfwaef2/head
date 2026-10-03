@@ -913,10 +913,10 @@ window.Worlds = (() => {
         W.dom.loadT.textContent = `「${node.name}」里有人……`; W.dom.loadB.style.width = '62%';
         const tf0 = performance.now(); W.foes = await popFoes(B, node, list); tp('foes', tf0); if (W) W.dom.loadB.style.width = '80%';
         if (W.foes && !W.foes.length && list.length) W.foes = null;
-        if (W.foes && B.site && window.WSites) WSites.seat(W.foes, B.site);
-      } catch (e) { console.warn('Foe', e); W.foes = null; }
+        if (W.foes && B.site && window.WSites) try { WSites.seat(W.foes, B.site); } catch (e) { console.warn('WSites.seat', e); } // R70：入座出错不能把整批敌人丢掉（以前 = 角色全定格 + 光球乱跑）
+      } catch (e) { console.warn('Foe', e); W.foes = liveFoes(); }
     }
-    if (!W.foes) { W.prey = spawnPrey(B, node); W.boss = wantBoss ? spawnBoss(B, node) : null; }
+    if (!W.foes) { dropFoes(); W.prey = spawnPrey(B, node); W.boss = wantBoss ? spawnBoss(B, node) : null; }
     // 门牌
     B.doors.forEach(d => { d.label.userData.set(doorName(node, d)); });
     // 出生点：来的那扇门内侧
@@ -941,9 +941,11 @@ window.Worlds = (() => {
   const SEAL = () => !!(window.Nemesis && Nemesis.sealed && Nemesis.sealed());
   const inFight = () => !!(W && window.Foe && Foe.foes && Foe.foes.some(f => f && !f.dead && f.pos && (f.atk || (f.seen && f.state === 'chase')) && Math.hypot(f.pos.x - W.pos.x, f.pos.z - W.pos.z) < 20));
   async function popFoes(B, node, list) { // R54l：载入失败先重试，不要动不动退回「光球小精灵」
-    for (let a = 0; a < 3; a++) { try { const f = await Foe.populate(foeCtx(B, node), list); if (f && (f.length || !list.length)) return f; } catch (e) { console.warn('Foe.populate', a, e); } if (!W) return null; await wait(500 + a * 700); }
+    for (let a = 0; a < 3; a++) { try { const f = await Foe.populate(foeCtx(B, node), list); if (f && (f.length || !list.length)) return f; } catch (e) { console.warn('Foe.populate', a, e); const lv = liveFoes(); if (lv) return lv; } if (!W) return null; await wait(500 + a * 700); } // R70：populate 后半段（预热/入座）抛错时，已经搭好的敌人照样用
     return null;
   }
+  function liveFoes() { try { const a = window.Foe && Foe.foes ? Foe.foes.filter(f => f && !f.dead && f.f && f.f.root && f.f.root.parent) : []; return a.length ? a : null; } catch (e) { return null; } }
+  function dropFoes() { try { if (window.Foe && Foe.clear && Foe.foes && Foe.foes.length) Foe.clear(); } catch (e) { console.warn('Foe.clear', e); } } // R70：退回光球前清掉不会再更新的角色（以前留在场上一动不动）
   function travel(i, from) { if (window.Loop) try { Loop.leaveNode(); } catch (e) { } if (CORR() && W && W.B && !W.B.corr) return gotoCorr(i, from).catch(e => { console.warn('corridor', e); if (W) goto(i, from); }); return goto(i, from); }
   const KIT = { templates: (n) => templates(n), veil: (g, home) => veil(g, home) };
   function corrSize(n) { const t = templates(n)[0]; return t ? { x: t.size.x, z: t.size.z, big: t.size.y > 1.5 || Math.max(t.size.x, t.size.z) > 2.5 } : { x: 1, z: 1, big: false }; }
@@ -982,8 +984,8 @@ window.Worlds = (() => {
         if (wantBoss) { const Bo = BOf(node); node.bossH = node.bossH || mkBossH(node, Bo); list.push({ h: node.bossH, pos: B.bossAt || new V3(0, 0, 0), boss: Bo, bossK: node.chB || node.region }); }
         const tf0 = performance.now(); foes = await popFoes(B, node, list); tp('foes', tf0);
         if (foes && !foes.length && list.length) foes = null;
-        if (foes && B.site && window.WSites) WSites.seat(foes, B.site);
-      } catch (e) { console.warn('Foe', e); foes = null; }
+        if (foes && B.site && window.WSites) try { WSites.seat(foes, B.site); } catch (e) { console.warn('WSites.seat', e); }
+      } catch (e) { console.warn('Foe', e); foes = liveFoes(); }
     }
     B.doors.forEach(d => { d.label.userData.set(doorName(node, d)); });
     try { if (window.Foe && Foe.warm) Foe.warm(G.renderer, B.sc, G.camera); } catch (e) { } // 着色器在走廊里就编好
@@ -995,7 +997,7 @@ window.Worlds = (() => {
       if (!W || W.B !== C) return;
       try { C.dispose(); } catch (e) { } W.B = B; W.corrTo = null;
       W.cur = node.i; node.visited = true; node.known = true; node.adj.forEach(b => W.graph.nodes[b].known = true); remember(node);
-      W.foes = foes; W.prey = []; W.boss = null; if (!W.foes) { W.prey = spawnPrey(B, node); W.boss = wantBoss ? spawnBoss(B, node) : null; }
+      W.foes = foes; W.prey = []; W.boss = null; if (!W.foes) { dropFoes(); W.prey = spawnPrey(B, node); W.boss = wantBoss ? spawnBoss(B, node) : null; }
       const d0 = B.doors.find(d => d.to === from) || B.doors.find(d => d.home) || B.doors[0], ins = d0 ? new V3(-Math.cos(d0.a), 0, -Math.sin(d0.a)) : new V3(0, 0, 1);
       W.pos.set((d0 ? d0.x : 0) + ins.x * 2.4, 0, (d0 ? d0.z : 0) + ins.z * 2.4); W.pos.y = B.H(W.pos.x, W.pos.z); W.vel.set(0, 0, 0);
       if (window.Beasts && !/[?&]nobeast=1/.test(location.search) && !(window.Mods && Mods.on('beasts') === false)) { try { await Beasts.spawn(beastCtx(B, node, r0 => r0), node); } catch (e) { console.warn('Beasts', e); } }

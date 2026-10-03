@@ -59,7 +59,7 @@ window.Hunters2 = (() => {
   }
 
   async function spawn(id) {
-    const W = Worlds._W, C = Foe.ctx && Foe.ctx(); if (!W || !C || T.spawning) return; T.spawning = true;
+    const W = Worlds._W, C = Foe.ctx && Foe.ctx(); if (!W || !C || T.spawning || !W.B || W.busy || C.sc !== W.B.sc) return; T.spawning = true; // R70：场景没准备好 / 敌人上下文还是上一个地点的，不往旧场景里刷人
     const d = BY[id], node = W.graph.nodes[W.cur], L = lvOf(id), rec = powOf(L);
     try {
       const h = recFor(id, node.loc), P = W.pos, R = (C.R || 20) - 3;
@@ -91,6 +91,7 @@ window.Hunters2 = (() => {
   }
   // R50 MOD hunter_calm：感应大幅放慢（用户：“猎手感应涨得太快”）
   const calm = () => !!(window.Mods && Mods.on && Mods.on('hunter_calm'));
+  const SURE = () => !window.Mods || !Mods.on || Mods.on('nem_sure') !== false;
   const CALM = { kill: 2.5, decap: 1.5, grace: 120, base: 0.07, ramp: 0.006, rampCap: 10, roll: 12, p0: 0.06, pMin: 0.06, pMax: 0.5, cool: 150000 };
   function endEncounter() { T.fo = null; T.id = null; T.m = 0; T.armedAt = 0; T.cool = performance.now() + (calm() ? CALM.cool : 40000); }
 
@@ -124,11 +125,12 @@ window.Hunters2 = (() => {
     else if (!T.fo && !quiet && now > T.cool) T.m += dt * (0.25 + mins * 0.06) * gm; // 每分钟约 15%，停得越久涨得越快
     T.m = Math.min(100, T.m); T.quiet = !!quiet;
     const al = alive();
-    const inf = (locK && s.reg[locK]) || 0, gate = s.hate >= 8 && inf >= 6 && mins >= 1.5 && !T.omenFired; /* R49d：开局不刷猎手——要这个地区有足够的“恶名”、仇恨够高、且已停留 1.5 分钟以上；入场伏击由 rollOmen 决定（带电影） */
-    T.gate = gate;
+    const inf = (locK && s.reg[locK]) || 0, SR = SURE(), gate = SR ? s.hate >= 8 && mins >= 1.5 : s.hate >= 8 && inf >= 6 && mins >= 1.5 && !T.omenFired; /* R49d：开局不刷猎手——要这个地区有足够的“恶名”、仇恨够高、且已停留 1.5 分钟以上；入场伏击由 rollOmen 决定（带电影） */
+    T.gate = gate; if (SR && !T.fo && (!gate || quiet)) T.m = Math.min(T.m, 95); // R70 nem_sure：条满 100% 就一定会来；条件不够时停在 95%（以前满条也可能永远不来）
     if (!T.fo && !quiet && gate && T.m >= 100 && al.length && now > T.cool) {
       if (!T.armedAt) T.armedAt = now;
-      T.rollT -= dt; if (T.rollT <= 0) { const c = calm(); T.rollT = c ? CALM.roll : 5; const am = (now - T.armedAt) / 60000; const p = c ? Math.min(CALM.pMax, CALM.p0 + am * CALM.pMin) : Math.min(0.9, 0.15 + am * 0.12); if (Math.random() < p) spawn(al[Math.floor(Math.random() * al.length)].id); }
+      if (SR) { if (!T.spawning && now - T.armedAt > 2500 && now - (T.sureAt || 0) > 4000) { T.sureAt = now; spawn(al[Math.floor(Math.random() * al.length)].id); } }
+      else { T.rollT -= dt; if (T.rollT <= 0) { const c = calm(); T.rollT = c ? CALM.roll : 5; const am = (now - T.armedAt) / 60000; const p = c ? Math.min(CALM.pMax, CALM.p0 + am * CALM.pMin) : Math.min(0.9, 0.15 + am * 0.12); if (Math.random() < p) spawn(al[Math.floor(Math.random() * al.length)].id); } }
     }
     // 猎手在场
     const fo = T.fo;

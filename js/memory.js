@@ -48,18 +48,18 @@ window.Memory = (() => {
   const gate = () => on() && !(window.Mods && Mods.on('skill_pick') === false) && !_allow; // 天赋树加点被锁（技能只能靠回忆三选一）
   function css() {
     if (css.done) return; css.done = 1; const s = document.createElement('style'); s.textContent = `
-#mmRoot{position:fixed;inset:0;z-index:64;display:none;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 45%,rgba(40,24,64,.55),rgba(0,0,0,.92));backdrop-filter:blur(5px);font-family:var(--u-serif,'Noto Serif SC',serif);color:#eee;overflow-y:auto;padding:16px 0}
-#mmRoot.on{display:flex;animation:mmIn .6s ease-out}@keyframes mmIn{from{opacity:0}}
+#mmRoot{position:fixed;inset:0;z-index:64;display:none;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 45%,rgba(40,24,64,.72),rgba(0,0,0,.95));font-family:var(--u-serif,'Noto Serif SC',serif);color:#eee;overflow-y:auto;padding:16px 0}
+#mmRoot.on{display:flex;animation:mmIn .25s ease-out}@keyframes mmIn{from{opacity:0}}
 #mmRoot .hd{text-align:center;margin:auto 0 16px}
 #mmRoot .hd .a{font-size:16px;letter-spacing:.7em;color:#c8b8ff;padding-left:.7em}
 #mmRoot .hd .b{font-size:clamp(40px,5.2vw,72px);font-weight:900;letter-spacing:.4em;color:#fff;text-shadow:0 0 50px #8a6aff99;padding-left:.4em;line-height:1.1}
 #mmRoot .hd .c{font-size:19px;color:#d8d0f0;letter-spacing:.12em;margin-top:6px}
 #mmRoot .hd .c b{color:#ffe28a;font-size:24px}
 #mmRoot .cards{display:flex;gap:18px;justify-content:center;align-items:stretch;padding:0 2vw;flex-wrap:wrap}
-#mmRoot .cd{position:relative;width:min(270px,21.5vw);min-width:232px;padding:0 0 18px;cursor:pointer;background:linear-gradient(170deg,color-mix(in srgb,var(--c) 22%,#0c0814),#0a0710 70%);box-shadow:inset 0 0 0 1px var(--c),0 18px 60px #000c,0 0 50px color-mix(in srgb,var(--c) 18%,transparent);opacity:0;transform:translateY(40px) rotateY(18deg) scale(.94);animation:mmCard .8s cubic-bezier(.2,.9,.2,1) forwards;transition:transform .25s,box-shadow .25s}
-#mmRoot .cd:nth-child(2){animation-delay:.12s}#mmRoot .cd:nth-child(3){animation-delay:.24s}#mmRoot .cd:nth-child(4){animation-delay:.36s}
+#mmRoot .cd{position:relative;width:min(270px,21.5vw);min-width:232px;padding:0 0 18px;cursor:pointer;background:linear-gradient(170deg,color-mix(in srgb,var(--c) 22%,#0c0814),#0a0710 70%);box-shadow:inset 0 0 0 1px var(--c),0 10px 30px #000c;opacity:0;transform:translateY(24px);animation:mmCard .35s ease-out forwards;transition:transform .15s}
+#mmRoot .cd:nth-child(2){animation-delay:.06s}#mmRoot .cd:nth-child(3){animation-delay:.12s}#mmRoot .cd:nth-child(4){animation-delay:.18s}
 @keyframes mmCard{to{opacity:1;transform:none}}
-#mmRoot .cd:hover{transform:translateY(-10px) scale(1.03);box-shadow:inset 0 0 0 2px var(--c),0 26px 80px #000,0 0 90px color-mix(in srgb,var(--c) 45%,transparent)}
+#mmRoot .cd:hover{transform:translateY(-8px);box-shadow:inset 0 0 0 2px var(--c),0 14px 36px #000}
 #mmRoot .cd .sc{padding:12px 16px 8px;display:flex;align-items:center;gap:10px;background:linear-gradient(90deg,color-mix(in srgb,var(--c) 35%,transparent),transparent)}
 #mmRoot .cd .sc i{font-style:normal;font-size:24px}#mmRoot .cd .sc b{font-size:17px;letter-spacing:.35em;color:var(--c)}#mmRoot .cd .sc em{margin-left:auto;font-style:normal;font-size:15px;color:var(--tc);letter-spacing:.1em;font-weight:800}
 #mmRoot .cd .ic{text-align:center;font-size:62px;line-height:1.25;filter:drop-shadow(0 0 20px var(--c))}
@@ -177,9 +177,7 @@ window.Memory = (() => {
   const safeNow = () => {
     const g = G(); if (!g || !g.playing || g.uiOpen) return false; const W = window.Worlds && Worlds.active && Worlds._W;
     if (!W) return !document.body.classList.contains('sgcine') && !(window.Saga && Saga.cine);
-    if (W.busy || W.dead || W.mapOpen || (window.Saga && Saga.cine)) return false;
-    try { const P = W.pos; for (const f of (window.Foe && Foe.foes) || []) if (f && !f.dead && !f.escaped && f.seen && f.pos && Math.hypot(f.pos.x - P.x, f.pos.z - P.z) < 42) return false; } catch (e) { }
-    return true;
+    return false; // R70：野外一律不自动弹（用户：技能升级弹窗卡交战、卡鼠标）——右上角提示「按 ` 选择」，回洞后自动弹出
   };
   // 升级后：待选「回忆」自动弹出——野外要等周围没有警觉的敌人（不会在战斗中打断你），否则排队，等安全了/回洞了再弹
   function queue(up) { pend = Date.now() + 1800; }

@@ -104,11 +104,12 @@ window.Nemesis = (() => {
   async function strike(reason) {
     const w = W(); if (!w || w.busy || !w.B || w.B.corr || w.dead) return false; const H2 = window.Hunters2, C = window.Foe && Foe.ctx(); if (!C || C.sc !== w.B.sc) return false;
     if (LP() && LP().isBossTrip()) return false; // BOSS 战时宿敌不来
-    const al = H2 && H2.on && H2.on() ? H2.alive() : []; if (H2 && H2.T && H2.T.fo && !H2.T.fo.dead) return false;
-    const ex = (S().extra || []).length; if (ex && Math.random() < ex / (ex + al.length + 1)) return extraStrike();
-    if (!al.length || Math.random() < 0.3) return clone();
-    try { await H2.spawn(al[Math.floor(Math.random() * al.length)].id); const fo = H2.T && H2.T.fo; if (fo) { if (!w.foes) w.foes = Foe.foes; else if (!w.foes.includes(fo)) w.foes.push(fo); fo.seen = true; fo.state = 'chase'; } return true; } catch (e) { console.warn('nemesis', e); return false; }
+    const al = H2 && H2.on && H2.on() ? H2.alive() : []; if (H2 && H2.T && H2.T.fo && !H2.T.fo.dead) return SURE(); // R70：已经有猎手在场 = 已经“来了”
+    const ex = (S().extra || []).length; if (ex && Math.random() < ex / (ex + al.length + 1)) { const ok = await extraStrike(); if (ok || !SURE()) return ok; }
+    if (!al.length || Math.random() < 0.3) { const ok = await clone(); if (ok || !SURE() || !al.length) return ok; }
+    try { await H2.spawn(al[Math.floor(Math.random() * al.length)].id); const fo = H2.T && H2.T.fo; if (fo) { if (!w.foes) w.foes = Foe.foes; else if (!w.foes.includes(fo)) w.foes.push(fo); fo.seen = true; fo.state = 'chase'; } return SURE() ? !!(fo && !fo.dead) : true; } catch (e) { console.warn('nemesis', e); return false; } // R70：以前猎手没刷出来也返回 true → 条清零、没人来
   }
+  const SURE = () => !window.Mods || !Mods.on || Mods.on('nem_sure') !== false;
   function tick() {
     if (!G() || !G().S) return; const s = S(), w = W(), dt = 1;
     if (G().playing) { s.play += dt; if (onN() && window.Hunters2 && Hunters2.SS) { const H2 = Hunters2.SS(), stp = Hunters2.HATE_STEP || 15, b0 = Math.floor(H2.hate / stp); H2.hate += stp / 480 * dt * (window.Diff ? Diff.nem() : 1); /* 每 8 分钟 +1 级，改成每秒连续积累（条可见） */ if (Math.floor(H2.hate / stp) > b0) { s.grow = s.play; try { G().toast(window.NemStory && NemStory.on() ? '🩸 宿敌们在你看不见的地方又变强了——进入下一个地点时，你会看到发生了什么' : '🩸 宿敌们在你看不见的地方又变强了（猎手全体 +1 级）', '#ff9a8a', 2.8); } catch (e) { } } } }
@@ -123,8 +124,10 @@ window.Nemesis = (() => {
     if (!plan || !onN() || boss) return; const now = performance.now() / 1000;
     if (w.busy || !w.B || w.B.corr) { plan.enteredAt = 0; return; } if (!plan.enteredAt) plan.enteredAt = now;
     if (LP() && G().playing && !w.dead) s.p = Math.min(100, s.p + 100 / 420 * LP().nemRate() * (window.Diff ? Diff.nem() : 1)); // R54i：出猎时逼近也在涨（满了就来），不只是洞里
-    if (plan.first && now - plan.enteredAt > 6) { plan.first = false; strike('first').catch(() => { }); }
-    else if (LP() && s.p >= 100 && now - plan.enteredAt > 8) { s.p = 0; strike('meter').then(ok => { if (!ok) s.p = 90; }).catch(() => { }); }
+    if (plan.striking || plan.wait > now) return; // R70 nem_sure：一次只刷一个；失败 5 秒后重试
+    const retry = () => { if (plan) { plan.striking = false; plan.wait = now + 5; } };
+    if (plan.first && now - plan.enteredAt > 6) { plan.first = false; plan.striking = true; strike('first').then(ok => { retry(); if (!ok && SURE() && plan) plan.first = true; }).catch(() => { retry(); if (SURE() && plan) plan.first = true; }); }
+    else if (LP() && s.p >= 100 && now - plan.enteredAt > 8) { if (!SURE()) s.p = 0; plan.striking = true; strike('meter').then(ok => { retry(); if (ok) s.p = 0; else if (!SURE()) s.p = 90; }).catch(() => { retry(); }); }
     else if (!LP() && now > plan.next && now - plan.enteredAt > 10) { plan.next = now + 240 + Math.random() * 180; strike('periodic').catch(() => { }); }
   }
   setInterval(() => { try { tick(); } catch (e) { } }, 1000);

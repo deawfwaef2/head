@@ -156,6 +156,7 @@ ${el.length ? `<div>👑 可挑战的精英：${el.map(d => `<b style="color:${d
     if (document.body) document.body.classList.toggle('arr2', on()); if (!on() || !window.G || !G.S) return;
     const W = window.Worlds && Worlds.active && Worlds._W;
     if (!W || !W.graph || !W.graph.trip) { if (T) { T = null; if (trk) trk.style.display = 'none'; const hs = document.getElementById('h2Sense'); if (hs) hs.style.top = ''; } return; }
+    if (W.graph.arena || (window.Loop && Loop.isBossTrip && Loop.isBossTrip())) { if (trk) trk.style.display = 'none'; return; } // R70：BOSS 擂台不生成/不显示支线
     const RT = window.RegionQuest && RegionQuest.T; const k = (RT && RT.k) || (W.graph.nodes[0] && W.graph.nodes[0].loc && W.graph.nodes[0].loc.k);
     if (!T && k) newTrip(W, k); if (!T) return;
     const nd = W.graph.nodes[W.cur]; if (nd && !nd.eliteArena && !nd.huntArena) T.deep = Math.max(T.deep, nd.depth || 0);

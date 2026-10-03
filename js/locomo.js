@@ -112,7 +112,9 @@ window.Locomo = (() => {
     if (fo.atk) return false;
     const dx = vx - fv.x, dz = vz - fv.z, dl = Math.hypot(dx, dz); if (dl < 1e-5) return true;
     const speedUp = Math.hypot(vx, vz) > Math.hypot(fv.x, fv.z);
-    const a = (burst ? 16 : speedUp ? 7 : 10) * dt, k = Math.min(1, a / dl);
+    // R70：冲锋/突刺/翻滚这类高速爆发（>4.5m/s）几乎瞬间到速，结束后快速刹住；以前 16m/s² 的上限让 0.4~0.7s 的冲刺只走了 1~4m（“看得到轨迹、敌人没冲过来”）
+    const big = burst && Math.hypot(vx, vz) > 4.5; if (big) fo._bst = 0.3; else if (fo._bst > 0) fo._bst -= dt;
+    const a = (big ? 90 : burst ? 16 : fo._bst > 0 ? 36 : speedUp ? 7 : 10) * dt, k = Math.min(1, a / dl);
     fv.x += dx * k; fv.z += dz * k; return true;
   }
   return { on, install, tick, turn, accel, G };

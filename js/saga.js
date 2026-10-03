@@ -607,7 +607,7 @@ ${rwHTML(sg, win)}<div class="go"><button data-sgok>收下结算 ▶</button></d
     if (!window.G || !G().S) return; document.body.classList.toggle('saga', on()); if (!CN && document.body.classList.contains('sgcine')) document.body.classList.remove('sgcine');
     const W = window.Worlds && Worlds.active && Worlds._W;
     if (!W || !on()) { if (trk) trk.style.display = 'none'; if (!W && T && !T.settled && !CN) { /* 非正常退出：不结算 */ } if (!W) T = null; return; }
-    if (!T) return; const sg = T; if (!sg.node && !sg.noNode && W.B) pickNode(sg, W); if (sg.noNode) return;
+    if (!T) return; const sg = T; if (W.graph && (W.graph.arena || (window.Loop && Loop.isBossTrip && Loop.isBossTrip()))) { if (trk) trk.style.display = 'none'; return; } /* R70：BOSS 擂台不显示异变目标 */ if (!sg.node && !sg.noNode && W.B) pickNode(sg, W); if (sg.noNode) return;
     if (W.trip && W.stats) sg.snap = { coins: W.trip.coins || 0, kill: W.stats.kill || 0, decap: W.stats.decap || 0 };
     if (!sg.readyAt && W.B && !W.busy) sg.readyAt = performance.now();
     if (window.NemStory && NemStory.hold()) { sg.readyAt = performance.now(); track(W); return; } // R57 nem_story：宿敌插曲先播，地区电影等它

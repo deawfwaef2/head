@@ -200,6 +200,7 @@ window.RegionQuest = (() => {
   function tick() {
     const W = window.Worlds && Worlds.active && Worlds._W;
     if (!W || !T || !on()) { if (hud) hud.root.style.display = 'none'; if (!W) T = null; return; }
+    if (W.graph && (W.graph.arena || (window.Loop && Loop.isBossTrip && Loop.isBossTrip()))) { if (hud) hud.root.style.display = 'none'; return; } // R70：BOSS 擂台只有一个 BOSS，不显示做不了的任务
     const h = ensureHud(); h.root.style.display = 'block';
     if (!T.shown && !W.busy && W.B) { T.shown = true; setTimeout(() => T && showCard(), 500); }
     // 小BOSS
