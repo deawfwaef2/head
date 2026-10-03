@@ -8,7 +8,7 @@ window.Sack = (() => {
   const G = new Proxy({}, { get: (_, k) => { const g = window.G || window.__game; return g && g[k]; } });
   const on = () => !(window.Mods && !Mods.on('sack_grid'));
   // 第二十二轮（用户：装东西时间太久）：每件 5 秒 → 按动作分：拿/放/丢 0.6s、腰带/使用 0.9s、换装 1.8s、塞首级 2.2s
-  const DUR = { take: 0.6, put: 0.6, drop: 0.6, belt: 0.9, use: 0.9, equip: 1.8, head: 2.2 }, dur = (j) => DUR[j && j.k] || 0.8;
+  const DUR = { take: 0.6, put: 0.6, drop: 0.6, belt: 0.9, use: 0.9, equip: 1.8, head: 2.2, body: 2.6 }, dur = (j) => DUR[j && j.k] || 0.8;
   let CELL = 40; // CELL 随屏幕自适应（css() 里计算）：第二十二轮把格子从 40px 放大到 44~64px
   const RARC = ['#b9b4aa', '#7fd07a', '#5fa6ff', '#c27cff', '#ffb347', '#ff5a4a', '#ffe27a'];
   const RARN = ['普通', '优良', '稀有', '史诗', '传说', '神话', '神话'];
@@ -93,8 +93,8 @@ window.Sack = (() => {
   const canAdd = (g, o) => addTo({ w: g.w, h: g.h, items: g.items.map(q => Object.assign({}, q)) }, Object.assign({}, o), false);
   const stashAdd = (o) => { const st = inv().stash, d = IT[o.id]; if (d.st > 1) for (const q of st) if (q.id === o.id && !q.plus) { q.n += o.n; return; } delete o.x; delete o.y; delete o.r; st.push(o); };
   const RN = ['凡魂', '灵魂', '英魂', '圣魂', '神魂'];
-  const nameOf = (o) => o.g2 && window.Gear2 ? Gear2.name(o) : o.og && window.Organs ? Organs.name(o) : o.bk ? `《${o.bk.ti}》` : o.id === 'head' && o.h ? `【${RN[o.h.c.rar] || ''}】${NM(o.h.c)}` : (IT[o.id] ? IT[o.id].n : o.id) + (o.plus ? ` +${o.plus}` : '');
-  const rarOf = (o) => o.g2 ? (o.g2.rar | 0) : o.og ? (o.og.rar | 0) : o.id === 'head' && o.h ? o.h.c.rar : (IT[o.id] ? IT[o.id].rar : 0);
+  const nameOf = (o) => o.g2 && window.Gear2 ? Gear2.name(o) : o.og && window.Organs ? Organs.name(o) : o.bd && window.Bodies ? Bodies.name(o) : o.bk ? `《${o.bk.ti}》` : o.id === 'head' && o.h ? `【${RN[o.h.c.rar] || ''}】${NM(o.h.c)}` : (IT[o.id] ? IT[o.id].n : o.id) + (o.plus ? ` +${o.plus}` : '');
+  const rarOf = (o) => o.g2 ? (o.g2.rar | 0) : o.og ? (o.og.rar | 0) : o.bd ? (o.bd.rar | 0) : o.id === 'head' && o.h ? o.h.c.rar : (IT[o.id] ? IT[o.id].rar : 0);
 
   // ---- 掉落 ----
   function lvOf(node) { const L = window.Lore && Lore.LOCS; const i = L ? Math.max(0, L.findIndex(l => l.k === (node.loc && node.loc.k))) : 0; return i + (node.depth || 0) * 0.15; }
@@ -179,12 +179,14 @@ window.Sack = (() => {
     const sack = inv().sack;
     if (j.k === 'take') return near(j.L) && itemsOf(j.L).includes(j.o);
     if (j.k === 'head') return j.ok() && j.hd.g && W_() && W_().pos.distanceTo(j.hd.g.position) < 3.5;
+    if (j.k === 'body') return near(j.L) && !j.L.bodyTaken;
     return sack.items.includes(j.o);
   }
   function finish(j) {
     const S = G.S, I = inv(), sack = I.sack;
     if (j.k === 'take') { const L = itemsOf(j.L), o = j.o; if (!addTo(sack, o)) { toast('麻袋放不下了', '#ffb070'); return; } L.splice(L.indexOf(o), 1); toast(`🎒 ${nameOf(o)} 装进麻袋`, RARC[rarOf(o)], 1.2); if (j.L.sp && !L.length) j.L.sp.visible = false; return; }
     if (j.k === 'head') { const o = mkHead(j.hd.h); if (!addTo(sack, o)) { toast('麻袋里没有 2×2 的空位放首级', '#ffb070', 2); return; } j.done(); return; }
+    if (j.k === 'body') { j.done(); return; }
     const o = j.o; sack.items.splice(sack.items.indexOf(o), 1);
     if (j.k === 'put') { itemsOf(j.L).push(o); return; }
     if (j.k === 'drop') { dropPile([o]); return; }
@@ -338,7 +340,7 @@ window.Sack = (() => {
   function render() {
     if (mode === 'wild' && panel) {
       const I = inv(), L = cont ? itemsOf(cont) : null;
-      panel.innerHTML = `<div class="sk-cols">${cont ? `<div class="sk-col"><h4>📦 ${esc(cont.name)} <small>${L.length ? '点击 = 装进麻袋' : '空了'}</small>${window.Organs && Organs.canDissect(cont) ? '<button class="sk-btn" data-act="dissect" title="取出整具身体的器官，每件带归属和属性">🔪 解剖</button>' : ''}</h4><div class="sk-list" id="skCont">${L.map(o => tile(o, '')).join('')}</div></div>` : ''}${sackHtml(I)}</div>
+      panel.innerHTML = `<div class="sk-cols">${cont ? `<div class="sk-col"><h4>📦 ${esc(cont.name)} <small>${L.length ? '点击 = 装进麻袋' : '空了'}</small>${window.Organs && Organs.canDissect(cont) ? '<button class="sk-btn" data-act="dissect" title="取出整具身体的器官，每件带归属和属性">🔪 解剖</button>' : ''}${window.Bodies && Bodies.canCarry(cont) ? `<button class="sk-btn" data-act="carry" title="整具无头身体塞进麻袋（占 ${Bodies.SZ.join('×')} 格），带回洞里用">🧍 扛走身体</button>` : ''}</h4><div class="sk-list" id="skCont">${L.map(o => tile(o, '')).join('')}</div></div>` : ''}${sackHtml(I)}</div>
         <div class="sk-foot">${Q.length ? `翻找中：${Q.length} 件排队（受击会打断）· ` : ''}点击麻袋物品 = 取出/使用/装备· 拖动整理（拖动时 R 旋转）· Tab / B / Esc 关闭</div>`;
       bind(panel);
     }
@@ -347,7 +349,7 @@ window.Sack = (() => {
   // 第二十二轮（用户：装备/物品 UI 太小、合成太乱、没有直接花钱升级好玩）：洞里页签重做 —— ⚔️ 装备（铁匠台，js/forge.js） · 🎒 物品（分类筛选 + 悬停详情） · 🔨 工坊（配方分组 + 摆件）
   let itemFilter = 'all', craftOnly = false;
   const FILT = [['all', '全部'], ['equip', '⚔️ 装备'], ['mat', '🪨 材料'], ['use', '🧪 药品'], ['body', '💀 首级·器官'], ['book', '📖 典籍'], ['prop', '🧷 摆件']];
-  const catOf = (o) => { const k = (IT[o.id] || {}).kind; return k === 'equip' ? 'equip' : k === 'use' ? 'use' : (k === 'head' || k === 'organ') ? 'body' : k === 'book' ? 'book' : k === 'prop' ? 'prop' : 'mat'; };
+  const catOf = (o) => { const k = (IT[o.id] || {}).kind; return k === 'equip' ? 'equip' : k === 'use' ? 'use' : (k === 'head' || k === 'organ' || k === 'body') ? 'body' : k === 'book' ? 'book' : k === 'prop' ? 'prop' : 'mat'; };
   const RGRP = [['🌙 回合 · 肉鸽 · 月之踪迹', r => r.grp === 'run', '围绕章节/回合循环：祈福、结算、宿敌、章节 BOSS、月之线索（大多每回合/每章限用）'], ['🧪 药品 · 消耗', r => r.g === 'med' || ['potion', 'bandage', 'stew', 'bigpotion'].includes(r.out), '出猎前带上，腰带按 H 瞬间喝'], ['🍲 料理 · 汤食', r => r.g === 'food', '便宜顶饱，出猎前多备几份'], ['🗡️ 战斗增益', r => r.g === 'buff' || r.out === 'whet', '喝下 / 使用后限时生效：伤害、防御、疾行、再生'], ['🛡️ 护具 · 饰品', r => r.g === 'gear', '用野外材料直接打造；做好后在「装备」页穿上'], ['♻️ 材料转化', r => r.g === 'conv', '把多余的材料换成缺的那一种'], ['🩸 拆解 · 肢体', r => r.g === 'body', '砍断的肢体会收进麻袋；在这里拆成骨、筋、皮'], ['🎒 背篓 · 扩容', r => /^b\d/.test(r.out), '合成后自动换上，麻袋格子变大、能多装东西']];
   function recipeCard(rc, i) {
     const S = G.S, d = IT[rc.out], okN = Object.entries(rc.need).every(([k, n]) => have(k) >= n), ok = okN && S.coins >= rc.coin, u = window.ItemIcons && ItemIcons.url && ItemIcons.url(rc.out);
@@ -395,6 +397,7 @@ window.Sack = (() => {
   function tipHtml(o) {
     const d = IT[o.id] || {}, r = Math.min(6, rarOf(o)), RNm = window.RN_ || RARN; let body = '';
     if (o.og && window.Organs) body = esc(Organs.info(o)).replace(/\n/g, '<br>');
+    else if (o.bd && window.Bodies) body = esc(Bodies.info(o)).replace(/\n/g, '<br>');
     else if (o.h) body = `${esc(RN[o.h.c.rar] || '')} · ${esc(o.h.c.raceN || o.h.c.race || '')}<br>回洞倒袋时滚出来`;
     else if (o.bk) body = esc(`${o.bk.sub || ''}（${o.bk.names.length} 个名字）`);
     else if (o.g2 && window.Gear2) body = Gear2.tipBody(o); /* R35 gear2 */
@@ -402,7 +405,7 @@ window.Sack = (() => {
       const E = RPG.EQUIP[d.slot], t = E.tiers[d.tier], c = E.tiers[G.S.eq[d.slot] || 0], K = ['atk', 'def', 'hp', 'str', 'con', 'agi', 'ter', 'soul', 'cap'], NM = { atk: '攻击', def: '防御', hp: '生命', str: '力量', con: '体魄', agi: '敏捷', ter: '凶威', soul: '魂力', cap: '背篓' };
       body = `<span style="color:${reqOfTier(d.tier) <= plvNow() || d.slot === 'bag' ? '#9fe89f' : '#ff7a6a'}">${d.slot === 'bag' ? '' : '需要等级 ' + reqOfTier(d.tier)}</span><br>` + K.filter(k => t[k] || c[k]).map(k => { const a = t[k] || 0, b = c[k] || 0, df = a - b; return `${NM[k]} <b>${a}</b> <span style="color:${df > 0 ? '#8fe88f' : df < 0 ? '#ff8f86' : '#998'}">${df > 0 ? '▲+' + df : df < 0 ? '▼' + df : '＝'}</span>`; }).join('<br>') + `<br><span style="color:#a99">${esc(t.desc || '')}</span>` + (d.slot === 'weapon' && window.WpnSpec ? WpnSpec.tip(d.tier, o.plus || 0, G.S.eq.weapon || 0, (G.S.eqPlus || {}).weapon || 0) : '');
     } else { body = esc(d.desc || ''); const us = [...new Set(RECIPES.filter(rc => rc.need[o.id]).map(rc => IT[rc.out] ? IT[rc.out].icon + IT[rc.out].n : rc.out))]; if (us.length) body += `<br><span style="color:#9fd0a0">🔨 可合成：${esc(us.slice(0, 8).join('、'))}${us.length > 8 ? ' …' : ''}</span>`; }
-    return `<div class="tn" style="color:${RARC[r]}">${d.icon || ''} ${esc(nameOf(o))}${o.n > 1 ? ' ×' + o.n : ''}</div><div class="tr" style="color:${RARC[r]}">${RARN[r]} · ${({ equip: '装备', use: '消耗品', head: '首级', organ: '人体器官', book: '典籍', prop: '摆件' })[d.kind] || '材料'}${d.st > 1 ? ' · 可堆叠 ' + d.st : ''} · ${dims(o).join('×')} 格</div><div class="tb">${body}</div>`;
+    return `<div class="tn" style="color:${RARC[r]}">${d.icon || ''} ${esc(nameOf(o))}${o.n > 1 ? ' ×' + o.n : ''}</div><div class="tr" style="color:${RARC[r]}">${RARN[r]} · ${({ equip: '装备', use: '消耗品', head: '首级', organ: '人体器官', body: '无头身体', book: '典籍', prop: '摆件' })[d.kind] || '材料'}${d.st > 1 ? ' · 可堆叠 ' + d.st : ''} · ${dims(o).join('×')} 格</div><div class="tb">${body}</div>`;
   }
   function bindTips(root) {
     hideTip(); if (root._tips) return; root._tips = 1;
@@ -425,6 +428,7 @@ window.Sack = (() => {
     root.querySelectorAll('[data-ench]').forEach(b => b.onclick = () => { const k = b.dataset.ench; if (k.indexOf('eq') === 0) enchant('eq', k.split(':')[1] || 'weapon'); else enchant(inv().stash.find(o => o.u === +k)); });
     root.querySelectorAll('[data-craft]').forEach(b => b.onclick = () => craft(RECIPES[+b.dataset.craft]));
     const dsb = root.querySelector('[data-act="dissect"]'); if (dsb) dsb.onclick = () => { if (!near(cont)) { toast('离尸体太远了', '#ccc'); return; } if (window.Autopsy && Autopsy.canOpen(cont)) Autopsy.open(cont, () => render()); else if (window.Dissect && Dissect.on()) Dissect.open(cont, () => render()); else { Organs.dissect(cont); render(); } };
+    const crb = root.querySelector('[data-act="carry"]'); if (crb) crb.onclick = () => { if (!near(cont)) { toast('离尸体太远了', '#ccc'); return; } Bodies.carry(cont, render); };
     const pour = root.querySelector('[data-act="pour"]'); if (pour) pour.onclick = () => pourWild();
     root.querySelectorAll('.sk-it').forEach(el => { el.onmousedown = (e) => itemDown(e, el); el.oncontextmenu = (e) => e.preventDefault(); });
   }
@@ -462,12 +466,13 @@ window.Sack = (() => {
       if (where === 'belt') acts.push(['放回储物箱', () => { I.belt[bi] = null; stashAdd(o); render(); }]);
     }
     if (o.og && window.Organs) acts.unshift(...Organs.menu(o, wild, render).filter(() => where === 'stash' || where === 'sack'));
+    if (o.bd && window.Bodies && (where === 'stash' || where === 'sack')) acts.unshift(...Bodies.menu(o, wild, render));
     if (d.kind === 'prop' && window.Props && (where === 'stash' || where === 'sack')) acts.unshift(['放置到洞里', () => Props.startPlace(d.ptype)]);
     if (d.kind === 'book' && o.bk && window.Books && (where === 'sack' || where === 'stash')) acts.unshift(...Books.menu(o, wild));
     if (!acts.length) return;
     closeMenu(); menuEl = document.createElement('div'); menuEl.className = 'sk-menu';
     const miu = window.ItemIcons && ItemIcons.url(o.id);
-    menuEl.innerHTML = (miu ? `<div class="mi"><img src="${miu}" alt=""></div>` : '') + `<div class="t" style="color:${RARC[rarOf(o)]}">${d.icon || ''} ${esc(nameOf(o))}${o.n > 1 ? ' ×' + o.n : ''}</div>${d.desc || o.h || o.bk || o.og ? `<div class="d" style="white-space:pre-line">${esc(o.og && window.Organs ? Organs.info(o) : o.h ? `${RN[o.h.c.rar] || ''} · 回洞倒袋时滚出来` : o.bk ? `${o.bk.sub || ''}（${o.bk.names.length} 个名字）` : d.desc)}</div>` : ''}` + acts.map((a, i) => `<div data-i="${i}">${a[0]}</div>`).join('');
+    menuEl.innerHTML = (miu ? `<div class="mi"><img src="${miu}" alt=""></div>` : '') + `<div class="t" style="color:${RARC[rarOf(o)]}">${d.icon || ''} ${esc(nameOf(o))}${o.n > 1 ? ' ×' + o.n : ''}</div>${d.desc || o.h || o.bk || o.og ? `<div class="d" style="white-space:pre-line">${esc(o.og && window.Organs ? Organs.info(o) : o.bd && window.Bodies ? Bodies.info(o) : o.h ? `${RN[o.h.c.rar] || ''} · 回洞倒袋时滚出来` : o.bk ? `${o.bk.sub || ''}（${o.bk.names.length} 个名字）` : d.desc)}</div>` : ''}` + acts.map((a, i) => `<div data-i="${i}">${a[0]}</div>`).join('');
     document.body.appendChild(menuEl); menuEl.style.left = Math.min(innerWidth - 180, e.clientX + 4) + 'px'; menuEl.style.top = Math.min(innerHeight - 40 - acts.length * 30, e.clientY + 4) + 'px';
     menuEl.querySelectorAll('[data-i]').forEach(el => el.onmousedown = (ev) => { ev.stopPropagation(); const a = acts[+el.dataset.i]; closeMenu(); a[1](); });
     setTimeout(() => addEventListener('mousedown', closeMenu, { once: true }), 0);
@@ -487,7 +492,7 @@ window.Sack = (() => {
   function mountCave(host) { if (!on() || !host) return; css(); inv(); closePanel(); host.className = 'sk-host'; panel = host; mode = 'cave'; cont = null; render(); if (window.ItemIcons && !ItemIcons.ready) ItemIcons.onReady(() => { if (panel === host && !drag) render(); }); }
   function hud() {
     if (!Q.length) return; if (!hudEl) { hudEl = document.createElement('div'); hudEl.id = 'skHud'; document.body.appendChild(hudEl); css(); }
-    const j = Q[0], nm = j.k === 'head' ? `把首级「${NM(j.hd.h.c)}」塞进麻袋` : j.k === 'take' ? `装进麻袋：${nameOf(j.o)}` : j.k === 'use' ? `从麻袋里翻出${nameOf(j.o)}` : j.k === 'equip' ? `翻出并换上${nameOf(j.o)}` : `翻找：${nameOf(j.o)}`;
+    const j = Q[0], nm = j.k === 'head' ? `把首级「${NM(j.hd.h.c)}」塞进麻袋` : j.k === 'body' ? `把${j.L.name.replace(/的尸体$/, '')}的无头身体扛上肩、折进麻袋` : j.k === 'take' ? `装进麻袋：${nameOf(j.o)}` : j.k === 'use' ? `从麻袋里翻出${nameOf(j.o)}` : j.k === 'equip' ? `翻出并换上${nameOf(j.o)}` : `翻找：${nameOf(j.o)}`;
     hudEl.style.display = 'block'; // 第二十二轮：只在文字变化时重写 DOM，进度条只改宽度（原先每帧 innerHTML 导致闪烁）
     const txt = `🎒 ${esc(nm)} · ${(dur(j) - j.t).toFixed(1)}s${Q.length > 1 ? ` · 还有 ${Q.length - 1} 件` : ''}`;
     if (!hudEl._bar) { hudEl.innerHTML = '<span class="tx"></span><div class="bar"><i></i></div>'; hudEl._bar = hudEl.querySelector('.bar i'); hudEl._tx = hudEl.querySelector('.tx'); }
@@ -496,6 +501,7 @@ window.Sack = (() => {
   }
   function queueHead(hd, ok, done) { if (!on()) return false; if (!canAdd(inv().sack, mk('head', 1))) { toast('麻袋里没有 2×2 的空位放首级（Tab 整理 / 倒掉点东西）', '#ffb070', 2.5); return true; } if (Q.some(j => j.hd === hd)) return true; queue({ k: 'head', hd, ok, done }); toast('把首级塞进麻袋……（别挨打）', '#ffd890', 1.6); return true; }
   function capture(h) { const o = mkHead(h); return addTo(inv().sack, o); } // 追上猎物：直接入袋（需要空位）
+  function queueBody(L, done) { if (!on() || !L) return false; if (!Q.some(j => j.k === 'body' && j.L === L)) { queue({ k: 'body', L, done }); toast('把身体扛起来……（别挨打）', '#ffd890', 1.6); } return true; }
   function usage() { const g = inv().sack; return [g.items.reduce((a, o) => { const [w, h] = dims(o); return a + w * h; }, 0), g.w * g.h, g.items.filter(o => o.id === 'head').length]; }
   // 按键：面板打开时拦截（捕获阶段，先于游戏）
   addEventListener('keydown', (e) => {
@@ -506,5 +512,5 @@ window.Sack = (() => {
     if (e.code === 'KeyH') { e.preventDefault(); e.stopImmediatePropagation(); quickUse(); return; }
   }, true);
   function frame(dt) { if (buffT > 0) buffT -= dt; for (const k in BF) { BF[k].t -= dt; if (BF[k].t <= 0) delete BF[k]; } if (BF.regen && W_() && G.S.hp > 0) { const mx = G.st().maxHp; G.S.hp = Math.min(mx, G.S.hp + mx * BF.regen.k * dt); } tick(dt); }
-  return { equip, enchant, enchCost, salvage, resizeSack, nameOf, RARC, on, IT, def, mk, stashAdd, have, take, RECIPES, defMul, spdMul, buffList, inv, lvOf, genLoot, placeLoot, corpse, carcass, openWild, toggleWild, closePanel, mountCave, mountWild, unmount, frame, interrupt, queueHead, capture, heads, tripEnd, onDeath, pourPending, homeArrive, quickUse, dmgMul, usage, itemsOf, roll, addTo, canAdd, get panelOpen() { return mode === 'wild' && !!panel; }, get queue() { return Q; } };
+  return { equip, enchant, enchCost, salvage, resizeSack, nameOf, RARC, on, IT, def, mk, stashAdd, have, take, RECIPES, defMul, spdMul, buffList, inv, lvOf, genLoot, placeLoot, corpse, carcass, openWild, toggleWild, closePanel, mountCave, mountWild, unmount, frame, interrupt, queueHead, queueBody, capture, heads, tripEnd, onDeath, pourPending, homeArrive, quickUse, dmgMul, usage, itemsOf, roll, addTo, canAdd, get panelOpen() { return mode === 'wild' && !!panel; }, get queue() { return Q; } };
 })();

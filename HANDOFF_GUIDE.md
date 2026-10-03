@@ -36,6 +36,7 @@
 - 技能：升级只能“回忆”三选一（`skill_pick`）；**R70：野外不自动弹，回洞再弹**，野外按 ` 键手动开。
 - 宿敌/猎手：条满 100% 必须真的来（R70 `nem_sure`），来了封门（BOSS/精英擂台除外）。
 - 首级玩法：R71 `head_play`（开）——F 回忆里的「🎪 余兴」9 个小游戏，每个给下一趟独特祝福；用户要的是「讽刺/嘲讽/恶趣味、符合身份的文字、蒙太奇镜头」，内容红线见第 1 节（成年、无性内容、头不说话——台词一律「格罗克代配」）。
+- 无头身体：R72 `body_carry`（开）——斩首后可把尸体扛走（2×4 格）→ 储物箱；余兴多了 2 个「头 + 身体」节目（借尸还魂/提线木偶），身体也可「炼化」成材料。用户嫌「只有头太单调」，后续节目尽量混搭头和身体。
 
 ## 3. 架构地图（找代码从这里开始）
 
@@ -66,7 +67,8 @@ js/hub.js / wheel.js / ui3a.js / css/ui63.css  统一菜单、转盘、UI 层级
 js/autopsy.js     解剖台（独立大模块，autopsy agent 维护）
 js/recall_iw.js   F 回忆（原地捧头）：动作栏 + 汲魂入口（siphon.js）+ 余兴入口（headplay）
 js/headplay.js    R71 首级余兴引擎：独立舞台 + 自己的 rAF（__pauseMain）、剧本生成器、节拍环/抉择/指认/顺序输入、机位硬切、祝福（pend→act→清空）
-js/headplay_games.js  9 个节目（HeadPlay.reg），文案按身份(c.id)/梦想(goal)/性格(traits) 变化
+js/headplay_games.js  11 个节目（HeadPlay.reg），文案按身份(c.id)/梦想(goal)/性格(traits) 变化；R72 两个身体节目（swap/puppet）在 `// __HPG_PART2__` 之前
+js/bodies.js      R72 无头身体：野外「🧍 扛走身体」(Sack.queueBody) → 2×4 格物品 → 储物箱；Autopsy.bake → pack() 存 IDB（Autopsy.put/get/del）；rig() 11 骨可摆姿势（POSE 表）；无存档时 fallback() 素麻人台
 tools/test/*.html 测试台（blood70.html、cine.html、autopsy.html …）；tools/test/aibench.js 敌人 AI 台架；tools/balance/sim.js、tools/test/sanbench.js 数值模拟
 ```
 
@@ -170,3 +172,6 @@ HP.reg({
 - 镜头坑：特写用 `face()`（有最小距离，太近只剩一只眼）；头在飞/转时对准 `h{i}.center` 并拉远；抉择卡片在屏幕下 1/3，抉择时对准下巴 `h{i}.chin` 让脸在卡片上方；多头前后排时把镜头抬高越过前排。
 - 尺寸坑：头组缩放 1.55，头高 `hd.H`≈0.3m；**不要用 `Box3.setFromObject` 量 VRM 头**（蒙皮几何体带整身包围盒，量出 3 米），用 `hd.L` 锚点（eyes/mouth/face/cut/center/crown/chin，头局部已含缩放）。
 - 验证：`tools/test/headplay.html?g=xxx&speed=3` 自动玩到结算；`&at=choice|pick|ring|seq|res&n=K` 冻结截图。改完脚本等 1~2 秒再刷新（编辑器写盘有延迟，曾拿到旧脚本）。
+- **R72 身体节目**：`HP.reg({ …, bodies: 1 })` → 储物箱里不够就锁按钮（提示去野外扛）；`Bodies.pickFor(cast, n)` 优先选「头的主人自己的身体」（`bd.oid` = 主人名|身份）。剧本里：`Z.bodyAt(j, x, y, z, yaw)` 摆位（脚底在 y）、`Z.pose(j, 'stand'|'cheer'|'kneel'|…|[l臂,r臂,l腿,r腿], rate)`、`Z.btip(j, 'neck'|'handL'|'handR'|'hands'|'kneeL'|'kneeR'|'chest', out)` 取世界坐标、`Z.attach(i, j, 'neck'|'hands', {dur, arc, pitch, yaw, roll})` 把头安到身体上（`Z.attTurn` 转脸、`Z.detach` 放下）。身体朝 +Z，左手 = +X。
+- 身体存档格式（IDB 记录 v1）：`sets[{P,N,C,U,W,Q,K(4 骨权重),I,tk,at}]`、`tex{}`(dataURL)、`BN{关节名:[x,y,z]}`、`cut[x,y,z,r]`（颈口中心/半径，来自断面 cap=2 顶点）、`h`；物品 meta `bd{pid, own, race, idN, idk, rar, age, goal, tr, loc, oid, h, t}`。测试台 `&bodies=N` 注入 N 具（无 IDB 记录 → 走人台兜底）。
+- 内容边界：身体保持原衣着、只做日常/滑稽姿势（立正/欢呼/鞠躬/跪/举手…）；不做任何性化动作或物理（用户提过乳摇，已拒绝，别加）。

@@ -453,5 +453,110 @@
     }
   });
 
+  // ===================================================================== ⑩ 借尸还魂 · 一具身体，两颗头（需要：无头身体 ×1）——赢的那颗装上身体，用新手捧起输的那颗
+  const SEW = new THREE.MeshStandardMaterial({ color: '#1a0e0a', roughness: 0.6 });
+  const ownOf = (x, b) => !!(x && x.c && b && ((x.c.name || '') + '|' + (x.c.id || '')) === b.boid);
+  function stitch(B0, a, q) { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.03, 5), SEW), r = (B0.neckR || 0.05) + 0.012; m.position.set(Math.sin(a) * r, 0, Math.cos(a) * r); m.rotation.set((Math.random() - 0.5) * 0.5 * (1.2 - q), 0, (Math.random() - 0.5) * 0.5); m.castShadow = true; B0.tips.neck.add(m); }
+  HP.reg({
+    id: 'swap', ic: '🧵', n: '借尸还魂', sub: '一具身体，两颗头', need: null, heads: 2, bodies: 1, buff: 'stitch', col: '#e07a8a', tag: '身体只有一具。谁抢到，谁就能站起来', roles: ['主演', '对手'], reveal: ['name', 'race', 'goal'],
+    d: '储物箱里的一具无头身体，两颗头抢。连按空格拔河（三局两胜）决定谁装上去；再沿颈口按准下 6 针；按住空格让她站起来——赢的那颗会用新长出来的手捧起输的那颗，对着她的梦想说两句。',
+    setup(Z) { Z.Z.sw = { tug: 0.5, jolt: 0, tilt: 0, pull: 0 }; Z.bodyAt(0, 0, -0.78, -0.6, 0); Z.pose(0, 'attention'); Z.bd[0].snap(); Z.rest(0, -0.25, 0.1, 0.5); Z.rest(1, 0.25, 0.1, -0.5); },
+    update(Z, dt, t) { const W = Z.Z.sw, b = Z.bd[0]; if (!W || !b) return; W.jolt *= Math.exp(-dt * 4); if (!W.up) b.g.position.x = W.jolt * 0.035 + (W.tug - 0.5) * 0.08; if (W.pull) Z.hd.forEach((h, i) => { if (!h.att) h.P.x += Math.sin(t * 31 + i * 2) * 0.006; }); },
+    *script(Z) {
+      const W = Z.Z.sw, X = Z.x, b = Z.bx[0], B0 = Z.bd[0];
+      Z.keys('<b>空格</b> 连按拔河 · 按准下针 · 按住站起来'); Z.meter('拔河', 0.5);
+      Z.cut({ t: () => V(Z, 0, 0.18, -0.25), az: 0, el: 0.16, d: 1.75, fov: 42, dr: { d: -0.25 } });
+      yield* line(Z, nar, '斯尼克推着一辆吱呀作响的小车进来。车上立着一具没有头的身体——原本属于{bn}（{bri}）。', b);
+      yield* line(Z, og, '「一具身体，」格罗克竖起一根手指，又竖起两根，「两颗头。」');
+      for (let i = 0; i < 2; i++) { const x = X[i]; Z.cut(face(i, { az: [0.45, -0.45][i], el: 0.12 })); yield* line(Z, og, ownOf(x, b) ? '「{n}——这具身体你认得吧？它原来就长在你脖子底下。」' : i === 0 ? '「{n}，{ri}。她想{goal}——有了腿，她就能自己去了。」' : '「{n}，{tr}的{ri}。她一辈子都在跟人抢东西——今晚也一样。」', x); }
+      Z.cut({ t: () => Z.btip(0, 'chest'), az: 0.35, el: 0.15, d: 1.0, fov: 38 }); yield* line(Z, nar, '{bn}生前{bact}。现在她的身体站在桌子后面，等着一颗不属于她的头。', b);
+      let win = 0, lose = 0;
+      for (let r = 0; r < 3 && win < 2 && lose < 2; r++) {
+        Z.cut({ t: () => V(Z, 0, 0.18, 0.02), az: Z.pk([-0.3, 0.3]), el: 0.25, d: 0.95, fov: 42 }); Z.ex(0, { angry: 0.75, aa: 0.5 }, true); Z.ex(1, { angry: 0.75, aa: 0.5 }, true);
+        Z.say(fmt(['两颗头咬住同一截袖口，往两边扯。', '布料撕开一道口子——不是她们的衣服，她们不心疼。', '最后一下！{bn}的胳膊被拽得来回晃。'][r], b)); W.pull = 1;
+        const M = yield Z.ring({ key: 'Space', kind: 'mash', n: [8, 10, 12][r], hold: 1.8, at: 0.8, lead: 0.7, a: () => V(Z, 0, 0.32, 0.12), tag: '连按空格' });
+        W.pull = 0; const mine = { perfect: 1, great: 0.8, ok: 0.55, miss: 0.2 }[M] || 0.2, ok = mine >= 0.35 + Math.random() * 0.45; if (ok) win++; else lose++;
+        W.tug = Z.cl(W.tug + (ok ? 0.22 : -0.22), 0, 1); W.jolt = ok ? -1 : 1; Z.meter('拔河', W.tug); Z.score(mine, 1.5); Z.snd('thud'); Z.shake(0.5);
+        yield* line(Z, nar, ok ? pk(['{n}咬着袖口猛地往回一扯——', '{n}的牙咬得咯咯响。这一下归她。']) : pk(['{n}把袖口抢了过去——', '{n}松了一下口，又被对面拽走了半寸。']), ok ? X[0] : X[1]);
+      }
+      const wi = win >= 2 ? 0 : 1, li = 1 - wi, Wn = X[wi], Ln = X[li], ctx = Object.assign({ wn: Wn.n, ln: Ln.n, lgoal: Ln.goal, lact: Ln.act, ltr: Ln.tr }, b), home = ownOf(Wn, b);
+      Z.banner(`${Wn.n} 抢到了身体`, wi === 0 ? '主演赢了' : '对手赢了', Z.gm.col, 2); Z.snd(wi === 0 ? 'cheer' : 'boo'); Z.ex(li, GRUDGE); yield 1.6;
+      Z.cut({ t: () => Z.btip(0, 'neck'), az: 0.5, el: 0.25, d: 0.85, fov: 38, dr: { az: -0.3 } }); Z.ex(wi, { surprised: 0.4, sad: 0.3 });
+      Z.attach(wi, 0, 'neck', { dur: 1.5, arc: 0.3 }); Z.snd('whoosh'); yield 1.6; Z.snd('thud'); Z.shake(0.4);
+      yield* line(Z, nar, '格罗克把{wn}的头按在{bn}的脖子上。断口对断口——差了一点，但格罗克不在乎。', ctx); Z.meter('缝合 <b>0</b> / 6', 0);
+      let good = 0;
+      for (let k = 0; k < 6; k++) {
+        const a = -1.9 + k * 0.76, rr = (B0.neckR || 0.05) + 0.025, loc = new THREE.Vector3(Math.sin(a) * rr, 0.004, Math.cos(a) * rr); Z.cut({ t: () => Z.btip(0, 'neck').add(new THREE.Vector3(0, -0.04, 0)), az: a * 0.55, el: 0.2, d: 0.85, fov: 36 });
+        if (k === 1) Z.say(fmt('针从{wn}的下颌底下穿进去，从{bn}的锁骨上面穿出来。两个人，一根线。', ctx)); if (k === 4) Z.say(fmt('斯尼克举着油灯：「往左一点……再左……好了，现在她俩是一个人了。」', ctx));
+        const R = yield Z.ring({ key: 'Space', at: 0.75, lead: 0.7, a: () => B0.tips.neck.localToWorld(loc.clone()), tag: `第 ${k + 1} 针` }), q = { perfect: 1, great: 0.85, ok: 0.55, miss: 0 }[R] || 0; Z.score(q, 1);
+        if (q > 0) { good++; stitch(B0, a, q); Z.sparks(B0.tips.neck.localToWorld(loc.clone()), 8, '#ff8a8a', 0.4); } else { W.tilt += 0.08; Z.attTurn(wi, 0, 0, W.tilt * (k % 2 ? 1 : -1)); }
+        Z.meter(`缝合 <b>${good}</b> / 6`, good / 6);
+      }
+      Z.cut({ t: () => Z.btip(0, 'chest'), az: 0, el: 0.12, d: 1.4, fov: 40, dr: { d: -0.15 } }); yield* line(Z, og, '「起来。」');
+      const U = yield Z.ring({ key: 'Space', kind: 'hold', at: 1.0, lead: 0.9, hold: 0.9, a: () => Z.btip(0, 'chest'), tag: '按住——站起来' }); Z.score({ perfect: 1, great: 0.85, ok: 0.6, miss: 0.2 }[U] || 0.2, 1.5);
+      W.up = 1; Z.pose(0, 'stand', 4); yield 0.7; Z.pose(0, 'cheer', 5); Z.ex(wi, SMUG); Z.snd('cheer');
+      yield* voiceL(Z, wi, home ? '「我的手……这是我自己的手。」' : '「我……有手了。」', ctx);
+      if (home) { Z.score(1, 1); yield* line(Z, nar, '她认出了自己的身体——在一个食人魔的洞里，以一种最不体面的方式团圆了。', ctx); }
+      Z.pose(0, 'present', 3); yield 0.9; const MID = () => Z.btip(0, 'hands').lerp(Z.btip(0, 'neck'), 0.45); Z.cut({ t: MID, az: 0.35, el: 0.12, d: 1.2, fov: 38 });
+      Z.attach(li, 0, 'hands', { dur: 1.4, arc: 0.2 }); Z.ex(li, { surprised: 0.6, sad: 0.4 }); Z.snd('whoosh'); yield 1.5;
+      const lhome = ownOf(Ln, b);
+      yield* line(Z, nar, lhome ? '{wn}用{bn}的两只手，把桌上的{ln}捧了起来——那正是{ln}自己的手。' : '{wn}用{bn}的两只手，把桌上的{ln}捧了起来。', ctx); Z.attTurn(wi, 0.35, 0, W.tilt);
+      yield* voiceL(Z, wi, lhome ? pk(['「认得这双手吗？你的。现在它们捧着你。」', '「你的身体挺好用的，{ln}。谢谢。」']) : pk(['「你不是想{lgoal}吗？我现在有腿了——我替你去。」', '「看看你，{ln}。{ltr}有什么用？身体是我的了。」', '「别瞪我。这具身体原本是{bn}的——我们都是借的，只是我借到了。」', '「{ln}，你生前{lact}。我生前也不怎么样——可现在，我站着，你躺着。」']), ctx);
+      Z.attTurn(li, 0, Math.PI, 0); Z.cut({ t: MID, az: 1.25, el: 0.1, d: 0.95, fov: 36 });
+      yield* line(Z, nar, '她把{ln}的脸转过来，对着自己。两张脸隔着一拳的距离——一张有身体，一张没有。', ctx);
+      Z.ex(li, GRUDGE); yield* voiceL(Z, li, pk(['「……你脖子上的线是歪的。」', '「你走不了多远的。那双腿记得的路，不是你的。」', '「拿着别人的手捧我——你也配？」']), ctx);
+      Z.attTurn(li, 0, 0, 0); Z.attTurn(wi, 0, 0, W.tilt); Z.pose(0, 'bow', 3); Z.cut({ t: () => V(Z, 0, 0.3, -0.3), az: 0, el: 0.12, d: 1.7, fov: 42 }); Z.snd('fan'); yield 1.6;
+      Z.stat(`拔河 <b>${win}</b> : ${lose} · 缝了 <b>${good}</b> / 6 针${home ? ' · 物归原主' : ''}`);
+      Z.endLine(fmt(home ? '{wn}终于又完整了——暂时。线是格罗克缝的，歪歪扭扭，像她这一生。' : wi === 0 ? '{wn}站在桌子后面，用{bn}的手捧着{ln}的头。今晚之前，她们三个谁也不认识谁。' : '主演输了。{ln}被捧在别人的手里，看着本该属于自己的身体弯腰谢幕。', ctx));
+    }
+  });
+
+  // ===================================================================== ⑪ 提线木偶 · 一个人的戏班（需要：无头身体 ×1）
+  function pupSeq(len) { for (let t = 0; t < 60; t++) { const s = [0, 0, 0, 0], seq = []; for (let k = 0; k < len; k++) { let i, n = 0; do { i = Math.floor(Math.random() * 4); n++; } while (n < 30 && ((i >= 2 && !s[i] && s[5 - i]) || (k && i === seq[k - 1]))); seq.push(i); s[i] ^= 1; } if (s.some(Boolean)) return { seq, s }; } return { seq: [0, 1], s: [1, 1, 0, 0] }; }
+  const PN = s => { const arms = s[0] + s[1], legs = s[2] + s[3]; if (!arms && !legs) return ['立正', '{n}站得笔直——像她当年{act}的时候一样。']; if (arms === 2 && !legs) return ['投降', '{n}生前没投降过。今晚，她投降了一次又一次。']; if (arms === 1 && !legs) return ['举手', '她举起了手——可惜没有人会点她的名。']; if (!arms) return ['金鸡独立', '单腿站立。平衡感不错——毕竟脖子上面换了一颗头。']; if (arms === 2) return ['欢呼', '双手高举、单腿翘起——像赢了什么。她这辈子大概没赢过这么一回。']; return ['跨栏', '一只手、一条腿——像在{loc}的田埂上奔跑。只是她跑不动了。']; };
+  HP.reg({
+    id: 'puppet', ic: '🪆', n: '提线木偶', sub: '一个人的戏班', need: null, heads: 1, bodies: 1, buff: 'string', col: '#d0a0ff', tag: '头是她的，身体是别人的，线是格罗克的', roles: ['木偶'], reveal: ['name', 'race', 'goal'],
+    d: '把她的头装上一具无头身体，手腕和膝盖各系一根线吊在桌上。格罗克先演一遍，你按 1 左手 / 2 右手 / 3 左腿 / 4 右腿 原样拉一遍；一轮比一轮长，拉错两次线就缠死了。',
+    setup(Z) {
+      const P = Z.Z.pp = { st: [0, 0, 0, 0], cut: false }, B0 = Z.bd[0]; Z.bodyAt(0, 0, 0, -0.08, 0); Z.pose(0, 'attention'); B0.snap(); Z.attach(0, 0, 'neck'); P.top = B0.h + 0.66;
+      for (const [w, d] of [[0.9, 0.035], [0.035, 0.5]]) { const m = Z.prop(new THREE.BoxGeometry(w, 0.03, d), { color: '#3a2a1c', roughness: 0.7 }); m.position.set(0, P.top, 0.02); }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(30), 3)); P.lines = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: '#efe2c2', transparent: true, opacity: 0.8 })); P.lines.frustumCulled = false; P.lines.userData.own = 1; Z.stage().add(P.lines); P.v = new THREE.Vector3();
+    },
+    update(Z, dt, t) {
+      const P = Z.Z.pp, b = Z.bd[0]; if (!P || !P.lines || !b) return; b.g.rotation.y = Math.sin(t * 0.7) * 0.06; P.lines.visible = !P.cut; if (P.cut) return;
+      const A = P.lines.geometry.attributes.position, v = P.v; let n = 0; const seg = (x, z) => { A.setXYZ(n++, x, P.top, 0.02 + z); A.setXYZ(n++, v.x, v.y, v.z); };
+      for (const [k, x, z] of [['handL', 0.42, 0], ['handR', -0.42, 0], ['kneeL', 0.12, 0.22], ['kneeR', -0.12, 0.22]]) { b.tip(k, v); seg(x, z); }
+      Z.wA(Z.hd[0], 'crown', v); seg(0, 0); A.needsUpdate = true;
+    },
+    *script(Z) {
+      const P = Z.Z.pp, x = Z.x[0], b = Z.bx[0], ctx = Object.assign({}, b, x), home = ownOf(x, b), LBL = ['左手', '右手', '左腿', '右腿'];
+      Z.keys('<b>1</b> 左手　<b>2</b> 右手　<b>3</b> 左腿　<b>4</b> 右腿　（照格罗克演的顺序拉线）'); Z.meter('掌声 <b>0</b>', 0);
+      const FULL = { t: () => V(Z, 0, 1.0, -0.05), az: 0, el: 0.06, d: 2.6, fov: 52 };
+      Z.cut(Object.assign({ dr: { d: -0.3 } }, FULL));
+      yield* line(Z, nar, '格罗克把{bn}的身体吊上桌，把{n}的头按在它的脖子上，又在手腕和膝盖上各系了一根线。', ctx);
+      yield* line(Z, og, home ? '「物归原主——今晚由{n}本人出演{n}。」' : '「今晚的节目：一个人的戏班。头是{n}的，身体是{bn}的，线是我的。」', ctx);
+      Z.cut(face(0, { az: 0.2, el: 0.1 })); yield* line(Z, nar, home ? '她的脸还是那张脸，脖子底下也还是那副身体——只是中间多了一圈线。' : '{n}低头看了看自己的“新身体”——{bri}的衣服，{bri}的手。她这辈子都没穿过这样的衣服。', ctx);
+      const LEN = [2, 3, 3, 4, 5], GAP = [0.75, 0.68, 0.62, 0.56, 0.5]; let fail = 0, okN = 0, all = 0, clap = 0;
+      for (let r = 0; r < LEN.length && fail < 2; r++) {
+        const { seq, s } = pupSeq(LEN[r]), nm = PN(s), st = [0, 0, 0, 0];
+        Z.cut(FULL); yield* line(Z, og, ['「看好了——」', '「这一段难一点。」', '「跟紧我的手。」', '「快一点！观众要睡着了。」', '「最后一段，别给我丢脸。」'][r]);
+        for (const i of seq) { st[i] ^= 1; Z.pose(0, st.slice(), 9); Z.snd('swish'); Z.pop(LBL[i], Z.gm.col); if (Math.random() < 0.45) Z.cut(Z.pk([face(0, { az: Z.pk([-0.4, 0.4]), el: 0.15 }), Object.assign({}, FULL, { az: Z.pk([-0.3, 0.3]), d: 2.2 })])); yield GAP[r]; }
+        Z.banner(`「${nm[0]}」`, '', Z.gm.col, 1.4); yield 1.1;
+        Z.pose(0, 'attention', 6); P.st = [0, 0, 0, 0]; Z.cut(FULL); yield 0.7; Z.pop('到你了', Z.gm.col);
+        const R = yield Z.seqIn({ seq, per: 2.4, onKey: (i, ok) => { P.st[i] ^= 1; Z.pose(0, P.st.slice(), 10); Z.snd(ok ? 'swish' : 'bad'); if (!ok) Z.shake(0.3); } });
+        okN += R.ok; all += R.n; Z.score(R.ok / R.n, R.n);
+        if (R.fail) { fail++; Z.pose(0, 'slump', 5); Z.ex(0, { sad: 0.6, angry: 0.3 }); Z.snd('boo'); yield* line(Z, nar, pk(['线缠成了一团。{n}的身体歪向一边，像一件挂歪了的衣服。', '拉错了——{bn}的胳膊甩在{n}自己的脸上。斯尼克笑出了声。']), ctx); yield* line(Z, sn, fail >= 2 ? '「线全缠死了，散场散场！」' : '「再来！刚才那下不算！」'); Z.pose(0, 'attention', 5); }
+        else { clap++; Z.snd('cheer'); Z.ex(0, SMUG); yield* line(Z, nar, nm[1], ctx); Z.ex(0, SAD); }
+        Z.meter(`掌声 <b>${clap}</b>`, clap / LEN.length);
+      }
+      Z.cut(FULL); Z.pose(0, 'bow', 3); yield* line(Z, og, '「谢幕——」格罗克拽着线，让她弯下腰。');
+      const C = yield Z.ring({ key: 'Space', at: 1.0, lead: 0.9, a: () => V(Z, 0, P.top, 0.03), tag: '剪线' }); Z.score({ perfect: 1, great: 0.85, ok: 0.6, miss: 0.2 }[C] || 0.2, 1.5);
+      P.cut = true; Z.snd('swish'); Z.pose(0, Object.assign({}, Bodies.POSE.kneel, { bow: 0.45 }), 3); Z.ex(0, { sad: 0.8, blink: 0.4 }); yield 0.8;
+      yield* line(Z, nar, '线一松，{n}就跪了下去——这是她今晚唯一一个不用线的动作。', ctx);
+      Z.stat(`拉对 <b>${okN}</b> / ${all} 下 · 缠线 <b>${fail}</b> 次`);
+      Z.endLine(fmt(fail === 0 ? '五段戏一气呵成。斯尼克鼓掌鼓到手疼——他不知道该夸{n}，还是夸{bn}的身体，还是夸那几根线。' : fail === 1 ? '戏演完了，线也缠过一回。{n}跪在桌上，脖子上的线圈在灯下闪着光。' : '戏没演完，线就缠死了。{n}和{bn}的身体一起歪在桌上——谁也不肯听谁的。', ctx));
+    }
+  });
+
   // __HPG_PART2__
 })();

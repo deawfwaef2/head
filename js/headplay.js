@@ -35,7 +35,9 @@ window.HeadPlay = (() => {
     luck: { ic: '🎲', n: '赌运', col: '#9fe8a0', txt: k => `清空奖励 +${Math.round(40 * k)}% · 每次击杀 ${Math.round(12 * k)}% 几率爆出一笔魂晶彩头`, nb: k => ({ clear: 0.4 * k }) },
     hymn: { ic: '🔔', n: '走调战歌', col: '#a8c8ff', txt: k => `每次击杀回复 ${Math.round(6 * k)}% 最大生命`, nb: k => ({ heal: 0.06 * k }) },
     infamy: { ic: '🎭', n: '恶名昭彰', col: '#ff6a8a', txt: k => `敌人生命 -${Math.round(15 * k)}%（听过你的戏）· 击杀时 7 米内的敌人有 ${Math.round(45 * k)}% 几率吓得踉跄`, nb: k => ({ fear: 0.15 * k }) },
-    strike: { ic: '🎳', n: '全中', col: '#7fd0ff', txt: k => `每次击杀后 4 秒内伤害 +${Math.round(12 * k)}%（连杀叠加，最多 3 层，再杀刷新）——连锁撞倒的手感`, nb: () => ({}) }
+    strike: { ic: '🎳', n: '全中', col: '#7fd0ff', txt: k => `每次击杀后 4 秒内伤害 +${Math.round(12 * k)}%（连杀叠加，最多 3 层，再杀刷新）——连锁撞倒的手感`, nb: () => ({}) },
+    stitch: { ic: '🧵', n: '缝补', col: '#e07a8a', txt: k => `每趟一次：受到致命一击时不死（留 1 点生命），并回复 ${Math.round(35 * k)}% 最大生命——格罗克的线还没断`, nb: () => ({}) },
+    string: { ic: '🪢', n: '提线步法', col: '#d0a0ff', txt: k => `受到伤害时 ${Math.round(14 * k)}% 几率被“线”扯开、完全闪避（触发后 3 秒内不再触发）`, nb: () => ({}) }
   };
   function st() { const S = G().S; const s = S.hplay || (S.hplay = { pend: {}, act: {}, used: {}, n: 0 }); s.pend = s.pend || {}; s.act = s.act || {}; s.used = s.used || {}; return s; }
   const inField = () => !!(window.Worlds && Worlds.active);
@@ -48,7 +50,7 @@ window.HeadPlay = (() => {
   function buffsHTML(which) { const L = buffList(which || 'pend'); if (!L.length) return ''; return L.map(x => `<div class="hpb" style="--c:${x.B.col}"><b>${x.B.ic} ${esc(x.B.n)} <i>${x.g}</i></b><span>${esc(x.B.txt(x.k))}</span></div>`).join(''); }
   // 出发 / 回洞：待生效 → 生效中 → 清空
   let wasW = false, nodeW = null, caught = false;
-  setInterval(() => { try { if (!G() || !G().S) return; const w = inField(), s = st(); if (w && !wasW) { s.act = s.pend; s.pend = {}; if (Object.keys(s.act).length) setTimeout(() => { try { G().toast(`🎪 余兴祝福生效：${buffList('act').map(x => x.B.ic + x.B.n + x.g).join(' · ')}`, '#ffd8a0', 4); } catch (e) { } }, 2500); } if (!w && wasW) s.act = {}; wasW = w; chip(); } catch (e) { } }, 600);
+  setInterval(() => { try { if (!G() || !G().S) return; const w = inField(), s = st(); if (w && !wasW) { s.act = s.pend; s.pend = {}; stitched = false; strT = 0; if (Object.keys(s.act).length) setTimeout(() => { try { G().toast(`🎪 余兴祝福生效：${buffList('act').map(x => x.B.ic + x.B.n + x.g).join(' · ')}`, '#ffd8a0', 4); } catch (e) { } }, 2500); } if (!w && wasW) s.act = {}; wasW = w; chip(); } catch (e) { } }, 600);
   let chipEl = null;
   function chip() { const L = inField() ? buffList('act') : []; if (!L.length) { if (chipEl) chipEl.style.display = 'none'; return; } if (!chipEl) { chipEl = document.createElement('div'); chipEl.style.cssText = 'position:fixed;right:14px;bottom:150px;z-index:33;pointer-events:none;font:700 12.5px system-ui,"Microsoft YaHei",sans-serif;color:#f4e6cf;text-shadow:0 1px 3px #000;text-align:right;line-height:1.5'; document.body.appendChild(chipEl); } const h = L.map(x => `<span style="color:${x.B.col}">${x.B.ic} ${esc(x.B.n)} ${x.g}</span>`).join('<br>'); if (chipEl._h !== h) { chipEl._h = h; chipEl.innerHTML = h; } chipEl.style.display = document.body.classList.contains('menuon') ? 'none' : 'block'; }
   // 独特效果：包住 Rogue 的命中/受伤/事件钩子（foe.js / worlds.js 已在调用它们）
@@ -58,11 +60,14 @@ window.HeadPlay = (() => {
     k = actK('strike'); if (k && stk && performance.now() < stkT) d = Math.round(d * (1 + 0.12 * k * stk));
     return d;
   }
-  let stk = 0, stkT = 0;
+  let stk = 0, stkT = 0, stitched = false, strT = 0;
   function inn(fo, n) {
-    const k = actK('catch'); if (!k || !(n > 0)) return n; const W = window.Worlds && Worlds._W; if (!W) return n;
-    if (nodeW !== W.cur) { nodeW = W.cur; caught = false; } if (caught) return n; caught = true;
-    if (Math.random() < k) { try { G().toast('🤹 接住了！——杂耍练出来的手，这一下没伤着你', '#ffd8a0', 1.6); } catch (e) { } return 0; } return n;
+    if (!(n > 0)) return n; let k = actK('string');
+    if (k && performance.now() > strT && Math.random() < 0.14 * k) { strT = performance.now() + 3000; try { G().toast('🪢 线一扯——你被拽开半步，这一下落空了', '#e0c8ff', 1.4); } catch (e) { } return 0; }
+    k = actK('catch'); const W = window.Worlds && Worlds._W;
+    if (k && W) { if (nodeW !== W.cur) { nodeW = W.cur; caught = false; } if (!caught) { caught = true; if (Math.random() < k) { try { G().toast('🤹 接住了！——杂耍练出来的手，这一下没伤着你', '#ffd8a0', 1.6); } catch (e) { } return 0; } } }
+    k = actK('stitch'); if (k && !stitched) { try { const g = G(), hp = g.S.hp; if (n >= hp) { stitched = true; const mx = g.st().maxHp; setTimeout(() => { try { g.S.hp = Math.min(mx, g.S.hp + mx * 0.35 * k); g.flash && g.flash('#ff8aa0', 0.5, 400); } catch (e) { } }, 60); g.toast('🧵 线没断——你被缝了回来（本趟用掉了）', '#ffb0c0', 2.6); return Math.max(0, hp - 1); } } catch (e) { } }
+    return n;
   }
   function ev(t, fo) {
     if (t !== 'kill' || !fo) return; const g = G();
@@ -111,6 +116,7 @@ window.HeadPlay = (() => {
     if (!on()) { o.lock = true; o.why = 'MOD「首级余兴」已关闭'; }
     else if (rec && rec.c && !ageOk(rec.c)) { o.lock = true; o.why = '只有成年人的首级能上台'; }
     else if (gm.need && !(window.Recall && Recall.hasB && Recall.hasB([gm.need]))) { o.lock = true; o.why = `需要建筑：${needName(gm.need)}`; }
+    else if (gm.bodies && !(window.Bodies && Bodies.on() && Bodies.count() >= gm.bodies)) { o.lock = true; o.why = `需要无头身体 ×${gm.bodies}（野外斩首后，在尸体的战利品里「🧍 扛走身体」）`; }
     else if (pool(rec).length < gm.heads - 1) { o.lock = true; o.why = `需要至少 ${gm.heads} 颗首级（洞里 + 魂库）`; }
     else if (usedNow(id)) { o.lock = true; o.why = '这一回合已经演过了——出猎回来再演'; }
     return o;
@@ -230,9 +236,18 @@ window.HeadPlay = (() => {
   function at(i, p, r, rate) { const hd = Z.hd[i]; if (!hd) return; if (p) hd.Pt.set(p[0], p[1], p[2]); if (r) hd.qt.setFromEuler(_e.set(r[0] || 0, r[1] || 0, r[2] || 0, 'YXZ')); hd.rate = rate || 9; }
   function rest(i, x, z, yaw, rate) { const hd = Z.hd[i]; at(i, [x, hd.H * 0.5 + 0.004, z], [0, yaw || 0, 0], rate); }
   function ex(i, e, keep) { const hd = Z.hd[i]; if (!hd) return; hd.exT = Object.assign(keep ? Object.assign({}, hd.exT) : Object.assign({}, hd.base), e || {}); }
+  // 头装到身体上：neck（断口对断口）/ hands（捧在两只手之间）/ handR……；k<1 时从原位置沿弧线搬过去
+  function attStep(hd, dt) {
+    const A = hd.att; A.b.tip(A.kind, _c, _q1); if (A.rqT) A.rq.slerp(A.rqT, 1 - Math.exp(-dt * 5)); _q2.copy(_q1).multiply(A.rq);
+    _b.copy(hd.L.center).sub(hd.L[A.anc] || hd.L.cut).applyQuaternion(_q2).add(_c); if (A.off) _b.add(A.off);
+    if (A.k < 1) { A.k = Math.min(1, A.k + dt / A.dur); const e = sm(A.k); hd.P.lerpVectors(A.p0, _b, e); hd.P.y += Math.sin(PI * e) * A.arc; hd.q.slerpQuaternions(A.q0, _q2, e); }
+    else { hd.P.copy(_b); hd.q.copy(_q2); }
+    hd.Pt.copy(hd.P); hd.qt.copy(hd.q);
+  }
   function updHeads(dt, now) {
     for (const hd of Z.hd) {
-      if (!hd.direct) { if (hd.snap) { hd.P.copy(hd.Pt); hd.q.copy(hd.qt); hd.snap = false; } else { const k = 1 - Math.exp(-dt * hd.rate); hd.P.lerp(hd.Pt, k); hd.q.slerp(hd.qt, k); } }
+      if (hd.att) attStep(hd, dt);
+      else if (!hd.direct) { if (hd.snap) { hd.P.copy(hd.Pt); hd.q.copy(hd.qt); hd.snap = false; } else { const k = 1 - Math.exp(-dt * hd.rate); hd.P.lerp(hd.Pt, k); hd.q.slerp(hd.qt, k); } }
       if (hd.bob > 0) { hd.bob = Math.max(0, hd.bob - dt); }
       const bp = hd.talk > 0 ? Math.abs(Math.sin(now * 13 + hd.i)) * 0.012 : 0; if (bp) { hd.P.y += bp; }
       placeHd(hd); if (bp) hd.P.y -= bp;
@@ -388,12 +403,14 @@ window.HeadPlay = (() => {
   function begin(id, o) {
     const gm = BY[id], rec = o && o.rec; if (Z || !gm || !rec || !window.G || !G().renderer) return false; const b = btn(id, rec); if (b.lock) { o.api && o.api.sub && o.api.sub(`<span class="d">${esc(b.why)}。</span>`); return false; }
     const cast = castFor(gm, rec); if (cast.length < gm.heads) return false;
+    const bodies = gm.bodies && window.Bodies ? Bodies.pickFor(cast, gm.bodies) : []; if (gm.bodies && bodies.length < gm.bodies) return false;
     ui(); const St = stage(), h = o.h; root.style.setProperty('--c', gm.col || '#ffd27a');
-    Z = { gm, o, rec, cast, h, sc: St.sc, cam: St.cam, L: St, t: 0, wall: performance.now(), hd: [], rings: [], wait: 0, aw: null, pts: 0, max: 0, phase: 'load', stats: [], revealed: [], shk: 0, mk: 0, api };
+    Z = { gm, o, rec, cast, h, sc: St.sc, cam: St.cam, L: St, t: 0, wall: performance.now(), hd: [], bd: [], bodyIt: bodies, rings: [], wait: 0, aw: null, pts: 0, max: 0, phase: 'load', stats: [], revealed: [], shk: 0, mk: 0, api };
+    if (bodies.length) { const z0 = Z; Promise.all(bodies.map(it => Bodies.load(it))).then(rs => { if (Z === z0) z0.bdR = rs; else rs.forEach(r => { try { r.dispose(); } catch (e) { } }); }).catch(e => { console.warn('HeadPlay bodies', e); if (Z === z0) z0.bdR = bodies.map(it => Bodies.fallback(it.bd)); }); }
     Z.fx = fxInit(Z.sc); seat(); window.__pauseMain = true; try { SFX.duck && SFX.duck(true); } catch (e) { }
     const host = document.getElementById('riw'); if (host) host.classList.add('hpon');
     const tt = q('.ttl'); tt.querySelector('small').textContent = `${gm.ic} 首级余兴 · ${gm.sub}`; tt.querySelector('b').textContent = gm.n; tt.querySelector('i').textContent = gm.tag || '';
-    tt.querySelector('.cast').innerHTML = cast.map((r, i) => { const x = cx(r); return `<div><em>${i === 0 ? '主演' : gm.roles && gm.roles[i] ? esc(gm.roles[i]) : '客串'}</em>${esc(x.n)}（${esc(x.ri)}）</div>`; }).join(''); tt.classList.add('on');
+    tt.querySelector('.cast').innerHTML = cast.map((r, i) => { const x = cx(r); return `<div><em>${i === 0 ? '主演' : gm.roles && gm.roles[i] ? esc(gm.roles[i]) : '客串'}</em>${esc(x.n)}（${esc(x.ri)}）</div>`; }).join('') + bodies.map(it => `<div><em>🧍 身体</em>${esc(Bodies.name(it))}</div>`).join(''); tt.classList.add('on');
     Z.loadQ = cast.slice(); Z.loadT = 0; loop.last = 0; requestAnimationFrame(loop); snd('sting');
     return true;
   }
@@ -410,6 +427,7 @@ window.HeadPlay = (() => {
       return false;
     }
     if (Z.loadFail || Z.hd.length < Z.gm.heads) { abortLoad(); return false; }
+    if (Z.bodyIt.length && !Z.bd.length) { if (!Z.bdR) { if (Z.loadT < 5) return false; Z.bdR = Z.bodyIt.map(it => Bodies.fallback(it.bd)); } Z.bd = Z.bdR; for (const b of Z.bd) Z.sc.add(b.g); }
     const rv = Z.gm.reveal || ['name', 'race']; for (const hd of Z.hd) for (const k of (hd.i === 0 ? rv : ['name', 'race'])) { try { if (window.Recall && Recall.reveal && !Recall.known(hd.rec.c, k) && Recall.reveal(hd.rec, k, true) && hd.i === 0) Z.revealed.push((Recall.FK && Recall.FK[k] && Recall.FK[k].n) || k); } catch (e) { } }
     for (const hd of Z.hd) hd.x = cx(hd.rec);
     try { Z.gm.setup(Z.api); } catch (e) { console.warn('HeadPlay setup', e); }
@@ -430,6 +448,7 @@ window.HeadPlay = (() => {
   }
   function render(dt, now) {
     try { ModelHeads.tick(now); } catch (e) { }
+    for (const b of Z.bd) { try { b.update(dt); } catch (e) { } }
     updHeads(dt, now); updFx(dt); placeCam(dt); Z.L.glow.intensity += ((Z.glowT || 0) - Z.L.glow.intensity) * (1 - Math.exp(-dt * 8));
     const R = G().renderer, post = G().post, cam = Z.cam; if (cam.aspect !== innerWidth / innerHeight) { cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); }
     try { if (post && post.on) post.render(Z.sc, cam); else R.render(Z.sc, cam); } catch (e) { try { R.render(Z.sc, cam); } catch (e2) { } }
@@ -453,6 +472,7 @@ window.HeadPlay = (() => {
       else if (z.hg0) { const p = z.hg0.p || G().scene; p.add(hd.g); hd.g.position.copy(z.hg0.pos); hd.g.quaternion.copy(z.hg0.q); hd.g.updateMatrixWorld(true); } }
     } catch (e) { console.warn('HeadPlay close', e); }
     if (z.hd.length === 0 && z.h && z.h.g && !z.h.g.parent) try { G().scene.add(z.h.g); } catch (e) { }
+    for (const b of (z.bd || [])) { try { z.sc.remove(b.g); b.dispose(); } catch (e) { } }
     try { z.sc.traverse(o => { if (o.userData && o.userData.own) { o.geometry && o.geometry.dispose(); o.material && o.material.dispose && o.material.dispose(); } }); z.fx.cryM.geometry.dispose(); z.fx.cryM.material.dispose(); z.fx.pts.geometry.dispose(); z.fx.pts.material.dispose(); z.fx.spr.forEach(e => e.s.material.dispose()); (z.own || []).forEach(x => { try { x.dispose(); } catch (e) { } }); } catch (e) { }
     try { SFX.duck && SFX.duck(false); } catch (e) { }
     const host = document.getElementById('riw'); if (host) host.classList.remove('hpon');
@@ -469,6 +489,14 @@ window.HeadPlay = (() => {
     direct(i, v) { const hd = Z.hd[i]; if (hd) hd.direct = v !== false; }, setP(i, p, qq) { const hd = Z.hd[i]; if (!hd) return; hd.P.copy(p); if (qq) hd.q.copy(qq); },
     shake(a) { Z.shk = Math.max(Z.shk || 0, a); }, glow(v) { Z.glowT = v; }, curtain(shut) { root.classList.toggle('shut', !!shut); }, stat(s) { Z.stats.push(s); }, endLine(s) { Z.endLine = s; }, grade: () => gradeOf(),
     stage: () => Z.sc, cam: () => Z.cam, get fx() { return Z.fx; }, V3, Q4, PI, BUFF, cx,
+    // 身体（R72）：bd[j] = 可摆姿势的无头身体；bx[j] = 它生前的归属文案
+    get bd() { return Z.bd; }, get bx() { return Z.bd.map(b => b.x); },
+    bodyAt(j, x, y, z, yaw) { const b = Z.bd[j]; if (!b) return; b.g.position.set(x, y, z); b.g.rotation.set(0, yaw || 0, 0); b.g.updateMatrixWorld(true); },
+    pose(j, p, rate) { const b = Z.bd[j]; if (b) b.pose(p, rate); },
+    btip(j, kind, out) { const b = Z.bd[j]; return b ? b.tip(kind, out || new V3()) : (out || new V3()); },
+    attach(i, j, kind, o) { const hd = Z.hd[i], b = Z.bd[j]; if (!hd || !b) return; o = o || {}; hd.att = { b, kind: kind || 'neck', anc: o.anc || (kind === 'hands' ? 'center' : 'cut'), rq: new Q4().setFromEuler(new THREE.Euler(o.pitch || 0, o.yaw || 0, o.roll || 0, 'YXZ')), rqT: null, off: o.off ? new V3(o.off[0], o.off[1], o.off[2]) : null, k: o.dur ? 0 : 1, dur: o.dur || 0.001, arc: o.arc != null ? o.arc : 0.12, p0: hd.P.clone(), q0: hd.q.clone() }; hd.direct = false; },
+    attTurn(i, pitch, yaw, roll) { const hd = Z.hd[i]; if (hd && hd.att) hd.att.rqT = new Q4().setFromEuler(new THREE.Euler(pitch || 0, yaw || 0, roll || 0, 'YXZ')); },
+    detach(i) { const hd = Z.hd[i]; if (hd) hd.att = null; },
     prop(geo, mat) { const m = new THREE.Mesh(geo, mat && mat.isMaterial ? mat : new THREE.MeshStandardMaterial(Object.assign({ color: '#4a3020', roughness: 0.7 }, mat || {}))); m.userData.own = 1; m.castShadow = true; m.receiveShadow = true; Z.sc.add(m); return m; }
   };
   Object.defineProperty(api, 'pts', { get() { return Z ? Z.pts / Math.max(1, Z.max) : 0; } });
@@ -483,7 +511,7 @@ window.HeadPlay = (() => {
     css(); const x = cx(rec), pend = buffsHTML('pend');
     let h = `<div class="hpmh">🎪 首级余兴</div><div class="hpmn">主演：<b>${esc(x.n)}</b>。洞里（和魂库）的其他首级来客串，格罗克亲自配音。每个节目每回合演一次；评级 S~D 决定下一趟出猎的祝福强度。<b>数字键</b>或点击开演。</div>${pend ? `<div style="margin-top:8px;font-size:12px;letter-spacing:.15em;color:#ffd27a">已攒下的祝福（下一趟生效）</div>${pend}` : ''}`;
     GAMES.forEach((gm, i) => { const b = btn(gm.id, rec), B = BUFF[gm.buff], used = usedNow(gm.id);
-      h += `<div class="hpm${b.lock ? ' lk' : ''}${used ? ' dn' : ''}" data-hp="${gm.id}" style="--c:${gm.col || '#ffd27a'}"><span class="k">${i + 1}</span><b>${gm.ic} ${esc(gm.n)}<i>${esc(gm.sub)}</i></b><small>${gm.need ? '🏛 ' + esc(needName(gm.need)) : '无需建筑'} · ${gm.heads} 颗首级${gm.coin ? ' · 🔮 有赏' : ''}</small><span class="d">${esc(gm.d)}</span><em>→ 下一趟：${B.ic} ${esc(B.n)}</em>${b.lock ? `<span class="why">🔒 ${esc(b.why)}</span>` : ''}</div>`; });
+      h += `<div class="hpm${b.lock ? ' lk' : ''}${used ? ' dn' : ''}" data-hp="${gm.id}" style="--c:${gm.col || '#ffd27a'}"><span class="k">${i + 1}</span><b>${gm.ic} ${esc(gm.n)}<i>${esc(gm.sub)}</i></b><small>${gm.need ? '🏛 ' + esc(needName(gm.need)) : '无需建筑'} · ${gm.heads} 颗首级${gm.bodies ? ` · 🧍 无头身体 ×${gm.bodies}（储物箱里有 ${window.Bodies ? Bodies.count() : 0} 具）` : ''}${gm.coin ? ' · 🔮 有赏' : ''}</small><span class="d">${esc(gm.d)}</span><em>→ 下一趟：${B.ic} ${esc(B.n)}</em>${b.lock ? `<span class="why">🔒 ${esc(b.why)}</span>` : ''}</div>`; });
     return h;
   }
   return { on, reg, GAMES, BY, BUFF, GRADE, ids, btn, begin, key, close, cardHTML, menuHTML, nb, buffList, buffsHTML, cx, fmt, pool, get active() { return !!Z; }, get phase() { return Z ? Z.phase : ''; }, get api() { return api; }, _st: () => st() };

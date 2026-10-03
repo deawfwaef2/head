@@ -14,12 +14,14 @@ const pn0 = performance.now.bind(performance); let vt = pn0(), lastR = pn0(), fr
 performance.now = () => { const r = pn0(); if (!frozen) vt += (r - lastR) * SPEED; lastR = r; return vt; };
 window.__freeze = v => { frozen = v !== false; }; // 外部（playwright）在任意时刻冻结 / 解冻
 window.SFX = { on: false };
+// &bodies=N：储物箱里放 N 具（素麻人台）无头身体，用来测 swap / puppet
+window.Sack = { IT: { body: { n: '无头身体' } }, def() { }, inv: () => window.__inv || (window.__inv = { stash: [], sack: { items: [] } }) };
 </script>
 <script src="../../lib/three.min.js"></script><script src="../../lib/GLTFLoader.js"></script>
 <script src="../../js/mods.js"></script><script src="../../js/lore.js"></script><script src="../../js/rpg.js"></script>
 <script src="../../models/AvatarSample_D_Darkness.js"></script><script src="../../models/Base_Female.js"></script><script src="../../models/Darkness_Shibu.js"></script><script src="../../models/HairSample_Female.js"></script><script src="../../models/Sendagaya_Shino.js"></script>
 <script src="../../js/hair_cover.js"></script><script src="../../js/cc0mode.js"></script><script src="../../js/heads.js"></script><script src="../../js/headwear.js"></script><script src="../../js/idlook.js"></script>
-<script>/* 防缓存：改了脚本刷新就生效 */ document.write(['headplay', 'headplay_games'].map(f => `<script src="../../js/${f}.js?v=${Date.now()}"><\/script>`).join(''));</script>
+<script>/* 防缓存：改了脚本刷新就生效 */ document.write(['headplay', 'headplay_games', 'bodies'].map(f => `<script src="../../js/${f}.js?v=${Date.now()}"><\/script>`).join(''));</script>
 <script>
 window.Recall = { hasB: () => true, known: () => true, reveal: () => false, bn: t => t, FK: {}, nm: c => c.name };
 (async () => {
@@ -29,6 +31,7 @@ window.Recall = { hasB: () => true, known: () => true, reveal: () => false, bn: 
   const S = { eq: { weapon: 0, helm: 0, armor: 0, charm: 0, bag: 0 }, stats: { trips: 3 }, heads: [] }, used = new Set(), sig = new Set(), recs = [];
   for (let i = 0; i < 6; i++) { const L = Lore.LOCS[(i + SEED) % Lore.LOCS.length]; const h = RPG.foe(S, L, (4242 + i * 977 + SEED * 131) >>> 0, used, sig); h.id = i + 1; if (!(+h.c.age >= 18)) h.c.age = 19 + i; recs.push(h); }
   S.heads = recs.slice(1);
+  for (let i = 0; i < +(QS.get('bodies') || 0); i++) { const c = recs[(i + 3) % recs.length].c; Sack.inv().stash.push({ id: 'body', n: 1, u: 900 + i, bd: { pid: '', own: c.name, race: c.raceN, idN: c.idN, idk: c.id, rar: c.rar | 0, age: c.age, goal: c.goal, tr: c.traits || [], loc: c.locN, oid: c.name + '|' + c.id, h: 1.49, t: 0 } }); }
   window.G = { renderer: R, scene, camera, heads: [], S, post: null, uiOpen: true, playing: true, save() { }, toast(t) { lg('toast ' + t); }, addCoins(n) { lg('coins +' + n); } };
   lg(recs.map(r => `${r.c.name}·${r.c.raceN}${r.c.idN}(${r.c.id}) 想${r.c.goal}`).join('\n'));
   if (QS.get('menu') === '1') { const d = document.createElement('div'); d.id = 'pn'; d.innerHTML = HeadPlay.menuHTML(recs[0]); document.body.appendChild(d); R.setClearColor('#2a2024'); R.render(scene, camera); return; }

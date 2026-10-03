@@ -878,6 +878,8 @@ if ( vTw < -2.5 ) {
     return { sets, tex, dim: [sz.x, sz.y, sz.z] };
   }
   function store(pid, rec) { CACHE.set(pid, rec); idb().then(d => { const t = d.transaction('p', 'readwrite'); t.objectStore('p').put(Object.assign({ pid }, rec)); }).catch(e => console.warn('Autopsy IDB', e)); }
+  function get(pid) { if (CACHE.has(pid)) return Promise.resolve(CACHE.get(pid)); return idb().then(d => new Promise(ok => { const r = d.transaction('p').objectStore('p').get(pid); r.onsuccess = () => { if (r.result) CACHE.set(pid, r.result); ok(r.result || null); }; r.onerror = () => ok(null); })).catch(() => null); }
+  function del(pid) { CACHE.delete(pid); idb().then(d => { d.transaction('p', 'readwrite').objectStore('p').delete(pid); }).catch(() => { }); }
   const scaleFor = dim => { const mx = Math.max(...dim) || 0.1; return clamp(0.5, 0.07 / mx, 0.45 / mx); };
   function fill(g, rec) {
     const inner = new T.Group(), texs = {}; for (const k in rec.tex) { const t = new T.TextureLoader().load(rec.tex[k]); t.flipY = false; t.encoding = T.sRGBEncoding; t.anisotropy = 2; texs[k] = t; }
@@ -890,5 +892,5 @@ if ( vTw < -2.5 ) {
     if (rec) fill(g, rec); else { const b = new T.Mesh(new T.BoxGeometry(dim[0] * sc, dim[1] * sc, dim[2] * sc), new T.MeshStandardMaterial({ color: 0x8a7a6a, roughness: 0.9 })); g.add(b); idb().then(d => new Promise(ok => { const r = d.transaction('p').objectStore('p').get(og.pid); r.onsuccess = () => ok(r.result); r.onerror = () => ok(null); })).then(r => { if (r) { CACHE.set(og.pid, r); fill(g, r); } }).catch(() => { }); }
     g.userData.ext = new V3(dim[0] * sc, dim[1] * sc, dim[2] * sc); return g;
   }
-  return { open, close, canOpen, on, effect, affText, model, AFX, baseStyles: BASE_STYLES, bake, rollAffixes, cutPart, sliceSet, get ui() { return UI; }, get isOpen() { return !!UI; } };
+  return { open, close, canOpen, on, effect, affText, model, AFX, baseStyles: BASE_STYLES, bake, rollAffixes, cutPart, sliceSet, mkMat, texURL, put: store, get, del, get ui() { return UI; }, get isOpen() { return !!UI; } };
 })();
