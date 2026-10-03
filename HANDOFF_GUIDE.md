@@ -35,6 +35,7 @@
 - 经济：资源有上限、按“轮”结算（R54i 用户洞察：无限刷=没价值）。魂晶=永久，SAN=临时（R60）。
 - 技能：升级只能“回忆”三选一（`skill_pick`）；**R70：野外不自动弹，回洞再弹**，野外按 ` 键手动开。
 - 宿敌/猎手：条满 100% 必须真的来（R70 `nem_sure`），来了封门（BOSS/精英擂台除外）。
+- 首级玩法：R71 `head_play`（开）——F 回忆里的「🎪 余兴」9 个小游戏，每个给下一趟独特祝福；用户要的是「讽刺/嘲讽/恶趣味、符合身份的文字、蒙太奇镜头」，内容红线见第 1 节（成年、无性内容、头不说话——台词一律「格罗克代配」）。
 
 ## 3. 架构地图（找代码从这里开始）
 
@@ -63,6 +64,9 @@ js/loop.js / san.js / san_cfg.js  回合经济、章节 BOSS（genArena 单 BOSS
 js/regionquest.js / arrival2.js / saga.js  任务、到达窗口、地区异变电影（BOSS 擂台里全部不显示）
 js/hub.js / wheel.js / ui3a.js / css/ui63.css  统一菜单、转盘、UI 层级（z-index 表见 R64）
 js/autopsy.js     解剖台（独立大模块，autopsy agent 维护）
+js/recall_iw.js   F 回忆（原地捧头）：动作栏 + 汲魂入口（siphon.js）+ 余兴入口（headplay）
+js/headplay.js    R71 首级余兴引擎：独立舞台 + 自己的 rAF（__pauseMain）、剧本生成器、节拍环/抉择/指认/顺序输入、机位硬切、祝福（pend→act→清空）
+js/headplay_games.js  9 个节目（HeadPlay.reg），文案按身份(c.id)/梦想(goal)/性格(traits) 变化
 tools/test/*.html 测试台（blood70.html、cine.html、autopsy.html …）；tools/test/aibench.js 敌人 AI 台架；tools/balance/sim.js、tools/test/sanbench.js 数值模拟
 ```
 
@@ -141,3 +145,28 @@ git checkout main
 3. 很多模块各自 `setInterval(…,250)` 改 DOM；统一到一个 HUD 刷新循环会更省（未做）。
 4. 平衡：没有真实存档数据校准；`tools/balance/sim.js` 停在 R41 模型，需要更新到现在的 `fair_fight + brain + foe_track` 节奏。
 5. 未实机验证（本机无 big/models）：R70 全部改动的体感、`field_tier` 降档阈值、`bal70` 难度。
+
+## 10. R71 首级余兴：怎么加一个小游戏
+
+```js
+// js/headplay_games.js 里（或新文件，加载在 headplay.js 之后）
+HP.reg({
+  id: 'xxx', ic: '🎯', n: '节目名', sub: '副标题', need: null /* 或建筑 id，如 'rh_dice' */, heads: 3, buff: 'eye' /* BUFF 表里的 id */,
+  col: '#8fe6ff', tag: '标题卡一句话', roles: ['主演', '…'], reveal: ['name', 'race', 'goal'] /* 演完想起主演的哪些信息 */, coin: 0 /* 可选魂晶赏 */,
+  d: '面板里的玩法说明（写清楚按什么键）',
+  setup(Z) { Z.rest(0, 0, 0, 0); /* 摆头、建道具 Z.prop(geo, {color})、Z.glowS() */ },
+  update(Z, dt, t) { /* 可选：每帧（Z.direct(i,true) 后可直接写 Z.hd[i].P / .q） */ },
+  *script(Z) {
+    yield* line(Z, og, '「格罗克的台词 {n}」');           // 字幕 + 按字数等待阅读
+    Z.cut(face(0, { az: 0.3 }));                         // 硬切机位
+    const C = yield Z.choice({ title: '…', opts: [{ t, d, v }] });   // 三选一 → { i, v, x }
+    const R = yield Z.ring({ key: 'Space', at: 1, kind: 'tap'|'hold'|'mash', a: 'h0.face' }); // → 'perfect'|'great'|'ok'|'miss'
+    Z.score(C.v, 1); Z.stat('结算行'); Z.endLine('落幕旁白');
+  }
+});
+```
+- 新祝福：`headplay.js` 的 `BUFF` 加 `{ ic, n, col, txt(k), nb(k) }`；`nb` 只能返回 Loop 认识的键（dmg/hp/spd/fear/heal/clear），其它效果写在 `out()/inn()/ev()`（已包装 Rogue 钩子）。
+- 文案上下文 `cx(rec)`：`{n, id, race, ri(去重的种族+身份), age, loc, wpn, act, fight, goal, tr, tr2, traits, belief, title, idk(身份 id)}`；身份分组正则 SINGER/FAITH/THIEF/NOBLE/ARMS/MAGE/FOLK 在文件头。头不会说话：她的台词用 `voiceL(Z, i, …)`（标「格罗克代配」）。
+- 镜头坑：特写用 `face()`（有最小距离，太近只剩一只眼）；头在飞/转时对准 `h{i}.center` 并拉远；抉择卡片在屏幕下 1/3，抉择时对准下巴 `h{i}.chin` 让脸在卡片上方；多头前后排时把镜头抬高越过前排。
+- 尺寸坑：头组缩放 1.55，头高 `hd.H`≈0.3m；**不要用 `Box3.setFromObject` 量 VRM 头**（蒙皮几何体带整身包围盒，量出 3 米），用 `hd.L` 锚点（eyes/mouth/face/cut/center/crown/chin，头局部已含缩放）。
+- 验证：`tools/test/headplay.html?g=xxx&speed=3` 自动玩到结算；`&at=choice|pick|ring|seq|res&n=K` 冻结截图。改完脚本等 1~2 秒再刷新（编辑器写盘有延迟，曾拿到旧脚本）。
