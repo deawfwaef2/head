@@ -113,9 +113,9 @@ ${window.Ng73 && Ng73.on() && Ng73.list().length ? `<div class="sec" style="--c:
 
   // ---------------- 选地点右侧面板：加「月蚀度」「使徒的布局」----------------
   function sideAug() { const el2 = document.getElementById('lpSide'); if (!el2 || el2.querySelector('.m73s') || !on()) return; const m = S(); if (!m) return; const k = tierOf(m.e), t = TIERS[k], a = apo();
-    const sec = document.createElement('section'); sec.className = 'm73s'; sec.style.setProperty('--bc', t.col);
+    const sec = document.createElement('section'); sec.className = 'm73s'; sec.dataset.ord = 1; sec.style.setProperty('--bc', t.col);
     sec.innerHTML = `<h4>${t.ic} 月蚀度 ${Math.round(m.e)}% · ${t.n}</h4><div class="bar"><i style="width:${m.e}%;background:linear-gradient(90deg,#6a5ad0,#c070ff,#ff4a7a)"></i></div><p class="m">${esc(t.d)}</p>${a ? `<p><b style="color:${esc(a.S.col)}">${esc(a.S.ic)} 本章使徒的布局：${esc(a.S.obj)}</b>（${a.wins} 破坏 / ${a.fails} 得逞）<br><span class="m">${esc(a.S.goal)}</span></p>` : ''}<p><button class="m73go" style="pointer-events:auto;padding:4px 10px;background:#2a1e44;border:1px solid #b8a8ff;color:#fff;cursor:pointer">🌙 打开主线面板</button></p>`;
-    el2.appendChild(sec); sec.querySelector('.m73go').addEventListener('click', e => { e.stopPropagation(); openP(); }); }
+    el2.appendChild(sec); try { R73.sortSide(el2); } catch (e) { } sec.querySelector('.m73go').addEventListener('click', e => { e.stopPropagation(); openP(); }); }
 
   // ================= 月之事件（野外）=================
   let lastW = null, lastB = null, play = 0;

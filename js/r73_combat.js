@@ -11,7 +11,8 @@ window.R73 = window.R73 || (() => {
   function fogApply(sc) { const u = sc && sc.userData && sc.userData.f73; if (!u || !sc.fog) return; const c = u.c0.clone(); let d = u.d0; for (const k in u.L) { const l = u.L[k]; c.lerp(l.col, l.amt); if (d != null) d *= l.dens; } sc.fog.color.copy(c); if (d != null && sc.fog.density != null) sc.fog.density = d; }
   function fog(sc, key, col, amt, dens) { if (!sc || !sc.fog || !window.THREE) return; const u = sc.userData.f73 || (sc.userData.f73 = { c0: sc.fog.color.clone(), d0: sc.fog.density, L: {} }); u.L[key] = { col: new THREE.Color(col), amt: amt == null ? 0.35 : amt, dens: dens || 1 }; fogApply(sc); }
   function fogClear(sc, key) { const u = sc && sc.userData && sc.userData.f73; if (!u || !u.L[key]) return; delete u.L[key]; fogApply(sc); }
-  return { on(fn) { if (typeof fn === 'function') L.push(fn); }, emit(t, fo, d) { for (const f of L) { try { f(t, fo, d); } catch (e) { console.warn('R73 bus', t, e); } } }, fog, fogClear };
+  function sortSide(el) { const L = [...el.querySelectorAll(':scope > section[data-ord]')].sort((a, b) => a.dataset.ord - b.dataset.ord); for (const s of L) el.appendChild(s); } // 选地点右侧面板：R73 各模块插入的分节按固定顺序排列
+  return { on(fn) { if (typeof fn === 'function') L.push(fn); }, emit(t, fo, d) { for (const f of L) { try { f(t, fo, d); } catch (e) { console.warn('R73 bus', t, e); } } }, fog, fogClear, sortSide };
 })();
 window.C73 = (() => {
   'use strict';
