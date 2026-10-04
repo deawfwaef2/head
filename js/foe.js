@@ -754,12 +754,13 @@ window.Foe = (() => {
     fo.gs.position.copy(fo.anchor.pos).addScaledVector(tv, 0.35); fo.gs.position.y += 0.12; fo.gs.material.rotation = fo.gAng - Math.PI / 2;
   }
   // ---- 技能接口（worlds.js 调用）----
+  const STRONG = fo => !!(fo && (fo.boss || fo.hunter || fo.hunter2 || fo.eliteId || fo.nemX || fo.nemClone)); // R73：宿敌/新猎手以前漏判 → 完美格挡后可直接处决
   function brokenNear(pos, yaw) { let best = null, bd = 2.6; for (const fo of FOES) { if (fo.dead || !(fo.broken > 0)) continue; const dx = fo.pos.x - pos.x, dz = fo.pos.z - pos.z, d = Math.hypot(dx, dz); if (d < bd && Math.abs(ang(Math.atan2(-dx, -dz) - yaw)) < 1.1) { bd = d; best = fo; } } return best; }
   function execute(fo, dir) { // 处决：破绽中按 E
     const nb = fo.f.bones.neck, p = nb.getWorldPosition(new V3()); const v = (dir || new V3(1, 0, 0)).clone().normalize().multiplyScalar(9);
     const info = { point: p, vel: v, speed: 9, kind: 'slash', dir: 'right' };
-    if ((fo.boss || fo.hunter || fo.eliteId) && fo.hp > fo.maxHp * 0.25) { /* R36b：强敌不能被处决秒杀：破绽中吃一记 15% 重击，血量 ≤25% 才能真正处决 */
-      const dm = Math.max(1, Math.round(fo.maxHp * 0.15)); fo.hp = Math.max(1, fo.hp - dm); fo.broken = 0; fo.atk = null; fo.stag = Math.max(fo.stag || 0, 0.9); fo.flash = 0.15; if (CTX && CTX.floatDmg) CTX.floatDmg(fo.anchor.pos, dm, true); if (CTX && CTX.bossHp && fo.boss) CTX.bossHp(fo); CTX.shake && CTX.shake(0.5); CTX.toast && CTX.toast('处决被她挡住了要害——重创！（血量 ≤ 25% 才能处决）', '#ffc0a0', 1.6); sfx().thud && sfx().thud(0.9); return; }
+    if (STRONG(fo) && fo.hp > fo.maxHp * 0.25) { /* R36b：强敌不能被处决秒杀：破绽中吃一记 15% 重击，血量 ≤25% 才能真正处决 */
+      const dm = Math.max(1, Math.round(fo.maxHp * (fo.psBroke ? 0.22 : 0.15))); fo.hp = Math.max(1, fo.hp - dm); fo.broken = 0; fo.atk = null; fo.stag = Math.max(fo.stag || 0, 0.9); fo.flash = 0.15; if (CTX && CTX.floatDmg) CTX.floatDmg(fo.anchor.pos, dm, true); if (CTX && CTX.bossHp && fo.boss) CTX.bossHp(fo); CTX.shake && CTX.shake(0.5); CTX.toast && CTX.toast('处决被她挡住了要害——重创！（血量 ≤ 25% 才能处决）', '#ffc0a0', 1.6); sfx().thud && sfx().thud(0.9); return; }
     fo.hp = 0; die(fo, info, true); decapitate(fo, info); slowmo(0.5, 0.3);
     CTX.shake && CTX.shake(0.7); CTX.event && CTX.event('execute', fo); sfx().roar && sfx().roar(0.4);
   }
@@ -849,7 +850,7 @@ window.Foe = (() => {
     if (!(window.FoeAbs && FoeAbs.on)) dealt = Math.max(dealt, Math.round(fo.maxHp * (fo.boss ? 0.09 : FT ? 0.27 : 0.17) * (fo.floorK || 1) * (info.fmul || 1) * Math.max(0.8, Math.min(1.4, sp)) * Math.min(1.6, mult) * (slash ? 1 : 0.8))); // 伤害下限：一记正常的砍至少削掉 ~17% 血（≈6 刀），霸主 ~9%（≈11 刀）——实力差距再大也不会出现“砍 20 刀不死”
     if (!(window.FoeAbs && FoeAbs.on)) { fo.nHit = (fo.nHit || 0) + 1; const cap = Math.round((fo.boss ? 12 : FT ? 4 : 6) * (fo.capK || 1)); /* R34：区域强度大时保险刀数按比例增加 */ if (fo.nHit >= cap - 2) dealt = Math.max(dealt, Math.ceil(fo.hp / (cap + 1 - Math.min(fo.nHit, cap)))); } // 第二十六轮保险（用户：永远打不死）：不管护甲/角色/回血，普通敌人第 6 刀必死、霸主第 12 刀必死
     if (WP && !info.crit && Math.random() * 100 < WP.crit) { info.crit = true; dealt = Math.round(dealt * WP.critD / 100); } // 武器暴击
-    if (window.Talents) { const d2 = Talents.outDmg(fo, info, dealt, zone, brk); if (isFinite(d2)) dealt = d2; } if (window.Rogue) { const d3 = Rogue.outDmg(fo, info, dealt, zone, brk); if (isFinite(d3)) dealt = d3; } /* R54k rogue_boons */ /* R36b：霸主/精英/猎手单刀上限 = 最大血量 10%，不可能再被一击秒杀 */ if (fo.boss || fo.hunter || fo.eliteId) dealt = Math.min(dealt, Math.max(1, Math.ceil(fo.maxHp * 0.1))); // R36：属性/天赋/暴击/背刺/印记
+    if (window.Talents) { const d2 = Talents.outDmg(fo, info, dealt, zone, brk); if (isFinite(d2)) dealt = d2; } if (window.Rogue) { const d3 = Rogue.outDmg(fo, info, dealt, zone, brk); if (isFinite(d3)) dealt = d3; } /* R54k rogue_boons */ /* R36b：霸主/精英/猎手单刀上限 = 最大血量 10%，不可能再被一击秒杀 */ if (STRONG(fo)) dealt = Math.min(dealt, Math.max(1, Math.ceil(fo.maxHp * 0.1))); // R36：属性/天赋/暴击/背刺/印记
     if (fo.defMul && fo.defMul < 1) dealt = Math.max(1, Math.round(dealt * fo.defMul)); // 宿敌防御（NemStory.stat）
     const first = fo.hp >= fo.maxHp; fo.hp -= dealt; fo.flash = 0.16; ctx.floatDmg(fo.anchor.pos, dealt, sp > 1.2 || brk || !!info.crit);
     if (window.HitFeel) try { HitFeel.hit(fo, c.point, info.vel, Math.min(1.6, 0.45 + dealt / Math.max(1, fo.maxHp) * 3 + (info.charged || info.crit ? 0.4 : 0)), { crit: info.crit, charged: info.charged, brk, kill: fo.hp <= 0 }); } catch (e) { } // R70 hit_feel2
@@ -860,7 +861,7 @@ window.Foe = (() => {
     if (fo.boss) ctx.bossHp(fo);
     // 斩首：够快的横砍砍中脖子，且这一刀后她剩不到一半血（霸主要剩不到 25%）
     // R42b 斩首（用户：伤害要达到能打死时才能斩首；只有部分武器技能可按“血量低于 X%”斩首）：横砍命中头/脖子，且这一刀致死（hp≤0），或技能带 decapAt 且血量已低于该比例（霸主/精英/猎手上限 25%）
-    if (slash && (zone === 'neck' || zone === 'head') && spd > 3 && (fo.hp <= 0 || (info.decapAt && fo.hp <= fo.maxHp * ((fo.boss || fo.hunter || fo.eliteId) ? Math.min(info.decapAt, 0.25) : info.decapAt)))) {
+    if (slash && (zone === 'neck' || zone === 'head') && spd > 3 && (fo.hp <= 0 || (info.decapAt && fo.hp <= fo.maxHp * (STRONG(fo) ? Math.min(info.decapAt, 0.25) : info.decapAt)))) {
       const one = first && !brk; fo.hp = 0; die(fo, info, true); decapitate(fo, info); ctx.event && ctx.event(brk ? 'execute' : one ? 'onecut' : 'decapAlive', fo); return true; }
     if (fo.hp <= 0) {
       die(fo, info, false); if (CTX && CTX.shake) CTX.shake(0.35); // 第十八轮：击杀不再慢放
@@ -1125,5 +1126,5 @@ window.Foe = (() => {
   }
   function has(name) { return !!(window.BODY_LIST && BODY_LIST.includes(name)); }
   try { setTimeout(() => { if (fastOn()) (window.requestIdleCallback || setTimeout)(() => { loadAnim().catch(() => { }); }); }, 5000); } catch (e) { } // R49：菜单空闲时先把动画包（1.4MB）载好，首次进图不用再等
-  return { slowSet, attachWeapon, preload, bodyFor, say: (fo, t, col) => talk(fo, t, col), hasHead: (h) => HEADS.includes(h), warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, dot: dotDmg, attack, ATK, tokenOK, ctx: () => CTX, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
+  return { STRONG, slowSet, attachWeapon, preload, bodyFor, say: (fo, t, col) => talk(fo, t, col), hasHead: (h) => HEADS.includes(h), warm: warmRender, template, build, animate, clipsFor, loadAnim, headFit, cloneSkinned, script, has, populate, update, targets, hit, clear, nearHead, pickup, parried, slowmo, threats, brokenNear, execute, aoe, roar, dot: dotDmg, attack, ATK, tokenOK, ctx: () => CTX, spark, IDENT, get foes() { return FOES; }, get heads() { return HEADS; }, get pieces() { return PIECES; }, _sever: sever, _decap: decapitate };
 })();

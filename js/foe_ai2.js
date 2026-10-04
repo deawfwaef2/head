@@ -131,10 +131,12 @@ window.FoeAI2 = (() => {
   // ================= 命中钩子 =================
   function evade(fo, info) { // 翻滚中 / 腾空：刃穿过去（返回 true = 没砍到）
     const s = fo.sk; if (!s || fo.dead) return false;
+    if (s.ev) { const C = F_().ctx(); if (performance.now() - (s.evT || 0) > 300) { s.evT = performance.now(); try { C.floatDmg(fo.anchor.pos, '闪', false); } catch (e) {} } return true; } // R73 扩展技能的无敌段（影步 / 烟遁）
     if (s.k === 'roll' || (s.k === 'leap' && s.ph === 'air')) { const C = F_().ctx(); if (performance.now() - (s.evT || 0) > 300) { s.evT = performance.now(); try { C.floatDmg(fo.anchor.pos, '闪', false); } catch (e) {} } return true; }
     return false;
   }
   function preHit(fo, info, c, zone, slash) { // 返回 true = 被吸收（护盾）
+    { const s = fo.sk, X = s && EXT[s.k]; if (X && X.preHit && !fo.dead) { try { if (X.preHit(fo, info, c, api())) return true; } catch (e) { console.warn('skill3 preHit', e); } } }
     if (fo.shield > 0 && !fo.dead) {
       if (info.charged || fo.broken > 0 || info.combo === 2) { fo.shield = 0; shieldMsg(fo, '💥 护盾碎了！'); spark(c.point, 24, 'blue'); return false; }
       fo.shield--; const C = F_().ctx(); try { C.floatDmg(fo.anchor.pos, fo.shield > 0 ? `🛡×${fo.shield}` : '🛡破', false); } catch (e) {}
@@ -184,9 +186,14 @@ window.FoeAI2 = (() => {
   const baseDmg = (fo, ctx, mul) => { const st = ctx.st(); return Math.max(2, Math.round(st.maxHp * (0.05 + fo.rar * 0.013 + (fo.armed ? 0.02 : 0)) * dmgK(fo) * (fo.dmgMul || 1) * (mul || 1))); };
   const arenaClamp = (ctx, x, z) => { if (ctx.edge) { for (let i = 0; i < 4; i++) { const E = ctx.edge(x, z); if (E[0] >= 1.6) break; x += E[1] * (1.6 - E[0]); z += E[2] * (1.6 - E[0]); } return [x, z]; } const R = (ctx.R || 40) - 1.6, d = Math.hypot(x, z); return d > R ? [x / d * R, z / d * R] : [x, z]; }; // R46：特殊形状按真实边界
   const others = fo => { for (const o of F_().foes) if (o !== fo && !o.dead && o.sk) return true; return false; };
+  // R73 foe_skills3：外部注册的技能（js/r73_skills.js）：{ can(fo,d,ctx,P)→权重, start(fo,d,P,ctx,face,api), run(fo,dt,d,face,dx,dz,P,ctx,api), preHit? }
+  const EXT = {}; let API = null;
+  const api = () => API || (API = { disc, strip, ringM, sector, kill, fin, baseDmg, hint, setV, spark, cue, say, arenaClamp, inStrip, M, T });
+  function reg(k, def) { EXT[k] = def; }
 
   function startSkill(fo, k, d, P, ctx, face) {
     const f = fo.f, pv = ctx.pvel || { x: 0, z: 0 };
+    if (EXT[k]) { try { return EXT[k].start(fo, d, P, ctx, face, api()) !== false; } catch (e) { console.warn('skill3', k, e); fo.sk = null; return false; } }
     if (SK2[k]) return start2(fo, k, d, P, ctx, face);
     if (k === 'leap') {
       const lx = P.pos.x + pv.x * 0.45, lz = P.pos.z + pv.z * 0.45, [tx, tz] = arenaClamp(ctx, lx, lz);
@@ -211,6 +218,7 @@ window.FoeAI2 = (() => {
 
   function runSkill(fo, dt, d, face, dx, dz, P, ctx) {
     const s = fo.sk, f = fo.f; s.t += dt; const C = ctx;
+    if (EXT[s.k]) { try { return EXT[s.k].run(fo, dt, d, face, dx, dz, P, ctx, api()); } catch (e) { console.warn('skill3 run', s.k, e); fin(fo, 1, 0); return null; } }
     if (s.k === 'leap') {
       if (s.ph === 'wind') { if (s.fx[0]) { s.fx[0].m.material.opacity = 0.2 + 0.2 * Math.abs(Math.sin(s.t * 14)); s.fx[0].m.scale.setScalar(2.0); }
         if (s.t >= 0.62) { s.ph = 'air'; s.t = 0; s.x0 = fo.pos.x; s.z0 = fo.pos.z; }
@@ -336,7 +344,7 @@ window.FoeAI2 = (() => {
     if (fo.aff.phantom) { fo.phT = (fo.phT == null ? 4 + Math.random() * 3 : fo.phT) - dt; if (fo.phT <= 0 && d > 3.2 && d < 12 && fo.cd < 2) { fo.phT = 6.5 + Math.random() * 3; fo.sk = { k: 'blink', t: 0 }; fo.f.play('Spell_Simple_Shoot', { once: true, fade: 0.05, restart: true }); cue(fo, 'cast'); return { turnTo: face, spd: 0 }; } }
     // --- 技能 ---
     if (M('foe_skills') && fo.skCd <= 0 && fo.cd <= 0.4 && tok()) {
-      const gate = 0.2 + 0.65 * tier + (fo.boss ? 0.2 : 0) + 0.05 * fo.rar + (window.__skillP || 0);
+      const gate = 0.2 + 0.65 * tier + (fo.boss ? 0.2 : 0) + 0.05 * fo.rar + (window.__skillP || 0) + (M('foe_skills3') ? 0.12 : 0);
       if (Math.random() > gate) { fo.skCd = 2 + Math.random() * 2.5; return null; }
       const pool = [];
       if (d >= 3.6 && d <= 9.5) { pool.push('leap', 'leap'); pool.push('charge'); }
@@ -352,6 +360,7 @@ window.FoeAI2 = (() => {
         if (fo.boss) add('nova', d < 4.2);
         if (sig) for (const k of sig) if (pool.includes(k)) pool.push(k, k); // 招牌技更常见
       }
+      if (M('foe_skills3')) for (const k in EXT) { try { const w = EXT[k].can(fo, d, ctx, P) | 0; for (let i = 0; i < w; i++) pool.push(k); } catch (e) { } }
       if (!fo.skPool && (fo.role === 'mage' || fo.role === 'healer' || fo.role === 'ranged' || fo.role === 'guard')) { fo.skCd = 3; return null; }
       if (!pool.length) { fo.skCd = 0.6; return null; }
       const forced = window.__forceSkill; const k = forced && pool.includes(forced) ? forced : forced ? forced : pool[Math.floor(Math.random() * pool.length)];
@@ -360,5 +369,5 @@ window.FoeAI2 = (() => {
     return null;
   }
 
-  return { init, tune, after, evade, preHit, onDie, update, tick, clear, packBonus, dmgK, AFF, SK2, SIG, M, get _fx() { return FXL; } };
+  return { init, tune, after, evade, preHit, onDie, update, tick, clear, packBonus, dmgK, AFF, SK2, SIG, M, reg, EXT, api, get _fx() { return FXL; } };
 })();
