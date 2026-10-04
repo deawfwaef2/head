@@ -136,6 +136,7 @@ window.FoeAI2 = (() => {
     return false;
   }
   function preHit(fo, info, c, zone, slash) { // 返回 true = 被吸收（护盾）
+    if (fo.ward73 && !fo.dead) { try { if (fo.ward73(fo, info, c)) return true; } catch (e) { console.warn('ward73', e); } } // R73：使徒阶段护盾 / 无敌段（r73_apostle.js）
     { const s = fo.sk, X = s && EXT[s.k]; if (X && X.preHit && !fo.dead) { try { if (X.preHit(fo, info, c, api())) return true; } catch (e) { console.warn('skill3 preHit', e); } } }
     if (fo.shield > 0 && !fo.dead) {
       if (info.charged || fo.broken > 0 || info.combo === 2) { fo.shield = 0; shieldMsg(fo, '💥 护盾碎了！'); spark(c.point, 24, 'blue'); return false; }
